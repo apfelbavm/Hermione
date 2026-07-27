@@ -1,9 +1,9 @@
-import { allGraphs, resolveNodeLabel, setPinLiteralValue, updateVariable } from "../engine/graphMutations";
+import { allGraphs, changeNodeElementType, resolveNodeLabel, setPinLiteralValue, updateVariable } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import type { CommentBox, NodeInstance, PinDef } from "../engine/types";
 import { DEFAULT_COMMENT_COLOR } from "../render/commentGeometry";
 import { getEditingGraph, getVisibleVariablesForState, type Store } from "../state/store";
-import { createTypeSelect, createTypedValueInput } from "./typedValueInput";
+import { createContainerSelect, createTypeSelect, createTypedValueInput } from "./typedValueInput";
 
 export interface DetailsPanelElements {
   /** The whole Details section, including its divider/header — hidden entirely when nothing is selected. */
@@ -42,6 +42,39 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
     if (elements.nodeFieldsContainer.contains(document.activeElement)) return;
 
     elements.nodeFieldsContainer.innerHTML = "";
+
+    if (def.configurableElementType) {
+      const elementRow = document.createElement("div");
+      elementRow.className = "variable-row";
+      const elementLabel = document.createElement("span");
+      elementLabel.className = "variable-name";
+      elementLabel.textContent = "Element Type";
+      const elementSelect = createTypeSelect(node.elementType ?? "number", (elementType) => {
+        changeNodeElementType(getEditingGraph(store.state), getVisibleVariablesForState(store.state), store.state.rootGraph.functions, node.id, {
+          elementType,
+        });
+        store.notify();
+      });
+      elementRow.append(elementLabel, elementSelect);
+      elements.nodeFieldsContainer.appendChild(elementRow);
+
+      if (def.configurableElementType.includeKeyType) {
+        const keyRow = document.createElement("div");
+        keyRow.className = "variable-row";
+        const keyLabel = document.createElement("span");
+        keyLabel.className = "variable-name";
+        keyLabel.textContent = "Key Type";
+        const keySelect = createTypeSelect(node.mapKeyType ?? "string", (mapKeyType) => {
+          changeNodeElementType(getEditingGraph(store.state), getVisibleVariablesForState(store.state), store.state.rootGraph.functions, node.id, {
+            mapKeyType,
+          });
+          store.notify();
+        });
+        keyRow.append(keyLabel, keySelect);
+        elements.nodeFieldsContainer.appendChild(keyRow);
+      }
+    }
+
     for (const prop of properties) {
       const row = document.createElement("div");
       row.className = "variable-row";
@@ -105,8 +138,9 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
       const graph = getEditingGraph(store.state);
       const [onlyId] = store.state.selectedNodeIds;
       const node = graph.nodes.find((n) => n.id === onlyId);
-      const properties = node ? getNodeDef(node.type).detailProperties : undefined;
-      if (node && properties && properties.length > 0) {
+      const def = node ? getNodeDef(node.type) : undefined;
+      const properties = def?.detailProperties ?? [];
+      if (node && def && (properties.length > 0 || def.configurableElementType)) {
         selectedNode = node;
         nodeProperties = properties;
       }
@@ -143,13 +177,38 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
       updateVariable(store.state.rootGraph, variable.id, { type });
       store.notify();
     });
-    const value = createTypedValueInput(variable.type, variable.defaultValue, (defaultValue) => {
-      updateVariable(store.state.rootGraph, variable.id, { defaultValue });
+    const container = createContainerSelect(variable.container ?? "single", (container) => {
+      updateVariable(store.state.rootGraph, variable.id, { container });
       store.notify();
     });
+    row.append(type, container);
 
-    row.append(type, value);
+    if (variable.container === "map") {
+      const keyType = createTypeSelect(variable.keyType ?? "string", (keyType) => {
+        updateVariable(store.state.rootGraph, variable.id, { keyType });
+        store.notify();
+      });
+      row.append(keyType);
+    }
+
     elements.variableFieldsContainer.appendChild(row);
+
+    // A container's default-value editor is a whole vertical list, not a single inline input —
+    // gets its own row underneath the type/container selectors instead of squeezing in beside them.
+    const valueRow = document.createElement("div");
+    valueRow.className = "variable-row";
+    const value = createTypedValueInput(
+      variable.type,
+      variable.defaultValue,
+      (defaultValue) => {
+        updateVariable(store.state.rootGraph, variable.id, { defaultValue });
+        store.notify();
+      },
+      variable.container ?? "single",
+      variable.keyType ?? "string",
+    );
+    valueRow.append(value);
+    elements.variableFieldsContainer.appendChild(valueRow);
   }
 
   return { render };

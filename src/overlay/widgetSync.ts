@@ -33,6 +33,9 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
       for (const pinLayout of geo.layout.pins) {
         const pinDef = pinLayout.pin;
         if (pinDef.direction !== "input" || !WIDGET_TYPES.includes(pinDef.type)) continue;
+        // Array/Set/Map pins are wiring-only on the canvas (see pinWidgetWidth) — a literal widget
+        // here would edit the container's value as if it were one scalar, corrupting it.
+        if (pinDef.container && pinDef.container !== "single") continue;
 
         const pin = node.pins[pinDef.id];
         if (pin?.connectionId) continue; // wired — no literal widget, per Unreal pin behavior

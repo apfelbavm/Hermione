@@ -411,7 +411,7 @@ html, body {
   font-size: 9px;
 }
 
-.type-menu-item {
+.pick-list-item {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -422,6 +422,55 @@ html, body {
   text-align: center;
   color: #6a7078;
   font-size: 11px;
+}
+
+.typed-value-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.typed-value-list-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.typed-value-list-row .typed-value-input {
+  flex: 1 1 auto;
+  width: 0;
+}
+
+.typed-value-list-remove {
+  flex: 0 0 auto;
+  background: #33383f;
+  color: #e8e8e8;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.typed-value-list-remove:hover {
+  background: #454a52;
+}
+
+.typed-value-list-add {
+  align-self: flex-start;
+  background: #3b6b8a;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.typed-value-list-add:hover {
+  background: #4a7ea0;
 }
 
 .variable-row input.variable-name.typed-value-input {

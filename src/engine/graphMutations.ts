@@ -7,12 +7,31 @@ import type {
   NodeDef,
   NodeInstance,
   Pin,
+  PinContainer,
   PinDef,
   PinSignatureEntry,
   PinType,
   Variable,
 } from "./types";
 import { createEmptyGraph } from "./types";
+
+/** Seed element/key type for a freshly-created configurableElementType node instance (see
+ * NodeDef.configurableElementType) — arbitrary but consistent defaults, same spirit as
+ * variablePanel.ts/functionIoPanel.ts always defaulting a brand-new Variable/PinSignatureEntry to
+ * type "number". */
+const DEFAULT_ELEMENT_TYPE: PinType = "number";
+const DEFAULT_KEY_TYPE: PinType = "string";
+
+/** Defensive shallow clone for a value about to be copied from a PinDef/Variable's `defaultValue`
+ * into a live Pin.value slot. A container's default is a plain array (see PinContainer's own doc
+ * comment), and that ONE array object is shared by reference across every instance/read of the
+ * owning NodeDef/Variable (a NodeDef's `pins` is built once at registerNode-time; a Variable has
+ * exactly one `defaultValue`) — copying it in by reference would let one instance's later edit
+ * silently corrupt every other instance, or the template/variable itself. Scalars (number/string/
+ * boolean/null) are immutable already, so this is a no-op for them. */
+export function cloneDefaultValue(value: unknown): unknown {
+  return Array.isArray(value) ? value.slice() : value;
+}
 
 let idCounter = 0;
 export function nextId(prefix: string): string {
@@ -39,12 +58,18 @@ export function createNodeInstance(
   // detailProperties are seeded here (not passed in by the caller) since every caller already
   // identifies the node purely by `type` — looking them up off the registered NodeDef keeps every
   // call site from having to remember to merge them in separately.
-  const detailProperties = getNodeDef(type).detailProperties ?? [];
+  const def = getNodeDef(type);
+  const detailProperties = def.detailProperties ?? [];
   const pins: Record<string, Pin> = {};
-  for (const def of [...pinDefs, ...detailProperties]) {
-    pins[def.id] = def.direction === "input" ? { value: def.defaultValue } : {};
+  for (const entry of [...pinDefs, ...detailProperties]) {
+    pins[entry.id] = entry.direction === "input" ? { value: cloneDefaultValue(entry.defaultValue) } : {};
   }
-  return { id, type, position, pins, variableId, functionId };
+  const node: NodeInstance = { id, type, position, pins, variableId, functionId };
+  if (def.configurableElementType) {
+    node.elementType = DEFAULT_ELEMENT_TYPE;
+    if (def.configurableElementType.includeKeyType) node.mapKeyType = DEFAULT_KEY_TYPE;
+  }
+  return node;
 }
 
 /** Resolves the pin defs for a node instance, accounting for variable-derived (Get/Set) nodes
@@ -169,14 +194,26 @@ export function removeNode(graph: Graph, variables: Variable[], functions: Funct
 /** Removes one entry pin from a node with an expandable, user-editable pin list (see
  * NodeDef.deriveInstancePins) — deletes its Pin record and prunes any connection touching it.
  * Generic across every such node type; which of its derived pins are eligible for this is up to
- * that node type's own deriveInstancePins (see PinDef.removable), not this function. */
-export function removeInstancePin(graph: Graph, nodeId: string, pinId: string): void {
+ * that node type's own deriveInstancePins (see PinDef.removable), not this function. Afterward,
+ * gives the node type a chance (NodeDef.onInstancePinRemoved) to also remove a linked sibling pin —
+ * e.g. Make Map's key-N when its paired value-N is the one actually deleted — since this function
+ * only ever targets one pin id per call. Guards against a hook that (incorrectly) names a pin
+ * that's already gone, so it can never loop. */
+export function removeInstancePin(graph: Graph, nodeId: string, pinId: string, visited: Set<string> = new Set()): void {
+  if (visited.has(pinId)) return;
+  visited.add(pinId);
+
   const node = graph.nodes.find((n) => n.id === nodeId);
-  if (!node) return;
+  if (!node || !(pinId in node.pins)) return;
   delete node.pins[pinId];
   graph.connections = graph.connections.filter(
     (c) => !((c.fromNode === nodeId && c.fromPin === pinId) || (c.toNode === nodeId && c.toPin === pinId)),
   );
+
+  const extraPinIds = getNodeDef(node.type).onInstancePinRemoved?.(node, pinId) ?? [];
+  for (const extraPinId of extraPinIds) {
+    removeInstancePin(graph, nodeId, extraPinId, visited);
+  }
 }
 
 export interface ConnectRequest {
@@ -206,7 +243,7 @@ export function connectPins(
   if (fromPinDef.direction !== "output" || toPinDef.direction !== "input") {
     throw new Error("connectPins: must connect an output pin to an input pin");
   }
-  if (!isPinTypeCompatible(fromPinDef.type, toPinDef.type)) {
+  if (!isPinTypeCompatible(fromPinDef, toPinDef)) {
     throw new Error(
       `connectPins: incompatible pin types "${fromPinDef.type}" -> "${toPinDef.type}"`,
     );
@@ -281,7 +318,7 @@ export function removeConnection(
       const pinDef = toNode
         ? resolvePinDefs(toNode, variables, functions).find((p) => p.id === conn.toPin)
         : undefined;
-      toPin.value = pinDef?.defaultValue;
+      toPin.value = cloneDefaultValue(pinDef?.defaultValue);
     }
   }
 }
@@ -318,6 +355,38 @@ export function setPinLiteralValue(graph: Graph, nodeId: string, pinId: string, 
     throw new Error(`setPinLiteralValue: pin "${nodeId}:${pinId}" is connected, disconnect first`);
   }
   pin.value = value;
+}
+
+/** Changes a configurableElementType node instance's element/key type (see
+ * NodeDef.configurableElementType) — e.g. an Array Length node switching from operating on
+ * Array<Number> to Array<String>. Every pin on such a node shares the one parameterized type, so
+ * (unlike a Variable, which only disconnects its single Get/Set value pin on a type change) this
+ * disconnects EVERY connection touching the node, applies the patch, then rebuilds every pin fresh
+ * from the now-current (post-patch) pin defs — deriveInstancePins reads the still-intact `node.pins`
+ * keys for arity (e.g. how many Make Array entries existed) before they're replaced, so entry COUNT
+ * survives a type change even though each entry's stored value resets to the new type's default. */
+export function changeNodeElementType(
+  graph: Graph,
+  variables: Variable[],
+  functions: FunctionDef[],
+  nodeId: string,
+  patch: { elementType?: PinType; mapKeyType?: PinType },
+): void {
+  const node = graph.nodes.find((n) => n.id === nodeId);
+  if (!node) return;
+
+  for (const conn of graph.connections.filter((c) => c.fromNode === nodeId || c.toNode === nodeId)) {
+    removeConnection(graph, variables, functions, conn.id);
+  }
+
+  if (patch.elementType !== undefined) node.elementType = patch.elementType;
+  if (patch.mapKeyType !== undefined) node.mapKeyType = patch.mapKeyType;
+
+  const pins: Record<string, Pin> = {};
+  for (const def of resolvePinDefs(node, variables, functions)) {
+    pins[def.id] = def.direction === "input" ? { value: cloneDefaultValue(def.defaultValue) } : {};
+  }
+  node.pins = pins;
 }
 
 // --- Functions -------------------------------------------------------------------------------
@@ -405,26 +474,40 @@ export interface TypedEntryPatch {
   name?: string;
   type?: PinType;
   defaultValue?: unknown;
+  container?: PinContainer;
+  keyType?: PinType;
+}
+
+/** A brand-new default for `type`/`container` — an empty list for any non-"single" container
+ * (Array/Set/Map are all backed by a plain array, see PinContainer's own doc comment), otherwise
+ * the plain per-type default. */
+function defaultValueFor(type: PinType, container: PinContainer | undefined): unknown {
+  return container && container !== "single" ? [] : DEFAULT_VALUE_BY_TYPE[type];
 }
 
 /** Renames/retypes/revalues a variable in place (global or local — searched across every graph).
- * Changing type resets the default value to match (unless a new one is given in the same patch)
- * and disconnects any wires on this variable's Get/Set nodes' value pin across every graph, since
- * the old wire may no longer be type-compatible — mirrors how removing a function input/output
- * prunes now-invalid pin references after a signature change. */
+ * Changing type, container, or (for a map) key type resets the default value to match (unless a
+ * new one is given in the same patch) and disconnects any wires on this variable's Get/Set nodes'
+ * value pin across every graph, since the old wire may no longer be type-compatible — mirrors how
+ * removing a function input/output prunes now-invalid pin references after a signature change. */
 export function updateVariable(rootGraph: Graph, variableId: string, patch: TypedEntryPatch): void {
   const variable = allGraphs(rootGraph)
     .flatMap((g) => g.variables)
     .find((v) => v.id === variableId);
   if (!variable) return;
 
-  const typeChanged = patch.type !== undefined && patch.type !== variable.type;
+  const signatureChanged =
+    (patch.type !== undefined && patch.type !== variable.type) ||
+    (patch.container !== undefined && patch.container !== variable.container) ||
+    (patch.keyType !== undefined && patch.keyType !== variable.keyType);
   if (patch.name !== undefined) variable.name = patch.name;
   if (patch.type !== undefined) variable.type = patch.type;
+  if (patch.container !== undefined) variable.container = patch.container;
+  if (patch.keyType !== undefined) variable.keyType = patch.keyType;
   if (patch.defaultValue !== undefined) variable.defaultValue = patch.defaultValue;
-  else if (typeChanged) variable.defaultValue = DEFAULT_VALUE_BY_TYPE[variable.type];
+  else if (signatureChanged) variable.defaultValue = defaultValueFor(variable.type, variable.container);
 
-  if (typeChanged) {
+  if (signatureChanged) {
     for (const g of allGraphs(rootGraph)) {
       const visibleVariables = getVisibleVariables(rootGraph, g);
       for (const node of g.nodes) {
@@ -447,13 +530,18 @@ function updateFunctionEntry(
   const entry = entries.find((e) => e.id === entryId);
   if (!entry) return;
 
-  const typeChanged = patch.type !== undefined && patch.type !== entry.type;
+  const signatureChanged =
+    (patch.type !== undefined && patch.type !== entry.type) ||
+    (patch.container !== undefined && patch.container !== entry.container) ||
+    (patch.keyType !== undefined && patch.keyType !== entry.keyType);
   if (patch.name !== undefined) entry.name = patch.name;
   if (patch.type !== undefined) entry.type = patch.type;
+  if (patch.container !== undefined) entry.container = patch.container;
+  if (patch.keyType !== undefined) entry.keyType = patch.keyType;
   if (patch.defaultValue !== undefined) entry.defaultValue = patch.defaultValue;
-  else if (typeChanged) entry.defaultValue = DEFAULT_VALUE_BY_TYPE[entry.type];
+  else if (signatureChanged) entry.defaultValue = defaultValueFor(entry.type, entry.container);
 
-  if (typeChanged) {
+  if (signatureChanged) {
     for (const g of allGraphs(rootGraph)) {
       const visibleVariables = getVisibleVariables(rootGraph, g);
       for (const node of g.nodes) {

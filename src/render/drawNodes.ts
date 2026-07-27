@@ -1,6 +1,6 @@
 import { resolveNodeLabel } from "../engine/graphMutations";
 import { getNodeDef, topLevelGroup } from "../engine/registry";
-import type { FunctionDef, Graph, NodeDef, NodeInstance, PinType, Variable } from "../engine/types";
+import type { FunctionDef, Graph, NodeDef, NodeInstance, PinDef, Variable } from "../engine/types";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
 import { NODE_HEADER_HEIGHT, PIN_RADIUS } from "./layout";
@@ -86,7 +86,7 @@ export function drawNodes(
 
     for (const pinLayout of geo.layout.pins) {
       const pos = geo.pinScreen[pinLayout.pin.id];
-      drawPinShape(ctx, pos.x, pos.y, PIN_RADIUS * camera.zoom, pinLayout.pin.type);
+      drawPinShape(ctx, pos.x, pos.y, PIN_RADIUS * camera.zoom, pinLayout.pin);
 
       ctx.fillStyle = TEXT_MUTED;
       if (pinLayout.pin.direction === "input") {
@@ -121,19 +121,49 @@ function drawPinShape(
   x: number,
   y: number,
   r: number,
-  type: PinType,
+  pin: PinDef,
 ): void {
-  ctx.fillStyle = PIN_COLORS[type];
-  if (type === "exec") {
+  // Map pins are colored by their VALUE type (pin.type) — the key type isn't drawn on the dot,
+  // only visible via the type-select controls (see typedValueInput.ts).
+  ctx.fillStyle = PIN_COLORS[pin.type];
+  if (pin.type === "exec") {
     ctx.beginPath();
     ctx.moveTo(x - r, y - r);
     ctx.lineTo(x + r * 1.2, y);
     ctx.lineTo(x - r, y + r);
     ctx.closePath();
     ctx.fill();
-  } else {
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
+    return;
+  }
+
+  switch (pin.container) {
+    case "array":
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      break;
+    case "set":
+      // A ring: filled circle at the element's radius, plus a stroked circle just outside it.
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x, y, r * 1.15, 0, Math.PI * 2);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = PIN_COLORS[pin.type];
+      ctx.stroke();
+      break;
+    case "map":
+      // A diamond (square rotated 45°).
+      ctx.beginPath();
+      ctx.moveTo(x, y - r * 1.2);
+      ctx.lineTo(x + r * 1.2, y);
+      ctx.lineTo(x, y + r * 1.2);
+      ctx.lineTo(x - r * 1.2, y);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    default:
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
   }
 }

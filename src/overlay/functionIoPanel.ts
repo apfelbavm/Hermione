@@ -13,7 +13,7 @@ import type { Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
-import { createTypeSelect, createTypedValueInput } from "./typedValueInput";
+import { createContainerSelect, createTypeSelect, createTypedValueInput } from "./typedValueInput";
 import { nextAvailableName } from "./uniqueName";
 
 export interface FunctionIoPanelElements {
@@ -102,8 +102,8 @@ export function createFunctionIoPanel(
         store.notify();
       });
 
-      const value = createTypedValueInput(entry.type, entry.defaultValue, (defaultValue) => {
-        update(store.state.rootGraph, fn, entry.id, { defaultValue });
+      const container = createContainerSelect(entry.container ?? "single", (container) => {
+        update(store.state.rootGraph, fn, entry.id, { container });
         store.notify();
       });
 
@@ -114,8 +114,34 @@ export function createFunctionIoPanel(
         store.notify();
       });
 
-      row.append(nameEl, type, value, delBtn);
+      row.append(nameEl, type, container);
+      if (entry.container === "map") {
+        const keyType = createTypeSelect(entry.keyType ?? "string", (keyType) => {
+          update(store.state.rootGraph, fn, entry.id, { keyType });
+          store.notify();
+        });
+        row.append(keyType);
+      }
+      row.append(delBtn);
       elements.list.appendChild(row);
+
+      // A container's default-value editor is a whole vertical list, not a single inline input —
+      // gets its own row underneath the name/type/container line instead of squeezing in beside it.
+      const valueRow = document.createElement("div");
+      valueRow.className = "variable-row";
+      const value = createTypedValueInput(
+        entry.type,
+        entry.defaultValue,
+        (defaultValue) => {
+          update(store.state.rootGraph, fn, entry.id, { defaultValue });
+          store.notify();
+        },
+        entry.container ?? "single",
+        entry.keyType ?? "string",
+      );
+      valueRow.append(value);
+      elements.list.appendChild(valueRow);
+
       if (nameInputToFocus) focusAndSelect(nameInputToFocus);
     }
   }

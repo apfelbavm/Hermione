@@ -56,6 +56,9 @@ function textWidth(text: string): number {
  * can never drift apart. Exec pins never get a widget (0). */
 export function pinWidgetWidth(pin: PinDef): number {
   if (pin.type === "exec") return 0;
+  // Array/Set/Map pins are wiring-only on the canvas, same treatment "object" already gets — no
+  // inline literal editor (see typedValueInput.ts's list editor for the Details-panel equivalent).
+  if (pin.container && pin.container !== "single") return 0;
   if (pin.type === "boolean") return 16;
   if (pin.type === "string" && pin.options && pin.options.length > 0) return 110;
   if (pin.type === "number") return 54;

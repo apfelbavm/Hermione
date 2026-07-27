@@ -1,5 +1,5 @@
 import { nextId, UNDELETABLE_NODE_TYPES } from "./graphMutations";
-import type { Connection, Graph, NodeInstance, PinType, Variable } from "./types";
+import type { Connection, Graph, NodeInstance, PinContainer, PinType, Variable } from "./types";
 
 /** Tags copied JSON so paste can tell "this came from our own Ctrl+C" apart from arbitrary
  * clipboard content (plain text, something copied from another app, a hand-edited value). */
@@ -7,6 +7,7 @@ const CLIPBOARD_SOURCE = "hermione-graph-editor";
 const CLIPBOARD_VERSION = 1;
 
 const PIN_TYPES: readonly PinType[] = ["exec", "number", "boolean", "string", "object"];
+const PIN_CONTAINERS: readonly PinContainer[] = ["single", "array", "set", "map"];
 
 export interface NodesClipboardPayload {
   source: typeof CLIPBOARD_SOURCE;
@@ -69,7 +70,9 @@ function isValidVariable(value: unknown): value is Variable {
     typeof value.name === "string" &&
     typeof value.type === "string" &&
     PIN_TYPES.includes(value.type as PinType) &&
-    "defaultValue" in value
+    "defaultValue" in value &&
+    (value.container === undefined || PIN_CONTAINERS.includes(value.container as PinContainer)) &&
+    (value.keyType === undefined || (typeof value.keyType === "string" && PIN_TYPES.includes(value.keyType as PinType)))
   );
 }
 

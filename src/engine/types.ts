@@ -1,10 +1,18 @@
 export type PinType = "exec" | "number" | "boolean" | "string" | "object";
 
+/** Orthogonal to PinType (see PinDef.container/Variable.container) — "single" (the default, a
+ * plain value of `type`) vs. a collection of `type`. Never a new PinType member: this keeps every
+ * exhaustive `Record<PinType, ...>` map (PIN_COLORS, DEFAULT_VALUE_BY_TYPE) untouched, since a
+ * container pin still just reuses its element type's color/default — only the pin's drawn SHAPE
+ * and its wiring-compatibility rules depend on container (see isPinTypeCompatible, drawPinShape). */
+export type PinContainer = "single" | "array" | "set" | "map";
+
 export type PinDirection = "input" | "output";
 
 export interface PinDef {
   id: string;
   label: string;
+  /** For a "map" container pin, this is the VALUE type — see keyType for the key. */
   type: PinType;
   direction: PinDirection;
   defaultValue?: unknown;
@@ -22,6 +30,10 @@ export interface PinDef {
    * any other string pin (which may carry a value outside this list — the dropdown only governs
    * how a LITERAL is entered, same relationship `integer` has to "number"). */
   options?: string[];
+  /** Defaults to "single" when absent. See PinContainer's own doc comment. */
+  container?: PinContainer;
+  /** Only meaningful when container === "map" — the map's KEY type (`type` is the value type). */
+  keyType?: PinType;
 }
 
 export interface ExecuteResult {
@@ -97,6 +109,20 @@ export interface NodeDef {
   compileExecute?: (args: CompileExecArgs) => string[];
   /** Named helper-function source snippets this node's generated code depends on (e.g. `delay`), deduped by name across the whole compiled file. */
   compileHelpers?: Record<string, string>;
+  /** Marks every pin this node type declares (own `pins`, or produced by deriveInstancePins) as
+   * sharing ONE user-chosen element type (and, if includeKeyType, one key type) per NodeInstance —
+   * e.g. Array Length must work on Array<Number> and Array<String> alike, but a node's own `pins`
+   * are fixed at registerNode-time, so there's nowhere else for "which type this instance operates
+   * on" to live. Consumed via NodeInstance.elementType/mapKeyType by this node's own
+   * deriveInstancePins; edited via a "Element Type"/"Key Type" selector in the Details panel (see
+   * detailsPanel.ts) instead of a wireable pin, using the same changeNodeElementType mutation a
+   * Variable's own type change uses. */
+  configurableElementType?: { includeKeyType?: boolean };
+  /** Present only on a node whose entries come in linked PAIRS (Make Map's key-N/value-N) — called
+   * by removeInstancePin right after it deletes+prunes `removedPinId`, returning any additional pin
+   * ids (the paired sibling) that should be deleted+pruned the same way, since the generic
+   * right-click "Delete" affordance only ever targets one pin at a time. */
+  onInstancePinRemoved?: (node: NodeInstance, removedPinId: string) => string[];
 }
 
 export interface Pin {
@@ -116,6 +142,11 @@ export interface NodeInstance {
    * hasConnectedDataOutput) — a disabled node's execute()/compileExecute() is never invoked, by
    * the interpreter or the compiler, and the exec chain simply doesn't continue past it. */
   disabled?: boolean;
+  /** Set only for a node whose NodeDef.configurableElementType is set — see that field's doc
+   * comment. Seeded by createNodeInstance, changed via changeNodeElementType. */
+  elementType?: PinType;
+  /** Set only for a node whose NodeDef.configurableElementType?.includeKeyType is set. */
+  mapKeyType?: PinType;
 }
 
 export interface Connection {
@@ -129,8 +160,13 @@ export interface Connection {
 export interface Variable {
   id: string;
   name: string;
+  /** For a "map" container variable, this is the VALUE type — see keyType for the key. */
   type: PinType;
   defaultValue: unknown;
+  /** Defaults to "single" when absent — see PinContainer's own doc comment. */
+  container?: PinContainer;
+  /** Only meaningful when container === "map". */
+  keyType?: PinType;
 }
 
 export interface CommentBox {
@@ -149,6 +185,8 @@ export interface PinSignatureEntry {
   name: string;
   type: PinType;
   defaultValue: unknown;
+  container?: PinContainer;
+  keyType?: PinType;
 }
 
 /** A user-defined function: its own typed signature plus its own body graph (whose `variables`

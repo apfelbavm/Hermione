@@ -1,7 +1,24 @@
-import type { PinType } from "../engine/types";
+import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
+import type { PinContainer, PinType } from "../engine/types";
 import { PIN_COLORS } from "../render/palette";
 
 const PIN_TYPE_OPTIONS: readonly PinType[] = ["number", "boolean", "string", "object"];
+const PIN_CONTAINER_OPTIONS: readonly PinContainer[] = ["single", "array", "set", "map"];
+const CONTAINER_LABELS: Record<PinContainer, string> = {
+  single: "Single",
+  array: "Array",
+  set: "Set",
+  map: "Map",
+};
+
+interface MapEntry {
+  key: unknown;
+  value: unknown;
+}
+
+function isMapEntry(value: unknown): value is MapEntry {
+  return typeof value === "object" && value !== null && "key" in value && "value" in value;
+}
 
 function createTypeDot(type: PinType): HTMLSpanElement {
   const dot = document.createElement("span");
@@ -10,15 +27,11 @@ function createTypeDot(type: PinType): HTMLSpanElement {
   return dot;
 }
 
-/** Builds a small inline editor for a typed default value, matching the per-type widget shapes
- * used for in-canvas pin literals (see widgetSync.ts) — object has no literal editor anywhere in
- * this app (wiring-only there too), so it just shows a placeholder. Commits on change (blur/Enter),
- * not per-keystroke, so a live re-render triggered elsewhere never yanks focus mid-edit. */
-export function createTypedValueInput(
-  type: PinType,
-  value: unknown,
-  onChange: (value: unknown) => void,
-): HTMLElement {
+/** Builds the single-value editor for one scalar of `type` — exactly what createTypedValueInput
+ * used to be in full before container support existed. Reused both for a "single" container value
+ * and for each row's own per-element/per-key/per-value editor inside a list (see
+ * createContainerListInput). */
+function createScalarInput(type: PinType, value: unknown, onChange: (value: unknown) => void): HTMLElement {
   if (type === "object" || type === "exec") {
     const span = document.createElement("span");
     span.className = "typed-value-placeholder";
@@ -45,6 +58,177 @@ export function createTypedValueInput(
   return input;
 }
 
+/** Builds the expandable list editor for an Array/Set/Map default value — one row per entry (a
+ * single scalar editor for Array/Set, a key+value pair of scalar editors for Map) plus a trailing
+ * "+ Add" row. Backing storage is always a plain array (Array<T> -> T[], Set<T> -> T[] deduped on
+ * every edit, Map<K,V> -> {key,value}[]) — see the plan's rationale for why real Map/Set instances
+ * are never used (they don't survive JSON.stringify, breaking save/load). */
+function createContainerListInput(
+  type: PinType,
+  value: unknown,
+  onChange: (value: unknown) => void,
+  container: PinContainer,
+  keyType: PinType,
+): HTMLElement {
+  const list = document.createElement("div");
+  list.className = "typed-value-list";
+  const entries: unknown[] = Array.isArray(value) ? value.slice() : [];
+
+  function commit(): void {
+    onChange(entries.slice());
+  }
+
+  function dedupeInPlace(): void {
+    const seen = new Set<string>();
+    for (let i = 0; i < entries.length; ) {
+      const key = JSON.stringify(entries[i]);
+      if (seen.has(key)) entries.splice(i, 1);
+      else {
+        seen.add(key);
+        i++;
+      }
+    }
+  }
+
+  function renderRows(): void {
+    list.innerHTML = "";
+
+    entries.forEach((entry, index) => {
+      const row = document.createElement("div");
+      row.className = "typed-value-list-row";
+
+      if (container === "map") {
+        const entryObj: MapEntry = isMapEntry(entry)
+          ? entry
+          : { key: DEFAULT_VALUE_BY_TYPE[keyType], value: DEFAULT_VALUE_BY_TYPE[type] };
+        const keyInput = createScalarInput(keyType, entryObj.key, (k) => {
+          entries[index] = { key: k, value: entryObj.value };
+          commit();
+        });
+        const valueInput = createScalarInput(type, entryObj.value, (v) => {
+          entries[index] = { key: entryObj.key, value: v };
+          commit();
+        });
+        row.append(keyInput, valueInput);
+      } else {
+        const elInput = createScalarInput(type, entry, (v) => {
+          entries[index] = v;
+          commit();
+          if (container === "set") {
+            dedupeInPlace();
+            renderRows();
+          }
+        });
+        row.append(elInput);
+      }
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "typed-value-list-remove";
+      removeBtn.textContent = "✕";
+      removeBtn.addEventListener("click", () => {
+        entries.splice(index, 1);
+        commit();
+        renderRows();
+      });
+      row.appendChild(removeBtn);
+
+      list.appendChild(row);
+    });
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "typed-value-list-add";
+    addBtn.textContent = "+ Add";
+    addBtn.addEventListener("click", () => {
+      entries.push(
+        container === "map" ? { key: DEFAULT_VALUE_BY_TYPE[keyType], value: DEFAULT_VALUE_BY_TYPE[type] } : DEFAULT_VALUE_BY_TYPE[type],
+      );
+      if (container === "set") dedupeInPlace();
+      commit();
+      renderRows();
+    });
+    list.appendChild(addBtn);
+  }
+
+  renderRows();
+  return list;
+}
+
+/** Builds a small inline editor for a typed default value, matching the per-type widget shapes
+ * used for in-canvas pin literals (see widgetSync.ts) — object has no literal editor anywhere in
+ * this app (wiring-only there too), so it just shows a placeholder. Commits on change (blur/Enter),
+ * not per-keystroke, so a live re-render triggered elsewhere never yanks focus mid-edit. When
+ * `container` is not "single", renders an expandable list editor instead (see
+ * createContainerListInput) — `keyType` is only meaningful (and required in practice) for "map". */
+export function createTypedValueInput(
+  type: PinType,
+  value: unknown,
+  onChange: (value: unknown) => void,
+  container: PinContainer = "single",
+  keyType: PinType = "string",
+): HTMLElement {
+  if (container !== "single") {
+    return createContainerListInput(type, value, onChange, container, keyType);
+  }
+  return createScalarInput(type, value, onChange);
+}
+
+/** A tiny floating menu of `options`, each row built by `renderItem` — shared open/close/outside-
+ * click/Escape plumbing for both the base-type menu and the container-kind menu below, so neither
+ * has to re-implement rowContextMenu.ts-style flyout wiring (that one only supports a plain string
+ * label, hence this separate — but now-shared — implementation). */
+function openPickList<T>(
+  screenPos: { x: number; y: number },
+  options: readonly T[],
+  renderItem: (item: T) => Node[],
+  onPick: (item: T) => void,
+): void {
+  const menu = document.createElement("div");
+  menu.className = "row-context-menu";
+  menu.style.left = `${screenPos.x}px`;
+  menu.style.top = `${screenPos.y}px`;
+
+  for (const item of options) {
+    const el = document.createElement("div");
+    el.className = "row-context-menu-item pick-list-item";
+    el.append(...renderItem(item));
+    el.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      close();
+      onPick(item);
+    });
+    menu.appendChild(el);
+  }
+
+  function close(): void {
+    menu.remove();
+    document.removeEventListener("mousedown", onOutside, true);
+    document.removeEventListener("keydown", onKeydown, true);
+  }
+  function onOutside(e: MouseEvent): void {
+    if (!menu.contains(e.target as Node)) close();
+  }
+  function onKeydown(e: KeyboardEvent): void {
+    if (e.key === "Escape") close();
+  }
+
+  document.body.appendChild(menu);
+  // Defer the outside-click closer so the click that opened this menu doesn't immediately close it.
+  setTimeout(() => {
+    document.addEventListener("mousedown", onOutside, true);
+    document.addEventListener("keydown", onKeydown, true);
+  }, 0);
+}
+
+function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinType) => void): void {
+  openPickList(screenPos, PIN_TYPE_OPTIONS, (type) => [createTypeDot(type), document.createTextNode(type)], onPick);
+}
+
+function openContainerMenu(screenPos: { x: number; y: number }, onPick: (container: PinContainer) => void): void {
+  openPickList(screenPos, PIN_CONTAINER_OPTIONS, (c) => [document.createTextNode(CONTAINER_LABELS[c])], onPick);
+}
+
 /** A custom dropdown (not a native <select> — those can't show arbitrary markup per option) for
  * editing a variable's or a function I/O entry's type. Each option, and the closed button itself,
  * shows the same colored dot used everywhere else a variable's type is indicated (see the
@@ -69,49 +253,42 @@ export function createTypeSelect(current: PinType, onChange: (type: PinType) => 
     openTypeMenu({ x: rect.left, y: rect.bottom }, (type) => {
       renderButton(type);
       onChange(type);
+      // A native <button> keeps focus after being clicked — left focused, it would permanently
+      // block whatever re-render onChange triggers (e.g. detailsPanel.ts's "don't wipe fields
+      // mid-edit" guard checks document.activeElement), since nothing else ever moves focus away.
+      button.blur();
     });
   });
 
   return button;
 }
 
-/** A tiny floating menu of every PinType, each row showing the same colored dot as the closed
- * button — mirrors rowContextMenu.ts's own open/close-on-outside-click/Escape plumbing, just with
- * dot+label rows instead of plain text (ContextMenuItem there only supports a plain string label). */
-function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinType) => void): void {
-  const menu = document.createElement("div");
-  menu.className = "row-context-menu";
-  menu.style.left = `${screenPos.x}px`;
-  menu.style.top = `${screenPos.y}px`;
+/** Sibling of createTypeSelect for picking a variable's/pin's CONTAINER (Single/Array/Set/Map) —
+ * same button+flyout shape, plain text options (no color dot — container is orthogonal to type,
+ * see PinContainer's own doc comment in engine/types.ts). */
+export function createContainerSelect(current: PinContainer, onChange: (container: PinContainer) => void): HTMLElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "typed-value-type-select";
 
-  for (const type of PIN_TYPE_OPTIONS) {
-    const item = document.createElement("div");
-    item.className = "row-context-menu-item type-menu-item";
-    item.append(createTypeDot(type), document.createTextNode(type));
-    item.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      close();
-      onPick(type);
+  function renderButton(container: PinContainer): void {
+    button.innerHTML = "";
+    const caret = document.createElement("span");
+    caret.className = "typed-value-type-caret";
+    caret.textContent = "▾";
+    button.append(document.createTextNode(CONTAINER_LABELS[container]), caret);
+  }
+  renderButton(current);
+
+  button.addEventListener("mousedown", (e) => e.stopPropagation());
+  button.addEventListener("click", () => {
+    const rect = button.getBoundingClientRect();
+    openContainerMenu({ x: rect.left, y: rect.bottom }, (container) => {
+      renderButton(container);
+      onChange(container);
+      button.blur(); // see createTypeSelect's identical fix for why this is necessary
     });
-    menu.appendChild(item);
-  }
+  });
 
-  function close(): void {
-    menu.remove();
-    document.removeEventListener("mousedown", onOutside, true);
-    document.removeEventListener("keydown", onKeydown, true);
-  }
-  function onOutside(e: MouseEvent): void {
-    if (!menu.contains(e.target as Node)) close();
-  }
-  function onKeydown(e: KeyboardEvent): void {
-    if (e.key === "Escape") close();
-  }
-
-  document.body.appendChild(menu);
-  // Defer the outside-click closer so the click that opened this menu doesn't immediately close it.
-  setTimeout(() => {
-    document.addEventListener("mousedown", onOutside, true);
-    document.addEventListener("keydown", onKeydown, true);
-  }, 0);
+  return button;
 }

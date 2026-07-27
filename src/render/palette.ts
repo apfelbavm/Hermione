@@ -20,6 +20,7 @@ export const NODE_HEADER_BG: Record<string, string> = {
   Actions: "#9b6b2f",
   // Same color as a "string" pin/wire, tying the whole node category to that type visually.
   String: PIN_COLORS.string,
+  Collections: "#5a4a8a",
 };
 export const NODE_HEADER_DEFAULT = "#44494f";
 export const NODE_BODY_BG = "#2b2f36";

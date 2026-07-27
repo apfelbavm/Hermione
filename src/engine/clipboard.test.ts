@@ -62,6 +62,29 @@ describe("parseClipboardPayload", () => {
     });
     expect(parseClipboardPayload(bad)).toBeNull();
   });
+
+  it("accepts a container (Array/Set/Map) variable payload round-tripped through serialize", () => {
+    const variable: Variable = {
+      id: "var-1",
+      name: "Scores",
+      type: "number",
+      container: "map",
+      keyType: "string",
+      defaultValue: [{ key: "a", value: 1 }],
+    };
+    const parsed = parseClipboardPayload(serializeVariableClipboardPayload(variable));
+    expect(parsed).toEqual({ source: "hermione-graph-editor", version: 1, kind: "variable", variable });
+  });
+
+  it("rejects a variable payload whose container isn't one of single/array/set/map", () => {
+    const bad = JSON.stringify({
+      source: "hermione-graph-editor",
+      version: 1,
+      kind: "variable",
+      variable: { id: "v1", name: "X", type: "number", container: "list", defaultValue: [] },
+    });
+    expect(parseClipboardPayload(bad)).toBeNull();
+  });
 });
 
 describe("cloneNodesForClipboard", () => {

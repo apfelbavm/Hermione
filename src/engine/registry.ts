@@ -1,4 +1,4 @@
-import type { NodeDef, PinType } from "./types";
+import type { NodeDef, PinContainer, PinType } from "./types";
 
 const registry = new Map<string, NodeDef>();
 
@@ -27,20 +27,34 @@ export function clearRegistry(): void {
   registry.clear();
 }
 
-export function isPinTypeCompatible(a: PinType, b: PinType): boolean {
-  return a === b;
+export interface PinTypeShape {
+  type: PinType;
+  container?: PinContainer;
+  keyType?: PinType;
 }
 
-/** Node defs with at least one pin of the opposite direction compatible with the given pin type. */
+/** Two pins can wire together only if their container matches ("single" is the implicit default),
+ * their element type matches, and — for a "map" container — their key type also matches. A
+ * container pin never silently connects to a differently-shaped one (no Array<Number> ->
+ * Set<Number>, no Map<string,X> -> Map<number,X>); the user would need an explicit conversion node
+ * (e.g. Set To Array) for that. */
+export function isPinTypeCompatible(a: PinTypeShape, b: PinTypeShape): boolean {
+  const containerA = a.container ?? "single";
+  const containerB = b.container ?? "single";
+  if (containerA !== containerB) return false;
+  if (a.type !== b.type) return false;
+  if (containerA === "map" && a.keyType !== b.keyType) return false;
+  return true;
+}
+
+/** Node defs with at least one pin of the opposite direction compatible with the given pin shape. */
 export function findCompatibleNodeDefs(
-  pinType: PinType,
+  pin: PinTypeShape,
   pinDirection: "input" | "output",
 ): NodeDef[] {
   const wantDirection = pinDirection === "output" ? "input" : "output";
   return allNodeDefs().filter((def) =>
-    def.pins.some(
-      (p) => p.direction === wantDirection && isPinTypeCompatible(p.type, pinType),
-    ),
+    def.pins.some((p) => p.direction === wantDirection && isPinTypeCompatible(p, pin)),
   );
 }
 

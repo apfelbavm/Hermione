@@ -26,7 +26,12 @@ registerNode({
   group: "Variables",
   pins: [], // real pins are derived per-instance from the bound Variable via derivePins
   // Unlabeled — the node's own title already shows the variable's name (see resolveNodeLabel).
-  derivePins: (variable) => [{ id: "value", label: "", type: variable.type, direction: "output" }],
+  // container/keyType are forwarded too so a container variable's Get pin wires exactly like the
+  // variable itself (see isPinTypeCompatible) — the value flows through untouched either way, since
+  // executor.ts/codegen.ts only ever branch on type !== "exec".
+  derivePins: (variable) => [
+    { id: "value", label: "", type: variable.type, direction: "output", container: variable.container, keyType: variable.keyType },
+  ],
   evaluate: ({ node, ctx }) => ({
     value: node.variableId ? getVariableValue(ctx, node.variableId) : undefined,
   }),
@@ -43,7 +48,15 @@ registerNode({
   // "value" is unlabeled too — the node's own title already shows the variable's name.
   derivePins: (variable) => [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "value", label: "", type: variable.type, direction: "input", defaultValue: variable.defaultValue },
+    {
+      id: "value",
+      label: "",
+      type: variable.type,
+      direction: "input",
+      defaultValue: variable.defaultValue,
+      container: variable.container,
+      keyType: variable.keyType,
+    },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
   execute: ({ node, inputs, ctx }) => {

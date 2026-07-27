@@ -65,7 +65,10 @@ export function createVariablePanel(
       const typeDot = document.createElement("span");
       typeDot.className = "variable-type-dot";
       typeDot.style.backgroundColor = PIN_COLORS[variable.type];
-      typeDot.title = variable.type;
+      typeDot.title =
+        variable.container && variable.container !== "single"
+          ? `${variable.container} of ${variable.type}`
+          : variable.type;
 
       let nameInputToFocus: HTMLInputElement | null = null;
       const nameEl = isEditing

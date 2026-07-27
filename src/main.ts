@@ -259,7 +259,7 @@ function createNodeAndMaybeConnect(
   if (anchors.length > 0) {
     const wantDirection = anchors[0].pin.direction === "output" ? "input" : "output";
     const matchPin = def.pins.find(
-      (p) => p.direction === wantDirection && isPinTypeCompatible(anchors[0].pin.type, p.type),
+      (p) => p.direction === wantDirection && isPinTypeCompatible(anchors[0].pin, p),
     );
     if (matchPin) {
       for (const anchor of anchors) {
@@ -287,7 +287,7 @@ function createNodeAndMaybeConnect(
 const pointerInteraction = setupPointerInteraction(canvas, store, {
   onWireDroppedInEmptySpace: (anchors, screenPos) => {
     const shared = anchors[0].pin;
-    const candidates = filterCreatableHere(findCompatibleNodeDefs(shared.type, shared.direction));
+    const candidates = filterCreatableHere(findCompatibleNodeDefs(shared, shared.direction));
     const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
     openNodeSearchMenu(overlay, {
       screenPos,

@@ -1,4 +1,4 @@
-import { getVisibleVariables, resolvePinDefs } from "./graphMutations";
+import { cloneDefaultValue, getVisibleVariables, resolvePinDefs } from "./graphMutations";
 import { connectionsFrom, connectionTo } from "./graphQueries";
 import { getNodeDef } from "./registry";
 import type { ExecutionContext, FunctionDef, Graph, NodeInstance } from "./types";
@@ -22,7 +22,7 @@ export function createExecutionContext(
 ): ExecutionContext {
   const variableValues = new Map<string, unknown>();
   for (const variable of graph.variables) {
-    variableValues.set(variable.id, variable.defaultValue);
+    variableValues.set(variable.id, cloneDefaultValue(variable.defaultValue));
   }
   return {
     log: (message: string) => console.log(message),
@@ -214,12 +214,12 @@ export async function runFunctionCall(
 
   const localVariableValues = new Map<string, unknown>();
   for (const variable of fn.body.variables) {
-    localVariableValues.set(variable.id, variable.defaultValue);
+    localVariableValues.set(variable.id, cloneDefaultValue(variable.defaultValue));
   }
 
   const outputs: Record<string, unknown> = {};
   for (const output of fn.outputs) {
-    outputs[output.id] = output.defaultValue;
+    outputs[output.id] = cloneDefaultValue(output.defaultValue);
   }
 
   const childCtx: ExecutionContext = {

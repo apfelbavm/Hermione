@@ -10,6 +10,7 @@ import {
   removeNode,
   removeVariable,
   resolveNodeLabel,
+  updateVariable,
 } from "./graphMutations";
 import { getNodeDef } from "./registry";
 import { createEmptyGraph, type Variable } from "./types";
@@ -193,5 +194,65 @@ describe("hasConnectedDataOutput", () => {
     graph.nodes.push(createNodeInstance("debug.print", { x: 0, y: 0 }, printDef.pins, "print"));
     connectPins(graph, [], [], { fromNode: "branch", fromPin: "true", toNode: "print", toPin: "exec-in" });
     expect(hasConnectedDataOutput(graph, "branch", [], [])).toBe(false);
+  });
+});
+
+describe("updateVariable — container support", () => {
+  it("resets the default value to an empty list and disconnects wires when switching to Array", () => {
+    const graph = createEmptyGraph("g", "root");
+    const variable: Variable = { id: "v1", name: "Nums", type: "number", defaultValue: 7 };
+    addVariable(graph, variable);
+    const getDef = getNodeDef("variable.get");
+    const getNode = createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
+    graph.nodes.push(getNode);
+    const addDef = getNodeDef("math.add");
+    graph.nodes.push(createNodeInstance("math.add", { x: 100, y: 0 }, addDef.pins, "add"));
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "get", fromPin: "value", toNode: "add", toPin: "a" });
+    expect(graph.connections).toHaveLength(1);
+
+    updateVariable(graph, "v1", { container: "array" });
+
+    expect(variable.container).toBe("array");
+    expect(variable.defaultValue).toEqual([]);
+    expect(graph.connections).toHaveLength(0);
+  });
+
+  it("resets the default value again when switching container back to single", () => {
+    const graph = createEmptyGraph("g", "root");
+    const variable: Variable = { id: "v1", name: "Nums", type: "number", defaultValue: [1, 2, 3], container: "array" };
+    addVariable(graph, variable);
+
+    updateVariable(graph, "v1", { container: "single" });
+
+    expect(variable.container).toBe("single");
+    expect(variable.defaultValue).toBe(0);
+  });
+
+  it("resets the default value when only the map key type changes (container/type unchanged)", () => {
+    const graph = createEmptyGraph("g", "root");
+    const variable: Variable = {
+      id: "v1",
+      name: "Scores",
+      type: "number",
+      container: "map",
+      keyType: "string",
+      defaultValue: [{ key: "a", value: 1 }],
+    };
+    addVariable(graph, variable);
+
+    updateVariable(graph, "v1", { keyType: "boolean" });
+
+    expect(variable.keyType).toBe("boolean");
+    expect(variable.defaultValue).toEqual([]);
+  });
+
+  it("leaves the default value alone when the patch itself supplies one", () => {
+    const graph = createEmptyGraph("g", "root");
+    const variable: Variable = { id: "v1", name: "Nums", type: "number", defaultValue: 0 };
+    addVariable(graph, variable);
+
+    updateVariable(graph, "v1", { container: "array", defaultValue: [1, 2] });
+
+    expect(variable.defaultValue).toEqual([1, 2]);
   });
 });

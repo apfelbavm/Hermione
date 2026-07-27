@@ -7,6 +7,9 @@ import "./actionsMock";
 import "./function";
 import "./string";
 import "./http";
+import "./array";
+import "./set";
+import "./map";
 
 let registered = false;
 

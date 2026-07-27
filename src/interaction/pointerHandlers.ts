@@ -90,7 +90,7 @@ function tryConnectAnchorsToTarget(
   if (anchors.some((a) => a.nodeId === target.nodeId)) return false; // no self-loops
   const anchorIsOutput = anchors[0].pin.direction === "output";
   const targetIsOutput = target.pin.direction === "output";
-  if (anchorIsOutput === targetIsOutput || !isPinTypeCompatible(anchors[0].pin.type, target.pin.type)) return false;
+  if (anchorIsOutput === targetIsOutput || !isPinTypeCompatible(anchors[0].pin, target.pin)) return false;
 
   for (const anchor of anchors) {
     const outputEnd = anchorIsOutput ? anchor : target;
