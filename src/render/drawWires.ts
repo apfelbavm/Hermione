@@ -43,7 +43,16 @@ export function drawWireDragPreview(
   ctx.lineWidth = 2;
   ctx.setLineDash([5, 4]);
   for (const from of wireDrag.fromScreens) {
-    drawBezierWire(ctx, from.x, from.y, wireDrag.toScreen.x, wireDrag.toScreen.y);
+    // drawBezierWire always treats its (x1,y1) as the OUTPUT/exit side (curve bulges right out of
+    // it) and (x2,y2) as the INPUT/entry side (curve pulls in from the left into it) — correct as-
+    // is when dragging off an output pin, but backwards when dragging off an INPUT pin, where the
+    // anchor itself is the entry side and the mouse (toScreen) stands in for the eventual output —
+    // so the argument order swaps to match.
+    if (wireDrag.anchorDirection === "output") {
+      drawBezierWire(ctx, from.x, from.y, wireDrag.toScreen.x, wireDrag.toScreen.y);
+    } else {
+      drawBezierWire(ctx, wireDrag.toScreen.x, wireDrag.toScreen.y, from.x, from.y);
+    }
   }
   ctx.setLineDash([]);
 }

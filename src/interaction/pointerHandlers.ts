@@ -210,6 +210,7 @@ export function setupPointerInteraction(
             .filter((p): p is { x: number; y: number } => !!p),
           toScreen: pos,
           pinType: anchors[0].pin.type,
+          anchorDirection: anchors[0].pin.direction,
         };
         store.notify();
         return;
@@ -236,6 +237,7 @@ export function setupPointerInteraction(
         fromScreens: [{ x: pinHit.screenX, y: pinHit.screenY }],
         toScreen: pos,
         pinType: anchor.pin.type,
+        anchorDirection: anchor.pin.direction,
       };
       store.notify();
       return;

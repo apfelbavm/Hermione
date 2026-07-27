@@ -1,5 +1,5 @@
 import { getVisibleVariables } from "../engine/graphMutations";
-import type { Graph, PinType, Variable } from "../engine/types";
+import type { Graph, PinDirection, PinType, Variable } from "../engine/types";
 import type { Camera } from "../render/camera";
 
 export interface WireDragState {
@@ -8,6 +8,13 @@ export interface WireDragState {
   fromScreens: { x: number; y: number }[];
   toScreen: { x: number; y: number };
   pinType: PinType;
+  /** Direction of the anchor pin(s) in fromScreens — "output" when dragging off an output pin
+   * (toScreen, the mouse, stands in for the eventual input), "input" when dragging off an input
+   * pin (toScreen stands in for the eventual output). drawWireDragPreview (see drawWires.ts) needs
+   * this to know which end of the preview curve to treat as the exit side vs the entry side —
+   * always the SAME for every entry in fromScreens (see the wire-multi comment above: every picked-
+   * up anchor shares the opposite direction of the pin that was Ctrl+dragged). */
+  anchorDirection: PinDirection;
 }
 
 /** In-progress rubber-band selection box, tracked in world coordinates so it stays correct even

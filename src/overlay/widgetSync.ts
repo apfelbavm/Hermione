@@ -11,6 +11,19 @@ type WidgetElement = HTMLInputElement | HTMLSelectElement;
 
 interface WidgetEntry {
   el: WidgetElement;
+  /** Snapshot of whatever about this pin's def determines the widget's DOM shape (see
+   * widgetSignature) — compared every sync() pass so a pin whose TYPE changes without its id
+   * changing (e.g. an Array/Set/Map node's entry-N pin after its Element Type is switched via the
+   * Details panel, or a Map's key-N/value-N pins after a key/value type change) gets a freshly
+   * rebuilt widget instead of silently keeping its old, now-mismatched one (a stale number <input>
+   * would never become a checkbox just because the underlying pin turned into a boolean). */
+  signature: string;
+}
+
+/** Everything about a PinDef that determines which kind of DOM element its widget must be —
+ * two calls with the same signature are safe to keep sharing one cached widget element. */
+function widgetSignature(pinDef: PinDef): string {
+  return [pinDef.type, pinDef.integer ? "int" : "", (pinDef.options ?? []).join(",")].join("|");
 }
 
 export interface WidgetSync {
@@ -42,8 +55,14 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
 
         const key = `${node.id}:${pinDef.id}`;
         seen.add(key);
+        const signature = widgetSignature(pinDef);
 
         let entry = widgets.get(key);
+        if (entry && entry.signature !== signature) {
+          entry.el.remove();
+          widgets.delete(key);
+          entry = undefined;
+        }
         if (!entry) {
           entry = createWidgetEntry(pinDef, node.id, pinDef.id, store);
           widgets.set(key, entry);
@@ -69,8 +88,9 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
 }
 
 function createWidgetEntry(pinDef: PinDef, nodeId: string, pinId: string, store: Store): WidgetEntry {
+  const signature = widgetSignature(pinDef);
   if (pinDef.type === "string" && pinDef.options && pinDef.options.length > 0) {
-    return createOptionsWidgetEntry(pinDef.options, nodeId, pinId, store);
+    return { el: createOptionsWidgetElement(pinDef.options, nodeId, pinId, store), signature };
   }
 
   const type = pinDef.type;
@@ -98,10 +118,10 @@ function createWidgetEntry(pinDef: PinDef, nodeId: string, pinId: string, store:
   if (type !== "boolean") el.addEventListener("input", () => commit(false));
   el.addEventListener("mousedown", (e) => e.stopPropagation());
 
-  return { el };
+  return { el, signature };
 }
 
-function createOptionsWidgetEntry(options: string[], nodeId: string, pinId: string, store: Store): WidgetEntry {
+function createOptionsWidgetElement(options: string[], nodeId: string, pinId: string, store: Store): HTMLSelectElement {
   const select = document.createElement("select");
   select.className = "pin-widget pin-widget-select";
   for (const option of options) {
@@ -116,7 +136,7 @@ function createOptionsWidgetEntry(options: string[], nodeId: string, pinId: stri
   });
   select.addEventListener("mousedown", (e) => e.stopPropagation());
 
-  return { el: select };
+  return select;
 }
 
 function setWidgetDisplayValue(el: WidgetElement, pinDef: PinDef, value: unknown): void {
