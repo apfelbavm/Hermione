@@ -42,7 +42,9 @@ export function drawWireDragPreview(
   ctx.strokeStyle = PIN_COLORS[wireDrag.pinType];
   ctx.lineWidth = 2;
   ctx.setLineDash([5, 4]);
-  drawBezierWire(ctx, wireDrag.fromScreen.x, wireDrag.fromScreen.y, wireDrag.toScreen.x, wireDrag.toScreen.y);
+  for (const from of wireDrag.fromScreens) {
+    drawBezierWire(ctx, from.x, from.y, wireDrag.toScreen.x, wireDrag.toScreen.y);
+  }
   ctx.setLineDash([]);
 }
 

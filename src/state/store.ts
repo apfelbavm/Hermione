@@ -3,7 +3,9 @@ import type { Graph, PinType, Variable } from "../engine/types";
 import type { Camera } from "../render/camera";
 
 export interface WireDragState {
-  fromScreen: { x: number; y: number };
+  /** One entry per anchor being dragged — more than one when a Ctrl+drag picked up every
+   * connection already on a pin at once (see pointerHandlers.ts's "wire-multi" drag mode). */
+  fromScreens: { x: number; y: number }[];
   toScreen: { x: number; y: number };
   pinType: PinType;
 }

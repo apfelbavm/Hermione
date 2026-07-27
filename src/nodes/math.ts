@@ -104,7 +104,7 @@ registerNode({
 
 registerNode({
   type: "math.equal",
-  label: "Compare (A == B)",
+  label: "Equal (A == B)",
   group: "Math.Comparison",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },

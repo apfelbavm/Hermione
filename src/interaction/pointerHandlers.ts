@@ -13,9 +13,11 @@ import {
   disconnectPin,
   nextId,
   removeCommentBox,
+  removeConnection,
   removeNode,
   resolvePinDefs,
 } from "../engine/graphMutations";
+import { connectionsTouchingPin } from "../engine/graphQueries";
 import { getNodeDef, isPinTypeCompatible } from "../engine/registry";
 import type { CommentBox, FunctionDef, Graph, PinDef, Variable } from "../engine/types";
 import { panCamera, screenToWorld, zoomCameraAt } from "../render/camera";
@@ -36,6 +38,7 @@ import {
   hitTestNode,
   hitTestNodeAddButton,
   hitTestPin,
+  type PinHit,
 } from "../render/hitTest";
 import { getEditingGraph, getVisibleVariablesForState, openFunctionTab, type Store } from "../state/store";
 
@@ -49,6 +52,9 @@ type DragMode =
     }
   | { kind: "marquee" }
   | { kind: "wire"; anchor: WireAnchor }
+  // Ctrl+drag off a pin that already has connections: every one of them was detached at drag-start
+  // and is now looking for a new home, all together — see the pinHit branch in mousedown below.
+  | { kind: "wire-multi"; anchors: WireAnchor[] }
   | { kind: "comment-move"; commentId: string; grabOffsetX: number; grabOffsetY: number }
   | { kind: "comment-resize"; commentId: string };
 
@@ -60,12 +66,47 @@ export interface WireAnchor {
 }
 
 export interface PointerInteractionCallbacks {
-  /** Wire released with no compatible pin under the cursor — the "filtered node menu" moment. */
-  onWireDroppedInEmptySpace: (anchor: WireAnchor, screenPos: { x: number; y: number }) => void;
+  /** Wire(s) released with no compatible pin under the cursor — the "filtered node menu" moment.
+   * Always an array — a plain single-pin drag passes one anchor, a Ctrl+drag pickup passes every
+   * anchor it grabbed, so picking a node from that menu reconnects all of them to it at once. */
+  onWireDroppedInEmptySpace: (anchors: WireAnchor[], screenPos: { x: number; y: number }) => void;
 }
 
 function findConnectionToInput(graph: Graph, nodeId: string, pinId: string) {
   return graph.connections.find((c) => c.toNode === nodeId && c.toPin === pinId);
+}
+
+/** Connects every anchor to `target` (all sharing the same direction/type, guaranteed by however
+ * they were gathered) if `target` is a valid, compatible, non-self partner — returns whether it
+ * connected anything. Used by both a plain single-anchor wire release and a Ctrl+drag "wire-multi"
+ * release, so dropping on a real pin behaves the same whether one or several anchors are in flight. */
+function tryConnectAnchorsToTarget(
+  graph: Graph,
+  variables: Variable[],
+  functions: FunctionDef[],
+  anchors: WireAnchor[],
+  target: PinHit,
+): boolean {
+  if (anchors.some((a) => a.nodeId === target.nodeId)) return false; // no self-loops
+  const anchorIsOutput = anchors[0].pin.direction === "output";
+  const targetIsOutput = target.pin.direction === "output";
+  if (anchorIsOutput === targetIsOutput || !isPinTypeCompatible(anchors[0].pin.type, target.pin.type)) return false;
+
+  for (const anchor of anchors) {
+    const outputEnd = anchorIsOutput ? anchor : target;
+    const inputEnd = anchorIsOutput ? target : anchor;
+    try {
+      connectPins(graph, variables, functions, {
+        fromNode: outputEnd.nodeId,
+        fromPin: outputEnd.pinId,
+        toNode: inputEnd.nodeId,
+        toPin: inputEnd.pinId,
+      });
+    } catch {
+      // Invalid for this particular anchor — skip it, the others may still connect fine.
+    }
+  }
+  return true;
 }
 
 /** Recomputes which nodes currently sit geometrically inside a comment box's body — called
@@ -143,6 +184,37 @@ export function setupPointerInteraction(
 
     const pinHit = hitTestPin(graph, geometries, pos.x, pos.y);
     if (pinHit) {
+      const touching = connectionsTouchingPin(graph, pinHit.nodeId, pinHit.pinId);
+
+      if ((e.ctrlKey || e.metaKey) && touching.length > 0) {
+        // Ctrl+drag off a pin that already has connections picks up ALL of them at once: each
+        // detached connection's OTHER end becomes an anchor (all sharing this pin's type and the
+        // opposite direction), so dropping them on one new pin — or picking one new node — rewires
+        // every one of them there in a single motion, instead of just this one pin's own wire.
+        const anchors: WireAnchor[] = touching.map((conn) => {
+          const otherIsFromEnd = conn.toNode === pinHit.nodeId && conn.toPin === pinHit.pinId;
+          const otherNodeId = otherIsFromEnd ? conn.fromNode : conn.toNode;
+          const otherPinId = otherIsFromEnd ? conn.fromPin : conn.toPin;
+          const otherNode = graph.nodes.find((n) => n.id === otherNodeId)!;
+          const otherPinDef = resolvePinDefs(otherNode, variables, functions).find((p) => p.id === otherPinId)!;
+          return { nodeId: otherNodeId, pinId: otherPinId, pin: otherPinDef };
+        });
+        for (const conn of touching) {
+          removeConnection(graph, variables, functions, conn.id);
+        }
+
+        drag = { kind: "wire-multi", anchors };
+        store.state.wireDrag = {
+          fromScreens: anchors
+            .map((a) => geometries.get(a.nodeId)?.pinScreen[a.pinId])
+            .filter((p): p is { x: number; y: number } => !!p),
+          toScreen: pos,
+          pinType: anchors[0].pin.type,
+        };
+        store.notify();
+        return;
+      }
+
       let anchor: WireAnchor = { nodeId: pinHit.nodeId, pinId: pinHit.pinId, pin: pinHit.pin };
 
       // Grabbing a connected input pin picks up the existing wire: detach it and
@@ -161,7 +233,7 @@ export function setupPointerInteraction(
 
       drag = { kind: "wire", anchor };
       store.state.wireDrag = {
-        fromScreen: { x: pinHit.screenX, y: pinHit.screenY },
+        fromScreens: [{ x: pinHit.screenX, y: pinHit.screenY }],
         toScreen: pos,
         pinType: anchor.pin.type,
       };
@@ -305,10 +377,24 @@ export function setupPointerInteraction(
       const variables = getVisibleVariablesForState(store.state);
       const functions = store.state.rootGraph.functions;
       const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
-      const anchorGeo = geometries.get(drag.anchor.nodeId);
-      const anchorScreen = anchorGeo?.pinScreen[drag.anchor.pinId];
+      const anchorScreen = geometries.get(drag.anchor.nodeId)?.pinScreen[drag.anchor.pinId];
       if (anchorScreen && store.state.wireDrag) {
-        store.state.wireDrag.fromScreen = anchorScreen;
+        store.state.wireDrag.fromScreens = [anchorScreen];
+        store.state.wireDrag.toScreen = pos;
+      }
+      store.notify();
+      return;
+    }
+
+    if (drag.kind === "wire-multi") {
+      const pos = screenPos(e);
+      const variables = getVisibleVariablesForState(store.state);
+      const functions = store.state.rootGraph.functions;
+      const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
+      if (store.state.wireDrag) {
+        store.state.wireDrag.fromScreens = drag.anchors
+          .map((a) => geometries.get(a.nodeId)?.pinScreen[a.pinId])
+          .filter((p): p is { x: number; y: number } => !!p);
         store.state.wireDrag.toScreen = pos;
       }
       store.notify();
@@ -353,7 +439,7 @@ export function setupPointerInteraction(
   });
 
   window.addEventListener("mouseup", (e) => {
-    if (drag.kind === "wire") {
+    if (drag.kind === "wire" || drag.kind === "wire-multi") {
       const graph = getEditingGraph(store.state);
       const { camera } = store.state;
       const variables = getVisibleVariablesForState(store.state);
@@ -361,35 +447,14 @@ export function setupPointerInteraction(
       const pos = screenPos(e);
       const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
       const targetHit = hitTestPin(graph, geometries, pos.x, pos.y);
-      const anchor = drag.anchor;
-      let connected = false;
+      const anchors = drag.kind === "wire" ? [drag.anchor] : drag.anchors;
 
-      if (targetHit && targetHit.nodeId !== anchor.nodeId) {
-        const target = targetHit;
-        const anchorIsOutput = anchor.pin.direction === "output";
-        const targetIsOutput = target.pin.direction === "output";
-
-        if (anchorIsOutput !== targetIsOutput && isPinTypeCompatible(anchor.pin.type, target.pin.type)) {
-          const outputEnd = anchorIsOutput ? anchor : target;
-          const inputEnd = anchorIsOutput ? target : anchor;
-          try {
-            connectPins(graph, variables, functions, {
-              fromNode: outputEnd.nodeId,
-              fromPin: outputEnd.pinId,
-              toNode: inputEnd.nodeId,
-              toPin: inputEnd.pinId,
-            });
-            connected = true;
-          } catch {
-            // incompatible/invalid — treated the same as an empty-space drop below
-          }
-        }
-      }
+      const connected = targetHit ? tryConnectAnchorsToTarget(graph, variables, functions, anchors, targetHit) : false;
 
       store.state.wireDrag = null;
       drag = { kind: "none" };
       store.notify();
-      if (!connected) callbacks.onWireDroppedInEmptySpace(anchor, pos);
+      if (!connected) callbacks.onWireDroppedInEmptySpace(anchors, pos);
       return;
     }
 

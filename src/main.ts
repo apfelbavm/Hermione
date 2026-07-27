@@ -1,7 +1,16 @@
 import "./style.css";
 import { registerBuiltins } from "./nodes";
 import { createExecutionContext, runExecFrom } from "./engine/executor";
-import { addNode, canPlaceNodeType, connectPins, createNodeInstance, removeInstancePin } from "./engine/graphMutations";
+import {
+  addNode,
+  canPlaceNodeType,
+  connectPins,
+  createNodeInstance,
+  removeConnection,
+  removeInstancePin,
+  resolveNodeLabel,
+} from "./engine/graphMutations";
+import { connectionsTouchingPin } from "./engine/graphQueries";
 import {
   allNodeDefs,
   findCompatibleNodeDefs,
@@ -30,7 +39,7 @@ import { createDetailsPanel } from "./overlay/detailsPanel";
 import { createGraphTabs } from "./overlay/graphTabs";
 import { openNodeSearchMenu } from "./overlay/nodeSearchMenu";
 import { FUNCTION_DRAG_MIME, VARIABLE_DRAG_MIME } from "./overlay/dragTypes";
-import { openRowContextMenu } from "./overlay/rowContextMenu";
+import { openRowContextMenu, type ContextMenuItem } from "./overlay/rowContextMenu";
 import { loadGraphFromFile, loadGraphFromLocalStorage } from "./persistence/load";
 import { downloadGraphAsFile, saveGraphToLocalStorage } from "./persistence/save";
 import { downloadCompiledGraph } from "./compiler/codegen";
@@ -229,36 +238,41 @@ function filterCreatableHere(defs: NodeDef[]): NodeDef[] {
   return defs.filter((def) => canPlaceNodeType(def.type, graph, isFunctionBody));
 }
 
-/** Creates a node at worldPos and, if an anchor pin is given, auto-connects it to the first compatible pin. */
+/** Creates a node at worldPos and, if any anchors are given, auto-connects ALL of them to the same
+ * first compatible pin (a plain pick passes one anchor; picking a node after a Ctrl+drag pickup —
+ * see pointerHandlers.ts's "wire-multi" mode — passes every anchor it grabbed, reconnecting them
+ * all to this one new node in a single motion). */
 function createNodeAndMaybeConnect(
   def: NodeDef,
   worldPos: { x: number; y: number },
-  anchor?: WireAnchor,
+  anchors: WireAnchor[] = [],
 ): void {
   const graph = getEditingGraph(store.state);
   const node = createNodeInstance(def.type, applySnapIfEnabled(worldPos), def.pins);
   addNode(graph, node);
 
-  if (anchor) {
-    const wantDirection = anchor.pin.direction === "output" ? "input" : "output";
+  if (anchors.length > 0) {
+    const wantDirection = anchors[0].pin.direction === "output" ? "input" : "output";
     const matchPin = def.pins.find(
-      (p) => p.direction === wantDirection && isPinTypeCompatible(anchor.pin.type, p.type),
+      (p) => p.direction === wantDirection && isPinTypeCompatible(anchors[0].pin.type, p.type),
     );
     if (matchPin) {
-      const anchorIsOutput = anchor.pin.direction === "output";
-      const outputEnd = anchorIsOutput ? anchor : { nodeId: node.id, pinId: matchPin.id };
-      const inputEnd = anchorIsOutput ? { nodeId: node.id, pinId: matchPin.id } : anchor;
-      connectPins(
-        graph,
-        getVisibleVariablesForState(store.state),
-        store.state.rootGraph.functions,
-        {
-          fromNode: outputEnd.nodeId,
-          fromPin: outputEnd.pinId,
-          toNode: inputEnd.nodeId,
-          toPin: inputEnd.pinId,
-        },
-      );
+      for (const anchor of anchors) {
+        const anchorIsOutput = anchor.pin.direction === "output";
+        const outputEnd = anchorIsOutput ? anchor : { nodeId: node.id, pinId: matchPin.id };
+        const inputEnd = anchorIsOutput ? { nodeId: node.id, pinId: matchPin.id } : anchor;
+        connectPins(
+          graph,
+          getVisibleVariablesForState(store.state),
+          store.state.rootGraph.functions,
+          {
+            fromNode: outputEnd.nodeId,
+            fromPin: outputEnd.pinId,
+            toNode: inputEnd.nodeId,
+            toPin: inputEnd.pinId,
+          },
+        );
+      }
     }
   }
 
@@ -266,13 +280,14 @@ function createNodeAndMaybeConnect(
 }
 
 const pointerInteraction = setupPointerInteraction(canvas, store, {
-  onWireDroppedInEmptySpace: (anchor, screenPos) => {
-    const candidates = filterCreatableHere(findCompatibleNodeDefs(anchor.pin.type, anchor.pin.direction));
+  onWireDroppedInEmptySpace: (anchors, screenPos) => {
+    const shared = anchors[0].pin;
+    const candidates = filterCreatableHere(findCompatibleNodeDefs(shared.type, shared.direction));
     const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
     openNodeSearchMenu(overlay, {
       screenPos,
       candidates,
-      onPick: (def) => createNodeAndMaybeConnect(def, worldPos, anchor),
+      onPick: (def) => createNodeAndMaybeConnect(def, worldPos, anchors),
       onCancel: () => {},
     });
   },
@@ -285,24 +300,47 @@ canvas.addEventListener("contextmenu", (e) => {
   const rect = canvas.getBoundingClientRect();
   const screenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 
-  // Right-clicking a removable entry pin (e.g. one of Append String's string slots) offers to
-  // delete just that entry instead of opening the node-creation menu.
+  // Right-clicking a pin offers to delete it (if it's a removable entry, e.g. one of Append
+  // String's string slots) and/or break whatever it's connected to — instead of opening the
+  // node-creation menu.
   const graph = getEditingGraph(store.state);
   const variables = getVisibleVariablesForState(store.state);
   const functions = store.state.rootGraph.functions;
   const geometries = computeAllNodeGeometries(graph, store.state.camera, variables, functions);
   const pinHit = hitTestPin(graph, geometries, screenPos.x, screenPos.y);
-  if (pinHit?.pin.removable) {
-    openRowContextMenu({ x: e.clientX, y: e.clientY }, [
-      {
+  if (pinHit) {
+    const items: ContextMenuItem[] = [];
+
+    if (pinHit.pin.removable) {
+      items.push({
         label: "Delete",
         onClick: () => {
           removeInstancePin(graph, pinHit.nodeId, pinHit.pinId);
           store.notify();
         },
-      },
-    ]);
-    return;
+      });
+    }
+
+    const touching = connectionsTouchingPin(graph, pinHit.nodeId, pinHit.pinId);
+    for (const conn of touching) {
+      const otherIsFromEnd = conn.toNode === pinHit.nodeId && conn.toPin === pinHit.pinId;
+      const otherNode = graph.nodes.find((n) => n.id === (otherIsFromEnd ? conn.fromNode : conn.toNode));
+      const otherLabel = otherNode ? resolveNodeLabel(otherNode, getNodeDef(otherNode.type), functions) : "?";
+      items.push({
+        // Only distinguish by destination when there's more than one to choose between (a fanned-out
+        // data output, or an exec input converging several branches) — otherwise it's unambiguous.
+        label: touching.length > 1 ? `Break Connection → ${otherLabel}` : "Break Connection",
+        onClick: () => {
+          removeConnection(graph, variables, functions, conn.id);
+          store.notify();
+        },
+      });
+    }
+
+    if (items.length > 0) {
+      openRowContextMenu({ x: e.clientX, y: e.clientY }, items);
+      return;
+    }
   }
 
   const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
