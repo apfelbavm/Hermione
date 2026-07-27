@@ -109,6 +109,11 @@ export function setupPointerInteraction(
   }
 
   canvas.addEventListener("mousedown", (e) => {
+    // Any click inside the graph view — regardless of what it hits — stands down whatever
+    // Variables/Functions sidebar row was selected, so the Details panel only ever reflects
+    // whichever was clicked last (see detailsPanel.ts).
+    store.state.sidebarSelection = null;
+
     if (e.button === 2) {
       // Right-drag pans the camera; a right-click with no drag still opens the context menu
       // (see shouldSuppressContextMenu, consumed by main.ts's "contextmenu" listener).
@@ -176,9 +181,6 @@ export function setupPointerInteraction(
         else next.add(node.id);
         store.state.selectedNodeIds = next;
         store.state.selectedCommentId = null;
-        // A canvas node selection takes over from whatever sidebar row's Details were showing —
-        // see detailsPanel.ts.
-        store.state.sidebarSelection = null;
         if (!next.has(node.id)) {
           // Just deselected it — nothing to grab from here.
           drag = { kind: "none" };
@@ -190,7 +192,6 @@ export function setupPointerInteraction(
         // Fresh click on a node outside the current selection replaces the selection.
         store.state.selectedNodeIds = new Set([node.id]);
         store.state.selectedCommentId = null;
-        store.state.sidebarSelection = null;
       }
       // else: the clicked node is already part of an existing multi-selection — keep the whole
       // selection intact so the drag below moves the whole group, Unreal-style.
@@ -420,7 +421,6 @@ export function setupPointerInteraction(
           rectIntersects(box, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), functions)),
         );
         store.state.selectedNodeIds = new Set(touched.map((n) => n.id));
-        store.state.sidebarSelection = null;
       }
       store.state.marqueeSelection = null;
       drag = { kind: "none" };

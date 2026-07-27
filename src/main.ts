@@ -123,7 +123,6 @@ const inputsPanel = createFunctionIoPanel(
     addButton: document.getElementById("add-input-button") as HTMLButtonElement,
   },
   store,
-  canvas,
   "input",
   getSelectedFunctionForDetails,
 );
@@ -134,10 +133,8 @@ const outputsPanel = createFunctionIoPanel(
     header: document.getElementById("outputs-header") as HTMLDivElement,
     list: document.getElementById("outputs-list") as HTMLDivElement,
     addButton: document.getElementById("add-output-button") as HTMLButtonElement,
-    spawnReturnButton: document.getElementById("spawn-return-node-button") as HTMLButtonElement,
   },
   store,
-  canvas,
   "output",
   getSelectedFunctionForDetails,
 );
@@ -309,14 +306,24 @@ canvas.addEventListener("contextmenu", (e) => {
   }
 
   const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
+  const activeFn = getActiveFunction();
+  // Return is the one exception to the "Functions group isn't generically creatable" rule below —
+  // inside a function body it's pinned to the top of the menu instead, bound to whichever function
+  // is currently open (a function body can hold several Return nodes, one per exec branch).
+  const returnDef = activeFn ? getNodeDef("function.return") : undefined;
+
   openNodeSearchMenu(overlay, {
     screenPos,
-    // Get/Set Variable nodes need a variable bound via the Variables panel, and Entry/Return/Call
-    // nodes need a function bound via the Functions panel — neither is generically creatable here.
+    // Get/Set Variable nodes need a variable bound via the Variables panel, and Entry/Call nodes
+    // need a function bound via the Functions panel — neither is generically creatable here.
     candidates: filterCreatableHere(
       allNodeDefs().filter((def) => !["Variables", "Functions"].includes(topLevelGroup(def.group))),
     ),
-    onPick: (def) => createNodeAndMaybeConnect(def, worldPos),
+    pinned: returnDef ? [returnDef] : undefined,
+    onPick: (def) => {
+      if (def.type === "function.return" && activeFn) spawnReturnNodeAt(activeFn, worldPos);
+      else createNodeAndMaybeConnect(def, worldPos);
+    },
     onCancel: () => {},
   });
 });
@@ -336,6 +343,16 @@ function spawnVariableNodeAt(type: "variable.get" | "variable.set", variable: Va
   const pinDefs = def.derivePins!(variable);
   const node = createNodeInstance(type, applySnapIfEnabled(worldPos), pinDefs, undefined, variable.id);
   addNode(getEditingGraph(store.state), node);
+  store.notify();
+}
+
+/** Placed by picking "Return" from the right-click menu inside a function's body (see the
+ * contextmenu handler above) — a function body can hold several, one per exec branch. */
+function spawnReturnNodeAt(fn: FunctionDef, worldPos: { x: number; y: number }): void {
+  const def = getNodeDef("function.return");
+  const pinDefs = def.deriveFunctionPins!(fn);
+  const node = createNodeInstance("function.return", applySnapIfEnabled(worldPos), pinDefs, undefined, undefined, fn.id);
+  addNode(fn.body, node);
   store.notify();
 }
 

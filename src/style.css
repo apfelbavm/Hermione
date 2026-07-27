@@ -543,6 +543,12 @@ html, body {
   color: #9aa0a8;
 }
 
+/** Separates pinned rows (e.g. "Return" inside a function body) from the regular grouped/sorted
+ * list below them. */
+.node-search-pinned-divider {
+  border-bottom: 1px solid #454a52;
+}
+
 .comment-title {
   box-sizing: border-box;
   background: transparent;

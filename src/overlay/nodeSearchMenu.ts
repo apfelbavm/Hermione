@@ -4,6 +4,10 @@ import { buildMenuTree, flattenVisible, type MenuNode, type VisibleRow } from ".
 export interface NodeSearchMenuOptions {
   screenPos: { x: number; y: number };
   candidates: NodeDef[];
+  /** Rendered as plain, ungrouped rows pinned above the rest of the list — e.g. "Return" when
+   * right-clicking inside a function body, so it doesn't need digging out of a nested group. Still
+   * participates in search filtering like any other candidate, just never nested under its group. */
+  pinned?: NodeDef[];
   onPick: (def: NodeDef) => void;
   onCancel: () => void;
 }
@@ -28,11 +32,22 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
   list.className = "node-search-list";
   menu.appendChild(list);
 
-  const tree = buildMenuTree(opts.candidates);
+  const pinned = opts.pinned ?? [];
+  const pinnedSet = new Set(pinned);
+  // Excluded from the grouped tree so a pinned def doesn't also show up nested under its own group.
+  const treeCandidates = opts.candidates.filter((d) => !pinnedSet.has(d));
+
+  const tree = buildMenuTree(treeCandidates);
   const expanded = new Set<string>();
 
-  let treeRows: VisibleRow[] = flattenVisible(tree, expanded);
+  function computeTreeRows(): VisibleRow[] {
+    const pinnedRows: VisibleRow[] = pinned.map((def) => ({ depth: 0, node: { kind: "leaf", def } }));
+    return [...pinnedRows, ...flattenVisible(tree, expanded)];
+  }
+
+  let treeRows: VisibleRow[] = computeTreeRows();
   let flatDefs: NodeDef[] = [];
+  let pinnedMatchCount = 0;
   let query = "";
   let highlighted = 0;
   let closed = false;
@@ -56,6 +71,9 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
         const li = document.createElement("li");
         li.className = "node-search-result";
         if (i === highlighted) li.classList.add("highlighted");
+        if (i === pinnedMatchCount - 1 && pinnedMatchCount < flatDefs.length) {
+          li.classList.add("node-search-pinned-divider");
+        }
 
         const labelEl = document.createElement("span");
         labelEl.className = "node-search-result-label";
@@ -79,6 +97,9 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
       const li = document.createElement("li");
       li.style.paddingLeft = `${8 + row.depth * 14}px`;
       if (i === highlighted) li.classList.add("highlighted");
+      if (i === pinned.length - 1 && pinned.length < treeRows.length) {
+        li.classList.add("node-search-pinned-divider");
+      }
 
       if (row.node.kind === "group") {
         li.className = "node-search-group";
@@ -103,7 +124,7 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
   function toggleGroup(group: Extract<MenuNode, { kind: "group" }>): void {
     if (expanded.has(group.path)) expanded.delete(group.path);
     else expanded.add(group.path);
-    treeRows = flattenVisible(tree, expanded);
+    treeRows = computeTreeRows();
     highlighted = Math.min(highlighted, Math.max(0, treeRows.length - 1));
     renderList();
   }
@@ -111,9 +132,11 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
   function applyFilter(): void {
     query = input.value.trim().toLowerCase();
     if (query) {
-      flatDefs = opts.candidates
-        .filter((d) => d.label.toLowerCase().includes(query) || d.group.toLowerCase().includes(query))
-        .sort((a, b) => a.label.localeCompare(b.label));
+      const matches = (d: NodeDef) => d.label.toLowerCase().includes(query) || d.group.toLowerCase().includes(query);
+      const matchedPinned = pinned.filter(matches);
+      const matchedOthers = treeCandidates.filter(matches).sort((a, b) => a.label.localeCompare(b.label));
+      pinnedMatchCount = matchedPinned.length;
+      flatDefs = [...matchedPinned, ...matchedOthers];
     }
     highlighted = 0;
     renderList();

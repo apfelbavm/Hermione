@@ -1,8 +1,6 @@
 import {
   addFunctionInput,
   addFunctionOutput,
-  addNode,
-  createNodeInstance,
   DEFAULT_VALUE_BY_TYPE,
   nextId,
   removeFunctionInput,
@@ -10,9 +8,7 @@ import {
   updateFunctionInput,
   updateFunctionOutput,
 } from "../engine/graphMutations";
-import { getNodeDef } from "../engine/registry";
 import type { FunctionDef, PinSignatureEntry, PinType } from "../engine/types";
-import { screenToWorld } from "../render/camera";
 import type { Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
@@ -26,46 +22,22 @@ export interface FunctionIoPanelElements {
   header: HTMLElement;
   list: HTMLElement;
   addButton: HTMLButtonElement;
-  /** Outputs-only: spawns a new function.return node into the open function's body. */
-  spawnReturnButton?: HTMLButtonElement;
 }
 
 /** Shared factory for the Inputs and Outputs sections — both are a list of typed signature
  * entries (name/type/default value) on the currently-open function. Collapsible; "+" creates an
  * entry with an unused default name and immediately enters rename mode; right-click > Edit renames
- * an existing one. The Outputs panel additionally spawns Return node instances onto the function's
- * body graph — a function's body has exactly one auto-placed Entry but can have several Returns. */
+ * an existing one. (A Return node instance is placed by right-clicking inside the function's body
+ * graph — see main.ts's contextmenu handler — not from here; a function body can hold several.) */
 export function createFunctionIoPanel(
   elements: FunctionIoPanelElements,
   store: Store,
-  canvas: HTMLCanvasElement,
   kind: "input" | "output",
   getActiveFunction: () => FunctionDef | null,
 ): { render: () => void } {
   setupCollapsibleSection(elements.header, elements.section);
 
-  let spawnCounter = 0;
   let editingId: string | null = null;
-
-  function centerWorldPos(): { x: number; y: number } {
-    const pos = screenToWorld(
-      store.state.camera,
-      canvas.clientWidth / 2 + spawnCounter * 24,
-      canvas.clientHeight / 2 + spawnCounter * 24,
-    );
-    spawnCounter += 1;
-    return pos;
-  }
-
-  elements.spawnReturnButton?.addEventListener("click", () => {
-    const fn = getActiveFunction();
-    if (!fn) return;
-    const def = getNodeDef("function.return");
-    const pinDefs = def.deriveFunctionPins!(fn);
-    const node = createNodeInstance("function.return", centerWorldPos(), pinDefs, nextId("node"), undefined, fn.id);
-    addNode(fn.body, node);
-    store.notify();
-  });
 
   function entriesOf(fn: FunctionDef): PinSignatureEntry[] {
     return kind === "input" ? fn.inputs : fn.outputs;
