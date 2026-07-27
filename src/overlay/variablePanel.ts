@@ -1,28 +1,36 @@
-import { addNode, addVariable, DEFAULT_VALUE_BY_TYPE, nextId, removeVariable, updateVariable } from "../engine/graphMutations";
+import { addVariable, DEFAULT_VALUE_BY_TYPE, nextId, removeVariable, updateVariable } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import type { Graph, PinType, Variable } from "../engine/types";
 import { screenToWorld } from "../render/camera";
 import type { Store } from "../state/store";
-import { createNameInput, createTypeSelect, createTypedValueInput } from "./typedValueInput";
+import { setupCollapsibleSection } from "./collapsibleSection";
+import { createEditableNameInput, createEditableNameLabel, focusAndSelect } from "./editableNameCell";
+import { openRowContextMenu } from "./rowContextMenu";
+import { createTypeSelect, createTypedValueInput } from "./typedValueInput";
+import { nextAvailableName } from "./uniqueName";
 
 export interface VariablePanelElements {
+  section: HTMLElement;
+  header: HTMLElement;
   list: HTMLElement;
-  nameInput: HTMLInputElement;
-  typeSelect: HTMLSelectElement;
   addButton: HTMLButtonElement;
 }
 
-/** Wires up a Variables-style side panel: create/delete variables, edit name/type/default value
- * in place, and spawn Get/Set nodes bound to one. Generalized over `getGraph` so the same factory
- * drives both the always-visible global Variables panel (bound to the root graph) and the Local
- * Variables panel (bound to whichever function's body is currently open). */
+/** Wires up a Variables-style side panel: collapsible, "+" creates a variable with an unused
+ * default name and immediately enters rename mode, right-click > Edit renames an existing one,
+ * and Get/Set spawn nodes bound to it. Generalized over `getGraph` so the same factory drives both
+ * the always-visible global Variables panel (bound to the root graph) and the Local Variables
+ * panel (bound to whichever function's body is currently open). */
 export function createVariablePanel(
   elements: VariablePanelElements,
   store: Store,
   canvas: HTMLCanvasElement,
   getGraph: () => Graph,
 ): { render: () => void } {
+  setupCollapsibleSection(elements.header, elements.section);
+
   let spawnCounter = 0;
+  let editingId: string | null = null;
 
   function centerWorldPos(): { x: number; y: number } {
     const pos = screenToWorld(
@@ -41,7 +49,18 @@ export function createVariablePanel(
     for (const pinDef of pinDefs) {
       node.pins[pinDef.id] = pinDef.direction === "input" ? { value: pinDef.defaultValue } : {};
     }
-    addNode(getGraph(), node);
+    getGraph().nodes.push(node);
+    store.notify();
+  }
+
+  function commitRename(variable: Variable, rawNewName: string): void {
+    const trimmed = rawNewName.trim();
+    const isDuplicate =
+      trimmed.length === 0 || getGraph().variables.some((v) => v.id !== variable.id && v.name === trimmed);
+    if (!isDuplicate) {
+      updateVariable(store.state.rootGraph, variable.id, { name: trimmed });
+    }
+    editingId = null;
     store.notify();
   }
 
@@ -55,11 +74,27 @@ export function createVariablePanel(
       const row = document.createElement("div");
       row.className = "variable-row";
 
-      const name = createNameInput(variable.name, (name) => {
-        updateVariable(store.state.rootGraph, variable.id, { name });
-        store.notify();
-      });
-      name.title = variable.name;
+      let nameInputToFocus: HTMLInputElement | null = null;
+      const nameEl =
+        editingId === variable.id
+          ? (() => {
+              const input = createEditableNameInput(
+                variable.name,
+                (newName) => commitRename(variable, newName),
+                () => {
+                  editingId = null;
+                  store.notify();
+                },
+              );
+              nameInputToFocus = input;
+              return input;
+            })()
+          : createEditableNameLabel(variable.name, (screenPos) => {
+              openRowContextMenu(screenPos, () => {
+                editingId = variable.id;
+                store.notify();
+              });
+            });
 
       const type = createTypeSelect(variable.type, (type) => {
         updateVariable(store.state.rootGraph, variable.id, { type });
@@ -86,22 +121,21 @@ export function createVariablePanel(
         store.notify();
       });
 
-      row.append(name, type, value, getBtn, setBtn, delBtn);
+      row.append(nameEl, type, value, getBtn, setBtn, delBtn);
       elements.list.appendChild(row);
+      if (nameInputToFocus) focusAndSelect(nameInputToFocus);
     }
   }
 
-  elements.addButton.addEventListener("click", () => {
-    const name = elements.nameInput.value.trim() || `Var${getGraph().variables.length + 1}`;
-    const type = elements.typeSelect.value as PinType;
-    const variable: Variable = {
-      id: nextId("var"),
-      name,
-      type,
-      defaultValue: DEFAULT_VALUE_BY_TYPE[type],
-    };
-    addVariable(getGraph(), variable);
-    elements.nameInput.value = "";
+  elements.addButton.addEventListener("click", (e) => {
+    e.stopPropagation(); // don't also toggle the section's collapse state
+    elements.section.classList.remove("collapsed");
+    const graph = getGraph();
+    const name = nextAvailableName(graph.variables.map((v) => v.name), "NewVariable");
+    const type: PinType = "number";
+    const variable: Variable = { id: nextId("var"), name, type, defaultValue: DEFAULT_VALUE_BY_TYPE[type] };
+    addVariable(graph, variable);
+    editingId = variable.id;
     store.notify();
   });
 

@@ -51,16 +51,3 @@ export function createTypeSelect(current: PinType, onChange: (type: PinType) => 
   select.addEventListener("change", () => onChange(select.value as PinType));
   return select;
 }
-
-/** A plain text input for editing an entry's name, committing on change (blur/Enter). */
-export function createNameInput(value: string, onChange: (value: string) => void): HTMLInputElement {
-  const input = document.createElement("input");
-  input.className = "typed-value-input variable-name";
-  input.type = "text";
-  input.value = value;
-  input.addEventListener("change", () => onChange(input.value));
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") input.blur();
-  });
-  return input;
-}

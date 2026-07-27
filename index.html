@@ -25,71 +25,52 @@
           </div>
         </div>
         <div id="sidebar">
-          <div class="panel-section">
-            <div class="panel-header">Functions</div>
-            <div id="functions-list" class="panel-list"></div>
-            <div class="panel-add-row">
-              <input id="new-function-name" type="text" placeholder="Name" />
-              <button id="add-function-button">+</button>
+          <div id="functions-section" class="panel-section">
+            <div id="functions-header" class="panel-header">
+              <span class="panel-header-title">Functions</span>
+              <button id="add-function-button" class="panel-header-add">+</button>
+            </div>
+            <div class="panel-body">
+              <div id="functions-list" class="panel-list"></div>
             </div>
           </div>
-          <div class="panel-section">
-            <div class="panel-header">Variables</div>
-            <div id="variables-list" class="panel-list"></div>
-            <div class="panel-add-row">
-              <input id="new-variable-name" type="text" placeholder="Name" />
-              <select id="new-variable-type">
-                <option value="number">number</option>
-                <option value="boolean">boolean</option>
-                <option value="string">string</option>
-                <option value="object">object</option>
-              </select>
-              <button id="add-variable-button">+</button>
+          <div id="variables-section" class="panel-section">
+            <div id="variables-header" class="panel-header">
+              <span class="panel-header-title">Variables</span>
+              <button id="add-variable-button" class="panel-header-add">+</button>
+            </div>
+            <div class="panel-body">
+              <div id="variables-list" class="panel-list"></div>
             </div>
           </div>
           <div id="inputs-section" class="panel-section">
-            <div class="panel-header">Inputs</div>
-            <div id="inputs-list" class="panel-list"></div>
-            <div class="panel-add-row">
-              <input id="new-input-name" type="text" placeholder="Name" />
-              <select id="new-input-type">
-                <option value="number">number</option>
-                <option value="boolean">boolean</option>
-                <option value="string">string</option>
-                <option value="object">object</option>
-              </select>
-              <button id="add-input-button">+</button>
+            <div id="inputs-header" class="panel-header">
+              <span class="panel-header-title">Inputs</span>
+              <button id="add-input-button" class="panel-header-add">+</button>
+            </div>
+            <div class="panel-body">
+              <div id="inputs-list" class="panel-list"></div>
             </div>
           </div>
           <div id="outputs-section" class="panel-section">
-            <div class="panel-header">Outputs</div>
-            <div id="outputs-list" class="panel-list"></div>
-            <div class="panel-add-row">
-              <input id="new-output-name" type="text" placeholder="Name" />
-              <select id="new-output-type">
-                <option value="number">number</option>
-                <option value="boolean">boolean</option>
-                <option value="string">string</option>
-                <option value="object">object</option>
-              </select>
-              <button id="add-output-button">+</button>
+            <div id="outputs-header" class="panel-header">
+              <span class="panel-header-title">Outputs</span>
+              <button id="add-output-button" class="panel-header-add">+</button>
             </div>
-            <div class="panel-add-row">
-              <button id="spawn-return-node-button" style="flex: 1 1 auto">Place Return Node</button>
+            <div class="panel-body">
+              <div id="outputs-list" class="panel-list"></div>
+              <div class="panel-add-row">
+                <button id="spawn-return-node-button" style="flex: 1 1 auto">Place Return Node</button>
+              </div>
             </div>
           </div>
           <div id="local-variables-section" class="panel-section">
-            <div class="panel-header">Local Variables</div>
-            <div id="local-variables-list" class="panel-list"></div>
-            <div class="panel-add-row">
-              <input id="new-local-variable-name" type="text" placeholder="Name" />
-              <select id="new-local-variable-type">
-                <option value="number">number</option>
-                <option value="boolean">boolean</option>
-                <option value="string">string</option>
-                <option value="object">object</option>
-              </select>
-              <button id="add-local-variable-button">+</button>
+            <div id="local-variables-header" class="panel-header">
+              <span class="panel-header-title">Local Variables</span>
+              <button id="add-local-variable-button" class="panel-header-add">+</button>
+            </div>
+            <div class="panel-body">
+              <div id="local-variables-list" class="panel-list"></div>
             </div>
           </div>
         </div>

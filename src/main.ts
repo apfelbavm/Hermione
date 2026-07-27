@@ -73,9 +73,9 @@ const widgetSync = createWidgetSync(overlay, store);
 const commentOverlay = createCommentOverlay(overlay, store);
 const variablePanel = createVariablePanel(
   {
+    section: document.getElementById("variables-section") as HTMLDivElement,
+    header: document.getElementById("variables-header") as HTMLDivElement,
     list: document.getElementById("variables-list") as HTMLDivElement,
-    nameInput: document.getElementById("new-variable-name") as HTMLInputElement,
-    typeSelect: document.getElementById("new-variable-type") as HTMLSelectElement,
     addButton: document.getElementById("add-variable-button") as HTMLButtonElement,
   },
   store,
@@ -91,8 +91,9 @@ function getActiveFunction(): FunctionDef | null {
 
 const functionsPanel = createFunctionsPanel(
   {
+    section: document.getElementById("functions-section") as HTMLDivElement,
+    header: document.getElementById("functions-header") as HTMLDivElement,
     list: document.getElementById("functions-list") as HTMLDivElement,
-    nameInput: document.getElementById("new-function-name") as HTMLInputElement,
     addButton: document.getElementById("add-function-button") as HTMLButtonElement,
   },
   store,
@@ -102,9 +103,8 @@ const functionsPanel = createFunctionsPanel(
 const inputsPanel = createFunctionIoPanel(
   {
     section: document.getElementById("inputs-section") as HTMLDivElement,
+    header: document.getElementById("inputs-header") as HTMLDivElement,
     list: document.getElementById("inputs-list") as HTMLDivElement,
-    nameInput: document.getElementById("new-input-name") as HTMLInputElement,
-    typeSelect: document.getElementById("new-input-type") as HTMLSelectElement,
     addButton: document.getElementById("add-input-button") as HTMLButtonElement,
   },
   store,
@@ -116,9 +116,8 @@ const inputsPanel = createFunctionIoPanel(
 const outputsPanel = createFunctionIoPanel(
   {
     section: document.getElementById("outputs-section") as HTMLDivElement,
+    header: document.getElementById("outputs-header") as HTMLDivElement,
     list: document.getElementById("outputs-list") as HTMLDivElement,
-    nameInput: document.getElementById("new-output-name") as HTMLInputElement,
-    typeSelect: document.getElementById("new-output-type") as HTMLSelectElement,
     addButton: document.getElementById("add-output-button") as HTMLButtonElement,
     spawnReturnButton: document.getElementById("spawn-return-node-button") as HTMLButtonElement,
   },
@@ -131,9 +130,9 @@ const outputsPanel = createFunctionIoPanel(
 const localVariablesSection = document.getElementById("local-variables-section") as HTMLDivElement;
 const localVariablePanel = createVariablePanel(
   {
+    section: localVariablesSection,
+    header: document.getElementById("local-variables-header") as HTMLDivElement,
     list: document.getElementById("local-variables-list") as HTMLDivElement,
-    nameInput: document.getElementById("new-local-variable-name") as HTMLInputElement,
-    typeSelect: document.getElementById("new-local-variable-type") as HTMLSelectElement,
     addButton: document.getElementById("add-local-variable-button") as HTMLButtonElement,
   },
   store,

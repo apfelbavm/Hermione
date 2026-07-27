@@ -151,9 +151,53 @@ html, body {
 }
 
 .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 10px 12px;
   font-weight: 600;
   border-bottom: 1px solid #33383f;
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-header-title {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-header-title::before {
+  content: "▾ ";
+  display: inline-block;
+  width: 12px;
+}
+
+.panel-section.collapsed .panel-header-title::before {
+  content: "▸ ";
+}
+
+.panel-section.collapsed .panel-body {
+  display: none;
+}
+
+.panel-header-add {
+  flex: 0 0 auto;
+  background: #3b6b8a;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.panel-header-add:hover {
+  background: #4a7ea0;
 }
 
 .panel-list {
@@ -205,6 +249,33 @@ html, body {
 .function-row-active .function-name {
   color: #e8b339;
   font-weight: 600;
+}
+
+.editable-name-label {
+  cursor: default;
+}
+
+.row-context-menu {
+  position: fixed;
+  z-index: 20;
+  background: #24272d;
+  border: 1px solid #454a52;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  min-width: 100px;
+  padding: 4px;
+  font-size: 13px;
+}
+
+.row-context-menu-item {
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #e8e8e8;
+}
+
+.row-context-menu-item:hover {
+  background: #3b6b8a;
 }
 
 .typed-value-input {
@@ -262,21 +333,6 @@ html, body {
   gap: 4px;
   padding: 8px;
   border-top: 1px solid #33383f;
-}
-
-.panel-add-row input,
-.panel-add-row select {
-  background: #1c1f24;
-  border: 1px solid #454a52;
-  color: #e8e8e8;
-  border-radius: 3px;
-  font-size: 12px;
-  padding: 3px 4px;
-  min-width: 0;
-}
-
-.panel-add-row input {
-  flex: 1 1 auto;
 }
 
 .panel-add-row button {
