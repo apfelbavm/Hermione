@@ -9,7 +9,7 @@ import {
   isPinTypeCompatible,
   topLevelGroup,
 } from "./engine/registry";
-import type { FunctionDef, NodeDef } from "./engine/types";
+import type { FunctionDef, NodeDef, Variable } from "./engine/types";
 import { buildDemoGraph } from "./demoGraph";
 import { createCamera, screenToWorld } from "./render/camera";
 import { computeAllNodeGeometries } from "./render/nodeGeometry";
@@ -27,6 +27,8 @@ import { createFunctionsPanel } from "./overlay/functionsPanel";
 import { createFunctionIoPanel } from "./overlay/functionIoPanel";
 import { createGraphTabs } from "./overlay/graphTabs";
 import { openNodeSearchMenu } from "./overlay/nodeSearchMenu";
+import { FUNCTION_DRAG_MIME, VARIABLE_DRAG_MIME } from "./overlay/dragTypes";
+import { openRowContextMenu } from "./overlay/rowContextMenu";
 import { loadGraphFromFile, loadGraphFromLocalStorage } from "./persistence/load";
 import { downloadGraphAsFile, saveGraphToLocalStorage } from "./persistence/save";
 import { downloadCompiledGraph } from "./compiler/codegen";
@@ -79,7 +81,6 @@ const variablePanel = createVariablePanel(
     addButton: document.getElementById("add-variable-button") as HTMLButtonElement,
   },
   store,
-  canvas,
   () => store.state.rootGraph,
 );
 
@@ -97,7 +98,6 @@ const functionsPanel = createFunctionsPanel(
     addButton: document.getElementById("add-function-button") as HTMLButtonElement,
   },
   store,
-  canvas,
 );
 
 const inputsPanel = createFunctionIoPanel(
@@ -136,7 +136,6 @@ const localVariablePanel = createVariablePanel(
     addButton: document.getElementById("add-local-variable-button") as HTMLButtonElement,
   },
   store,
-  canvas,
   () => getActiveFunction()?.body ?? store.state.rootGraph,
 );
 
@@ -246,6 +245,58 @@ canvas.addEventListener("contextmenu", (e) => {
     onPick: (def) => createNodeAndMaybeConnect(def, worldPos),
     onCancel: () => {},
   });
+});
+
+// --- Drag a Functions/Variables sidebar row onto the canvas: dropping a function spawns a Call
+// node bound to it at the drop point; dropping a variable pops a Get/Set choice at the drop point.
+function spawnCallNodeAt(fn: FunctionDef, worldPos: { x: number; y: number }): void {
+  const def = getNodeDef("function.call");
+  const pinDefs = def.deriveFunctionPins!(fn);
+  const node = createNodeInstance("function.call", worldPos, pinDefs, undefined, undefined, fn.id);
+  addNode(getEditingGraph(store.state), node);
+  store.notify();
+}
+
+function spawnVariableNodeAt(type: "variable.get" | "variable.set", variable: Variable, worldPos: { x: number; y: number }): void {
+  const def = getNodeDef(type);
+  const pinDefs = def.derivePins!(variable);
+  const node = createNodeInstance(type, worldPos, pinDefs, undefined, variable.id);
+  addNode(getEditingGraph(store.state), node);
+  store.notify();
+}
+
+canvas.addEventListener("dragover", (e) => {
+  const types = e.dataTransfer?.types;
+  if (types?.includes(FUNCTION_DRAG_MIME) || types?.includes(VARIABLE_DRAG_MIME)) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+  }
+});
+
+canvas.addEventListener("drop", (e) => {
+  const functionId = e.dataTransfer?.getData(FUNCTION_DRAG_MIME);
+  const variableId = e.dataTransfer?.getData(VARIABLE_DRAG_MIME);
+  if (!functionId && !variableId) return;
+  e.preventDefault();
+
+  const rect = canvas.getBoundingClientRect();
+  const screenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
+
+  if (functionId) {
+    const fn = store.state.rootGraph.functions.find((f) => f.id === functionId);
+    if (fn) spawnCallNodeAt(fn, worldPos);
+    return;
+  }
+
+  if (variableId) {
+    const variable = getVisibleVariablesForState(store.state).find((v) => v.id === variableId);
+    if (!variable) return;
+    openRowContextMenu({ x: e.clientX, y: e.clientY }, [
+      { label: "Get", onClick: () => spawnVariableNodeAt("variable.get", variable, worldPos) },
+      { label: "Set", onClick: () => spawnVariableNodeAt("variable.set", variable, worldPos) },
+    ]);
+  }
 });
 
 // --- Run button: fires every event-root node once (manual test of all entry points), live-highlighting

@@ -114,10 +114,15 @@ export function createFunctionIoPanel(
               return input;
             })()
           : createEditableNameLabel(entry.name, (screenPos) => {
-              openRowContextMenu(screenPos, () => {
-                editingId = entry.id;
-                store.notify();
-              });
+              openRowContextMenu(screenPos, [
+                {
+                  label: "Edit",
+                  onClick: () => {
+                    editingId = entry.id;
+                    store.notify();
+                  },
+                },
+              ]);
             });
 
       const type = createTypeSelect(entry.type, (type) => {

@@ -1,9 +1,8 @@
 import { addVariable, DEFAULT_VALUE_BY_TYPE, nextId, removeVariable, updateVariable } from "../engine/graphMutations";
-import { getNodeDef } from "../engine/registry";
 import type { Graph, PinType, Variable } from "../engine/types";
-import { screenToWorld } from "../render/camera";
 import type { Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
+import { VARIABLE_DRAG_MIME } from "./dragTypes";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
 import { createTypeSelect, createTypedValueInput } from "./typedValueInput";
@@ -17,41 +16,19 @@ export interface VariablePanelElements {
 }
 
 /** Wires up a Variables-style side panel: collapsible, "+" creates a variable with an unused
- * default name and immediately enters rename mode, right-click > Edit renames an existing one,
- * and Get/Set spawn nodes bound to it. Generalized over `getGraph` so the same factory drives both
- * the always-visible global Variables panel (bound to the root graph) and the Local Variables
- * panel (bound to whichever function's body is currently open). */
+ * default name and immediately enters rename mode, right-click > Edit renames an existing one.
+ * Rows are drag-and-drop sources — dropping one onto the canvas (see main.ts) pops up a Get/Set
+ * choice at the drop point instead of a dedicated button here. Generalized over `getGraph` so the
+ * same factory drives both the always-visible global Variables panel (bound to the root graph)
+ * and the Local Variables panel (bound to whichever function's body is currently open). */
 export function createVariablePanel(
   elements: VariablePanelElements,
   store: Store,
-  canvas: HTMLCanvasElement,
   getGraph: () => Graph,
 ): { render: () => void } {
   setupCollapsibleSection(elements.header, elements.section);
 
-  let spawnCounter = 0;
   let editingId: string | null = null;
-
-  function centerWorldPos(): { x: number; y: number } {
-    const pos = screenToWorld(
-      store.state.camera,
-      canvas.clientWidth / 2 + spawnCounter * 24,
-      canvas.clientHeight / 2 + spawnCounter * 24,
-    );
-    spawnCounter += 1;
-    return pos;
-  }
-
-  function spawnBoundNode(type: "variable.get" | "variable.set", variable: Variable): void {
-    const def = getNodeDef(type);
-    const pinDefs = def.derivePins!(variable);
-    const node = { id: nextId("node"), type, position: centerWorldPos(), pins: {} as Record<string, { value?: unknown; connectionId?: string }>, variableId: variable.id };
-    for (const pinDef of pinDefs) {
-      node.pins[pinDef.id] = pinDef.direction === "input" ? { value: pinDef.defaultValue } : {};
-    }
-    getGraph().nodes.push(node);
-    store.notify();
-  }
 
   function commitRename(variable: Variable, rawNewName: string): void {
     const trimmed = rawNewName.trim();
@@ -71,30 +48,41 @@ export function createVariablePanel(
 
     elements.list.innerHTML = "";
     for (const variable of getGraph().variables) {
+      const isEditing = editingId === variable.id;
+
       const row = document.createElement("div");
       row.className = "variable-row";
+      row.draggable = !isEditing;
+      row.addEventListener("dragstart", (e) => {
+        e.dataTransfer?.setData(VARIABLE_DRAG_MIME, variable.id);
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
+      });
 
       let nameInputToFocus: HTMLInputElement | null = null;
-      const nameEl =
-        editingId === variable.id
-          ? (() => {
-              const input = createEditableNameInput(
-                variable.name,
-                (newName) => commitRename(variable, newName),
-                () => {
-                  editingId = null;
+      const nameEl = isEditing
+        ? (() => {
+            const input = createEditableNameInput(
+              variable.name,
+              (newName) => commitRename(variable, newName),
+              () => {
+                editingId = null;
+                store.notify();
+              },
+            );
+            nameInputToFocus = input;
+            return input;
+          })()
+        : createEditableNameLabel(variable.name, (screenPos) => {
+            openRowContextMenu(screenPos, [
+              {
+                label: "Edit",
+                onClick: () => {
+                  editingId = variable.id;
                   store.notify();
                 },
-              );
-              nameInputToFocus = input;
-              return input;
-            })()
-          : createEditableNameLabel(variable.name, (screenPos) => {
-              openRowContextMenu(screenPos, () => {
-                editingId = variable.id;
-                store.notify();
-              });
-            });
+              },
+            ]);
+          });
 
       const type = createTypeSelect(variable.type, (type) => {
         updateVariable(store.state.rootGraph, variable.id, { type });
@@ -106,14 +94,6 @@ export function createVariablePanel(
         store.notify();
       });
 
-      const getBtn = document.createElement("button");
-      getBtn.textContent = "Get";
-      getBtn.addEventListener("click", () => spawnBoundNode("variable.get", variable));
-
-      const setBtn = document.createElement("button");
-      setBtn.textContent = "Set";
-      setBtn.addEventListener("click", () => spawnBoundNode("variable.set", variable));
-
       const delBtn = document.createElement("button");
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", () => {
@@ -121,7 +101,7 @@ export function createVariablePanel(
         store.notify();
       });
 
-      row.append(nameEl, type, value, getBtn, setBtn, delBtn);
+      row.append(nameEl, type, value, delBtn);
       elements.list.appendChild(row);
       if (nameInputToFocus) focusAndSelect(nameInputToFocus);
     }

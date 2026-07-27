@@ -1,9 +1,8 @@
-import { addNode, createFunctionDef, createNodeInstance, nextId, removeFunctionDef } from "../engine/graphMutations";
-import { getNodeDef } from "../engine/registry";
+import { createFunctionDef, removeFunctionDef } from "../engine/graphMutations";
 import type { FunctionDef } from "../engine/types";
-import { screenToWorld } from "../render/camera";
-import { closeFunctionTab, getEditingGraph, openFunctionTab, type Store } from "../state/store";
+import { closeFunctionTab, openFunctionTab, type Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
+import { FUNCTION_DRAG_MIME } from "./dragTypes";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
 import { nextAvailableName } from "./uniqueName";
@@ -17,31 +16,12 @@ export interface FunctionsPanelElements {
 
 /** Lists every user-defined function: collapsible, "+" creates one with an unused default name
  * and immediately enters rename mode, right-click > Edit renames an existing one, click its name
- * opens its body in a tab, "Call" spawns a function.call node bound to it into whichever graph is
- * currently open. */
-export function createFunctionsPanel(elements: FunctionsPanelElements, store: Store, canvas: HTMLCanvasElement): { render: () => void } {
+ * opens its body in a tab. Rows are drag-and-drop sources — dropping one onto the canvas (see
+ * main.ts) creates a function.call node bound to it at the drop position. */
+export function createFunctionsPanel(elements: FunctionsPanelElements, store: Store): { render: () => void } {
   setupCollapsibleSection(elements.header, elements.section);
 
-  let spawnCounter = 0;
   let editingId: string | null = null;
-
-  function centerWorldPos(): { x: number; y: number } {
-    const pos = screenToWorld(
-      store.state.camera,
-      canvas.clientWidth / 2 + spawnCounter * 24,
-      canvas.clientHeight / 2 + spawnCounter * 24,
-    );
-    spawnCounter += 1;
-    return pos;
-  }
-
-  function spawnCallNode(fn: FunctionDef): void {
-    const def = getNodeDef("function.call");
-    const pinDefs = def.deriveFunctionPins!(fn);
-    const node = createNodeInstance("function.call", centerWorldPos(), pinDefs, nextId("node"), undefined, fn.id);
-    addNode(getEditingGraph(store.state), node);
-    store.notify();
-  }
 
   function commitRename(fn: FunctionDef, rawNewName: string): void {
     const trimmed = rawNewName.trim();
@@ -59,43 +39,50 @@ export function createFunctionsPanel(elements: FunctionsPanelElements, store: St
 
     elements.list.innerHTML = "";
     for (const fn of store.state.rootGraph.functions) {
+      const isEditing = editingId === fn.id;
+
       const row = document.createElement("div");
       row.className = "variable-row" + (store.state.activeFunctionId === fn.id ? " function-row-active" : "");
+      row.draggable = !isEditing;
+      row.addEventListener("dragstart", (e) => {
+        e.dataTransfer?.setData(FUNCTION_DRAG_MIME, fn.id);
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
+      });
 
       let nameInputToFocus: HTMLInputElement | null = null;
-      const nameEl =
-        editingId === fn.id
-          ? (() => {
-              const input = createEditableNameInput(
-                fn.name,
-                (newName) => commitRename(fn, newName),
-                () => {
-                  editingId = null;
-                  store.notify();
-                },
-              );
-              nameInputToFocus = input;
-              return input;
-            })()
-          : (() => {
-              const label = createEditableNameLabel(fn.name, (screenPos) => {
-                openRowContextMenu(screenPos, () => {
-                  editingId = fn.id;
-                  store.notify();
-                });
-              });
-              label.classList.add("function-name");
-              label.title = "Click to open this function's graph in a tab";
-              label.addEventListener("click", () => {
-                openFunctionTab(store.state, fn.id);
+      const nameEl = isEditing
+        ? (() => {
+            const input = createEditableNameInput(
+              fn.name,
+              (newName) => commitRename(fn, newName),
+              () => {
+                editingId = null;
                 store.notify();
-              });
-              return label;
-            })();
-
-      const callBtn = document.createElement("button");
-      callBtn.textContent = "Call";
-      callBtn.addEventListener("click", () => spawnCallNode(fn));
+              },
+            );
+            nameInputToFocus = input;
+            return input;
+          })()
+        : (() => {
+            const label = createEditableNameLabel(fn.name, (screenPos) => {
+              openRowContextMenu(screenPos, [
+                {
+                  label: "Edit",
+                  onClick: () => {
+                    editingId = fn.id;
+                    store.notify();
+                  },
+                },
+              ]);
+            });
+            label.classList.add("function-name");
+            label.title = "Click to open this function's graph in a tab";
+            label.addEventListener("click", () => {
+              openFunctionTab(store.state, fn.id);
+              store.notify();
+            });
+            return label;
+          })();
 
       const delBtn = document.createElement("button");
       delBtn.textContent = "✕";
@@ -105,7 +92,7 @@ export function createFunctionsPanel(elements: FunctionsPanelElements, store: St
         store.notify();
       });
 
-      row.append(nameEl, callBtn, delBtn);
+      row.append(nameEl, delBtn);
       elements.list.appendChild(row);
       if (nameInputToFocus) focusAndSelect(nameInputToFocus);
     }
