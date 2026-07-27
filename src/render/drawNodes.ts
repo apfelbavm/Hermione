@@ -1,5 +1,6 @@
+import { resolveNodeLabel } from "../engine/graphMutations";
 import { getNodeDef, topLevelGroup } from "../engine/registry";
-import type { Graph } from "../engine/types";
+import type { FunctionDef, Graph } from "../engine/types";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
 import { NODE_HEADER_HEIGHT, PIN_RADIUS } from "./layout";
@@ -22,6 +23,7 @@ export function drawNodes(
   geometries: ReadonlyMap<string, NodeScreenGeometry>,
   selectedNodeIds: ReadonlySet<string>,
   executingNodeId: string | null,
+  functions: FunctionDef[],
 ): void {
   // Text scales with zoom too — a camera zooming over world-space content, same as everything else.
   ctx.font = `${13 * camera.zoom}px Segoe UI, sans-serif`;
@@ -61,7 +63,11 @@ export function drawNodes(
 
     ctx.fillStyle = TEXT_PRIMARY;
     ctx.textAlign = "left";
-    ctx.fillText(def.label, geo.screenX + 10 * camera.zoom, geo.screenY + headerHeight / 2);
+    ctx.fillText(
+      resolveNodeLabel(node, def, functions),
+      geo.screenX + 10 * camera.zoom,
+      geo.screenY + headerHeight / 2,
+    );
 
     for (const pinLayout of geo.layout.pins) {
       const pos = geo.pinScreen[pinLayout.pin.id];

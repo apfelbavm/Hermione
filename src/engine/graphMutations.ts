@@ -4,6 +4,7 @@ import type {
   Connection,
   FunctionDef,
   Graph,
+  NodeDef,
   NodeInstance,
   Pin,
   PinDef,
@@ -55,6 +56,17 @@ export function resolvePinDefs(node: NodeInstance, variables: Variable[], functi
     if (fn) return def.deriveFunctionPins(fn);
   }
   return def.pins;
+}
+
+/** The display label for a node instance — normally its NodeDef's static label, except a
+ * function.call node shows the name of the function it's bound to (so the graph reads e.g.
+ * "Double", not the generic "Call Function"), matching how its pins already reflect that function. */
+export function resolveNodeLabel(node: NodeInstance, def: NodeDef, functions: FunctionDef[]): string {
+  if (node.type === "function.call" && node.functionId) {
+    const fn = functions.find((f) => f.id === node.functionId);
+    if (fn) return fn.name;
+  }
+  return def.label;
 }
 
 /** All variables visible from `currentGraph`: just the root's if editing the root itself, or

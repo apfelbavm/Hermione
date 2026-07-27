@@ -62,7 +62,7 @@ function recomputeContainment(graph: Graph, variables: Variable[], functions: Fu
     height: box.size.height - COMMENT_HEADER_HEIGHT,
   };
   box.containedNodeIds = graph.nodes
-    .filter((n) => rectContains(innerBounds, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions))))
+    .filter((n) => rectContains(innerBounds, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), functions)))
     .map((n) => n.id);
 }
 
@@ -339,7 +339,7 @@ export function setupPointerInteraction(
         const rects = [...selectedNodeIds]
           .map((id) => graph.nodes.find((n) => n.id === id))
           .filter((n): n is NonNullable<typeof n> => !!n)
-          .map((n) => computeNodeWorldRect(n, resolvePinDefs(n, variables, functions)));
+          .map((n) => computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), functions));
 
         const minX = Math.min(...rects.map((r) => r.x));
         const minY = Math.min(...rects.map((r) => r.y));

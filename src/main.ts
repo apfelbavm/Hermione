@@ -155,7 +155,7 @@ function render(): void {
   const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
   drawWires(ctx, graph, camera, geometries, firedConnectionIds, variables, functions);
   if (wireDrag) drawWireDragPreview(ctx, wireDrag);
-  drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId);
+  drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, functions);
   widgetSync.sync(geometries);
   commentOverlay.sync();
   variablePanel.render();

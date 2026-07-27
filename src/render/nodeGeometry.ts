@@ -1,5 +1,5 @@
 import { getNodeDef } from "../engine/registry";
-import { resolvePinDefs } from "../engine/graphMutations";
+import { resolveNodeLabel, resolvePinDefs } from "../engine/graphMutations";
 import type { FunctionDef, Graph, NodeInstance, PinDef, Variable } from "../engine/types";
 import { computeNodeLayout, type NodeLayout } from "./layout";
 import { worldToScreen, type Camera } from "./camera";
@@ -36,14 +36,14 @@ export function computeNodeScreenGeometry(
 }
 
 /** A node's bounding box in world units (independent of camera) — used for comment-box containment tests. */
-export function computeNodeWorldRect(node: NodeInstance, pinDefs: PinDef[]): {
+export function computeNodeWorldRect(node: NodeInstance, pinDefs: PinDef[], functions: FunctionDef[]): {
   x: number;
   y: number;
   width: number;
   height: number;
 } {
   const def = getNodeDef(node.type);
-  const layout = computeNodeLayout(def.label, pinDefs);
+  const layout = computeNodeLayout(resolveNodeLabel(node, def, functions), pinDefs);
   return { x: node.position.x, y: node.position.y, width: layout.width, height: layout.height };
 }
 
@@ -60,7 +60,7 @@ export function computeAllNodeGeometries(
   for (const node of graph.nodes) {
     const def = getNodeDef(node.type);
     const pinDefs = resolvePinDefs(node, variables, functions);
-    map.set(node.id, computeNodeScreenGeometry(node, def.label, pinDefs, camera));
+    map.set(node.id, computeNodeScreenGeometry(node, resolveNodeLabel(node, def, functions), pinDefs, camera));
   }
   return map;
 }
