@@ -25,7 +25,7 @@ import {
   hitTestNode,
   hitTestPin,
 } from "../render/hitTest";
-import { getEditingGraph, getVisibleVariablesForState, type Store } from "../state/store";
+import { getEditingGraph, getVisibleVariablesForState, openFunctionTab, type Store } from "../state/store";
 
 type DragMode =
   | { kind: "none" }
@@ -162,6 +162,23 @@ export function setupPointerInteraction(
     store.state.selectedNodeIds = new Set();
     store.state.selectedCommentId = null;
     drag = { kind: "pan", lastX: e.clientX, lastY: e.clientY };
+    store.notify();
+  });
+
+  canvas.addEventListener("dblclick", (e) => {
+    const graph = getEditingGraph(store.state);
+    const { camera } = store.state;
+    const variables = getVisibleVariablesForState(store.state);
+    const functions = store.state.rootGraph.functions;
+    const pos = screenPos(e);
+    const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
+
+    const nodeHit = hitTestNode(graph, geometries, pos.x, pos.y);
+    if (!nodeHit) return;
+    const node = graph.nodes.find((n) => n.id === nodeHit.nodeId);
+    if (!node || node.type !== "function.call" || !node.functionId) return;
+
+    openFunctionTab(store.state, node.functionId);
     store.notify();
   });
 
