@@ -82,6 +82,20 @@ export function drawNodes(
         ctx.fillText(pinLayout.pin.label, pos.x - 10 * camera.zoom, pos.y);
       }
     }
+
+    if (geo.addButtonScreen) {
+      const r = geo.addButtonScreen;
+      ctx.beginPath();
+      ctx.roundRect(r.x, r.y, r.width, r.height, 3 * camera.zoom);
+      ctx.fillStyle = NODE_HEADER_DEFAULT;
+      ctx.fill();
+      ctx.strokeStyle = NODE_BORDER;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = TEXT_PRIMARY;
+      ctx.textAlign = "center";
+      ctx.fillText("+", r.x + r.width / 2, r.y + r.height / 2 + 1);
+    }
   }
   ctx.textAlign = "left";
 }

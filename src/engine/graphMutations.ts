@@ -55,6 +55,7 @@ export function resolvePinDefs(node: NodeInstance, variables: Variable[], functi
     const fn = functions.find((f) => f.id === node.functionId);
     if (fn) return def.deriveFunctionPins(fn);
   }
+  if (def.deriveInstancePins) return def.deriveInstancePins(node);
   return def.pins;
 }
 
@@ -100,6 +101,19 @@ export function removeNode(graph: Graph, nodeId: string): void {
   for (const box of graph.commentBoxes) {
     box.containedNodeIds = box.containedNodeIds.filter((id) => id !== nodeId);
   }
+}
+
+/** Removes one entry pin from a node with an expandable, user-editable pin list (see
+ * NodeDef.deriveInstancePins) — deletes its Pin record and prunes any connection touching it.
+ * Generic across every such node type; which of its derived pins are eligible for this is up to
+ * that node type's own deriveInstancePins (see PinDef.removable), not this function. */
+export function removeInstancePin(graph: Graph, nodeId: string, pinId: string): void {
+  const node = graph.nodes.find((n) => n.id === nodeId);
+  if (!node) return;
+  delete node.pins[pinId];
+  graph.connections = graph.connections.filter(
+    (c) => !((c.fromNode === nodeId && c.fromPin === pinId) || (c.toNode === nodeId && c.toPin === pinId)),
+  );
 }
 
 export interface ConnectRequest {

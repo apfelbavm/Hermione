@@ -8,6 +8,10 @@ export interface PinDef {
   type: PinType;
   direction: PinDirection;
   defaultValue?: unknown;
+  /** Marks an entry produced by NodeDef.deriveInstancePins as individually removable via the
+   * canvas's right-click "Delete" menu (see removeInstancePin) — e.g. one of Append String's
+   * string slots, but never its fixed output pin. */
+  removable?: boolean;
 }
 
 export interface ExecuteResult {
@@ -62,6 +66,13 @@ export interface NodeDef {
   derivePins?: (variable: Variable) => PinDef[];
   /** Sibling of derivePins for the Entry/Return/Call function nodes, dispatched off NodeInstance.functionId. */
   deriveFunctionPins?: (fn: FunctionDef) => PinDef[];
+  /** Sibling of derivePins/deriveFunctionPins for a node whose pin list depends on data stored
+   * directly on its own NodeInstance — e.g. Append String's expandable list of string inputs —
+   * rather than a bound Variable/FunctionDef. */
+  deriveInstancePins?: (node: NodeInstance) => PinDef[];
+  /** Present only on a deriveInstancePins node: mutates `node.pins` in place to add one more
+   * entry. Invoked by the canvas "+" affordance drawn next to the node (see NodeLayout.addButton). */
+  addInstancePinEntry?: (node: NodeInstance) => void;
   /** Marks this node type as a graph entry point (Unreal's BeginPlay/EventTick equivalent). */
   eventTrigger?: EventTrigger;
   /** Compile-time counterpart of `evaluate`: returns a JS expression string per output pin. */

@@ -10,6 +10,9 @@ export interface NodeScreenGeometry {
   width: number;
   height: number;
   pinScreen: Record<string, { x: number; y: number }>;
+  /** Screen-space rect of the "+" add-entry affordance, only for a node whose type has
+   * NodeDef.addInstancePinEntry (see NodeLayout.addButton). */
+  addButtonScreen?: { x: number; y: number; width: number; height: number };
   layout: NodeLayout;
 }
 
@@ -18,19 +21,29 @@ export function computeNodeScreenGeometry(
   label: string,
   pinDefs: PinDef[],
   camera: Camera,
+  showAddButton: boolean = false,
 ): NodeScreenGeometry {
-  const layout = computeNodeLayout(label, pinDefs);
+  const layout = computeNodeLayout(label, pinDefs, { showAddButton });
   const screen = worldToScreen(camera, node.position.x, node.position.y);
   const pinScreen: Record<string, { x: number; y: number }> = {};
   for (const p of layout.pins) {
     pinScreen[p.pin.id] = { x: screen.x + p.x * camera.zoom, y: screen.y + p.y * camera.zoom };
   }
+  const addButtonScreen = layout.addButton
+    ? {
+        x: screen.x + layout.addButton.x * camera.zoom,
+        y: screen.y + layout.addButton.y * camera.zoom,
+        width: layout.addButton.width * camera.zoom,
+        height: layout.addButton.height * camera.zoom,
+      }
+    : undefined;
   return {
     screenX: screen.x,
     screenY: screen.y,
     width: layout.width * camera.zoom,
     height: layout.height * camera.zoom,
     pinScreen,
+    addButtonScreen,
     layout,
   };
 }
@@ -43,7 +56,9 @@ export function computeNodeWorldRect(node: NodeInstance, pinDefs: PinDef[], func
   height: number;
 } {
   const def = getNodeDef(node.type);
-  const layout = computeNodeLayout(resolveNodeLabel(node, def, functions), pinDefs);
+  const layout = computeNodeLayout(resolveNodeLabel(node, def, functions), pinDefs, {
+    showAddButton: !!def.addInstancePinEntry,
+  });
   return { x: node.position.x, y: node.position.y, width: layout.width, height: layout.height };
 }
 
@@ -60,7 +75,10 @@ export function computeAllNodeGeometries(
   for (const node of graph.nodes) {
     const def = getNodeDef(node.type);
     const pinDefs = resolvePinDefs(node, variables, functions);
-    map.set(node.id, computeNodeScreenGeometry(node, resolveNodeLabel(node, def, functions), pinDefs, camera));
+    map.set(
+      node.id,
+      computeNodeScreenGeometry(node, resolveNodeLabel(node, def, functions), pinDefs, camera, !!def.addInstancePinEntry),
+    );
   }
   return map;
 }

@@ -1,7 +1,7 @@
 import "./style.css";
 import { registerBuiltins } from "./nodes";
 import { createExecutionContext, runExecFrom } from "./engine/executor";
-import { addNode, connectPins, createNodeInstance } from "./engine/graphMutations";
+import { addNode, connectPins, createNodeInstance, removeInstancePin } from "./engine/graphMutations";
 import {
   allNodeDefs,
   findCompatibleNodeDefs,
@@ -13,6 +13,7 @@ import type { FunctionDef, NodeDef, Variable } from "./engine/types";
 import { buildDemoGraph } from "./demoGraph";
 import { createCamera, screenToWorld } from "./render/camera";
 import { computeAllNodeGeometries } from "./render/nodeGeometry";
+import { hitTestPin } from "./render/hitTest";
 import { drawComments } from "./render/drawComments";
 import { drawGrid, snapPositionToGrid } from "./render/drawGrid";
 import { drawNodes } from "./render/drawNodes";
@@ -54,7 +55,7 @@ const store = createStore({
   activeFunctionId: null,
   openFunctionTabs: [],
   camera: createCamera(),
-  snapToGrid: false,
+  snapToGrid: true,
   selectedNodeIds: new Set(),
   selectedCommentId: null,
   executingNodeId: null,
@@ -274,6 +275,27 @@ canvas.addEventListener("contextmenu", (e) => {
   if (pointerInteraction.shouldSuppressContextMenu()) return;
   const rect = canvas.getBoundingClientRect();
   const screenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+  // Right-clicking a removable entry pin (e.g. one of Append String's string slots) offers to
+  // delete just that entry instead of opening the node-creation menu.
+  const graph = getEditingGraph(store.state);
+  const variables = getVisibleVariablesForState(store.state);
+  const functions = store.state.rootGraph.functions;
+  const geometries = computeAllNodeGeometries(graph, store.state.camera, variables, functions);
+  const pinHit = hitTestPin(graph, geometries, screenPos.x, screenPos.y);
+  if (pinHit?.pin.removable) {
+    openRowContextMenu({ x: e.clientX, y: e.clientY }, [
+      {
+        label: "Delete",
+        onClick: () => {
+          removeInstancePin(graph, pinHit.nodeId, pinHit.pinId);
+          store.notify();
+        },
+      },
+    ]);
+    return;
+  }
+
   const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
   openNodeSearchMenu(overlay, {
     screenPos,

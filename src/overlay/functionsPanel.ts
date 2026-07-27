@@ -69,7 +69,7 @@ export function createFunctionsPanel(elements: FunctionsPanelElements, store: St
             const label = createEditableNameLabel(fn.name, (screenPos) => {
               openRowContextMenu(screenPos, [
                 {
-                  label: "Edit",
+                  label: "Rename",
                   onClick: () => {
                     editingId = fn.id;
                     store.notify();

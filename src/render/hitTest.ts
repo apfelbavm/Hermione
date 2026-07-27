@@ -17,6 +17,31 @@ export interface NodeHit {
   nodeId: string;
 }
 
+export interface NodeAddButtonHit {
+  kind: "node-add-button";
+  nodeId: string;
+}
+
+/** Hit-tests the "+" add-entry affordance drawn on a node with NodeDef.addInstancePinEntry (see
+ * NodeScreenGeometry.addButtonScreen) — checked ahead of hitTestNode so clicking it doesn't also
+ * start a node drag. */
+export function hitTestNodeAddButton(
+  graph: Graph,
+  geometries: ReadonlyMap<string, NodeScreenGeometry>,
+  screenX: number,
+  screenY: number,
+): NodeAddButtonHit | null {
+  for (let i = graph.nodes.length - 1; i >= 0; i--) {
+    const node = graph.nodes[i];
+    const rect = geometries.get(node.id)?.addButtonScreen;
+    if (!rect) continue;
+    if (screenX >= rect.x && screenX <= rect.x + rect.width && screenY >= rect.y && screenY <= rect.y + rect.height) {
+      return { kind: "node-add-button", nodeId: node.id };
+    }
+  }
+  return null;
+}
+
 const PIN_HIT_RADIUS = 9;
 
 export function hitTestPin(

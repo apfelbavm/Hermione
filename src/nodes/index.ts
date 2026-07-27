@@ -5,6 +5,7 @@ import "./math";
 import "./variable";
 import "./actionsMock";
 import "./function";
+import "./string";
 
 let registered = false;
 

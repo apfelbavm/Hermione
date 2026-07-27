@@ -15,7 +15,7 @@ import {
   removeNode,
   resolvePinDefs,
 } from "../engine/graphMutations";
-import { isPinTypeCompatible } from "../engine/registry";
+import { getNodeDef, isPinTypeCompatible } from "../engine/registry";
 import type { CommentBox, FunctionDef, Graph, PinDef, Variable } from "../engine/types";
 import { panCamera, screenToWorld, zoomCameraAt } from "../render/camera";
 import {
@@ -33,6 +33,7 @@ import {
   hitTestCommentHeader,
   hitTestCommentResizeHandle,
   hitTestNode,
+  hitTestNodeAddButton,
   hitTestPin,
 } from "../render/hitTest";
 import { getEditingGraph, getVisibleVariablesForState, openFunctionTab, type Store } from "../state/store";
@@ -122,6 +123,17 @@ export function setupPointerInteraction(
     const functions = store.state.rootGraph.functions;
     const pos = screenPos(e);
     const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
+
+    const addButtonHit = hitTestNodeAddButton(graph, geometries, pos.x, pos.y);
+    if (addButtonHit) {
+      const node = graph.nodes.find((n) => n.id === addButtonHit.nodeId);
+      const def = node && getNodeDef(node.type);
+      if (node && def?.addInstancePinEntry) {
+        def.addInstancePinEntry(node);
+        store.notify();
+      }
+      return;
+    }
 
     const pinHit = hitTestPin(graph, geometries, pos.x, pos.y);
     if (pinHit) {
