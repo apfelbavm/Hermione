@@ -101,6 +101,8 @@ function compileFrom(
     inputs,
     graph,
     compileFrom: (execOutPin: string) => {
+      // connectPins now enforces "one wire per exec output" itself, so this can't arise
+      // through normal editor use — this guard only catches a hand-edited/corrupted graph.
       const outgoing = connectionsFrom(graph, node.id, execOutPin);
       if (outgoing.length > 1) {
         throw new Error(
@@ -147,6 +149,7 @@ export function compileGraph(graph: Graph): CompileResult {
     if (!def.eventTrigger) continue;
 
     const functionName = functionNameFor(node, usedNames);
+    // Same defensive-only guard as above: connectPins already enforces this.
     const outgoing = connectionsFrom(graph, node.id, "exec-out");
     const body =
       outgoing.length === 0

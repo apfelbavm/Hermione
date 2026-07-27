@@ -139,14 +139,54 @@ describe("compileGraph", () => {
     expect(logs).toEqual(["1", "2"]);
   });
 
+  it("runs a shared continuation exactly once per branch when Branch's true/false paths converge on it", async () => {
+    const graph = createEmptyGraph("g3b", "test");
+    const variable = { id: "cond", name: "Cond", type: "boolean" as const, defaultValue: false };
+    graph.variables.push(variable);
+
+    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const branch = addBuiltinNode(graph, "flow.branch", { x: 100, y: 0 }, "branch");
+    const getDef = getNodeDef("variable.get");
+    const getCond = createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "getCond", variable.id);
+    graph.nodes.push(getCond);
+    const shared = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "shared");
+    shared.pins.message.value = "reached shared";
+
+    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: branch.id, toPin: "exec-in" });
+    connectPins(graph, { fromNode: getCond.id, fromPin: "value", toNode: branch.id, toPin: "condition" });
+    // Both branches converge on the same downstream node — proves the compiler's per-branch
+    // inlining doesn't double-run the shared tail (it's nested inside mutually exclusive
+    // if/else arms in the generated code, so exactly one copy executes per call).
+    connectPins(graph, { fromNode: branch.id, fromPin: "true", toNode: shared.id, toPin: "exec-in" });
+    connectPins(graph, { fromNode: branch.id, fromPin: "false", toNode: shared.id, toPin: "exec-in" });
+
+    const { code, manifest } = compileGraph(graph);
+    const compiled = await loadCompiled(code);
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
+
+    for (const condValue of [true, false]) {
+      const state = createInitialState() as Record<string, unknown>;
+      state["cond"] = condValue;
+      const logs: string[] = [];
+      await trigger({ state, log: (m: string) => logs.push(m) });
+      expect(logs).toEqual(["reached shared"]);
+    }
+  });
+
   it("throws when an event root's exec-out fans out to multiple wires", () => {
     const graph = createEmptyGraph("g4", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const print1 = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print1");
     const print2 = addBuiltinNode(graph, "debug.print", { x: 100, y: 100 }, "print2");
 
-    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: print1.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: print2.id, toPin: "exec-in" });
+    // Built directly: connectPins itself now enforces "one wire per exec output" (the second
+    // call would just replace the first), so this shape can't arise through normal editor use —
+    // this simulates a hand-edited/corrupted save file, same rationale as the cyclic-wire test.
+    graph.connections.push(
+      { id: "c1", fromNode: start.id, fromPin: "exec-out", toNode: print1.id, toPin: "exec-in" },
+      { id: "c2", fromNode: start.id, fromPin: "exec-out", toNode: print2.id, toPin: "exec-in" },
+    );
 
     expect(() => compileGraph(graph)).toThrow(/parallel exec fan-out/);
   });
@@ -159,8 +199,10 @@ describe("compileGraph", () => {
     const print2 = addBuiltinNode(graph, "debug.print", { x: 200, y: 100 }, "print2");
 
     connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: branchStart.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: branchStart.id, fromPin: "exec-out", toNode: print1.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: branchStart.id, fromPin: "exec-out", toNode: print2.id, toPin: "exec-in" });
+    graph.connections.push(
+      { id: "c1", fromNode: branchStart.id, fromPin: "exec-out", toNode: print1.id, toPin: "exec-in" },
+      { id: "c2", fromNode: branchStart.id, fromPin: "exec-out", toNode: print2.id, toPin: "exec-in" },
+    );
 
     expect(() => compileGraph(graph)).toThrow(/parallel exec fan-out/);
   });

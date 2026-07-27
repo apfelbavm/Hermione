@@ -70,8 +70,15 @@ export function connectPins(graph: Graph, req: ConnectRequest): Connection {
     );
   }
 
-  // Input pins accept only one incoming wire — replace any existing one.
-  disconnectPin(graph, req.toNode, req.toPin);
+  if (toPinDef.type === "exec") {
+    // Exec pins invert the data-pin rule: an input may converge many incoming wires (several
+    // branches can all lead to the same next step), but a single output can only ever drive
+    // ONE next step — replace any existing wire leaving this output instead.
+    disconnectOutput(graph, req.fromNode, req.fromPin);
+  } else {
+    // Data pins: an input takes exactly one source; an output may fan out to many freely.
+    disconnectPin(graph, req.toNode, req.toPin);
+  }
 
   const connection: Connection = { id: nextId("conn"), ...req };
   graph.connections.push(connection);
@@ -83,9 +90,16 @@ export function connectPins(graph: Graph, req: ConnectRequest): Connection {
   return connection;
 }
 
-/** Removes the connection feeding the given input pin, if any, restoring its literal default. */
+/** Removes the (first) connection feeding the given input pin, if any, restoring its literal default. */
 export function disconnectPin(graph: Graph, nodeId: string, pinId: string): void {
   const existing = graph.connections.find((c) => c.toNode === nodeId && c.toPin === pinId);
+  if (!existing) return;
+  removeConnection(graph, existing.id);
+}
+
+/** Removes the connection leaving the given output pin, if any — enforces "one wire per exec output." */
+export function disconnectOutput(graph: Graph, nodeId: string, pinId: string): void {
+  const existing = graph.connections.find((c) => c.fromNode === nodeId && c.fromPin === pinId);
   if (!existing) return;
   removeConnection(graph, existing.id);
 }
@@ -98,9 +112,16 @@ export function removeConnection(graph: Graph, connectionId: string): void {
   const toNode = graph.nodes.find((n) => n.id === conn.toNode);
   const toPin = toNode?.pins[conn.toPin];
   if (toPin) {
-    toPin.connectionId = undefined;
-    const pinDef = toNode ? resolvePinDefs(toNode, graph.variables).find((p) => p.id === conn.toPin) : undefined;
-    toPin.value = pinDef?.defaultValue;
+    // An exec input pin may still have OTHER incoming wires after this one is removed —
+    // only clear connectionId/restore the literal default once none remain.
+    const remaining = graph.connections.find(
+      (c) => c.toNode === conn.toNode && c.toPin === conn.toPin,
+    );
+    toPin.connectionId = remaining?.id;
+    if (!remaining) {
+      const pinDef = toNode ? resolvePinDefs(toNode, graph.variables).find((p) => p.id === conn.toPin) : undefined;
+      toPin.value = pinDef?.defaultValue;
+    }
   }
 }
 

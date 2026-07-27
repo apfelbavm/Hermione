@@ -180,4 +180,60 @@ describe("executor", () => {
       connectPins(graph, { fromNode: add.id, fromPin: "result", toNode: branch.id, toPin: "exec-in" }),
     ).toThrow();
   });
+
+  it("exec input pins accept multiple incoming wires (branches can converge)", async () => {
+    const graph = createEmptyGraph("g8", "test");
+    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const branch = addBuiltinNode(graph, "flow.branch", { x: 100, y: 0 }, "branch");
+    const shared = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "shared");
+    shared.pins.message.value = "reached the shared continuation";
+
+    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: branch.id, toPin: "exec-in" });
+    // Both the true AND false paths converge on the same node — the second connectPins call
+    // must NOT silently disconnect the first, unlike a data/input pin.
+    connectPins(graph, { fromNode: branch.id, fromPin: "true", toNode: shared.id, toPin: "exec-in" });
+    connectPins(graph, { fromNode: branch.id, fromPin: "false", toNode: shared.id, toPin: "exec-in" });
+
+    expect(graph.connections.filter((c) => c.toNode === shared.id && c.toPin === "exec-in")).toHaveLength(2);
+
+    for (const condition of [true, false]) {
+      branch.pins.condition.value = condition;
+      const logs: string[] = [];
+      await runExecFrom(start.id, "exec-out", createExecutionContext(graph, { log: (m) => logs.push(m) }));
+      expect(logs).toEqual(["reached the shared continuation"]);
+    }
+  });
+
+  it("exec output pins allow only one outgoing wire — a second connect replaces the first", () => {
+    const graph = createEmptyGraph("g9", "test");
+    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const print1 = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print1");
+    const print2 = addBuiltinNode(graph, "debug.print", { x: 100, y: 100 }, "print2");
+
+    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: print1.id, toPin: "exec-in" });
+    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: print2.id, toPin: "exec-in" });
+
+    const fromStart = graph.connections.filter((c) => c.fromNode === start.id && c.fromPin === "exec-out");
+    expect(fromStart).toHaveLength(1);
+    expect(fromStart[0].toNode).toBe(print2.id);
+  });
+
+  it("data pins keep the original cardinality: one input takes one source, one output fans out freely", () => {
+    const graph = createEmptyGraph("g10", "test");
+    const add1 = addBuiltinNode(graph, "math.add", { x: 0, y: 0 }, "add1");
+    const add2 = addBuiltinNode(graph, "math.add", { x: 0, y: 100 }, "add2");
+    const compare = addBuiltinNode(graph, "math.compare", { x: 100, y: 0 }, "compare");
+
+    // One output fans out to two different inputs — still fine for data pins.
+    connectPins(graph, { fromNode: add1.id, fromPin: "result", toNode: add2.id, toPin: "a" });
+    connectPins(graph, { fromNode: add1.id, fromPin: "result", toNode: add2.id, toPin: "b" });
+    expect(graph.connections.filter((c) => c.fromNode === add1.id && c.fromPin === "result")).toHaveLength(2);
+
+    // A second wire into the SAME data input still replaces the first (unchanged behavior).
+    connectPins(graph, { fromNode: add1.id, fromPin: "result", toNode: compare.id, toPin: "a" });
+    connectPins(graph, { fromNode: add2.id, fromPin: "result", toNode: compare.id, toPin: "a" });
+    const intoCompareA = graph.connections.filter((c) => c.toNode === compare.id && c.toPin === "a");
+    expect(intoCompareA).toHaveLength(1);
+    expect(intoCompareA[0].fromNode).toBe(add2.id);
+  });
 });
