@@ -89,8 +89,8 @@ registerNode({
     { id: "index", label: "Index", type: "number", direction: "output" },
     { id: "completed", label: "Completed", type: "exec", direction: "output" },
   ],
-  // Runs the ENTIRE chain wired to "loop-body" to completion once per index from Start up to
-  // (exclusive) End, awaiting each iteration before starting the next — mirrors function.call
+  // Runs the ENTIRE chain wired to "loop-body" to completion once per index from Start up to AND
+  // INCLUDING End, awaiting each iteration before starting the next — mirrors function.call
   // awaiting runFunctionCall, just walking a chain in this SAME graph instead of a function's body.
   // "index" is exposed the same way any other exec node exposes an output: written to
   // ctx.execOutputs before each iteration's body runs, so anything wired to Loop Body can read it

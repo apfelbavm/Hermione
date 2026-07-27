@@ -38,24 +38,24 @@ function buildLoopGraph(start: number, end: number) {
 }
 
 describe("flow.forLoop", () => {
-  it("runs the loop-body chain once per index from start up to (exclusive of) end, then fires completed", async () => {
+  it("runs the loop-body chain once per index from start up to and including end, then fires completed", async () => {
     const { graph } = buildLoopGraph(0, 3);
     const logs: string[] = [];
     const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
 
     await runExecFrom("loop", "exec-in", ctx);
 
-    expect(logs).toEqual(["0", "1", "2", "Done"]);
+    expect(logs).toEqual(["0", "1", "2", "3", "Done"]);
   });
 
-  it("runs zero iterations when start equals end, but still fires completed", async () => {
+  it("runs exactly one iteration when start equals end, then fires completed", async () => {
     const { graph } = buildLoopGraph(5, 5);
     const logs: string[] = [];
     const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
 
     await runExecFrom("loop", "exec-in", ctx);
 
-    expect(logs).toEqual(["Done"]);
+    expect(logs).toEqual(["5", "Done"]);
   });
 
   it("runs zero iterations when start is greater than end", async () => {
@@ -75,7 +75,7 @@ describe("flow.forLoop", () => {
 
     await runExecFrom("loop", "exec-in", ctx);
 
-    expect(logs).toEqual(["1", "2", "Done"]); // start rounds to 1, end to 3
+    expect(logs).toEqual(["1", "2", "3", "Done"]); // start rounds to 1, end to 3
   });
 
   it("throws instead of hanging when the range would exceed the iteration cap", async () => {

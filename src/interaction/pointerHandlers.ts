@@ -407,12 +407,12 @@ export function setupPointerInteraction(
       if (box) {
         const pos = screenPos(e);
         const worldPos = screenToWorld(camera, pos.x, pos.y);
-        const newX = worldPos.x - grabOffsetX;
-        const newY = worldPos.y - grabOffsetY;
-        const dx = newX - box.position.x;
-        const dy = newY - box.position.y;
-        box.position.x = newX;
-        box.position.y = newY;
+        const raw = { x: worldPos.x - grabOffsetX, y: worldPos.y - grabOffsetY };
+        const snapped = store.state.snapToGrid ? snapPositionToGrid(raw) : raw;
+        const dx = snapped.x - box.position.x;
+        const dy = snapped.y - box.position.y;
+        box.position.x = snapped.x;
+        box.position.y = snapped.y;
         for (const nodeId of box.containedNodeIds) {
           const node = graph.nodes.find((n) => n.id === nodeId);
           if (node) {
