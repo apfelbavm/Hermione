@@ -6,6 +6,7 @@ import { setupCollapsibleSection } from "./collapsibleSection";
 import { VARIABLE_DRAG_MIME } from "./dragTypes";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
+import { createContainerIcon } from "./typedValueInput";
 import { nextAvailableName } from "./uniqueName";
 
 export interface VariablePanelElements {
@@ -61,11 +62,18 @@ export function createVariablePanel(
         if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
       });
 
-      // Same color its pin/node header would use on the canvas — a quick visual cue for the type.
-      const typeDot = document.createElement("span");
-      typeDot.className = "variable-type-dot";
-      typeDot.style.backgroundColor = PIN_COLORS[variable.type];
-      typeDot.title =
+      // One icon per row, always colored by the variable's type (same color its pin/node header
+      // would use on the canvas): a plain dot for a "single" variable, or the Array/Set/Map shape
+      // for a container one (see typedValueInput.ts's createContainerIcon, drawNodes.ts's
+      // drawPinShape) — the container icon REPLACES the dot rather than sitting alongside it, since
+      // a variable only ever has one "kind" to show at a glance.
+      const containerIcon =
+        variable.container && variable.container !== "single" ? createContainerIcon(variable.container) : null;
+      const typeIcon = containerIcon ?? document.createElement("span");
+      if (!containerIcon) typeIcon.className = "variable-type-dot";
+      typeIcon.style.color = PIN_COLORS[variable.type];
+      typeIcon.style.backgroundColor = containerIcon ? "" : PIN_COLORS[variable.type];
+      typeIcon.title =
         variable.container && variable.container !== "single"
           ? `${variable.container} of ${variable.type}`
           : variable.type;
@@ -114,7 +122,7 @@ export function createVariablePanel(
         store.notify();
       });
 
-      row.append(typeDot, nameEl, delBtn);
+      row.append(typeIcon, nameEl, delBtn);
       elements.list.appendChild(row);
       if (nameInputToFocus) focusAndSelect(nameInputToFocus);
     }

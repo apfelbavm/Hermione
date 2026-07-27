@@ -15,7 +15,7 @@ const CONTAINER_LABELS: Record<PinContainer, string> = {
  * a 3x3 grid of quads for Array, the same grid with its middle row's first two quads merged into
  * one wide quad for Map, and a "{ }" brace pair for Set. "single" has no icon (a plain value has
  * no container to distinguish). */
-function createContainerIcon(container: PinContainer): HTMLElement | null {
+export function createContainerIcon(container: PinContainer): HTMLElement | null {
   if (container === "single") return null;
 
   if (container === "set") {
