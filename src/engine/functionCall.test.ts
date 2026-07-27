@@ -209,8 +209,8 @@ describe("function calls", () => {
     expect(entryNode).toBeDefined();
     expect(returnNode).toBeDefined();
 
-    removeNode(fn.body, entryNode!.id);
-    removeNode(fn.body, returnNode!.id);
+    removeNode(fn.body, [], [], entryNode!.id);
+    removeNode(fn.body, [], [], returnNode!.id);
 
     expect(fn.body.nodes).toContain(entryNode);
     expect(fn.body.nodes).toContain(returnNode);

@@ -106,14 +106,20 @@ export function canPlaceNodeType(type: string, graph: Graph, isFunctionBody: boo
  * doesn't interfere with them. */
 export const UNDELETABLE_NODE_TYPES = new Set(["function.entry", "function.return"]);
 
-export function removeNode(graph: Graph, nodeId: string): void {
+export function removeNode(graph: Graph, variables: Variable[], functions: FunctionDef[], nodeId: string): void {
   const node = graph.nodes.find((n) => n.id === nodeId);
-  if (node && UNDELETABLE_NODE_TYPES.has(node.type)) return;
+  if (!node || UNDELETABLE_NODE_TYPES.has(node.type)) return;
+
+  // Prune every connection touching this node through removeConnection (not a raw array filter) so
+  // whichever OTHER node sat on the far end of an outgoing wire gets its input pin properly
+  // restored to a literal default — a raw filter would leave that pin's connectionId dangling and
+  // its value stuck at whatever it was mid-connection (undefined, surfacing as a stray "null"),
+  // never falling back to a real default the way an explicit disconnect already does.
+  for (const conn of graph.connections.filter((c) => c.fromNode === nodeId || c.toNode === nodeId)) {
+    removeConnection(graph, variables, functions, conn.id);
+  }
 
   graph.nodes = graph.nodes.filter((n) => n.id !== nodeId);
-  graph.connections = graph.connections.filter(
-    (c) => c.fromNode !== nodeId && c.toNode !== nodeId,
-  );
   for (const box of graph.commentBoxes) {
     box.containedNodeIds = box.containedNodeIds.filter((id) => id !== nodeId);
   }
@@ -243,11 +249,14 @@ export function addVariable(graph: Graph, variable: Variable): void {
   graph.variables.push(variable);
 }
 
-/** Removes a variable along with any Get/Set nodes bound to it — an orphaned binding has no valid pins. */
-export function removeVariable(graph: Graph, variableId: string): void {
+/** Removes a variable along with any Get/Set nodes bound to it — an orphaned binding has no valid
+ * pins. `variables`/`functions` must be the full VISIBLE sets for `graph` (see getVisibleVariables)
+ * so removeNode can correctly restore a literal default on whatever was downstream of a removed
+ * Get node's output. */
+export function removeVariable(graph: Graph, variables: Variable[], functions: FunctionDef[], variableId: string): void {
   const dependentNodeIds = graph.nodes.filter((n) => n.variableId === variableId).map((n) => n.id);
   for (const nodeId of dependentNodeIds) {
-    removeNode(graph, nodeId);
+    removeNode(graph, variables, functions, nodeId);
   }
   graph.variables = graph.variables.filter((v) => v.id !== variableId);
 }
@@ -303,11 +312,12 @@ export function createFunctionDef(name: string): FunctionDef {
  * function's body (Call nodes can appear anywhere, including inside other functions). */
 export function removeFunctionDef(rootGraph: Graph, functionId: string): void {
   for (const g of allGraphs(rootGraph)) {
+    const variables = getVisibleVariables(rootGraph, g);
     const dependentNodeIds = g.nodes
       .filter((n) => n.functionId === functionId && n.type === "function.call")
       .map((n) => n.id);
     for (const nodeId of dependentNodeIds) {
-      removeNode(g, nodeId);
+      removeNode(g, variables, rootGraph.functions, nodeId);
     }
   }
   rootGraph.functions = rootGraph.functions.filter((f) => f.id !== functionId);

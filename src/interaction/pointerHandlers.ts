@@ -450,8 +450,10 @@ export function setupPointerInteraction(
     if (e.key === "Delete" || e.key === "Backspace") {
       const { selectedNodeIds, selectedCommentId } = store.state;
       if (selectedNodeIds.size === 0 && !selectedCommentId) return;
+      const variables = getVisibleVariablesForState(store.state);
+      const functions = store.state.rootGraph.functions;
       for (const nodeId of selectedNodeIds) {
-        removeNode(graph, nodeId);
+        removeNode(graph, variables, functions, nodeId);
       }
       if (selectedCommentId) removeCommentBox(graph, selectedCommentId);
       store.state.selectedNodeIds = new Set();

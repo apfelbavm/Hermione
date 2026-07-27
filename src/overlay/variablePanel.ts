@@ -1,4 +1,4 @@
-import { addVariable, DEFAULT_VALUE_BY_TYPE, nextId, removeVariable, updateVariable } from "../engine/graphMutations";
+import { addVariable, DEFAULT_VALUE_BY_TYPE, getVisibleVariables, nextId, removeVariable, updateVariable } from "../engine/graphMutations";
 import type { Graph, PinType, Variable } from "../engine/types";
 import type { Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
@@ -96,7 +96,8 @@ export function createVariablePanel(
       const delBtn = document.createElement("button");
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", () => {
-        removeVariable(getGraph(), variable.id);
+        const graph = getGraph();
+        removeVariable(graph, getVisibleVariables(store.state.rootGraph, graph), store.state.rootGraph.functions, variable.id);
         if (store.state.sidebarSelection?.kind === "variable" && store.state.sidebarSelection.variableId === variable.id) {
           store.state.sidebarSelection = null;
         }

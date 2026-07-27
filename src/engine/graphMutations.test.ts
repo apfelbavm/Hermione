@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../nodes";
-import { canPlaceNodeType, createNodeInstance } from "./graphMutations";
+import { addVariable, canPlaceNodeType, connectPins, createNodeInstance, removeNode, removeVariable } from "./graphMutations";
 import { getNodeDef } from "./registry";
-import { createEmptyGraph } from "./types";
+import { createEmptyGraph, type Variable } from "./types";
 
 beforeAll(() => {
   registerBuiltins();
@@ -41,5 +41,67 @@ describe("canPlaceNodeType", () => {
     graph.nodes.push(createNodeInstance("event.run", { x: 0, y: 0 }, runDef.pins));
 
     expect(canPlaceNodeType("event.start", graph, false)).toBe(true);
+  });
+});
+
+describe("removeNode", () => {
+  it("restores a downstream input pin to its literal default instead of leaving it wired-but-dangling", () => {
+    const graph = createEmptyGraph("g", "root");
+    const addDef = getNodeDef("math.add");
+    const addNode = createNodeInstance("math.add", { x: 100, y: 0 }, addDef.pins, "add");
+    graph.nodes.push(addNode);
+
+    const variable: Variable = { id: "v1", name: "Score", type: "number", defaultValue: 7 };
+    addVariable(graph, variable);
+    const getDef = getNodeDef("variable.get");
+    const getNode = createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
+    graph.nodes.push(getNode);
+
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "get",
+      fromPin: "value",
+      toNode: "add",
+      toPin: "a",
+    });
+    expect(addNode.pins.a.connectionId).toBeDefined();
+
+    removeNode(graph, graph.variables, graph.functions, "get");
+
+    expect(graph.nodes.find((n) => n.id === "get")).toBeUndefined();
+    expect(graph.connections).toHaveLength(0);
+    expect(addNode.pins.a.connectionId).toBeUndefined();
+    expect(addNode.pins.a.value).toBe(addDef.pins.find((p) => p.id === "a")!.defaultValue); // 0, not undefined/stuck
+  });
+});
+
+describe("removeVariable", () => {
+  it("removes the Get node AND restores whatever it fed into, rather than leaving a dangling wired-looking pin", () => {
+    const graph = createEmptyGraph("g", "root");
+    const addDef = getNodeDef("math.add");
+    const addNode = createNodeInstance("math.add", { x: 100, y: 0 }, addDef.pins, "add");
+    graph.nodes.push(addNode);
+
+    const variable: Variable = { id: "v1", name: "Score", type: "number", defaultValue: 7 };
+    addVariable(graph, variable);
+    const getDef = getNodeDef("variable.get");
+    const getNode = createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
+    graph.nodes.push(getNode);
+
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "get",
+      fromPin: "value",
+      toNode: "add",
+      toPin: "a",
+    });
+
+    removeVariable(graph, graph.variables, graph.functions, variable.id);
+
+    expect(graph.variables).toHaveLength(0);
+    expect(graph.nodes.find((n) => n.id === "get")).toBeUndefined();
+    expect(graph.connections).toHaveLength(0);
+    // The bug: "a" would keep its stale connectionId (so no literal widget ever reappears) and its
+    // value would stay stuck at undefined (surfacing as "null") instead of falling back to a real default.
+    expect(addNode.pins.a.connectionId).toBeUndefined();
+    expect(addNode.pins.a.value).toBe(0);
   });
 });
