@@ -2,7 +2,7 @@ import { addNode, createFunctionDef, createNodeInstance, nextId, removeFunctionD
 import { getNodeDef } from "../engine/registry";
 import type { FunctionDef } from "../engine/types";
 import { screenToWorld } from "../render/camera";
-import { getEditingGraph, type Store } from "../state/store";
+import { closeFunctionTab, getEditingGraph, openFunctionTab, type Store } from "../state/store";
 
 export interface FunctionsPanelElements {
   list: HTMLElement;
@@ -44,9 +44,9 @@ export function createFunctionsPanel(elements: FunctionsPanelElements, store: St
       const name = document.createElement("span");
       name.className = "variable-name function-name";
       name.textContent = fn.name;
-      name.title = "Click to edit this function's graph";
+      name.title = "Click to open this function's graph in a tab";
       name.addEventListener("click", () => {
-        store.state.activeFunctionId = fn.id;
+        openFunctionTab(store.state, fn.id);
         store.notify();
       });
 
@@ -57,7 +57,7 @@ export function createFunctionsPanel(elements: FunctionsPanelElements, store: St
       const delBtn = document.createElement("button");
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", () => {
-        if (store.state.activeFunctionId === fn.id) store.state.activeFunctionId = null;
+        closeFunctionTab(store.state, fn.id);
         removeFunctionDef(store.state.rootGraph, fn.id);
         store.notify();
       });

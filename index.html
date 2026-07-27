@@ -10,8 +10,6 @@
     <div id="app">
       <div id="toolbar">
         <span id="toolbar-title">Hermione</span>
-        <button id="back-button" style="display: none">◀ Back</button>
-        <span id="breadcrumb"></span>
         <button id="run-button">Run ▶</button>
         <button id="save-button">Save</button>
         <button id="load-button">Load</button>
@@ -19,9 +17,12 @@
         <input id="load-file-input" type="file" accept="application/json" style="display: none" />
       </div>
       <div id="main-area">
-        <div id="canvas-container">
-          <canvas id="graph-canvas"></canvas>
-          <div id="overlay"></div>
+        <div id="canvas-column">
+          <div id="graph-tabs"></div>
+          <div id="canvas-container">
+            <canvas id="graph-canvas"></canvas>
+            <div id="overlay"></div>
+          </div>
         </div>
         <div id="sidebar">
           <div class="panel-section">

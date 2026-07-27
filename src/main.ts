@@ -24,6 +24,7 @@ import { createCommentOverlay } from "./overlay/commentOverlay";
 import { createVariablePanel } from "./overlay/variablePanel";
 import { createFunctionsPanel } from "./overlay/functionsPanel";
 import { createFunctionIoPanel } from "./overlay/functionIoPanel";
+import { createGraphTabs } from "./overlay/graphTabs";
 import { openNodeSearchMenu } from "./overlay/nodeSearchMenu";
 import { loadGraphFromFile, loadGraphFromLocalStorage } from "./persistence/load";
 import { downloadGraphAsFile, saveGraphToLocalStorage } from "./persistence/save";
@@ -40,14 +41,13 @@ const saveButton = document.getElementById("save-button") as HTMLButtonElement;
 const loadButton = document.getElementById("load-button") as HTMLButtonElement;
 const compileButton = document.getElementById("compile-button") as HTMLButtonElement;
 const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
-const backButton = document.getElementById("back-button") as HTMLButtonElement;
-const breadcrumb = document.getElementById("breadcrumb") as HTMLSpanElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 if (!ctx) throw new Error("Canvas 2D context unavailable");
 
 const store = createStore({
   rootGraph: loadGraphFromLocalStorage() ?? buildDemoGraph(),
   activeFunctionId: null,
+  openFunctionTabs: [],
   camera: createCamera(),
   selectedNodeIds: new Set(),
   selectedCommentId: null,
@@ -139,10 +139,7 @@ const localVariablePanel = createVariablePanel(
   () => getActiveFunction()?.body ?? store.state.rootGraph,
 );
 
-backButton.addEventListener("click", () => {
-  store.state.activeFunctionId = null;
-  store.notify();
-});
+const graphTabs = createGraphTabs(document.getElementById("graph-tabs") as HTMLDivElement, store);
 
 function render(): void {
   const { camera, selectedNodeIds, selectedCommentId, executingNodeId, firedConnectionIds, wireDrag } =
@@ -165,12 +162,11 @@ function render(): void {
   functionsPanel.render();
   inputsPanel.render();
   outputsPanel.render();
+  graphTabs.render();
 
   const activeFn = getActiveFunction();
   localVariablesSection.style.display = activeFn ? "" : "none";
   if (activeFn) localVariablePanel.render();
-  backButton.style.display = activeFn ? "" : "none";
-  breadcrumb.textContent = activeFn ? `Editing function: ${activeFn.name}` : "";
 }
 
 store.subscribe(render);
@@ -315,6 +311,7 @@ loadFileInput.addEventListener("change", async () => {
     const graph = await loadGraphFromFile(file);
     store.state.rootGraph = graph;
     store.state.activeFunctionId = null;
+    store.state.openFunctionTabs = [];
     store.state.selectedNodeIds = new Set();
     store.state.selectedCommentId = null;
     store.state.executingNodeId = null;

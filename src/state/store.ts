@@ -14,6 +14,10 @@ export interface AppState {
   rootGraph: Graph;
   /** Which function's body is currently open for editing, or null for the root graph itself. */
   activeFunctionId: string | null;
+  /** Ordered ids of functions currently open as tabs (the root graph's tab is implicit and
+   * always first, and isn't tracked here since it can't be closed or reordered). Session-only
+   * UI state — not persisted, reset to [] on load like selection/camera. */
+  openFunctionTabs: string[];
   camera: Camera;
   selectedNodeIds: Set<string>;
   selectedCommentId: string | null;
@@ -27,6 +31,25 @@ export function getEditingGraph(state: AppState): Graph {
   if (!state.activeFunctionId) return state.rootGraph;
   const fn = state.rootGraph.functions.find((f) => f.id === state.activeFunctionId);
   return fn ? fn.body : state.rootGraph;
+}
+
+/** Opens (or focuses, if already open) a function's tab and makes it the active editing graph. */
+export function openFunctionTab(state: AppState, functionId: string): void {
+  if (!state.openFunctionTabs.includes(functionId)) {
+    state.openFunctionTabs.push(functionId);
+  }
+  state.activeFunctionId = functionId;
+}
+
+/** Closes a function's tab. If it was the active tab, falls back to whichever tab took its place,
+ * else the previous tab, else the root graph's (always-open, unclosable) tab. */
+export function closeFunctionTab(state: AppState, functionId: string): void {
+  const index = state.openFunctionTabs.indexOf(functionId);
+  if (index === -1) return;
+  state.openFunctionTabs.splice(index, 1);
+  if (state.activeFunctionId === functionId) {
+    state.activeFunctionId = state.openFunctionTabs[index] ?? state.openFunctionTabs[index - 1] ?? null;
+  }
 }
 
 /** Variables visible from the currently open editing graph — root's own, or root + the active
