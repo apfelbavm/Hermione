@@ -73,6 +73,12 @@ export interface NodeDef {
   /** Present only on a deriveInstancePins node: mutates `node.pins` in place to add one more
    * entry. Invoked by the canvas "+" affordance drawn next to the node (see NodeLayout.addButton). */
   addInstancePinEntry?: (node: NodeInstance) => void;
+  /** Instance-level configuration edited in the sidebar Details panel when this node is selected
+   * on the canvas (see detailsPanel.ts) — e.g. On Interval's interval duration — instead of as a
+   * wireable pin. Storage still goes through NodeInstance.pins (same as any other pin's value);
+   * these ids are simply never returned by resolvePinDefs, so they're never drawn, wired, or given
+   * an inline canvas widget like a real pin would be. */
+  detailProperties?: PinDef[];
   /** Marks this node type as a graph entry point (Unreal's BeginPlay/EventTick equivalent). */
   eventTrigger?: EventTrigger;
   /** Compile-time counterpart of `evaluate`: returns a JS expression string per output pin. */

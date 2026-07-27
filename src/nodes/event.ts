@@ -13,9 +13,11 @@ registerNode({
   type: "event.interval",
   label: "On Interval",
   group: "Events",
-  pins: [
+  pins: [{ id: "exec-out", label: "", type: "exec", direction: "output" }],
+  // Editable in the Details panel when this node is selected, not as a wireable pin — see
+  // NodeDef.detailProperties.
+  detailProperties: [
     { id: "intervalMs", label: "Interval (ms)", type: "number", direction: "input", defaultValue: 5000 },
-    { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
   execute: () => ({ nextExec: "exec-out" }),
   eventTrigger: {

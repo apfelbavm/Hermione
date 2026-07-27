@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "./index";
+import { createNodeInstance, resolvePinDefs } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 
 beforeAll(() => {
@@ -12,15 +13,40 @@ describe("event nodes have no user-settable name — the node type/label says ho
     expect(def.pins.some((p) => p.id === "name")).toBe(false);
   });
 
-  it("On Interval has no 'name' pin (but keeps its interval config)", () => {
-    const def = getNodeDef("event.interval");
-    expect(def.pins.some((p) => p.id === "name")).toBe(false);
-    expect(def.pins.some((p) => p.id === "intervalMs")).toBe(true);
-  });
-
   it("On Run has no 'name' pin", () => {
     const def = getNodeDef("event.run");
     expect(def.pins.some((p) => p.id === "name")).toBe(false);
+  });
+});
+
+describe("On Interval's intervalMs is a Details-panel property, never a wireable pin", () => {
+  it("is absent from both the static pins list and resolvePinDefs", () => {
+    const def = getNodeDef("event.interval");
+    expect(def.pins.some((p) => p.id === "intervalMs")).toBe(false);
+    expect(def.pins.some((p) => p.id === "name")).toBe(false);
+
+    const node = createNodeInstance("event.interval", { x: 0, y: 0 }, def.pins);
+    expect(resolvePinDefs(node, [], []).some((p) => p.id === "intervalMs")).toBe(false);
+  });
+
+  it("is declared as a detailProperty with the expected default", () => {
+    const def = getNodeDef("event.interval");
+    expect(def.detailProperties).toEqual([
+      { id: "intervalMs", label: "Interval (ms)", type: "number", direction: "input", defaultValue: 5000 },
+    ]);
+  });
+
+  it("still gets seeded onto the instance's pins record at creation, for storage/persistence", () => {
+    const def = getNodeDef("event.interval");
+    const node = createNodeInstance("event.interval", { x: 0, y: 0 }, def.pins);
+    expect(node.pins.intervalMs).toEqual({ value: 5000 });
+  });
+
+  it("describeInstance still reads the live value for the compiled manifest", () => {
+    const def = getNodeDef("event.interval");
+    const node = createNodeInstance("event.interval", { x: 0, y: 0 }, def.pins);
+    node.pins.intervalMs!.value = 9000;
+    expect(def.eventTrigger!.describeInstance!(node)).toEqual({ intervalMs: 9000 });
   });
 });
 

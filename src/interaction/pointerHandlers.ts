@@ -176,6 +176,9 @@ export function setupPointerInteraction(
         else next.add(node.id);
         store.state.selectedNodeIds = next;
         store.state.selectedCommentId = null;
+        // A canvas node selection takes over from whatever sidebar row's Details were showing —
+        // see detailsPanel.ts.
+        store.state.sidebarSelection = null;
         if (!next.has(node.id)) {
           // Just deselected it — nothing to grab from here.
           drag = { kind: "none" };
@@ -187,6 +190,7 @@ export function setupPointerInteraction(
         // Fresh click on a node outside the current selection replaces the selection.
         store.state.selectedNodeIds = new Set([node.id]);
         store.state.selectedCommentId = null;
+        store.state.sidebarSelection = null;
       }
       // else: the clicked node is already part of an existing multi-selection — keep the whole
       // selection intact so the drag below moves the whole group, Unreal-style.
@@ -416,6 +420,7 @@ export function setupPointerInteraction(
           rectIntersects(box, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), functions)),
         );
         store.state.selectedNodeIds = new Set(touched.map((n) => n.id));
+        store.state.sidebarSelection = null;
       }
       store.state.marqueeSelection = null;
       drag = { kind: "none" };
@@ -501,6 +506,7 @@ export function setupPointerInteraction(
             if (newIds.length > 0) {
               store.state.selectedNodeIds = new Set(newIds);
               store.state.selectedCommentId = null;
+              store.state.sidebarSelection = null;
               store.notify();
             }
           } else {

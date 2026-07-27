@@ -36,8 +36,12 @@ export function createNodeInstance(
   variableId?: string,
   functionId?: string,
 ): NodeInstance {
+  // detailProperties are seeded here (not passed in by the caller) since every caller already
+  // identifies the node purely by `type` — looking them up off the registered NodeDef keeps every
+  // call site from having to remember to merge them in separately.
+  const detailProperties = getNodeDef(type).detailProperties ?? [];
   const pins: Record<string, Pin> = {};
-  for (const def of pinDefs) {
+  for (const def of [...pinDefs, ...detailProperties]) {
     pins[def.id] = def.direction === "input" ? { value: def.defaultValue } : {};
   }
   return { id, type, position, pins, variableId, functionId };
