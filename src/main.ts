@@ -383,9 +383,11 @@ runButton.addEventListener("click", async () => {
   logPanel.innerHTML = "";
   store.state.firedConnectionIds = new Set();
 
-  const eventRoots = store.state.rootGraph.nodes.filter((n) => getNodeDef(n.type).eventTrigger);
+  // On Start/On Interval describe how a *compiled* graph gets triggered outside the editor —
+  // the Run button only ever fires On Run nodes.
+  const eventRoots = store.state.rootGraph.nodes.filter((n) => n.type === "event.run");
   if (eventRoots.length === 0) {
-    appendLog("No event nodes in graph — nothing to run.");
+    appendLog('No "On Run" node in graph — nothing to run.');
     runButton.disabled = false;
     return;
   }

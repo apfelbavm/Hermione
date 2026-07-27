@@ -13,7 +13,7 @@ function addNode(graph: Graph, type: string, position: { x: number; y: number },
 export function buildDemoGraph(): Graph {
   const graph = createEmptyGraph("demo", "Interview Scheduling Demo");
 
-  const start = addNode(graph, "event.start", { x: 40, y: 220 }, "start");
+  const start = addNode(graph, "event.run", { x: 40, y: 220 }, "start");
   const add = addNode(graph, "math.add", { x: 320, y: 40 }, "add");
   const compare = addNode(graph, "math.equal", { x: 560, y: 40 }, "compare");
   const branch = addNode(graph, "flow.branch", { x: 320, y: 260 }, "branch");
