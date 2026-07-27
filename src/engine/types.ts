@@ -123,6 +123,13 @@ export interface NodeDef {
    * ids (the paired sibling) that should be deleted+pruned the same way, since the generic
    * right-click "Delete" affordance only ever targets one pin at a time. */
   onInstancePinRemoved?: (node: NodeInstance, removedPinId: string) => string[];
+  /** Overrides which exec-out pin(s) fire when a node of this type is disabled (see
+   * NodeInstance.disabled) — the generic disabled behavior fires EVERY exec-out pin, since there's
+   * normally no execute() result to say which one its own logic would have picked. That default is
+   * wrong for a loop node (For Loop, Array/Set/Map For Each): its "loop-body" pin isn't a plain
+   * continuation, it's the repeated iteration body, so a disabled loop must skip straight to
+   * "completed" and never fire "loop-body" at all — same as if it ran zero iterations. */
+  disabledNextExec?: string[];
 }
 
 export interface Pin {

@@ -248,4 +248,33 @@ describe("compileGraph", () => {
 
     expect(logs).toEqual(["second"]); // print1 (disabled) is skipped, but print2 downstream still runs
   });
+
+  it("a disabled loop node compiles straight to 'completed', never splicing in its loop-body chain", async () => {
+    const graph = createEmptyGraph("g13", "test");
+    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const loop = addBuiltinNode(graph, "flow.forLoop", { x: 100, y: 0 }, "loop");
+    const printBody = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "printBody");
+    const printDone = addBuiltinNode(graph, "debug.print", { x: 200, y: 100 }, "printDone");
+    printBody.pins.message.value = "body";
+    printDone.pins.message.value = "done";
+    loop.pins.start.value = 0;
+    loop.pins.end.value = 3;
+    loop.disabled = true;
+
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: loop.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: loop.id, fromPin: "loop-body", toNode: printBody.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: loop.id, fromPin: "completed", toNode: printDone.id, toPin: "exec-in" });
+
+    // Even though flow.forLoop itself has no compileExecute, a DISABLED node never needs one — it
+    // only splices in the compiled chain for its disabledNextExec pin(s) (see codegen.ts).
+    const { code, manifest } = compileGraph(graph);
+    const compiled = await loadCompiled(code);
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
+
+    const logs: string[] = [];
+    await trigger({ state: createInitialState(), log: (m: string) => logs.push(m) });
+
+    expect(logs).toEqual(["done"]); // loop-body's "body" print never runs, not even once
+  });
 });

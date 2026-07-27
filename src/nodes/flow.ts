@@ -89,6 +89,10 @@ registerNode({
     { id: "index", label: "Index", type: "number", direction: "output" },
     { id: "completed", label: "Completed", type: "exec", direction: "output" },
   ],
+  // Disabled must skip straight to "completed" — never firing "loop-body" — rather than the
+  // generic disabled behavior of firing every exec-out pin (which would run the body once, an
+  // actual loop node's body isn't a plain continuation). See NodeDef.disabledNextExec.
+  disabledNextExec: ["completed"],
   // Runs the ENTIRE chain wired to "loop-body" to completion once per index from Start up to AND
   // INCLUDING End, awaiting each iteration before starting the next — mirrors function.call
   // awaiting runFunctionCall, just walking a chain in this SAME graph instead of a function's body.

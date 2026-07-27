@@ -8,7 +8,6 @@ registerNode({
   group: "Actions",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "url", label: "URL", type: "string", direction: "input", defaultValue: "" },
     {
       id: "method",
       label: "Method",
@@ -17,6 +16,7 @@ registerNode({
       defaultValue: "GET",
       options: HTTP_METHODS,
     },
+    { id: "url", label: "URL", type: "string", direction: "input", defaultValue: "" },
     { id: "headers", label: "Headers (JSON)", type: "string", direction: "input", defaultValue: "{}" },
     { id: "body", label: "Body", type: "string", direction: "input", defaultValue: "" },
     { id: "timeoutMs", label: "Timeout (ms)", type: "number", direction: "input", defaultValue: 10000, integer: true },

@@ -242,6 +242,27 @@ describe("array.forEach", () => {
 
     expect(logs).toEqual(["Done"]);
   });
+
+  it("when disabled, never runs the loop body (even with a non-empty array) and fires only Completed", async () => {
+    const graph = createEmptyGraph("g", "test");
+    const forEachDef = getNodeDef("array.forEach");
+    const forEach = createNodeInstance("array.forEach", { x: 0, y: 0 }, forEachDef.pins, "forEach");
+    forEach.disabled = true;
+    graph.nodes.push(forEach);
+    const printDef = getNodeDef("debug.print");
+    graph.nodes.push(createNodeInstance("debug.print", { x: 0, y: 0 }, printDef.pins, "printElement"));
+    const printDone = createNodeInstance("debug.print", { x: 0, y: 0 }, printDef.pins, "printDone");
+    printDone.pins.message.value = "Done";
+    graph.nodes.push(printDone);
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "forEach", fromPin: "loop-body", toNode: "printElement", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "forEach", fromPin: "completed", toNode: "printDone", toPin: "exec-in" });
+    forEach.pins.array.value = [10, 20, 30];
+
+    const logs: string[] = [];
+    await runExecFrom("forEach", "exec-in", createExecutionContext(graph, { log: (m) => logs.push(m) }));
+
+    expect(logs).toEqual(["Done"]);
+  });
 });
 
 describe("changeNodeElementType", () => {

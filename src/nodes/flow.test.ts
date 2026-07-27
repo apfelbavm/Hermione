@@ -84,4 +84,15 @@ describe("flow.forLoop", () => {
 
     await expect(runExecFrom("loop", "exec-in", ctx)).rejects.toThrow(/iterations/);
   });
+
+  it("when disabled, never runs the loop body (not even once) and fires only completed", async () => {
+    const { graph, loop } = buildLoopGraph(0, 3);
+    loop.disabled = true;
+    const logs: string[] = [];
+    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
+
+    await runExecFrom("loop", "exec-in", ctx);
+
+    expect(logs).toEqual(["Done"]);
+  });
 });

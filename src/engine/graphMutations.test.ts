@@ -195,6 +195,16 @@ describe("hasConnectedDataOutput", () => {
     connectPins(graph, [], [], { fromNode: "branch", fromPin: "true", toNode: "print", toPin: "exec-in" });
     expect(hasConnectedDataOutput(graph, "branch", [], [])).toBe(false);
   });
+
+  it("is false for a loop node even when its data output (e.g. For Loop's Index) is wired — see NodeDef.disabledNextExec", () => {
+    const graph = createEmptyGraph("g", "root");
+    const loopDef = getNodeDef("flow.forLoop");
+    const toStrDef = getNodeDef("string.fromNumber");
+    graph.nodes.push(createNodeInstance("flow.forLoop", { x: 0, y: 0 }, loopDef.pins, "loop"));
+    graph.nodes.push(createNodeInstance("string.fromNumber", { x: 0, y: 0 }, toStrDef.pins, "toStr"));
+    connectPins(graph, [], [], { fromNode: "loop", fromPin: "index", toNode: "toStr", toPin: "value" });
+    expect(hasConnectedDataOutput(graph, "loop", [], [])).toBe(false);
+  });
 });
 
 describe("updateVariable — container support", () => {

@@ -306,6 +306,9 @@ registerNode({
       { id: "completed", label: "Completed", type: "exec", direction: "output" },
     ];
   },
+  // Disabled must skip straight to "completed" — never firing "loop-body" — same rationale as
+  // flow.forLoop (see its own comment and NodeDef.disabledNextExec).
+  disabledNextExec: ["completed"],
   execute: async ({ node, inputs, ctx }) => {
     const entries = asEntries(inputs.map);
     if (entries.length > MAX_MAP_FOR_EACH_ITERATIONS) {

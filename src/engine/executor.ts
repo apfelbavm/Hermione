@@ -137,12 +137,17 @@ export async function runExecFrom(
     if (node.disabled) {
       // Disabled (see NodeInstance.disabled): its own logic never runs — no execute(), no
       // onNodeStart flash, no data outputs produced — but the exec chain still continues past it,
-      // firing every exec-OUTPUT pin it has (there's no execute() result to tell us which one its
-      // own logic would have picked, e.g. a disabled Branch's condition). For the common case of a
-      // single exec-in/exec-out node this is exactly "skip what it does, keep going."
-      nextExecPins = resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions)
-        .filter((p) => p.direction === "output" && p.type === "exec")
-        .map((p) => p.id);
+      // firing every exec-OUTPUT pin it has by default (there's no execute() result to tell us
+      // which one its own logic would have picked, e.g. a disabled Branch's condition) — UNLESS its
+      // NodeDef overrides this via disabledNextExec (see its own doc comment — a loop node must
+      // skip straight to "completed" and never fire "loop-body"). For the common case of a plain
+      // single exec-in/exec-out node this default is exactly "skip what it does, keep going."
+      const disabledNextExec = getNodeDef(node.type).disabledNextExec;
+      nextExecPins =
+        disabledNextExec ??
+        resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions)
+          .filter((p) => p.direction === "output" && p.type === "exec")
+          .map((p) => p.id);
     } else {
       const def = getNodeDef(node.type);
       if (!def.execute) {
