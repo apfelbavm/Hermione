@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hermione</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="toolbar">
+        <span id="toolbar-title">Hermione</span>
+        <button id="run-button">Run ▶</button>
+        <button id="save-button">Save</button>
+        <button id="load-button">Load</button>
+        <input id="load-file-input" type="file" accept="application/json" style="display: none" />
+      </div>
+      <div id="main-area">
+        <div id="canvas-container">
+          <canvas id="graph-canvas"></canvas>
+          <div id="overlay"></div>
+        </div>
+        <div id="variables-panel">
+          <div class="panel-header">Variables</div>
+          <div id="variables-list"></div>
+          <div class="panel-add-row">
+            <input id="new-variable-name" type="text" placeholder="Name" />
+            <select id="new-variable-type">
+              <option value="number">number</option>
+              <option value="boolean">boolean</option>
+              <option value="string">string</option>
+              <option value="object">object</option>
+            </select>
+            <button id="add-variable-button">+</button>
+          </div>
+        </div>
+      </div>
+      <div id="log-panel"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
