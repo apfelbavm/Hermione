@@ -117,12 +117,20 @@ describe("removeVariable", () => {
 });
 
 describe("resolveNodeLabel", () => {
-  it("shows the bound variable's name for a Get/Set node instead of the generic def label", () => {
+  it("prefixes a Get node's label with 'Get ' followed by the bound variable's name", () => {
     const variable: Variable = { id: "v1", name: "Score", type: "number", defaultValue: 0 };
     const getDef = getNodeDef("variable.get");
     const node = createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
 
-    expect(resolveNodeLabel(node, getDef, [variable], [])).toBe("Score");
+    expect(resolveNodeLabel(node, getDef, [variable], [])).toBe("Get Score");
+  });
+
+  it("prefixes a Set node's label with 'Set ' followed by the bound variable's name", () => {
+    const variable: Variable = { id: "v1", name: "Score", type: "number", defaultValue: 0 };
+    const setDef = getNodeDef("variable.set");
+    const node = createNodeInstance("variable.set", { x: 0, y: 0 }, setDef.derivePins!(variable), "set", variable.id);
+
+    expect(resolveNodeLabel(node, setDef, [variable], [])).toBe("Set Score");
   });
 
   it("falls back to the def's generic label when the bound variable can't be found", () => {
