@@ -2,6 +2,17 @@
   box-sizing: border-box;
 }
 
+/* No spinner arrows on any number input, anywhere (canvas pin widgets, sidebar type/value fields). */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 html, body {
   margin: 0;
   height: 100%;
