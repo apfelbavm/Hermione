@@ -26,6 +26,26 @@ export interface EvaluateArgs {
   ctx: ExecutionContext;
 }
 
+export interface CompileEvalArgs {
+  node: NodeInstance;
+  inputs: Record<string, string>;
+  graph: Graph;
+}
+
+export interface CompileExecArgs {
+  node: NodeInstance;
+  inputs: Record<string, string>;
+  graph: Graph;
+  /** Compiles whatever is wired to this node's given exec-out pin into statements. */
+  compileFrom: (execOutPin: string) => string[];
+}
+
+export interface EventTrigger {
+  /** Open string, not a closed union — new trigger kinds (webhook, on-deploy, ...) never require editing this shared file. */
+  kind: string;
+  describeInstance?: (node: NodeInstance) => Record<string, unknown>;
+}
+
 export interface NodeDef {
   type: string;
   label: string;
@@ -36,6 +56,14 @@ export interface NodeDef {
     args: EvaluateArgs,
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
   derivePins?: (variable: Variable) => PinDef[];
+  /** Marks this node type as a graph entry point (Unreal's BeginPlay/EventTick equivalent). */
+  eventTrigger?: EventTrigger;
+  /** Compile-time counterpart of `evaluate`: returns a JS expression string per output pin. */
+  compileEvaluate?: (args: CompileEvalArgs) => Record<string, string>;
+  /** Compile-time counterpart of `execute`: returns JS statement strings. */
+  compileExecute?: (args: CompileExecArgs) => string[];
+  /** Named helper-function source snippets this node's generated code depends on (e.g. `delay`), deduped by name across the whole compiled file. */
+  compileHelpers?: Record<string, string>;
 }
 
 export interface Pin {

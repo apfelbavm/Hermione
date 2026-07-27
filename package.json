@@ -7,9 +7,12 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "compile": "tsx scripts/compileGraph.ts"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
     "typescript": "~5.6.2",
     "vite": "^5.4.10",
     "vitest": "^2.1.4"

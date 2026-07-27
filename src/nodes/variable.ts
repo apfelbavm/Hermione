@@ -1,5 +1,9 @@
 import { registerNode } from "../engine/registry";
 
+function variableName(graph: { variables: { id: string; name: string }[] }, variableId?: string): string {
+  return graph.variables.find((v) => v.id === variableId)?.name ?? "unknown";
+}
+
 registerNode({
   type: "variable.get",
   label: "Get Variable",
@@ -10,6 +14,9 @@ registerNode({
   ],
   evaluate: ({ node, ctx }) => ({
     value: node.variableId ? ctx.variableValues.get(node.variableId) : undefined,
+  }),
+  compileEvaluate: ({ node, graph }) => ({
+    value: `rt.state[${JSON.stringify(node.variableId)}] /* ${variableName(graph, node.variableId)} */`,
   }),
 });
 
@@ -27,4 +34,8 @@ registerNode({
     if (node.variableId) ctx.variableValues.set(node.variableId, inputs.value);
     return { nextExec: "exec-out" };
   },
+  compileExecute: ({ node, inputs, graph, compileFrom }) => [
+    `rt.state[${JSON.stringify(node.variableId)}] = ${inputs.value}; /* ${variableName(graph, node.variableId)} */`,
+    ...compileFrom("exec-out"),
+  ],
 });

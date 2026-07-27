@@ -28,8 +28,6 @@ export function clearRegistry(): void {
 }
 
 export function isPinTypeCompatible(a: PinType, b: PinType): boolean {
-  if (a === "exec" || b === "exec") return a === b;
-  if (a === "object" || b === "object") return true;
   return a === b;
 }
 

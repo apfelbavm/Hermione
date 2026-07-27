@@ -12,6 +12,9 @@ registerNode({
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) + Number(inputs.b ?? 0),
   }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `(Number(${inputs.a}) + Number(${inputs.b}))`,
+  }),
 });
 
 registerNode({
@@ -25,5 +28,8 @@ registerNode({
   ],
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) > Number(inputs.b ?? 0),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `(Number(${inputs.a}) > Number(${inputs.b}))`,
   }),
 });

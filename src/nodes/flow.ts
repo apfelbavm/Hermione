@@ -1,4 +1,5 @@
 import { registerNode } from "../engine/registry";
+import { DELAY_HELPER_SOURCE, indent } from "../engine/compileUtils";
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -17,6 +18,11 @@ registerNode({
     await wait(Number(inputs.duration ?? 0));
     return { nextExec: "exec-out" };
   },
+  compileHelpers: { delay: DELAY_HELPER_SOURCE },
+  compileExecute: ({ inputs, compileFrom }) => [
+    `await delay(Number(${inputs.duration}));`,
+    ...compileFrom("exec-out"),
+  ],
 });
 
 registerNode({
@@ -30,4 +36,11 @@ registerNode({
     { id: "false", label: "False", type: "exec", direction: "output" },
   ],
   execute: ({ inputs }) => ({ nextExec: inputs.condition ? "true" : "false" }),
+  compileExecute: ({ inputs, compileFrom }) => [
+    `if (${inputs.condition}) {`,
+    ...indent(compileFrom("true")),
+    `} else {`,
+    ...indent(compileFrom("false")),
+    `}`,
+  ],
 });

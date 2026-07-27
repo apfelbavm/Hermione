@@ -108,6 +108,44 @@ describe("executor", () => {
     expect(ctx.variableValues.get(variable.id)).toBe("hello from variable");
   });
 
+  it("Get Variable reflects the current value across exec steps, not a stale per-tick cache", async () => {
+    const graph = createEmptyGraph("g7", "test");
+    const variable = { id: "x", name: "X", type: "string" as const, defaultValue: "" };
+    graph.variables.push(variable);
+
+    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const setDef = getNodeDef("variable.set");
+    const getDef = getNodeDef("variable.get");
+
+    const set1 = createNodeInstance("variable.set", { x: 0, y: 0 }, setDef.derivePins!(variable), "set1", variable.id);
+    set1.pins.value.value = "1";
+    graph.nodes.push(set1);
+
+    const getNode = createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
+    graph.nodes.push(getNode);
+
+    const print1 = addBuiltinNode(graph, "debug.print", { x: 0, y: 0 }, "print1");
+
+    const set2 = createNodeInstance("variable.set", { x: 0, y: 0 }, setDef.derivePins!(variable), "set2", variable.id);
+    set2.pins.value.value = "2";
+    graph.nodes.push(set2);
+
+    const print2 = addBuiltinNode(graph, "debug.print", { x: 0, y: 0 }, "print2");
+
+    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: set1.id, toPin: "exec-in" });
+    connectPins(graph, { fromNode: set1.id, fromPin: "exec-out", toNode: print1.id, toPin: "exec-in" });
+    connectPins(graph, { fromNode: getNode.id, fromPin: "value", toNode: print1.id, toPin: "message" });
+    connectPins(graph, { fromNode: print1.id, fromPin: "exec-out", toNode: set2.id, toPin: "exec-in" });
+    connectPins(graph, { fromNode: set2.id, fromPin: "exec-out", toNode: print2.id, toPin: "exec-in" });
+    connectPins(graph, { fromNode: getNode.id, fromPin: "value", toNode: print2.id, toPin: "message" });
+
+    const logs: string[] = [];
+    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
+    await runExecFrom(start.id, "exec-out", ctx);
+
+    expect(logs).toEqual(["1", "2"]);
+  });
+
   it("awaits async nodes in order: Delay -> Send Email (mock) -> Print", async () => {
     const graph = createEmptyGraph("g6", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");

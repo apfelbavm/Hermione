@@ -1,4 +1,5 @@
 import { resolvePinDefs } from "./graphMutations";
+import { connectionsFrom, connectionTo } from "./graphQueries";
 import { getNodeDef } from "./registry";
 import type { ExecutionContext, Graph, NodeInstance } from "./types";
 
@@ -6,14 +7,6 @@ export function findNode(graph: Graph, nodeId: string): NodeInstance {
   const node = graph.nodes.find((n) => n.id === nodeId);
   if (!node) throw new Error(`Node "${nodeId}" not found in graph`);
   return node;
-}
-
-function connectionsFrom(graph: Graph, nodeId: string, pinId: string) {
-  return graph.connections.filter((c) => c.fromNode === nodeId && c.fromPin === pinId);
-}
-
-function connectionTo(graph: Graph, nodeId: string, pinId: string) {
-  return graph.connections.find((c) => c.toNode === nodeId && c.toPin === pinId);
 }
 
 export function createExecutionContext(
@@ -94,6 +87,8 @@ export async function resolveDataPin(
   return ctx.tickCache.get(outputCacheKey);
 }
 
+const MAX_EXEC_STEPS = 100_000;
+
 /** Walks the exec chain starting at (nodeId, execInPin), awaiting each node's execute(). */
 export async function runExecFrom(
   nodeId: string,
@@ -101,8 +96,14 @@ export async function runExecFrom(
   ctx: ExecutionContext,
 ): Promise<void> {
   const queue: Array<{ nodeId: string; execInPin: string }> = [{ nodeId, execInPin }];
+  let steps = 0;
 
   while (queue.length > 0) {
+    if (++steps > MAX_EXEC_STEPS) {
+      throw new Error(
+        `Exec chain exceeded ${MAX_EXEC_STEPS} steps — likely a cyclic wire (loop nodes aren't supported yet)`,
+      );
+    }
     const step = queue.shift()!;
     const node = findNode(ctx.graph, step.nodeId);
     const def = getNodeDef(node.type);
@@ -111,6 +112,12 @@ export async function runExecFrom(
     }
 
     await ctx.onNodeStart?.(node.id);
+
+    // Cleared per exec-step (not once per run): a variable read must reflect whatever the
+    // most recent Set Variable step wrote, not a value cached from an earlier step. Within
+    // this one step, resolving a diamond-shaped pure subgraph still dedups correctly, since
+    // the cache only clears *between* steps.
+    ctx.tickCache.clear();
 
     const pinDefs = resolvePinDefs(node, ctx.graph.variables);
     const inputs: Record<string, unknown> = {};

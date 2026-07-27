@@ -2,7 +2,7 @@ import "./style.css";
 import { registerBuiltins } from "./nodes";
 import { createExecutionContext, runExecFrom } from "./engine/executor";
 import { addNode, connectPins, createNodeInstance } from "./engine/graphMutations";
-import { allNodeDefs, findCompatibleNodeDefs, isPinTypeCompatible } from "./engine/registry";
+import { allNodeDefs, findCompatibleNodeDefs, getNodeDef, isPinTypeCompatible } from "./engine/registry";
 import type { NodeDef } from "./engine/types";
 import { buildDemoGraph } from "./demoGraph";
 import { createCamera, screenToWorld } from "./render/camera";
@@ -19,6 +19,7 @@ import { createVariablePanel } from "./overlay/variablePanel";
 import { openNodeSearchMenu } from "./overlay/nodeSearchMenu";
 import { loadGraphFromFile, loadGraphFromLocalStorage } from "./persistence/load";
 import { downloadGraphAsFile, saveGraphToLocalStorage } from "./persistence/save";
+import { downloadCompiledGraph } from "./compiler/codegen";
 
 registerBuiltins();
 
@@ -29,6 +30,7 @@ const logPanel = document.getElementById("log-panel") as HTMLDivElement;
 const runButton = document.getElementById("run-button") as HTMLButtonElement;
 const saveButton = document.getElementById("save-button") as HTMLButtonElement;
 const loadButton = document.getElementById("load-button") as HTMLButtonElement;
+const compileButton = document.getElementById("compile-button") as HTMLButtonElement;
 const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 if (!ctx) throw new Error("Canvas 2D context unavailable");
@@ -152,7 +154,11 @@ canvas.addEventListener("contextmenu", (e) => {
   });
 });
 
-// --- Run button: walks the exec chain, live-highlighting nodes/wires and logging Print output ---
+// --- Run button: fires every event-root node once (manual test of all entry points), live-highlighting
+// nodes/wires and logging Print output. This is an in-editor testing simulation, not real deployment
+// behavior — the compiled output (see src/compiler/codegen.ts) is what wires up a real setInterval for
+// an "interval"-kind root, etc. All roots share one ExecutionContext so variable state persists across
+// them within a single Run click, matching how a real deployed instance shares state across its lifetime.
 function appendLog(message: string): void {
   const line = document.createElement("div");
   line.className = "log-line";
@@ -172,9 +178,9 @@ runButton.addEventListener("click", async () => {
   logPanel.innerHTML = "";
   store.state.firedConnectionIds = new Set();
 
-  const startNode = store.state.graph.nodes.find((n) => n.type === "event.start");
-  if (!startNode) {
-    appendLog("No event.start node in graph — nothing to run.");
+  const eventRoots = store.state.graph.nodes.filter((n) => getNodeDef(n.type).eventTrigger);
+  if (eventRoots.length === 0) {
+    appendLog("No event nodes in graph — nothing to run.");
     runButton.disabled = false;
     return;
   }
@@ -193,7 +199,9 @@ runButton.addEventListener("click", async () => {
   });
 
   try {
-    await runExecFrom(startNode.id, "exec-out", execCtx);
+    for (const root of eventRoots) {
+      await runExecFrom(root.id, "exec-out", execCtx);
+    }
   } catch (err) {
     appendLog(`Error: ${err instanceof Error ? err.message : String(err)}`);
   } finally {
@@ -227,5 +235,14 @@ loadFileInput.addEventListener("change", async () => {
     store.notify();
   } catch (err) {
     appendLog(`Failed to load graph: ${err instanceof Error ? err.message : String(err)}`);
+  }
+});
+
+// --- Compile: generates a self-contained .mjs from the graph (see src/compiler/codegen.ts) and downloads it ---
+compileButton.addEventListener("click", () => {
+  try {
+    downloadCompiledGraph(store.state.graph);
+  } catch (err) {
+    appendLog(`Compile error: ${err instanceof Error ? err.message : String(err)}`);
   }
 });

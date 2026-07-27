@@ -48,7 +48,8 @@ html, body {
 }
 
 #save-button,
-#load-button {
+#load-button,
+#compile-button {
   background: #33383f;
   color: #e8e8e8;
   border: none;
@@ -59,7 +60,8 @@ html, body {
 }
 
 #save-button:hover,
-#load-button:hover {
+#load-button:hover,
+#compile-button:hover {
   background: #454a52;
 }
 
