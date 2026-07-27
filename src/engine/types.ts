@@ -16,6 +16,12 @@ export interface PinDef {
    * Loop's Start/End (see widgetSync.ts). Wiring is unaffected: it stays type "number" so it can
    * still connect to/from any other number pin, this only governs the canvas literal-input widget. */
   integer?: boolean;
+  /** A "string" pin restricted to a fixed set of choices, rendered as a <select> dropdown in the
+   * canvas literal-input widget instead of a free-text box — e.g. HTTP Request's Method (see
+   * widgetSync.ts). Wiring is unaffected: it stays type "string" so it can still connect to/from
+   * any other string pin (which may carry a value outside this list — the dropdown only governs
+   * how a LITERAL is entered, same relationship `integer` has to "number"). */
+  options?: string[];
 }
 
 export interface ExecuteResult {

@@ -1,21 +1,23 @@
 import { setPinLiteralValue } from "../engine/graphMutations";
 import type { PinDef, PinType } from "../engine/types";
 import type { Camera } from "../render/camera";
-import { CHAR_WIDTH } from "../render/layout";
+import { pinWidgetWidth } from "../render/layout";
 import type { NodeScreenGeometry } from "../render/nodeGeometry";
 import { getEditingGraph, type Store } from "../state/store";
 
 const WIDGET_TYPES: readonly PinType[] = ["number", "boolean", "string"];
 
+type WidgetElement = HTMLInputElement | HTMLSelectElement;
+
 interface WidgetEntry {
-  el: HTMLInputElement;
+  el: WidgetElement;
 }
 
 export interface WidgetSync {
   sync: (geometries: ReadonlyMap<string, NodeScreenGeometry>) => void;
 }
 
-/** Keeps a real DOM <input> alive per unconnected literal-value pin, positioned over the canvas each frame. */
+/** Keeps a real DOM <input>/<select> alive per unconnected literal-value pin, positioned over the canvas each frame. */
 export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync {
   const widgets = new Map<string, WidgetEntry>();
 
@@ -45,7 +47,7 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
           overlay.appendChild(entry.el);
         }
 
-        positionWidget(entry.el, geo.pinScreen[pinDef.id], pinDef, camera);
+        positionWidget(entry.el, geo.pinScreen[pinDef.id].y, geo, pinDef, camera);
         if (document.activeElement !== entry.el) {
           setWidgetDisplayValue(entry.el, pinDef, pin?.value);
         }
@@ -64,6 +66,10 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
 }
 
 function createWidgetEntry(pinDef: PinDef, nodeId: string, pinId: string, store: Store): WidgetEntry {
+  if (pinDef.type === "string" && pinDef.options && pinDef.options.length > 0) {
+    return createOptionsWidgetEntry(pinDef.options, nodeId, pinId, store);
+  }
+
   const type = pinDef.type;
   const el = document.createElement("input");
   el.className = "pin-widget";
@@ -92,8 +98,26 @@ function createWidgetEntry(pinDef: PinDef, nodeId: string, pinId: string, store:
   return { el };
 }
 
-function setWidgetDisplayValue(el: HTMLInputElement, pinDef: PinDef, value: unknown): void {
-  if (pinDef.type === "boolean") {
+function createOptionsWidgetEntry(options: string[], nodeId: string, pinId: string, store: Store): WidgetEntry {
+  const select = document.createElement("select");
+  select.className = "pin-widget pin-widget-select";
+  for (const option of options) {
+    const optionEl = document.createElement("option");
+    optionEl.value = option;
+    optionEl.textContent = option;
+    select.appendChild(optionEl);
+  }
+  select.addEventListener("change", () => {
+    setPinLiteralValue(getEditingGraph(store.state), nodeId, pinId, select.value);
+    store.notify();
+  });
+  select.addEventListener("mousedown", (e) => e.stopPropagation());
+
+  return { el: select };
+}
+
+function setWidgetDisplayValue(el: WidgetElement, pinDef: PinDef, value: unknown): void {
+  if (pinDef.type === "boolean" && el instanceof HTMLInputElement) {
     el.checked = Boolean(value);
   } else if (pinDef.type === "number" && pinDef.integer && typeof value === "number") {
     el.value = String(Math.round(value));
@@ -102,23 +126,25 @@ function setWidgetDisplayValue(el: HTMLInputElement, pinDef: PinDef, value: unkn
   }
 }
 
-// Everything scales together with zoom — like the rest of the graph, this is a camera
-// zooming over world-space content, not a fixed screen-space UI overlay.
+// Every input widget in a node lines up on its RIGHT edge at geo.layout.inputWidgetRightX (see
+// layout.ts) instead of trailing right after its own row's label — a straight column instead of a
+// ragged one, capped so it never grows into the space reserved for the node's longest output label.
+// Everything scales together with zoom — like the rest of the graph, this is a camera zooming over
+// world-space content, not a fixed screen-space UI overlay.
 function positionWidget(
-  el: HTMLInputElement,
-  pinScreenPos: { x: number; y: number },
+  el: WidgetElement,
+  pinScreenY: number,
+  geo: NodeScreenGeometry,
   pinDef: PinDef,
   camera: Camera,
 ): void {
-  const type = pinDef.type;
-  const labelWidth = pinDef.label.length * CHAR_WIDTH * camera.zoom;
-  const x = pinScreenPos.x + 14 * camera.zoom + labelWidth;
-  const widthPx = (type === "boolean" ? 16 : type === "number" ? 54 : 90) * camera.zoom;
-  const heightPx = (type === "boolean" ? 16 : 18) * camera.zoom;
+  const widthPx = pinWidgetWidth(pinDef) * camera.zoom;
+  const rightX = geo.screenX + geo.layout.inputWidgetRightX * camera.zoom;
+  const heightPx = (pinDef.type === "boolean" ? 16 : 18) * camera.zoom;
 
   el.style.position = "absolute";
-  el.style.left = `${x}px`;
-  el.style.top = `${pinScreenPos.y - heightPx / 2}px`;
+  el.style.left = `${rightX - widthPx}px`;
+  el.style.top = `${pinScreenY - heightPx / 2}px`;
   el.style.width = `${widthPx}px`;
   el.style.height = `${heightPx}px`;
   el.style.fontSize = `${11 * camera.zoom}px`;

@@ -20,7 +20,7 @@ registerNode({
       direction: "input",
       defaultValue: 500,
     },
-    { id: "exec-out", label: "", type: "exec", direction: "output" },
+    { id: "exec-out", label: "Completed", type: "exec", direction: "output" },
   ],
   execute: async ({ inputs }) => {
     await wait(Number(inputs.duration ?? 0));

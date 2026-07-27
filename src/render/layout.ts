@@ -7,6 +7,13 @@ export const NODE_PADDING_X = 12;
 export const PIN_RADIUS = 5;
 export const PIN_MARGIN = 14;
 export const ADD_BUTTON_SIZE = 16;
+/** Gap between a pin's dot and where its label text starts (input side) or ends (output side) —
+ * mirrors the same 10px offset drawNodes.ts draws labels at. */
+export const PIN_LABEL_GAP = 10;
+/** Gap between the end of an input pin's label and the start of its literal-value widget. */
+export const LABEL_WIDGET_GAP = 10;
+/** Gap held between an input widget's right edge and the start of the reserved output-label zone. */
+export const WIDGET_OUTPUT_GAP = 10;
 
 // Rough monospace-ish average character width at the render font size (13px),
 // used for layout sizing without needing a canvas context available.
@@ -32,10 +39,27 @@ export interface NodeLayout {
   /** Present only for a node whose type has NodeDef.addInstancePinEntry — an extra row below its
    * last input pin where the canvas draws a "+" affordance to add another entry. */
   addButton?: NodeAddButtonLayout;
+  /** World-space x (relative to the node's own left edge, same space as PinLayout.x) where every
+   * input pin's literal-value widget's RIGHT edge lines up. Common across all input rows so the
+   * widgets read as one clean right-aligned column instead of each trailing raggedly right after
+   * its own row's (possibly much shorter) label — capped so it never runs into the space reserved
+   * for this node's longest OUTPUT pin label, when it has any output pins at all. */
+  inputWidgetRightX: number;
 }
 
 function textWidth(text: string): number {
   return text.length * CHAR_WIDTH;
+}
+
+/** Natural width of a pin's literal-value widget in the canvas overlay (see widgetSync.ts) — the
+ * single source of truth shared by node-width sizing here and widget positioning there, so the two
+ * can never drift apart. Exec pins never get a widget (0). */
+export function pinWidgetWidth(pin: PinDef): number {
+  if (pin.type === "exec") return 0;
+  if (pin.type === "boolean") return 16;
+  if (pin.type === "string" && pin.options && pin.options.length > 0) return 110;
+  if (pin.type === "number") return 54;
+  return 90;
 }
 
 export function computeNodeLayout(
@@ -50,15 +74,25 @@ export function computeNodeLayout(
   const rows = Math.max(inputRows, outputs.length, 1);
   const height = NODE_HEADER_HEIGHT + rows * PIN_ROW_HEIGHT + 10;
 
+  const outputLabelMaxWidth = outputs.reduce((max, p) => Math.max(max, textWidth(p.label)), 0);
+  const rightReserve =
+    outputs.length > 0 ? PIN_LABEL_GAP + outputLabelMaxWidth + WIDGET_OUTPUT_GAP : PIN_MARGIN;
+
   let widestRow = textWidth(label) + NODE_PADDING_X * 2;
   for (let i = 0; i < rows; i++) {
-    const inLabel = inputs[i]?.label ?? "";
+    const inPin = inputs[i];
+    const inLabel = inPin?.label ?? "";
     const outLabel = outputs[i]?.label ?? "";
+    const widgetWidth = inPin ? pinWidgetWidth(inPin) : 0;
     const rowWidth =
-      PIN_MARGIN * 2 + textWidth(inLabel) + textWidth(outLabel) + (inLabel && outLabel ? 40 : 20);
+      PIN_MARGIN +
+      textWidth(inLabel) +
+      (widgetWidth > 0 ? LABEL_WIDGET_GAP + widgetWidth : outLabel ? 20 : 0) +
+      rightReserve;
     widestRow = Math.max(widestRow, rowWidth);
   }
   const width = Math.max(NODE_MIN_WIDTH, Math.ceil(widestRow));
+  const inputWidgetRightX = width - rightReserve;
 
   const pins: PinLayout[] = [];
   inputs.forEach((pin, i) => {
@@ -77,5 +111,5 @@ export function computeNodeLayout(
       }
     : undefined;
 
-  return { width, height, pins, addButton };
+  return { width, height, pins, addButton, inputWidgetRightX };
 }

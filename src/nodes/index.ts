@@ -6,6 +6,7 @@ import "./variable";
 import "./actionsMock";
 import "./function";
 import "./string";
+import "./http";
 
 let registered = false;
 

@@ -499,6 +499,10 @@ html, body {
   border-color: #e8b339;
 }
 
+.pin-widget-select {
+  cursor: pointer;
+}
+
 .node-search-menu {
   position: absolute;
   width: 220px;
