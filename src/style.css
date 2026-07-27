@@ -65,6 +65,25 @@ html, body {
   background: #454a52;
 }
 
+#back-button {
+  background: #33383f;
+  color: #e8e8e8;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#back-button:hover {
+  background: #454a52;
+}
+
+#breadcrumb {
+  color: #9aa0a8;
+  font-size: 13px;
+}
+
 #main-area {
   display: flex;
   flex: 1 1 auto;
@@ -77,8 +96,8 @@ html, body {
   overflow: hidden;
 }
 
-#variables-panel {
-  flex: 0 0 220px;
+#sidebar {
+  flex: 0 0 240px;
   display: flex;
   flex-direction: column;
   background: #24272d;
@@ -87,14 +106,20 @@ html, body {
   font-size: 13px;
 }
 
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  border-bottom: 1px solid #33383f;
+}
+
 .panel-header {
   padding: 10px 12px;
   font-weight: 600;
   border-bottom: 1px solid #33383f;
 }
 
-#variables-list {
-  flex: 1 1 auto;
+.panel-list {
   padding: 6px;
   display: flex;
   flex-direction: column;
@@ -136,6 +161,65 @@ html, body {
   background: #454a52;
 }
 
+.function-name {
+  cursor: pointer;
+}
+
+.function-row-active .function-name {
+  color: #e8b339;
+  font-weight: 600;
+}
+
+.typed-value-input {
+  box-sizing: border-box;
+  background: #14161a;
+  border: 1px solid #454a52;
+  color: #e8e8e8;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 2px 4px;
+  min-width: 0;
+}
+
+.typed-value-input[type="number"] {
+  flex: 0 0 52px;
+}
+
+.typed-value-input[type="text"] {
+  flex: 0 0 64px;
+}
+
+.typed-value-input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  accent-color: #5db85c;
+}
+
+.typed-value-type-select {
+  box-sizing: border-box;
+  background: #14161a;
+  border: 1px solid #454a52;
+  color: #e8e8e8;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 1px 2px;
+  flex: 0 0 auto;
+}
+
+.typed-value-placeholder {
+  flex: 0 0 20px;
+  text-align: center;
+  color: #6a7078;
+  font-size: 11px;
+}
+
+.variable-row input.variable-name.typed-value-input {
+  flex: 1 1 auto;
+  width: 0;
+}
+
 .panel-add-row {
   display: flex;
   gap: 4px;
@@ -165,6 +249,10 @@ html, body {
   border-radius: 3px;
   padding: 3px 10px;
   cursor: pointer;
+}
+
+.panel-add-row button:hover {
+  background: #4a7ea0;
 }
 
 #graph-canvas {

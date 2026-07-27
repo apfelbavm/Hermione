@@ -8,7 +8,7 @@ import {
   resolvePinDefs,
 } from "../engine/graphMutations";
 import { isPinTypeCompatible } from "../engine/registry";
-import type { CommentBox, Graph, PinDef } from "../engine/types";
+import type { CommentBox, FunctionDef, Graph, PinDef, Variable } from "../engine/types";
 import { panCamera, screenToWorld, zoomCameraAt } from "../render/camera";
 import {
   COMMENT_HEADER_HEIGHT,
@@ -25,7 +25,7 @@ import {
   hitTestNode,
   hitTestPin,
 } from "../render/hitTest";
-import type { Store } from "../state/store";
+import { getEditingGraph, getVisibleVariablesForState, type Store } from "../state/store";
 
 type DragMode =
   | { kind: "none" }
@@ -54,7 +54,7 @@ function findConnectionToInput(graph: Graph, nodeId: string, pinId: string) {
 /** Recomputes which nodes currently sit geometrically inside a comment box's body — called
  * fresh whenever a header-drag starts, so it picks up nodes moved into the box since it was
  * last resized, matching Unreal's "whatever's actually inside moves with it" behavior. */
-function recomputeContainment(graph: Graph, box: CommentBox): void {
+function recomputeContainment(graph: Graph, variables: Variable[], functions: FunctionDef[], box: CommentBox): void {
   const innerBounds = {
     x: box.position.x,
     y: box.position.y + COMMENT_HEADER_HEIGHT,
@@ -62,7 +62,7 @@ function recomputeContainment(graph: Graph, box: CommentBox): void {
     height: box.size.height - COMMENT_HEADER_HEIGHT,
   };
   box.containedNodeIds = graph.nodes
-    .filter((n) => rectContains(innerBounds, computeNodeWorldRect(n, resolvePinDefs(n, graph.variables))))
+    .filter((n) => rectContains(innerBounds, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions))))
     .map((n) => n.id);
 }
 
@@ -82,9 +82,12 @@ export function setupPointerInteraction(
   }
 
   canvas.addEventListener("mousedown", (e) => {
-    const { graph, camera } = store.state;
+    const graph = getEditingGraph(store.state);
+    const { camera } = store.state;
+    const variables = getVisibleVariablesForState(store.state);
+    const functions = store.state.rootGraph.functions;
     const pos = screenPos(e);
-    const geometries = computeAllNodeGeometries(graph, camera);
+    const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
 
     const pinHit = hitTestPin(graph, geometries, pos.x, pos.y);
     if (pinHit) {
@@ -96,10 +99,10 @@ export function setupPointerInteraction(
         const existing = findConnectionToInput(graph, pinHit.nodeId, pinHit.pinId);
         if (existing) {
           const fromNode = graph.nodes.find((n) => n.id === existing.fromNode)!;
-          const fromPinDef = resolvePinDefs(fromNode, graph.variables).find(
+          const fromPinDef = resolvePinDefs(fromNode, variables, functions).find(
             (p) => p.id === existing.fromPin,
           )!;
-          disconnectPin(graph, pinHit.nodeId, pinHit.pinId);
+          disconnectPin(graph, variables, functions, pinHit.nodeId, pinHit.pinId);
           anchor = { nodeId: fromNode.id, pinId: fromPinDef.id, pin: fromPinDef };
         }
       }
@@ -142,7 +145,7 @@ export function setupPointerInteraction(
     const headerHit = hitTestCommentHeader(graph, camera, pos.x, pos.y);
     if (headerHit) {
       const box = graph.commentBoxes.find((b) => b.id === headerHit.commentId)!;
-      recomputeContainment(graph, box);
+      recomputeContainment(graph, variables, functions, box);
       const worldPos = screenToWorld(camera, pos.x, pos.y);
       store.state.selectedCommentId = box.id;
       store.state.selectedNodeIds = new Set();
@@ -165,7 +168,8 @@ export function setupPointerInteraction(
   window.addEventListener("mousemove", (e) => {
     lastMouseScreenPos = screenPos(e);
     if (drag.kind === "none") return;
-    const { graph, camera } = store.state;
+    const graph = getEditingGraph(store.state);
+    const { camera } = store.state;
 
     if (drag.kind === "pan") {
       panCamera(camera, e.clientX - drag.lastX, e.clientY - drag.lastY);
@@ -190,7 +194,9 @@ export function setupPointerInteraction(
 
     if (drag.kind === "wire") {
       const pos = screenPos(e);
-      const geometries = computeAllNodeGeometries(graph, camera);
+      const variables = getVisibleVariablesForState(store.state);
+      const functions = store.state.rootGraph.functions;
+      const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
       const anchorGeo = geometries.get(drag.anchor.nodeId);
       const anchorScreen = anchorGeo?.pinScreen[drag.anchor.pinId];
       if (anchorScreen && store.state.wireDrag) {
@@ -240,9 +246,12 @@ export function setupPointerInteraction(
 
   window.addEventListener("mouseup", (e) => {
     if (drag.kind === "wire") {
-      const { graph, camera } = store.state;
+      const graph = getEditingGraph(store.state);
+      const { camera } = store.state;
+      const variables = getVisibleVariablesForState(store.state);
+      const functions = store.state.rootGraph.functions;
       const pos = screenPos(e);
-      const geometries = computeAllNodeGeometries(graph, camera);
+      const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
       const targetHit = hitTestPin(graph, geometries, pos.x, pos.y);
       const anchor = drag.anchor;
       let connected = false;
@@ -256,7 +265,7 @@ export function setupPointerInteraction(
           const outputEnd = anchorIsOutput ? anchor : target;
           const inputEnd = anchorIsOutput ? target : anchor;
           try {
-            connectPins(graph, {
+            connectPins(graph, variables, functions, {
               fromNode: outputEnd.nodeId,
               fromPin: outputEnd.pinId,
               toNode: inputEnd.nodeId,
@@ -277,10 +286,12 @@ export function setupPointerInteraction(
     }
 
     if (drag.kind === "comment-resize") {
-      const { graph } = store.state;
+      const graph = getEditingGraph(store.state);
       const { commentId } = drag;
       const box = graph.commentBoxes.find((b) => b.id === commentId);
-      if (box) recomputeContainment(graph, box);
+      if (box) {
+        recomputeContainment(graph, getVisibleVariablesForState(store.state), store.state.rootGraph.functions, box);
+      }
       drag = { kind: "none" };
       store.notify();
       return;
@@ -303,9 +314,10 @@ export function setupPointerInteraction(
 
   window.addEventListener("keydown", (e) => {
     if (document.activeElement instanceof HTMLInputElement) return; // don't hijack text-field editing
+    const graph = getEditingGraph(store.state);
 
     if (e.key === "Delete" || e.key === "Backspace") {
-      const { graph, selectedNodeIds, selectedCommentId } = store.state;
+      const { selectedNodeIds, selectedCommentId } = store.state;
       if (selectedNodeIds.size === 0 && !selectedCommentId) return;
       for (const nodeId of selectedNodeIds) {
         removeNode(graph, nodeId);
@@ -318,14 +330,16 @@ export function setupPointerInteraction(
     }
 
     if (e.key.toLowerCase() === "c" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const { graph, camera, selectedNodeIds } = store.state;
+      const { camera, selectedNodeIds } = store.state;
+      const variables = getVisibleVariablesForState(store.state);
+      const functions = store.state.rootGraph.functions;
 
       if (selectedNodeIds.size > 0) {
         // Nodes selected: wrap them, Unreal-style.
         const rects = [...selectedNodeIds]
           .map((id) => graph.nodes.find((n) => n.id === id))
           .filter((n): n is NonNullable<typeof n> => !!n)
-          .map((n) => computeNodeWorldRect(n, resolvePinDefs(n, graph.variables)));
+          .map((n) => computeNodeWorldRect(n, resolvePinDefs(n, variables, functions)));
 
         const minX = Math.min(...rects.map((r) => r.x));
         const minY = Math.min(...rects.map((r) => r.y));

@@ -9,7 +9,7 @@ import {
   isPinTypeCompatible,
   topLevelGroup,
 } from "./engine/registry";
-import type { NodeDef } from "./engine/types";
+import type { FunctionDef, NodeDef } from "./engine/types";
 import { buildDemoGraph } from "./demoGraph";
 import { createCamera, screenToWorld } from "./render/camera";
 import { computeAllNodeGeometries } from "./render/nodeGeometry";
@@ -17,11 +17,13 @@ import { drawComments } from "./render/drawComments";
 import { drawGrid } from "./render/drawGrid";
 import { drawNodes } from "./render/drawNodes";
 import { drawWires, drawWireDragPreview } from "./render/drawWires";
-import { createStore } from "./state/store";
+import { createStore, getEditingGraph, getVisibleVariablesForState } from "./state/store";
 import { setupPointerInteraction, type WireAnchor } from "./interaction/pointerHandlers";
 import { createWidgetSync } from "./overlay/widgetSync";
 import { createCommentOverlay } from "./overlay/commentOverlay";
 import { createVariablePanel } from "./overlay/variablePanel";
+import { createFunctionsPanel } from "./overlay/functionsPanel";
+import { createFunctionIoPanel } from "./overlay/functionIoPanel";
 import { openNodeSearchMenu } from "./overlay/nodeSearchMenu";
 import { loadGraphFromFile, loadGraphFromLocalStorage } from "./persistence/load";
 import { downloadGraphAsFile, saveGraphToLocalStorage } from "./persistence/save";
@@ -38,11 +40,14 @@ const saveButton = document.getElementById("save-button") as HTMLButtonElement;
 const loadButton = document.getElementById("load-button") as HTMLButtonElement;
 const compileButton = document.getElementById("compile-button") as HTMLButtonElement;
 const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
+const backButton = document.getElementById("back-button") as HTMLButtonElement;
+const breadcrumb = document.getElementById("breadcrumb") as HTMLSpanElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 if (!ctx) throw new Error("Canvas 2D context unavailable");
 
 const store = createStore({
-  graph: loadGraphFromLocalStorage() ?? buildDemoGraph(),
+  rootGraph: loadGraphFromLocalStorage() ?? buildDemoGraph(),
+  activeFunctionId: null,
   camera: createCamera(),
   selectedNodeIds: new Set(),
   selectedCommentId: null,
@@ -73,30 +78,99 @@ const variablePanel = createVariablePanel(
   },
   store,
   canvas,
+  () => store.state.rootGraph,
 );
 
+function getActiveFunction(): FunctionDef | null {
+  const id = store.state.activeFunctionId;
+  if (!id) return null;
+  return store.state.rootGraph.functions.find((f) => f.id === id) ?? null;
+}
+
+const functionsPanel = createFunctionsPanel(
+  {
+    list: document.getElementById("functions-list") as HTMLDivElement,
+    nameInput: document.getElementById("new-function-name") as HTMLInputElement,
+    addButton: document.getElementById("add-function-button") as HTMLButtonElement,
+  },
+  store,
+  canvas,
+);
+
+const inputsPanel = createFunctionIoPanel(
+  {
+    section: document.getElementById("inputs-section") as HTMLDivElement,
+    list: document.getElementById("inputs-list") as HTMLDivElement,
+    nameInput: document.getElementById("new-input-name") as HTMLInputElement,
+    typeSelect: document.getElementById("new-input-type") as HTMLSelectElement,
+    addButton: document.getElementById("add-input-button") as HTMLButtonElement,
+  },
+  store,
+  canvas,
+  "input",
+  getActiveFunction,
+);
+
+const outputsPanel = createFunctionIoPanel(
+  {
+    section: document.getElementById("outputs-section") as HTMLDivElement,
+    list: document.getElementById("outputs-list") as HTMLDivElement,
+    nameInput: document.getElementById("new-output-name") as HTMLInputElement,
+    typeSelect: document.getElementById("new-output-type") as HTMLSelectElement,
+    addButton: document.getElementById("add-output-button") as HTMLButtonElement,
+    spawnReturnButton: document.getElementById("spawn-return-node-button") as HTMLButtonElement,
+  },
+  store,
+  canvas,
+  "output",
+  getActiveFunction,
+);
+
+const localVariablesSection = document.getElementById("local-variables-section") as HTMLDivElement;
+const localVariablePanel = createVariablePanel(
+  {
+    list: document.getElementById("local-variables-list") as HTMLDivElement,
+    nameInput: document.getElementById("new-local-variable-name") as HTMLInputElement,
+    typeSelect: document.getElementById("new-local-variable-type") as HTMLSelectElement,
+    addButton: document.getElementById("add-local-variable-button") as HTMLButtonElement,
+  },
+  store,
+  canvas,
+  () => getActiveFunction()?.body ?? store.state.rootGraph,
+);
+
+backButton.addEventListener("click", () => {
+  store.state.activeFunctionId = null;
+  store.notify();
+});
+
 function render(): void {
-  const {
-    graph,
-    camera,
-    selectedNodeIds,
-    selectedCommentId,
-    executingNodeId,
-    firedConnectionIds,
-    wireDrag,
-  } = store.state;
+  const { camera, selectedNodeIds, selectedCommentId, executingNodeId, firedConnectionIds, wireDrag } =
+    store.state;
+  const graph = getEditingGraph(store.state);
+  const variables = getVisibleVariablesForState(store.state);
+  const functions = store.state.rootGraph.functions;
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
 
   drawGrid(ctx, camera, width, height);
   drawComments(ctx, graph, camera, selectedCommentId);
-  const geometries = computeAllNodeGeometries(graph, camera);
-  drawWires(ctx, graph, camera, geometries, firedConnectionIds);
+  const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
+  drawWires(ctx, graph, camera, geometries, firedConnectionIds, variables, functions);
   if (wireDrag) drawWireDragPreview(ctx, wireDrag);
   drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId);
   widgetSync.sync(geometries);
   commentOverlay.sync();
   variablePanel.render();
+  functionsPanel.render();
+  inputsPanel.render();
+  outputsPanel.render();
+
+  const activeFn = getActiveFunction();
+  localVariablesSection.style.display = activeFn ? "" : "none";
+  if (activeFn) localVariablePanel.render();
+  backButton.style.display = activeFn ? "" : "none";
+  breadcrumb.textContent = activeFn ? `Editing function: ${activeFn.name}` : "";
 }
 
 store.subscribe(render);
@@ -109,8 +183,9 @@ function createNodeAndMaybeConnect(
   worldPos: { x: number; y: number },
   anchor?: WireAnchor,
 ): void {
+  const graph = getEditingGraph(store.state);
   const node = createNodeInstance(def.type, worldPos, def.pins);
-  addNode(store.state.graph, node);
+  addNode(graph, node);
 
   if (anchor) {
     const wantDirection = anchor.pin.direction === "output" ? "input" : "output";
@@ -121,12 +196,17 @@ function createNodeAndMaybeConnect(
       const anchorIsOutput = anchor.pin.direction === "output";
       const outputEnd = anchorIsOutput ? anchor : { nodeId: node.id, pinId: matchPin.id };
       const inputEnd = anchorIsOutput ? { nodeId: node.id, pinId: matchPin.id } : anchor;
-      connectPins(store.state.graph, {
-        fromNode: outputEnd.nodeId,
-        fromPin: outputEnd.pinId,
-        toNode: inputEnd.nodeId,
-        toPin: inputEnd.pinId,
-      });
+      connectPins(
+        graph,
+        getVisibleVariablesForState(store.state),
+        store.state.rootGraph.functions,
+        {
+          fromNode: outputEnd.nodeId,
+          fromPin: outputEnd.pinId,
+          toNode: inputEnd.nodeId,
+          toPin: inputEnd.pinId,
+        },
+      );
     }
   }
 
@@ -153,8 +233,9 @@ canvas.addEventListener("contextmenu", (e) => {
   const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
   openNodeSearchMenu(overlay, {
     screenPos,
-    // Get/Set Variable nodes need a variable bound via the Variables panel — not generically creatable here.
-    candidates: allNodeDefs().filter((def) => topLevelGroup(def.group) !== "Variables"),
+    // Get/Set Variable nodes need a variable bound via the Variables panel, and Entry/Return/Call
+    // nodes need a function bound via the Functions panel — neither is generically creatable here.
+    candidates: allNodeDefs().filter((def) => !["Variables", "Functions"].includes(topLevelGroup(def.group))),
     onPick: (def) => createNodeAndMaybeConnect(def, worldPos),
     onCancel: () => {},
   });
@@ -184,14 +265,14 @@ runButton.addEventListener("click", async () => {
   logPanel.innerHTML = "";
   store.state.firedConnectionIds = new Set();
 
-  const eventRoots = store.state.graph.nodes.filter((n) => getNodeDef(n.type).eventTrigger);
+  const eventRoots = store.state.rootGraph.nodes.filter((n) => getNodeDef(n.type).eventTrigger);
   if (eventRoots.length === 0) {
     appendLog("No event nodes in graph — nothing to run.");
     runButton.disabled = false;
     return;
   }
 
-  const execCtx = createExecutionContext(store.state.graph, {
+  const execCtx = createExecutionContext(store.state.rootGraph, {
     log: appendLog,
     onNodeStart: async (nodeId) => {
       store.state.executingNodeId = nodeId;
@@ -219,8 +300,8 @@ runButton.addEventListener("click", async () => {
 
 // --- Save / Load: JSON persisted to localStorage (auto-restored on next launch) and downloadable as a file ---
 saveButton.addEventListener("click", () => {
-  saveGraphToLocalStorage(store.state.graph);
-  downloadGraphAsFile(store.state.graph);
+  saveGraphToLocalStorage(store.state.rootGraph);
+  downloadGraphAsFile(store.state.rootGraph);
 });
 
 loadButton.addEventListener("click", () => loadFileInput.click());
@@ -232,7 +313,8 @@ loadFileInput.addEventListener("change", async () => {
 
   try {
     const graph = await loadGraphFromFile(file);
-    store.state.graph = graph;
+    store.state.rootGraph = graph;
+    store.state.activeFunctionId = null;
     store.state.selectedNodeIds = new Set();
     store.state.selectedCommentId = null;
     store.state.executingNodeId = null;
@@ -247,7 +329,7 @@ loadFileInput.addEventListener("change", async () => {
 // --- Compile: generates a self-contained .mjs from the graph (see src/compiler/codegen.ts) and downloads it ---
 compileButton.addEventListener("click", () => {
   try {
-    downloadCompiledGraph(store.state.graph);
+    downloadCompiledGraph(store.state.rootGraph);
   } catch (err) {
     appendLog(`Compile error: ${err instanceof Error ? err.message : String(err)}`);
   }

@@ -6,6 +6,7 @@ import { getNodeDef } from "../engine/registry";
 import { createEmptyGraph, type Graph, type Variable } from "../engine/types";
 import { deserializeGraph } from "./load";
 import { serializeGraph } from "./save";
+import { CURRENT_FORMAT_VERSION } from "./schema";
 
 function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);
@@ -28,7 +29,7 @@ describe("persistence round-trip", () => {
     const start = addBuiltinNode(graph, "event.start", { x: 12, y: 34 }, "start");
     const print = addBuiltinNode(graph, "debug.print", { x: 200, y: 50 }, "print");
     print.pins.message.value = "round-tripped";
-    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: print.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: print.id, toPin: "exec-in" });
 
     graph.commentBoxes.push({
       id: "comment1",
@@ -54,9 +55,9 @@ describe("persistence round-trip", () => {
     printTrue.pins.message.value = "took true branch";
     printFalse.pins.message.value = "took false branch";
 
-    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: branch.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: branch.id, fromPin: "true", toNode: printTrue.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: branch.id, fromPin: "false", toNode: printFalse.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: branch.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "true", toNode: printTrue.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "false", toNode: printFalse.id, toPin: "exec-in" });
 
     const runLogs = async (g: Graph) => {
       const logs: string[] = [];
@@ -69,5 +70,24 @@ describe("persistence round-trip", () => {
     const after = await runLogs(loaded);
 
     expect(after).toEqual(before);
+  });
+
+  it("migrates a v1 document (predating Functions) by defaulting an empty functions array", () => {
+    const graph = createEmptyGraph("g3", "Legacy");
+    addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const v1Doc = JSON.parse(serializeGraph(graph)) as { formatVersion: number; graph: Graph };
+    v1Doc.formatVersion = 1;
+    // @ts-expect-error simulating a v1 save file that predates the `functions` field entirely
+    delete v1Doc.graph.functions;
+
+    const loaded = deserializeGraph(JSON.stringify(v1Doc));
+
+    expect(loaded.functions).toEqual([]);
+  });
+
+  it("saves at the current format version", () => {
+    const graph = createEmptyGraph("g4", "test");
+    const doc = JSON.parse(serializeGraph(graph)) as { formatVersion: number };
+    expect(doc.formatVersion).toBe(CURRENT_FORMAT_VERSION);
   });
 });

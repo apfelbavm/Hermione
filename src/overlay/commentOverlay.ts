@@ -1,6 +1,6 @@
 import { COMMENT_HEADER_HEIGHT, computeCommentScreenRect, DEFAULT_COMMENT_COLOR } from "../render/commentGeometry";
 import { CHAR_WIDTH } from "../render/layout";
-import type { Store } from "../state/store";
+import { getEditingGraph, type Store } from "../state/store";
 
 interface CommentEntry {
   titleEl: HTMLInputElement;
@@ -16,7 +16,8 @@ export function createCommentOverlay(overlay: HTMLElement, store: Store): Commen
   const entries = new Map<string, CommentEntry>();
 
   function sync(): void {
-    const { graph, camera } = store.state;
+    const graph = getEditingGraph(store.state);
+    const { camera } = store.state;
     const seen = new Set<string>();
 
     for (const box of graph.commentBoxes) {
@@ -83,7 +84,7 @@ function createCommentEntry(commentId: string, store: Store): CommentEntry {
   titleEl.className = "comment-title";
   titleEl.autocomplete = "off";
   titleEl.addEventListener("input", () => {
-    const box = store.state.graph.commentBoxes.find((b) => b.id === commentId);
+    const box = getEditingGraph(store.state).commentBoxes.find((b) => b.id === commentId);
     if (box) box.text = titleEl.value;
     store.notify();
   });
@@ -94,7 +95,7 @@ function createCommentEntry(commentId: string, store: Store): CommentEntry {
   colorEl.className = "comment-color-swatch";
   colorEl.title = "Comment box color";
   colorEl.addEventListener("input", () => {
-    const box = store.state.graph.commentBoxes.find((b) => b.id === commentId);
+    const box = getEditingGraph(store.state).commentBoxes.find((b) => b.id === commentId);
     if (box) box.color = colorEl.value;
     store.notify();
   });

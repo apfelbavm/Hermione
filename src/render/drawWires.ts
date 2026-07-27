@@ -1,5 +1,5 @@
 import { resolvePinDefs } from "../engine/graphMutations";
-import type { Graph } from "../engine/types";
+import type { FunctionDef, Graph, Variable } from "../engine/types";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
 import { PIN_COLORS } from "./palette";
@@ -11,6 +11,8 @@ export function drawWires(
   camera: Camera,
   geometries: ReadonlyMap<string, NodeScreenGeometry>,
   firedConnectionIds: ReadonlySet<string>,
+  variables: Variable[],
+  functions: FunctionDef[],
 ): void {
   for (const conn of graph.connections) {
     const fromGeo = geometries.get(conn.fromNode);
@@ -22,7 +24,7 @@ export function drawWires(
     if (!from || !to) continue;
 
     const fromNode = graph.nodes.find((n) => n.id === conn.fromNode)!;
-    const pinDefs = resolvePinDefs(fromNode, graph.variables);
+    const pinDefs = resolvePinDefs(fromNode, variables, functions);
     const pinDef = pinDefs.find((p) => p.id === conn.fromPin);
     const color = pinDef ? PIN_COLORS[pinDef.type] : "#888";
 

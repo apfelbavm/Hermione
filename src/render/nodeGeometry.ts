@@ -1,6 +1,6 @@
 import { getNodeDef } from "../engine/registry";
 import { resolvePinDefs } from "../engine/graphMutations";
-import type { Graph, NodeInstance, PinDef } from "../engine/types";
+import type { FunctionDef, Graph, NodeInstance, PinDef, Variable } from "../engine/types";
 import { computeNodeLayout, type NodeLayout } from "./layout";
 import { worldToScreen, type Camera } from "./camera";
 
@@ -47,15 +47,19 @@ export function computeNodeWorldRect(node: NodeInstance, pinDefs: PinDef[]): {
   return { x: node.position.x, y: node.position.y, width: layout.width, height: layout.height };
 }
 
-/** Computes screen geometry for every node once per frame, reused by drawing, hit-testing, and the DOM overlay. */
+/** Computes screen geometry for every node once per frame, reused by drawing, hit-testing, and the DOM overlay.
+ * `variables` must be the full VISIBLE set (see getVisibleVariables) and `functions` the root's function
+ * list — `graph` may be a function's body, whose own `.variables`/`.functions` aren't the complete picture. */
 export function computeAllNodeGeometries(
   graph: Graph,
   camera: Camera,
+  variables: Variable[],
+  functions: FunctionDef[],
 ): Map<string, NodeScreenGeometry> {
   const map = new Map<string, NodeScreenGeometry>();
   for (const node of graph.nodes) {
     const def = getNodeDef(node.type);
-    const pinDefs = resolvePinDefs(node, graph.variables);
+    const pinDefs = resolvePinDefs(node, variables, functions);
     map.set(node.id, computeNodeScreenGeometry(node, def.label, pinDefs, camera));
   }
   return map;

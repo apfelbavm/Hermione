@@ -4,6 +4,7 @@ import "./flow";
 import "./math";
 import "./variable";
 import "./actionsMock";
+import "./function";
 
 let registered = false;
 

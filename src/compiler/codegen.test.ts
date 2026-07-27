@@ -35,7 +35,7 @@ describe("compileGraph", () => {
     const graph = createEmptyGraph("g1", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const add = addBuiltinNode(graph, "math.add", { x: 0, y: 100 }, "add");
-    const compare = addBuiltinNode(graph, "math.compare", { x: 100, y: 100 }, "compare");
+    const compare = addBuiltinNode(graph, "math.greaterThan", { x: 100, y: 100 }, "compare");
     const branch = addBuiltinNode(graph, "flow.branch", { x: 200, y: 0 }, "branch");
     const printTrue = addBuiltinNode(graph, "debug.print", { x: 300, y: -50 }, "printTrue");
     const printFalse = addBuiltinNode(graph, "debug.print", { x: 300, y: 50 }, "printFalse");
@@ -46,11 +46,11 @@ describe("compileGraph", () => {
     printTrue.pins.message.value = "5 is greater than 4";
     printFalse.pins.message.value = "not greater";
 
-    connectPins(graph, { fromNode: add.id, fromPin: "result", toNode: compare.id, toPin: "a" });
-    connectPins(graph, { fromNode: compare.id, fromPin: "result", toNode: branch.id, toPin: "condition" });
-    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: branch.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: branch.id, fromPin: "true", toNode: printTrue.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: branch.id, fromPin: "false", toNode: printFalse.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: add.id, fromPin: "result", toNode: compare.id, toPin: "a" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: compare.id, fromPin: "result", toNode: branch.id, toPin: "condition" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: branch.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "true", toNode: printTrue.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "false", toNode: printFalse.id, toPin: "exec-in" });
 
     const interpreterLogs: string[] = [];
     await runExecFrom(
@@ -86,9 +86,9 @@ describe("compileGraph", () => {
     sendEmail.pins.subject.value = "Interview Invitation";
     print.pins.message.value = "done";
 
-    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: delay.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: delay.id, fromPin: "exec-out", toNode: sendEmail.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: sendEmail.id, fromPin: "exec-out", toNode: print.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: delay.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: delay.id, fromPin: "exec-out", toNode: sendEmail.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: sendEmail.id, fromPin: "exec-out", toNode: print.id, toPin: "exec-in" });
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
@@ -121,12 +121,12 @@ describe("compileGraph", () => {
     graph.nodes.push(set2);
     const print2 = addBuiltinNode(graph, "debug.print", { x: 0, y: 0 }, "print2");
 
-    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: set1.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: set1.id, fromPin: "exec-out", toNode: print1.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: getNode.id, fromPin: "value", toNode: print1.id, toPin: "message" });
-    connectPins(graph, { fromNode: print1.id, fromPin: "exec-out", toNode: set2.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: set2.id, fromPin: "exec-out", toNode: print2.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: getNode.id, fromPin: "value", toNode: print2.id, toPin: "message" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: set1.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: set1.id, fromPin: "exec-out", toNode: print1.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: getNode.id, fromPin: "value", toNode: print1.id, toPin: "message" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: print1.id, fromPin: "exec-out", toNode: set2.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: set2.id, fromPin: "exec-out", toNode: print2.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: getNode.id, fromPin: "value", toNode: print2.id, toPin: "message" });
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
@@ -152,13 +152,13 @@ describe("compileGraph", () => {
     const shared = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "shared");
     shared.pins.message.value = "reached shared";
 
-    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: branch.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: getCond.id, fromPin: "value", toNode: branch.id, toPin: "condition" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: branch.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: getCond.id, fromPin: "value", toNode: branch.id, toPin: "condition" });
     // Both branches converge on the same downstream node — proves the compiler's per-branch
     // inlining doesn't double-run the shared tail (it's nested inside mutually exclusive
     // if/else arms in the generated code, so exactly one copy executes per call).
-    connectPins(graph, { fromNode: branch.id, fromPin: "true", toNode: shared.id, toPin: "exec-in" });
-    connectPins(graph, { fromNode: branch.id, fromPin: "false", toNode: shared.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "true", toNode: shared.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "false", toNode: shared.id, toPin: "exec-in" });
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
@@ -198,7 +198,7 @@ describe("compileGraph", () => {
     const print1 = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "print1");
     const print2 = addBuiltinNode(graph, "debug.print", { x: 200, y: 100 }, "print2");
 
-    connectPins(graph, { fromNode: start.id, fromPin: "exec-out", toNode: branchStart.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: branchStart.id, toPin: "exec-in" });
     graph.connections.push(
       { id: "c1", fromNode: branchStart.id, fromPin: "exec-out", toNode: print1.id, toPin: "exec-in" },
       { id: "c2", fromNode: branchStart.id, fromPin: "exec-out", toNode: print2.id, toPin: "exec-in" },

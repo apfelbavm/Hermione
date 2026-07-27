@@ -3,7 +3,7 @@ import type { PinDef, PinType } from "../engine/types";
 import type { Camera } from "../render/camera";
 import { CHAR_WIDTH } from "../render/layout";
 import type { NodeScreenGeometry } from "../render/nodeGeometry";
-import type { Store } from "../state/store";
+import { getEditingGraph, type Store } from "../state/store";
 
 const WIDGET_TYPES: readonly PinType[] = ["number", "boolean", "string"];
 
@@ -20,7 +20,8 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
   const widgets = new Map<string, WidgetEntry>();
 
   function sync(geometries: ReadonlyMap<string, NodeScreenGeometry>): void {
-    const { graph, camera } = store.state;
+    const graph = getEditingGraph(store.state);
+    const { camera } = store.state;
     const seen = new Set<string>();
 
     for (const node of graph.nodes) {
@@ -70,7 +71,7 @@ function createWidgetEntry(type: PinType, nodeId: string, pinId: string, store: 
 
   const commit = () => {
     const value = type === "boolean" ? el.checked : type === "number" ? Number(el.value) : el.value;
-    setPinLiteralValue(store.state.graph, nodeId, pinId, value);
+    setPinLiteralValue(getEditingGraph(store.state), nodeId, pinId, value);
     store.notify();
   };
   el.addEventListener("change", commit);

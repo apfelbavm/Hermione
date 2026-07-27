@@ -12,6 +12,9 @@ export interface PinDef {
 
 export interface ExecuteResult {
   nextExec?: string | string[];
+  /** Data this exec node produces on its own output pins (e.g. a function call's results), readable
+   * by whatever's wired next in the same exec chain via the normal data-pin resolution machinery. */
+  outputs?: Record<string, unknown>;
 }
 
 export interface ExecuteArgs {
@@ -57,6 +60,8 @@ export interface NodeDef {
     args: EvaluateArgs,
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
   derivePins?: (variable: Variable) => PinDef[];
+  /** Sibling of derivePins for the Entry/Return/Call function nodes, dispatched off NodeInstance.functionId. */
+  deriveFunctionPins?: (fn: FunctionDef) => PinDef[];
   /** Marks this node type as a graph entry point (Unreal's BeginPlay/EventTick equivalent). */
   eventTrigger?: EventTrigger;
   /** Compile-time counterpart of `evaluate`: returns a JS expression string per output pin. */
@@ -78,6 +83,8 @@ export interface NodeInstance {
   position: { x: number; y: number };
   pins: Record<string, Pin>;
   variableId?: string;
+  /** Binds this node to a FunctionDef — used by function.entry/return/call, sibling to variableId. */
+  functionId?: string;
 }
 
 export interface Connection {
@@ -104,6 +111,26 @@ export interface CommentBox {
   color?: string;
 }
 
+/** One entry in a function's input or output signature — behaves like a Variable (name, type,
+ * default value) but lives on a FunctionDef rather than a Graph. */
+export interface PinSignatureEntry {
+  id: string;
+  name: string;
+  type: PinType;
+  defaultValue: unknown;
+}
+
+/** A user-defined function: its own typed signature plus its own body graph (whose `variables`
+ * field holds this function's LOCAL variables — the body is a real Graph so every render/
+ * interaction/persistence function that already operates on `Graph` works on it unmodified). */
+export interface FunctionDef {
+  id: string;
+  name: string;
+  inputs: PinSignatureEntry[];
+  outputs: PinSignatureEntry[];
+  body: Graph;
+}
+
 export interface Graph {
   id: string;
   name: string;
@@ -111,13 +138,30 @@ export interface Graph {
   connections: Connection[];
   variables: Variable[];
   commentBoxes: CommentBox[];
+  functions: FunctionDef[];
 }
 
 export interface ExecutionContext {
+  /** The graph currently being walked — swapped to a function's body inside a nested call. */
   graph: Graph;
+  /** Stable reference to the true top-level graph, never swapped — lets a nested call still
+   * resolve global variables and look up other FunctionDefs to call. */
+  rootGraph: Graph;
   tickCache: Map<string, unknown>;
-  /** Current value of each variable (by Variable.id) for the lifetime of this execution run. */
+  /** Data produced by exec nodes' own execute() (e.g. a function call's results) on their output
+   * pins, readable by whatever's wired next in the same exec chain. Unlike tickCache, NOT cleared
+   * per exec-step — a call's outputs must survive until the very next step reads them. */
+  execOutputs: Map<string, unknown>;
+  /** Current value of each GLOBAL variable (by Variable.id) for the lifetime of this execution run. */
   variableValues: Map<string, unknown>;
+  /** Current call frame's LOCAL variables — fresh per nested function call, never shared/shared-and-restored. */
+  localVariableValues?: Map<string, unknown>;
+  /** Nesting depth of function calls so far — guards against unbounded (self-)recursion. */
+  callDepth: number;
+  /** Set only inside a function-body walk: the resolved argument values this specific call passed in. */
+  entryArgs?: Record<string, unknown>;
+  /** Set only inside a function-body walk: called by function.return with its resolved input values. */
+  onReturn?: (values: Record<string, unknown>) => void;
   log: (message: string) => void;
   /** May return a Promise to introduce a visualization pause between exec steps; awaited by the executor. */
   onNodeStart?: (nodeId: string) => void | Promise<void>;
@@ -125,5 +169,5 @@ export interface ExecutionContext {
 }
 
 export function createEmptyGraph(id: string, name: string): Graph {
-  return { id, name, nodes: [], connections: [], variables: [], commentBoxes: [] };
+  return { id, name, nodes: [], connections: [], variables: [], commentBoxes: [], functions: [] };
 }

@@ -1,7 +1,23 @@
 import { registerNode } from "../engine/registry";
+import type { ExecutionContext } from "../engine/types";
 
 function variableName(graph: { variables: { id: string; name: string }[] }, variableId?: string): string {
   return graph.variables.find((v) => v.id === variableId)?.name ?? "unknown";
+}
+
+// Local variables (the current function-call frame's own) shadow globals of the same id — but since
+// ids are unique per-Variable regardless of scope, this is really just "check local first, else global."
+function getVariableValue(ctx: ExecutionContext, variableId: string): unknown {
+  if (ctx.localVariableValues?.has(variableId)) return ctx.localVariableValues.get(variableId);
+  return ctx.variableValues.get(variableId);
+}
+
+function setVariableValue(ctx: ExecutionContext, variableId: string, value: unknown): void {
+  if (ctx.localVariableValues?.has(variableId)) {
+    ctx.localVariableValues.set(variableId, value);
+  } else {
+    ctx.variableValues.set(variableId, value);
+  }
 }
 
 registerNode({
@@ -13,7 +29,7 @@ registerNode({
     { id: "value", label: variable.name, type: variable.type, direction: "output" },
   ],
   evaluate: ({ node, ctx }) => ({
-    value: node.variableId ? ctx.variableValues.get(node.variableId) : undefined,
+    value: node.variableId ? getVariableValue(ctx, node.variableId) : undefined,
   }),
   compileEvaluate: ({ node, graph }) => ({
     value: `rt.state[${JSON.stringify(node.variableId)}] /* ${variableName(graph, node.variableId)} */`,
@@ -31,7 +47,7 @@ registerNode({
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
   execute: ({ node, inputs, ctx }) => {
-    if (node.variableId) ctx.variableValues.set(node.variableId, inputs.value);
+    if (node.variableId) setVariableValue(ctx, node.variableId, inputs.value);
     return { nextExec: "exec-out" };
   },
   compileExecute: ({ node, inputs, graph, compileFrom }) => [

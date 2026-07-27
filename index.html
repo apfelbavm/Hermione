@@ -10,6 +10,8 @@
     <div id="app">
       <div id="toolbar">
         <span id="toolbar-title">Hermione</span>
+        <button id="back-button" style="display: none">◀ Back</button>
+        <span id="breadcrumb"></span>
         <button id="run-button">Run ▶</button>
         <button id="save-button">Save</button>
         <button id="load-button">Load</button>
@@ -21,18 +23,73 @@
           <canvas id="graph-canvas"></canvas>
           <div id="overlay"></div>
         </div>
-        <div id="variables-panel">
-          <div class="panel-header">Variables</div>
-          <div id="variables-list"></div>
-          <div class="panel-add-row">
-            <input id="new-variable-name" type="text" placeholder="Name" />
-            <select id="new-variable-type">
-              <option value="number">number</option>
-              <option value="boolean">boolean</option>
-              <option value="string">string</option>
-              <option value="object">object</option>
-            </select>
-            <button id="add-variable-button">+</button>
+        <div id="sidebar">
+          <div class="panel-section">
+            <div class="panel-header">Functions</div>
+            <div id="functions-list" class="panel-list"></div>
+            <div class="panel-add-row">
+              <input id="new-function-name" type="text" placeholder="Name" />
+              <button id="add-function-button">+</button>
+            </div>
+          </div>
+          <div class="panel-section">
+            <div class="panel-header">Variables</div>
+            <div id="variables-list" class="panel-list"></div>
+            <div class="panel-add-row">
+              <input id="new-variable-name" type="text" placeholder="Name" />
+              <select id="new-variable-type">
+                <option value="number">number</option>
+                <option value="boolean">boolean</option>
+                <option value="string">string</option>
+                <option value="object">object</option>
+              </select>
+              <button id="add-variable-button">+</button>
+            </div>
+          </div>
+          <div id="inputs-section" class="panel-section">
+            <div class="panel-header">Inputs</div>
+            <div id="inputs-list" class="panel-list"></div>
+            <div class="panel-add-row">
+              <input id="new-input-name" type="text" placeholder="Name" />
+              <select id="new-input-type">
+                <option value="number">number</option>
+                <option value="boolean">boolean</option>
+                <option value="string">string</option>
+                <option value="object">object</option>
+              </select>
+              <button id="add-input-button">+</button>
+            </div>
+          </div>
+          <div id="outputs-section" class="panel-section">
+            <div class="panel-header">Outputs</div>
+            <div id="outputs-list" class="panel-list"></div>
+            <div class="panel-add-row">
+              <input id="new-output-name" type="text" placeholder="Name" />
+              <select id="new-output-type">
+                <option value="number">number</option>
+                <option value="boolean">boolean</option>
+                <option value="string">string</option>
+                <option value="object">object</option>
+              </select>
+              <button id="add-output-button">+</button>
+            </div>
+            <div class="panel-add-row">
+              <button id="spawn-return-node-button" style="flex: 1 1 auto">Place Return Node</button>
+            </div>
+          </div>
+          <div id="local-variables-section" class="panel-section">
+            <div class="panel-header">Local Variables</div>
+            <div id="local-variables-list" class="panel-list"></div>
+            <div class="panel-add-row">
+              <input id="new-local-variable-name" type="text" placeholder="Name" />
+              <select id="new-local-variable-type">
+                <option value="number">number</option>
+                <option value="boolean">boolean</option>
+                <option value="string">string</option>
+                <option value="object">object</option>
+              </select>
+              <button id="add-local-variable-button">+</button>
+            </div>
           </div>
         </div>
       </div>

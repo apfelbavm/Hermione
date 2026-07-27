@@ -1,12 +1,19 @@
-import { resolvePinDefs } from "./graphMutations";
+import { getVisibleVariables, resolvePinDefs } from "./graphMutations";
 import { connectionsFrom, connectionTo } from "./graphQueries";
 import { getNodeDef } from "./registry";
-import type { ExecutionContext, Graph, NodeInstance } from "./types";
+import type { ExecutionContext, FunctionDef, Graph, NodeInstance } from "./types";
 
 export function findNode(graph: Graph, nodeId: string): NodeInstance {
   const node = graph.nodes.find((n) => n.id === nodeId);
   if (!node) throw new Error(`Node "${nodeId}" not found in graph`);
   return node;
+}
+
+/** Variables visible to whatever ctx.graph currently is — root's own if not nested, or
+ * root (global) + ctx.graph's own (local) if a function-call frame has swapped ctx.graph
+ * to that function's body. */
+function visibleVariables(ctx: ExecutionContext) {
+  return getVisibleVariables(ctx.rootGraph, ctx.graph);
 }
 
 export function createExecutionContext(
@@ -21,12 +28,16 @@ export function createExecutionContext(
     log: (message: string) => console.log(message),
     ...overrides,
     graph,
+    rootGraph: graph,
     tickCache: new Map(),
+    execOutputs: new Map(),
     variableValues,
+    callDepth: 0,
   };
 }
 
-/** Resolves a data-input pin's value: literal, or recursively pulled from an upstream pure node. */
+/** Resolves a data-input pin's value: literal, or recursively pulled from an upstream pure node,
+ * or (for an upstream exec/action node like a function call) whatever it most recently produced. */
 export async function resolveDataPin(
   nodeId: string,
   pinId: string,
@@ -47,21 +58,35 @@ export async function resolveDataPin(
   const outputCacheKey = `${conn.fromNode}:${conn.fromPin}`;
   if (ctx.tickCache.has(outputCacheKey)) return ctx.tickCache.get(outputCacheKey);
 
+  const upstreamNode = findNode(ctx.graph, conn.fromNode);
+  const upstreamDef = getNodeDef(upstreamNode.type);
+
+  if (!upstreamDef.evaluate) {
+    // Not a pure/data node — if it's an exec/action node (e.g. a function call), its output pins
+    // are populated by runExecFrom when it executes, not pulled lazily here. A missing entry means
+    // it hasn't run yet in this traversal — a genuine wiring/ordering error, not a stale-cache issue.
+    if (upstreamDef.execute) {
+      if (!ctx.execOutputs.has(outputCacheKey)) {
+        throw new Error(
+          `Node "${upstreamNode.type}" (${upstreamNode.id}) hasn't executed yet in this run — ` +
+            `its output pin "${conn.fromPin}" can only be read by something that runs after it`,
+        );
+      }
+      return ctx.execOutputs.get(outputCacheKey);
+    }
+    throw new Error(
+      `Node "${upstreamNode.type}" (${upstreamNode.id}) has no evaluate() but is wired to a data pin`,
+    );
+  }
+
   if (resolving.has(outputCacheKey)) {
     throw new Error(`Cyclic data-pin dependency detected at ${outputCacheKey}`);
   }
   resolving.add(outputCacheKey);
 
-  const upstreamNode = findNode(ctx.graph, conn.fromNode);
-  const upstreamDef = getNodeDef(upstreamNode.type);
-  if (!upstreamDef.evaluate) {
-    throw new Error(
-      `Node "${upstreamNode.type}" (${upstreamNode.id}) has no evaluate() but is wired to a data pin`,
-    );
-  }
   // Pins actually in effect for this instance — not the static def.pins, which is empty
   // for variable-derived node types (Get/Set Variable) whose pins depend on the bound Variable.
-  const upstreamPinDefs = resolvePinDefs(upstreamNode, ctx.graph.variables);
+  const upstreamPinDefs = resolvePinDefs(upstreamNode, visibleVariables(ctx), ctx.rootGraph.functions);
 
   const upstreamInputs: Record<string, unknown> = {};
   for (const pinDef of upstreamPinDefs) {
@@ -119,7 +144,7 @@ export async function runExecFrom(
     // the cache only clears *between* steps.
     ctx.tickCache.clear();
 
-    const pinDefs = resolvePinDefs(node, ctx.graph.variables);
+    const pinDefs = resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions);
     const inputs: Record<string, unknown> = {};
     for (const pinDef of pinDefs) {
       if (pinDef.direction === "input" && pinDef.type !== "exec") {
@@ -128,6 +153,21 @@ export async function runExecFrom(
     }
 
     const result = await def.execute({ node, inputs, ctx });
+
+    // Clear this node's own prior output-pin entries FIRST, then write whatever it produced this
+    // time (possibly nothing) — otherwise a node that produces outputs on one run but not the next
+    // would silently keep serving the earlier run's stale value instead of a clear "not run yet" error.
+    for (const pinDef of pinDefs) {
+      if (pinDef.direction === "output" && pinDef.type !== "exec") {
+        ctx.execOutputs.delete(`${node.id}:${pinDef.id}`);
+      }
+    }
+    if (result.outputs) {
+      for (const [pinId, value] of Object.entries(result.outputs)) {
+        ctx.execOutputs.set(`${node.id}:${pinId}`, value);
+      }
+    }
+
     const nextExecPins = result.nextExec
       ? Array.isArray(result.nextExec)
         ? result.nextExec
@@ -141,4 +181,54 @@ export async function runExecFrom(
       }
     }
   }
+}
+
+const MAX_CALL_DEPTH = 500;
+
+/** Runs a function's body from its Entry node, given already-resolved argument values, and
+ * returns its outputs — defaulted from the function's declared output defaults, overwritten by
+ * whichever function.return node fires last (if any). The caller continues regardless of whether
+ * any Return node was ever reached; this never blocks. Builds a genuine child ExecutionContext
+ * (fresh tickCache/execOutputs/localVariableValues) rather than mutating and restoring the
+ * caller's ctx, so a thrown error mid-call can't leave shared state pointed at the callee. */
+export async function runFunctionCall(
+  fn: FunctionDef,
+  argValues: Record<string, unknown>,
+  ctx: ExecutionContext,
+): Promise<Record<string, unknown>> {
+  if (ctx.callDepth >= MAX_CALL_DEPTH) {
+    throw new Error(
+      `Function call depth exceeded ${MAX_CALL_DEPTH} while calling "${fn.name}" — likely unbounded recursion`,
+    );
+  }
+
+  const localVariableValues = new Map<string, unknown>();
+  for (const variable of fn.body.variables) {
+    localVariableValues.set(variable.id, variable.defaultValue);
+  }
+
+  const outputs: Record<string, unknown> = {};
+  for (const output of fn.outputs) {
+    outputs[output.id] = output.defaultValue;
+  }
+
+  const childCtx: ExecutionContext = {
+    ...ctx,
+    graph: fn.body,
+    tickCache: new Map(),
+    execOutputs: new Map(),
+    localVariableValues,
+    callDepth: ctx.callDepth + 1,
+    entryArgs: argValues,
+    onReturn: (values) => {
+      Object.assign(outputs, values);
+    },
+  };
+
+  const entryNode = fn.body.nodes.find((n) => n.type === "function.entry" && n.functionId === fn.id);
+  if (entryNode) {
+    await runExecFrom(entryNode.id, "exec-out", childCtx);
+  }
+
+  return outputs;
 }

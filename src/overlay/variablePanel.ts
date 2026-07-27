@@ -1,16 +1,9 @@
-import { addNode, addVariable, nextId, removeVariable } from "../engine/graphMutations";
+import { addNode, addVariable, DEFAULT_VALUE_BY_TYPE, nextId, removeVariable, updateVariable } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
-import type { PinType, Variable } from "../engine/types";
+import type { Graph, PinType, Variable } from "../engine/types";
 import { screenToWorld } from "../render/camera";
 import type { Store } from "../state/store";
-
-const DEFAULT_VALUE_BY_TYPE: Record<PinType, unknown> = {
-  exec: undefined,
-  number: 0,
-  boolean: false,
-  string: "",
-  object: null,
-};
+import { createNameInput, createTypeSelect, createTypedValueInput } from "./typedValueInput";
 
 export interface VariablePanelElements {
   list: HTMLElement;
@@ -19,11 +12,15 @@ export interface VariablePanelElements {
   addButton: HTMLButtonElement;
 }
 
-/** Wires up the Variables side panel: create/delete variables, and spawn Get/Set nodes bound to one. */
+/** Wires up a Variables-style side panel: create/delete variables, edit name/type/default value
+ * in place, and spawn Get/Set nodes bound to one. Generalized over `getGraph` so the same factory
+ * drives both the always-visible global Variables panel (bound to the root graph) and the Local
+ * Variables panel (bound to whichever function's body is currently open). */
 export function createVariablePanel(
   elements: VariablePanelElements,
   store: Store,
   canvas: HTMLCanvasElement,
+  getGraph: () => Graph,
 ): { render: () => void } {
   let spawnCounter = 0;
 
@@ -44,24 +41,35 @@ export function createVariablePanel(
     for (const pinDef of pinDefs) {
       node.pins[pinDef.id] = pinDef.direction === "input" ? { value: pinDef.defaultValue } : {};
     }
-    addNode(store.state.graph, node);
+    addNode(getGraph(), node);
     store.notify();
   }
 
   function render(): void {
+    // Skip rebuilding while the user is actively editing a field in this list — otherwise any
+    // unrelated store.notify() (e.g. dragging a node on canvas) would wipe the DOM mid-keystroke.
+    if (elements.list.contains(document.activeElement)) return;
+
     elements.list.innerHTML = "";
-    for (const variable of store.state.graph.variables) {
+    for (const variable of getGraph().variables) {
       const row = document.createElement("div");
       row.className = "variable-row";
 
-      const name = document.createElement("span");
-      name.className = "variable-name";
-      name.textContent = variable.name;
+      const name = createNameInput(variable.name, (name) => {
+        updateVariable(store.state.rootGraph, variable.id, { name });
+        store.notify();
+      });
       name.title = variable.name;
 
-      const type = document.createElement("span");
-      type.className = "variable-type";
-      type.textContent = variable.type;
+      const type = createTypeSelect(variable.type, (type) => {
+        updateVariable(store.state.rootGraph, variable.id, { type });
+        store.notify();
+      });
+
+      const value = createTypedValueInput(variable.type, variable.defaultValue, (defaultValue) => {
+        updateVariable(store.state.rootGraph, variable.id, { defaultValue });
+        store.notify();
+      });
 
       const getBtn = document.createElement("button");
       getBtn.textContent = "Get";
@@ -74,17 +82,17 @@ export function createVariablePanel(
       const delBtn = document.createElement("button");
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", () => {
-        removeVariable(store.state.graph, variable.id);
+        removeVariable(getGraph(), variable.id);
         store.notify();
       });
 
-      row.append(name, type, getBtn, setBtn, delBtn);
+      row.append(name, type, value, getBtn, setBtn, delBtn);
       elements.list.appendChild(row);
     }
   }
 
   elements.addButton.addEventListener("click", () => {
-    const name = elements.nameInput.value.trim() || `Var${store.state.graph.variables.length + 1}`;
+    const name = elements.nameInput.value.trim() || `Var${getGraph().variables.length + 1}`;
     const type = elements.typeSelect.value as PinType;
     const variable: Variable = {
       id: nextId("var"),
@@ -92,7 +100,7 @@ export function createVariablePanel(
       type,
       defaultValue: DEFAULT_VALUE_BY_TYPE[type],
     };
-    addVariable(store.state.graph, variable);
+    addVariable(getGraph(), variable);
     elements.nameInput.value = "";
     store.notify();
   });

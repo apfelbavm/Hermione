@@ -40,7 +40,7 @@ function compileResolveDataPin(graph: Graph, nodeId: string, pinId: string, help
     );
   }
 
-  const upstreamPinDefs = resolvePinDefs(upstreamNode, graph.variables);
+  const upstreamPinDefs = resolvePinDefs(upstreamNode, graph.variables, graph.functions);
   const upstreamInputs: Record<string, string> = {};
   for (const pinDef of upstreamPinDefs) {
     if (pinDef.direction === "input" && pinDef.type !== "exec") {
@@ -86,7 +86,7 @@ function compileFrom(
     throw new Error(`Node type "${node.type}" has no compileExecute — cannot compile this graph yet`);
   }
 
-  const pinDefs = resolvePinDefs(node, graph.variables);
+  const pinDefs = resolvePinDefs(node, graph.variables, graph.functions);
   const inputs: Record<string, string> = {};
   for (const pinDef of pinDefs) {
     if (pinDef.direction === "input" && pinDef.type !== "exec") {
