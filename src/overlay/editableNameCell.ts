@@ -56,3 +56,13 @@ export function focusAndSelect(input: HTMLInputElement): void {
   input.focus();
   input.select();
 }
+
+/** True only while an editable-name-input within `list` is actually focused — i.e. a rename is
+ * genuinely in progress. Deliberately narrower than "does this list contain the focused element
+ * at all": clicking a delete button, a type <select>, or a value input also moves focus into the
+ * list, and none of those should block the list from rebuilding afterward (only a live rename
+ * should — losing keystrokes mid-edit is the failure this guards against). */
+export function isRenamingWithinList(list: HTMLElement): boolean {
+  const active = document.activeElement;
+  return active instanceof HTMLElement && active.classList.contains("editable-name-input") && list.contains(active);
+}

@@ -15,7 +15,7 @@ import type { FunctionDef, PinSignatureEntry, PinType } from "../engine/types";
 import { screenToWorld } from "../render/camera";
 import type { Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
-import { createEditableNameInput, createEditableNameLabel, focusAndSelect } from "./editableNameCell";
+import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
 import { createTypeSelect, createTypedValueInput } from "./typedValueInput";
 import { nextAvailableName } from "./uniqueName";
@@ -87,7 +87,7 @@ export function createFunctionIoPanel(
     const fn = getActiveFunction();
     elements.section.style.display = fn ? "" : "none";
     if (!fn) return;
-    if (elements.list.contains(document.activeElement)) return;
+    if (isRenamingWithinList(elements.list)) return;
 
     elements.list.innerHTML = "";
     const entries = entriesOf(fn);

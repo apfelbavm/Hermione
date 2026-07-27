@@ -3,7 +3,7 @@ import type { Graph, PinType, Variable } from "../engine/types";
 import type { Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
 import { VARIABLE_DRAG_MIME } from "./dragTypes";
-import { createEditableNameInput, createEditableNameLabel, focusAndSelect } from "./editableNameCell";
+import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
 import { createTypeSelect, createTypedValueInput } from "./typedValueInput";
 import { nextAvailableName } from "./uniqueName";
@@ -42,9 +42,9 @@ export function createVariablePanel(
   }
 
   function render(): void {
-    // Skip rebuilding while the user is actively editing a field in this list — otherwise any
-    // unrelated store.notify() (e.g. dragging a node on canvas) would wipe the DOM mid-keystroke.
-    if (elements.list.contains(document.activeElement)) return;
+    // Skip rebuilding while the user is actively mid-rename — otherwise any unrelated
+    // store.notify() (e.g. dragging a node on canvas) would wipe the DOM mid-keystroke.
+    if (isRenamingWithinList(elements.list)) return;
 
     elements.list.innerHTML = "";
     for (const variable of getGraph().variables) {

@@ -3,7 +3,7 @@ import type { FunctionDef } from "../engine/types";
 import { closeFunctionTab, openFunctionTab, type Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
 import { FUNCTION_DRAG_MIME } from "./dragTypes";
-import { createEditableNameInput, createEditableNameLabel, focusAndSelect } from "./editableNameCell";
+import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
 import { nextAvailableName } from "./uniqueName";
 
@@ -35,7 +35,7 @@ export function createFunctionsPanel(elements: FunctionsPanelElements, store: St
   }
 
   function render(): void {
-    if (elements.list.contains(document.activeElement)) return;
+    if (isRenamingWithinList(elements.list)) return;
 
     elements.list.innerHTML = "";
     for (const fn of store.state.rootGraph.functions) {
