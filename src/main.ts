@@ -14,7 +14,7 @@ import { buildDemoGraph } from "./demoGraph";
 import { createCamera, screenToWorld } from "./render/camera";
 import { computeAllNodeGeometries } from "./render/nodeGeometry";
 import { drawComments } from "./render/drawComments";
-import { drawGrid } from "./render/drawGrid";
+import { drawGrid, snapPositionToGrid } from "./render/drawGrid";
 import { drawNodes } from "./render/drawNodes";
 import { drawWires, drawWireDragPreview } from "./render/drawWires";
 import { drawMarqueeSelection } from "./render/drawMarquee";
@@ -44,6 +44,7 @@ const runButton = document.getElementById("run-button") as HTMLButtonElement;
 const saveButton = document.getElementById("save-button") as HTMLButtonElement;
 const loadButton = document.getElementById("load-button") as HTMLButtonElement;
 const compileButton = document.getElementById("compile-button") as HTMLButtonElement;
+const snapToGridCheckbox = document.getElementById("snap-to-grid-checkbox") as HTMLInputElement;
 const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 if (!ctx) throw new Error("Canvas 2D context unavailable");
@@ -53,6 +54,7 @@ const store = createStore({
   activeFunctionId: null,
   openFunctionTabs: [],
   camera: createCamera(),
+  snapToGrid: false,
   selectedNodeIds: new Set(),
   selectedCommentId: null,
   executingNodeId: null,
@@ -195,6 +197,7 @@ function render(): void {
   outputsPanel.render();
   graphTabs.render();
   detailsPanel.render();
+  snapToGridCheckbox.checked = store.state.snapToGrid;
 
   const activeFn = getActiveFunction();
   localVariablesSection.style.display = activeFn ? "" : "none";
@@ -205,6 +208,17 @@ store.subscribe(render);
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
+snapToGridCheckbox.addEventListener("change", () => {
+  store.state.snapToGrid = snapToGridCheckbox.checked;
+  store.notify();
+});
+
+/** Snaps a newly placed node's spawn position to the grid when the toolbar toggle is on — never
+ * applied to nodes already in the graph, only at the moment a new one is dropped/placed. */
+function applySnapIfEnabled(worldPos: { x: number; y: number }): { x: number; y: number } {
+  return store.state.snapToGrid ? snapPositionToGrid(worldPos) : worldPos;
+}
+
 /** Creates a node at worldPos and, if an anchor pin is given, auto-connects it to the first compatible pin. */
 function createNodeAndMaybeConnect(
   def: NodeDef,
@@ -212,7 +226,7 @@ function createNodeAndMaybeConnect(
   anchor?: WireAnchor,
 ): void {
   const graph = getEditingGraph(store.state);
-  const node = createNodeInstance(def.type, worldPos, def.pins);
+  const node = createNodeInstance(def.type, applySnapIfEnabled(worldPos), def.pins);
   addNode(graph, node);
 
   if (anchor) {
@@ -276,7 +290,7 @@ canvas.addEventListener("contextmenu", (e) => {
 function spawnCallNodeAt(fn: FunctionDef, worldPos: { x: number; y: number }): void {
   const def = getNodeDef("function.call");
   const pinDefs = def.deriveFunctionPins!(fn);
-  const node = createNodeInstance("function.call", worldPos, pinDefs, undefined, undefined, fn.id);
+  const node = createNodeInstance("function.call", applySnapIfEnabled(worldPos), pinDefs, undefined, undefined, fn.id);
   addNode(getEditingGraph(store.state), node);
   store.notify();
 }
@@ -284,7 +298,7 @@ function spawnCallNodeAt(fn: FunctionDef, worldPos: { x: number; y: number }): v
 function spawnVariableNodeAt(type: "variable.get" | "variable.set", variable: Variable, worldPos: { x: number; y: number }): void {
   const def = getNodeDef(type);
   const pinDefs = def.derivePins!(variable);
-  const node = createNodeInstance(type, worldPos, pinDefs, undefined, variable.id);
+  const node = createNodeInstance(type, applySnapIfEnabled(worldPos), pinDefs, undefined, variable.id);
   addNode(getEditingGraph(store.state), node);
   store.notify();
 }

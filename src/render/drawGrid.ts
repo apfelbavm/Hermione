@@ -2,8 +2,19 @@ import type { Camera } from "./camera";
 import { screenToWorld } from "./camera";
 import { CANVAS_BG, GRID_LINE_MAJOR, GRID_LINE_MINOR } from "./palette";
 
-const MINOR_SPACING = 20;
+export const GRID_SIZE = 20;
+const MINOR_SPACING = GRID_SIZE;
 const MAJOR_EVERY = 5;
+
+/** Rounds a world-space position to the nearest grid intersection — used to snap newly
+ * dropped/moved nodes onto the same grid this file draws, when the toolbar's "Snap to Grid"
+ * toggle is on. */
+export function snapPositionToGrid(position: { x: number; y: number }): { x: number; y: number } {
+  return {
+    x: Math.round(position.x / GRID_SIZE) * GRID_SIZE,
+    y: Math.round(position.y / GRID_SIZE) * GRID_SIZE,
+  };
+}
 
 export function drawGrid(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
   ctx.fillStyle = CANVAS_BG;

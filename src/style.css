@@ -76,6 +76,16 @@ html, body {
   background: #454a52;
 }
 
+.toolbar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #e8e8e8;
+  cursor: pointer;
+  user-select: none;
+}
+
 #main-area {
   display: flex;
   flex: 1 1 auto;

@@ -27,6 +27,7 @@ import {
   rectContains,
   rectIntersects,
 } from "../render/commentGeometry";
+import { snapPositionToGrid } from "../render/drawGrid";
 import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGeometry";
 import {
   hitTestCommentHeader,
@@ -263,8 +264,10 @@ export function setupPointerInteraction(
       for (const [nodeId, initial] of initialPositions) {
         const node = graph.nodes.find((n) => n.id === nodeId);
         if (node) {
-          node.position.x = initial.x + dx;
-          node.position.y = initial.y + dy;
+          const next = { x: initial.x + dx, y: initial.y + dy };
+          const snapped = store.state.snapToGrid ? snapPositionToGrid(next) : next;
+          node.position.x = snapped.x;
+          node.position.y = snapped.y;
         }
       }
       store.notify();
@@ -464,7 +467,8 @@ export function setupPointerInteraction(
 
           const pasteGraph = getEditingGraph(store.state);
           if (payload.kind === "nodes") {
-            const targetTopLeft = screenToWorld(store.state.camera, lastMouseScreenPos.x, lastMouseScreenPos.y);
+            const rawTarget = screenToWorld(store.state.camera, lastMouseScreenPos.x, lastMouseScreenPos.y);
+            const targetTopLeft = store.state.snapToGrid ? snapPositionToGrid(rawTarget) : rawTarget;
             const newIds = pasteNodesIntoGraph(pasteGraph, payload, targetTopLeft);
             if (newIds.length > 0) {
               store.state.selectedNodeIds = new Set(newIds);

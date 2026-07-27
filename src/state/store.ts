@@ -34,6 +34,9 @@ export interface AppState {
    * UI state — not persisted, reset to [] on load like selection/camera. */
   openFunctionTabs: string[];
   camera: Camera;
+  /** Toolbar toggle: when on, nodes snap to the grid as they're moved or newly dropped/placed onto
+   * the canvas. Never retroactively applied to nodes already sitting at an off-grid position. */
+  snapToGrid: boolean;
   selectedNodeIds: Set<string>;
   selectedCommentId: string | null;
   executingNodeId: string | null;
