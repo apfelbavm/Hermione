@@ -30,7 +30,12 @@ import { getEditingGraph, getVisibleVariablesForState, openFunctionTab, type Sto
 type DragMode =
   | { kind: "none" }
   | { kind: "pan"; lastX: number; lastY: number }
-  | { kind: "node"; nodeId: string; grabOffsetX: number; grabOffsetY: number }
+  | {
+      kind: "nodes";
+      startWorld: { x: number; y: number };
+      initialPositions: Map<string, { x: number; y: number }>;
+    }
+  | { kind: "marquee" }
   | { kind: "wire"; anchor: WireAnchor }
   | { kind: "comment-move"; commentId: string; grabOffsetX: number; grabOffsetY: number }
   | { kind: "comment-resize"; commentId: string };
@@ -66,15 +71,25 @@ function recomputeContainment(graph: Graph, variables: Variable[], functions: Fu
     .map((n) => n.id);
 }
 
+export interface PointerInteraction {
+  /** True if a right-drag pan just moved the camera — consumed once, so the trailing native
+   * "contextmenu" event knows to suppress the node-creation menu instead of opening it at the
+   * release point. A plain right-click with no drag still opens the menu as normal. */
+  shouldSuppressContextMenu: () => boolean;
+}
+
 export function setupPointerInteraction(
   canvas: HTMLCanvasElement,
   store: Store,
   callbacks: PointerInteractionCallbacks,
-): void {
+): PointerInteraction {
   let drag: DragMode = { kind: "none" };
   // Tracked continuously so the "C" comment-box shortcut knows where the cursor is —
   // keydown events carry no pointer coordinates of their own.
   let lastMouseScreenPos = { x: 0, y: 0 };
+  // Set once a right-drag pan actually moves; consumed by shouldSuppressContextMenu so a
+  // right-drag-to-pan doesn't also pop the node-creation context menu at the release point.
+  let rightDragMoved = false;
 
   function screenPos(e: MouseEvent) {
     const rect = canvas.getBoundingClientRect();
@@ -82,6 +97,15 @@ export function setupPointerInteraction(
   }
 
   canvas.addEventListener("mousedown", (e) => {
+    if (e.button === 2) {
+      // Right-drag pans the camera; a right-click with no drag still opens the context menu
+      // (see shouldSuppressContextMenu, consumed by main.ts's "contextmenu" listener).
+      rightDragMoved = false;
+      drag = { kind: "pan", lastX: e.clientX, lastY: e.clientY };
+      return;
+    }
+    if (e.button !== 0) return; // ignore middle-click etc.
+
     const graph = getEditingGraph(store.state);
     const { camera } = store.state;
     const variables = getVisibleVariablesForState(store.state);
@@ -121,14 +145,35 @@ export function setupPointerInteraction(
     if (nodeHit) {
       const node = graph.nodes.find((n) => n.id === nodeHit.nodeId)!;
       const worldPos = screenToWorld(camera, pos.x, pos.y);
-      store.state.selectedNodeIds = new Set([node.id]);
-      store.state.selectedCommentId = null;
-      drag = {
-        kind: "node",
-        nodeId: node.id,
-        grabOffsetX: worldPos.x - node.position.x,
-        grabOffsetY: worldPos.y - node.position.y,
-      };
+
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl/Cmd-click toggles this node's membership in the current multi-selection.
+        const next = new Set(store.state.selectedNodeIds);
+        if (next.has(node.id)) next.delete(node.id);
+        else next.add(node.id);
+        store.state.selectedNodeIds = next;
+        store.state.selectedCommentId = null;
+        if (!next.has(node.id)) {
+          // Just deselected it — nothing to grab from here.
+          drag = { kind: "none" };
+          store.notify();
+          return;
+        }
+        // Otherwise fall through and start a group-drag of the updated selection below.
+      } else if (!store.state.selectedNodeIds.has(node.id)) {
+        // Fresh click on a node outside the current selection replaces the selection.
+        store.state.selectedNodeIds = new Set([node.id]);
+        store.state.selectedCommentId = null;
+      }
+      // else: the clicked node is already part of an existing multi-selection — keep the whole
+      // selection intact so the drag below moves the whole group, Unreal-style.
+
+      const initialPositions = new Map<string, { x: number; y: number }>();
+      for (const id of store.state.selectedNodeIds) {
+        const n = graph.nodes.find((gn) => gn.id === id);
+        if (n) initialPositions.set(id, { x: n.position.x, y: n.position.y });
+      }
+      drag = { kind: "nodes", startWorld: worldPos, initialPositions };
       store.notify();
       return;
     }
@@ -159,9 +204,12 @@ export function setupPointerInteraction(
       return;
     }
 
+    // Empty space: clear selection and start a rubber-band marquee-select box.
     store.state.selectedNodeIds = new Set();
     store.state.selectedCommentId = null;
-    drag = { kind: "pan", lastX: e.clientX, lastY: e.clientY };
+    const worldPos = screenToWorld(camera, pos.x, pos.y);
+    store.state.marqueeSelection = { startWorld: worldPos, currentWorld: worldPos };
+    drag = { kind: "marquee" };
     store.notify();
   });
 
@@ -192,19 +240,32 @@ export function setupPointerInteraction(
       panCamera(camera, e.clientX - drag.lastX, e.clientY - drag.lastY);
       drag.lastX = e.clientX;
       drag.lastY = e.clientY;
+      rightDragMoved = true;
       store.notify();
       return;
     }
 
-    if (drag.kind === "node") {
-      const { nodeId, grabOffsetX, grabOffsetY } = drag;
+    if (drag.kind === "nodes") {
+      const { startWorld, initialPositions } = drag;
       const pos = screenPos(e);
       const worldPos = screenToWorld(camera, pos.x, pos.y);
-      const node = graph.nodes.find((n) => n.id === nodeId);
-      if (node) {
-        node.position.x = worldPos.x - grabOffsetX;
-        node.position.y = worldPos.y - grabOffsetY;
+      const dx = worldPos.x - startWorld.x;
+      const dy = worldPos.y - startWorld.y;
+      for (const [nodeId, initial] of initialPositions) {
+        const node = graph.nodes.find((n) => n.id === nodeId);
+        if (node) {
+          node.position.x = initial.x + dx;
+          node.position.y = initial.y + dy;
+        }
       }
+      store.notify();
+      return;
+    }
+
+    if (drag.kind === "marquee") {
+      const pos = screenPos(e);
+      const worldPos = screenToWorld(camera, pos.x, pos.y);
+      if (store.state.marqueeSelection) store.state.marqueeSelection.currentWorld = worldPos;
       store.notify();
       return;
     }
@@ -314,6 +375,29 @@ export function setupPointerInteraction(
       return;
     }
 
+    if (drag.kind === "marquee") {
+      const marquee = store.state.marqueeSelection;
+      if (marquee) {
+        const graph = getEditingGraph(store.state);
+        const variables = getVisibleVariablesForState(store.state);
+        const functions = store.state.rootGraph.functions;
+        const box = {
+          x: Math.min(marquee.startWorld.x, marquee.currentWorld.x),
+          y: Math.min(marquee.startWorld.y, marquee.currentWorld.y),
+          width: Math.abs(marquee.currentWorld.x - marquee.startWorld.x),
+          height: Math.abs(marquee.currentWorld.y - marquee.startWorld.y),
+        };
+        const enclosed = graph.nodes.filter((n) =>
+          rectContains(box, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), functions)),
+        );
+        store.state.selectedNodeIds = new Set(enclosed.map((n) => n.id));
+      }
+      store.state.marqueeSelection = null;
+      drag = { kind: "none" };
+      store.notify();
+      return;
+    }
+
     drag = { kind: "none" };
   });
 
@@ -393,4 +477,12 @@ export function setupPointerInteraction(
       }
     }
   });
+
+  return {
+    shouldSuppressContextMenu: () => {
+      const moved = rightDragMoved;
+      rightDragMoved = false;
+      return moved;
+    },
+  };
 }

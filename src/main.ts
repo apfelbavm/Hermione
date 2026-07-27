@@ -17,6 +17,7 @@ import { drawComments } from "./render/drawComments";
 import { drawGrid } from "./render/drawGrid";
 import { drawNodes } from "./render/drawNodes";
 import { drawWires, drawWireDragPreview } from "./render/drawWires";
+import { drawMarqueeSelection } from "./render/drawMarquee";
 import { createStore, getEditingGraph, getVisibleVariablesForState } from "./state/store";
 import { setupPointerInteraction, type WireAnchor } from "./interaction/pointerHandlers";
 import { createWidgetSync } from "./overlay/widgetSync";
@@ -54,6 +55,7 @@ const store = createStore({
   executingNodeId: null,
   firedConnectionIds: new Set(),
   wireDrag: null,
+  marqueeSelection: null,
 });
 
 function resizeCanvas(): void {
@@ -142,8 +144,15 @@ const localVariablePanel = createVariablePanel(
 const graphTabs = createGraphTabs(document.getElementById("graph-tabs") as HTMLDivElement, store);
 
 function render(): void {
-  const { camera, selectedNodeIds, selectedCommentId, executingNodeId, firedConnectionIds, wireDrag } =
-    store.state;
+  const {
+    camera,
+    selectedNodeIds,
+    selectedCommentId,
+    executingNodeId,
+    firedConnectionIds,
+    wireDrag,
+    marqueeSelection,
+  } = store.state;
   const graph = getEditingGraph(store.state);
   const variables = getVisibleVariablesForState(store.state);
   const functions = store.state.rootGraph.functions;
@@ -156,6 +165,7 @@ function render(): void {
   drawWires(ctx, graph, camera, geometries, firedConnectionIds, variables, functions);
   if (wireDrag) drawWireDragPreview(ctx, wireDrag);
   drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, functions);
+  if (marqueeSelection) drawMarqueeSelection(ctx, camera, marqueeSelection);
   widgetSync.sync(geometries);
   commentOverlay.sync();
   variablePanel.render();
@@ -209,7 +219,7 @@ function createNodeAndMaybeConnect(
   store.notify();
 }
 
-setupPointerInteraction(canvas, store, {
+const pointerInteraction = setupPointerInteraction(canvas, store, {
   onWireDroppedInEmptySpace: (anchor, screenPos) => {
     const candidates = findCompatibleNodeDefs(anchor.pin.type, anchor.pin.direction);
     const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
@@ -224,6 +234,8 @@ setupPointerInteraction(canvas, store, {
 
 canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault();
+  // A right-drag pan just moved the camera — don't also pop the menu at the release point.
+  if (pointerInteraction.shouldSuppressContextMenu()) return;
   const rect = canvas.getBoundingClientRect();
   const screenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
   const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);

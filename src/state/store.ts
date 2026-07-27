@@ -8,6 +8,13 @@ export interface WireDragState {
   pinType: PinType;
 }
 
+/** In-progress rubber-band selection box, tracked in world coordinates so it stays correct even
+ * if the camera zooms mid-drag. */
+export interface MarqueeSelectionState {
+  startWorld: { x: number; y: number };
+  currentWorld: { x: number; y: number };
+}
+
 export interface AppState {
   /** Always the true whole program — what Run/Compile/Save/Load and the Functions/global
    * Variables panels operate on, regardless of what's currently open for editing. */
@@ -24,6 +31,7 @@ export interface AppState {
   executingNodeId: string | null;
   firedConnectionIds: Set<string>;
   wireDrag: WireDragState | null;
+  marqueeSelection: MarqueeSelectionState | null;
 }
 
 /** The graph currently open for editing on the canvas — the root graph, or a function's body. */
