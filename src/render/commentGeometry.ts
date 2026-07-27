@@ -42,3 +42,10 @@ export function rectContains(outer: WorldRect, inner: WorldRect): boolean {
     inner.y + inner.height <= outer.y + outer.height
   );
 }
+
+/** True if the two rects overlap at all (touching counts) — unlike rectContains, neither has to
+ * fully enclose the other. Used for marquee selection, where a node need only be touched by the
+ * drag box, not wholly inside it. */
+export function rectIntersects(a: WorldRect, b: WorldRect): boolean {
+  return a.x <= b.x + b.width && a.x + a.width >= b.x && a.y <= b.y + b.height && a.y + a.height >= b.y;
+}

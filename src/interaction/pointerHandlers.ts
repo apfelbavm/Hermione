@@ -17,6 +17,7 @@ import {
   DEFAULT_COMMENT_HEIGHT,
   DEFAULT_COMMENT_WIDTH,
   rectContains,
+  rectIntersects,
 } from "../render/commentGeometry";
 import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGeometry";
 import {
@@ -387,10 +388,10 @@ export function setupPointerInteraction(
           width: Math.abs(marquee.currentWorld.x - marquee.startWorld.x),
           height: Math.abs(marquee.currentWorld.y - marquee.startWorld.y),
         };
-        const enclosed = graph.nodes.filter((n) =>
-          rectContains(box, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), functions)),
+        const touched = graph.nodes.filter((n) =>
+          rectIntersects(box, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), functions)),
         );
-        store.state.selectedNodeIds = new Set(enclosed.map((n) => n.id));
+        store.state.selectedNodeIds = new Set(touched.map((n) => n.id));
       }
       store.state.marqueeSelection = null;
       drag = { kind: "none" };
