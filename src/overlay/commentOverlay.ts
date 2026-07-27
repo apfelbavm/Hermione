@@ -14,13 +14,13 @@ export interface CommentOverlay {
  * view, spanning the full header width now that the color swatch has moved to the Details panel
  * (see detailsPanel.ts) — select the box to edit its color there.
  *
- * Since the title now covers almost the entire header, a plain click on it would otherwise always
- * hit this element instead of the canvas underneath, making the header un-draggable/un-selectable
- * except in a thin margin. So a single click here (while not already editing) is forwarded to the
- * canvas as a synthetic mousedown at the same position instead of focusing — canvas's own existing
- * header hit-test then selects/drags the box exactly as if the click had landed there directly.
- * Only a double-click (or a click while already focused, to reposition the caret) edits the text —
- * the same single-click-selects/double-click-renames split used for names in the sidebar. */
+ * Since the title now covers almost the entire header, it also has to double as the header's
+ * drag/select handle — a plain click on it can't just always start editing, or the box would
+ * become nearly impossible to drag by its header. So mousedown here waits to see whether the
+ * pointer actually MOVES before releasing: no movement is treated as a click, focusing the title
+ * with the caret placed exactly where the pointer landed; real movement is treated as a drag and
+ * forwarded to the canvas as a synthetic mousedown at the original position instead, so its own
+ * existing header hit-test selects/drags the box exactly as if the click had landed there directly. */
 export function createCommentOverlay(overlay: HTMLElement, canvas: HTMLCanvasElement, store: Store): CommentOverlay {
   const entries = new Map<string, CommentEntry>();
 
@@ -77,26 +77,57 @@ function createCommentEntry(commentId: string, store: Store, canvas: HTMLCanvasE
     store.notify();
   });
 
+  const DRAG_THRESHOLD_PX = 4;
+
   titleEl.addEventListener("mousedown", (e) => {
-    if (document.activeElement === titleEl || e.detail >= 2) {
-      // Already editing (just reposition the caret) or this IS the click that starts editing
-      // (double-click) — either way, let the browser's own contenteditable behavior run.
-      e.stopPropagation();
+    if (document.activeElement === titleEl) {
+      // Already editing — let the browser's own caret placement/selection run normally. This also
+      // covers the second mousedown of a double-click (the first already focused it below), so
+      // word-select-on-double-click still works natively without any extra handling here.
       return;
     }
-    // A single click while not editing selects/drags the box instead, same as clicking anywhere
-    // else on the header — hand it to the canvas at the same screen position.
+
+    // We decide ourselves (below) whether this becomes an edit or a drag, instead of the browser's
+    // default mousedown behavior (which would focus + start a native text-selection drag).
     e.preventDefault();
-    canvas.dispatchEvent(
-      new MouseEvent("mousedown", {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-        clientX: e.clientX,
-        clientY: e.clientY,
-        button: e.button,
-      }),
-    );
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const button = e.button;
+    let settled = false;
+
+    function onMove(moveEvent: MouseEvent): void {
+      if (settled) return;
+      if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) <= DRAG_THRESHOLD_PX) return;
+      settled = true;
+      cleanup();
+      canvas.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window, clientX: startX, clientY: startY, button }),
+      );
+    }
+
+    function onUp(): void {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      // A plain click, no drag — enter edit mode with the caret placed exactly where clicked
+      // (falls back to whatever focus() defaults to if the browser doesn't support this API).
+      titleEl.focus();
+      const range = document.caretRangeFromPoint?.(startX, startY);
+      if (range) {
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+    }
+
+    function cleanup(): void {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   });
 
   return { titleEl };

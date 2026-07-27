@@ -597,11 +597,14 @@ html, body {
   white-space: normal;
   word-break: break-word;
   line-height: 1.25;
+  cursor: text;
 }
 
+/* No background wash on hover/focus — it used to cover a small content-fit box, but now that the
+   title spans nearly the whole header, a filled background there just reads as a stray dark box.
+   A border is enough to hint that it's editable. */
 .comment-title:hover,
 .comment-title:focus {
-  background: rgba(0, 0, 0, 0.25);
   border-color: #454a52;
 }
 
