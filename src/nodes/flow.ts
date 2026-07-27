@@ -1,5 +1,7 @@
 import { registerNode } from "../engine/registry";
 import { DELAY_HELPER_SOURCE, indent } from "../engine/compileUtils";
+import { runExecFrom } from "../engine/executor";
+import { connectionsFrom } from "../engine/graphQueries";
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -43,4 +45,50 @@ registerNode({
     ...indent(compileFrom("false")),
     `}`,
   ],
+});
+
+// A runaway Start/End (typo'd or wired to the wrong value) shouldn't be able to hang the whole
+// tab — same philosophy as executor.ts's MAX_EXEC_STEPS/MAX_CALL_DEPTH, just for loop iterations.
+const MAX_FOR_LOOP_ITERATIONS = 100_000;
+
+registerNode({
+  type: "flow.forLoop",
+  label: "For Loop",
+  group: "Flow Control",
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    { id: "start", label: "Start", type: "number", direction: "input", defaultValue: 0 },
+    { id: "end", label: "End", type: "number", direction: "input", defaultValue: 0 },
+    { id: "loop-body", label: "Loop Body", type: "exec", direction: "output" },
+    { id: "index", label: "Index", type: "number", direction: "output" },
+    { id: "completed", label: "Completed", type: "exec", direction: "output" },
+  ],
+  // Runs the ENTIRE chain wired to "loop-body" to completion once per index from Start up to
+  // (exclusive) End, awaiting each iteration before starting the next — mirrors function.call
+  // awaiting runFunctionCall, just walking a chain in this SAME graph instead of a function's body.
+  // "index" is exposed the same way any other exec node exposes an output: written to
+  // ctx.execOutputs before each iteration's body runs, so anything wired to Loop Body can read it
+  // via the normal input-pin resolution machinery.
+  execute: async ({ node, inputs, ctx }) => {
+    const start = Math.trunc(Number(inputs.start ?? 0));
+    const end = Math.trunc(Number(inputs.end ?? 0));
+    if (end - start > MAX_FOR_LOOP_ITERATIONS) {
+      throw new Error(
+        `For Loop (${node.id}) would run ${end - start} iterations, over the ${MAX_FOR_LOOP_ITERATIONS} limit — check its Start/End.`,
+      );
+    }
+
+    const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
+    for (let i = start; i < end; i++) {
+      ctx.execOutputs.set(`${node.id}:index`, i);
+      for (const conn of bodyTargets) {
+        await runExecFrom(conn.toNode, conn.toPin, ctx);
+      }
+    }
+
+    return { nextExec: "completed" };
+  },
+  // Compiler support (compileExecute/compileEvaluate) is intentionally out of scope for now — same
+  // call as function.entry/return/call in function.ts. Compiling a graph containing one throws the
+  // existing "no compileExecute"/"no compileEvaluate" error, an honest failure mode until it lands.
 });
