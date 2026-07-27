@@ -8,6 +8,7 @@ import {
 } from "../engine/clipboard";
 import {
   addCommentBox,
+  canPlaceNodeType,
   connectPins,
   disconnectPin,
   nextId,
@@ -479,9 +480,24 @@ export function setupPointerInteraction(
 
           const pasteGraph = getEditingGraph(store.state);
           if (payload.kind === "nodes") {
+            // Event nodes can't go inside a function body, and at most one instance of each event
+            // type may exist per graph — drop any pasted node that would violate that (also
+            // guarding against pasting two of the same event type in one go).
+            const isFunctionBody = store.state.activeFunctionId !== null;
+            const seenEventTypes = new Set<string>();
+            const placeableNodes = payload.nodes.filter((n) => {
+              if (!canPlaceNodeType(n.type, pasteGraph, isFunctionBody)) return false;
+              if (getNodeDef(n.type).eventTrigger) {
+                if (seenEventTypes.has(n.type)) return false;
+                seenEventTypes.add(n.type);
+              }
+              return true;
+            });
+            const placeablePayload = { ...payload, nodes: placeableNodes };
+
             const rawTarget = screenToWorld(store.state.camera, lastMouseScreenPos.x, lastMouseScreenPos.y);
             const targetTopLeft = store.state.snapToGrid ? snapPositionToGrid(rawTarget) : rawTarget;
-            const newIds = pasteNodesIntoGraph(pasteGraph, payload, targetTopLeft);
+            const newIds = pasteNodesIntoGraph(pasteGraph, placeablePayload, targetTopLeft);
             if (newIds.length > 0) {
               store.state.selectedNodeIds = new Set(newIds);
               store.state.selectedCommentId = null;

@@ -1,7 +1,7 @@
 import "./style.css";
 import { registerBuiltins } from "./nodes";
 import { createExecutionContext, runExecFrom } from "./engine/executor";
-import { addNode, connectPins, createNodeInstance, removeInstancePin } from "./engine/graphMutations";
+import { addNode, canPlaceNodeType, connectPins, createNodeInstance, removeInstancePin } from "./engine/graphMutations";
 import {
   allNodeDefs,
   findCompatibleNodeDefs,
@@ -220,6 +220,15 @@ function applySnapIfEnabled(worldPos: { x: number; y: number }): { x: number; y:
   return store.state.snapToGrid ? snapPositionToGrid(worldPos) : worldPos;
 }
 
+/** Narrows a candidate list down to what's actually placeable in the graph currently open for
+ * editing — event nodes (On Start/On Interval/On Run) can't go inside a function body, and at most
+ * one instance of each event type may exist per graph (see canPlaceNodeType). */
+function filterCreatableHere(defs: NodeDef[]): NodeDef[] {
+  const graph = getEditingGraph(store.state);
+  const isFunctionBody = store.state.activeFunctionId !== null;
+  return defs.filter((def) => canPlaceNodeType(def.type, graph, isFunctionBody));
+}
+
 /** Creates a node at worldPos and, if an anchor pin is given, auto-connects it to the first compatible pin. */
 function createNodeAndMaybeConnect(
   def: NodeDef,
@@ -258,7 +267,7 @@ function createNodeAndMaybeConnect(
 
 const pointerInteraction = setupPointerInteraction(canvas, store, {
   onWireDroppedInEmptySpace: (anchor, screenPos) => {
-    const candidates = findCompatibleNodeDefs(anchor.pin.type, anchor.pin.direction);
+    const candidates = filterCreatableHere(findCompatibleNodeDefs(anchor.pin.type, anchor.pin.direction));
     const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
     openNodeSearchMenu(overlay, {
       screenPos,
@@ -301,7 +310,9 @@ canvas.addEventListener("contextmenu", (e) => {
     screenPos,
     // Get/Set Variable nodes need a variable bound via the Variables panel, and Entry/Return/Call
     // nodes need a function bound via the Functions panel — neither is generically creatable here.
-    candidates: allNodeDefs().filter((def) => !["Variables", "Functions"].includes(topLevelGroup(def.group))),
+    candidates: filterCreatableHere(
+      allNodeDefs().filter((def) => !["Variables", "Functions"].includes(topLevelGroup(def.group))),
+    ),
     onPick: (def) => createNodeAndMaybeConnect(def, worldPos),
     onCancel: () => {},
   });

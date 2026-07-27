@@ -83,6 +83,18 @@ export function addNode(graph: Graph, node: NodeInstance): void {
   graph.nodes.push(node);
 }
 
+/** True if a node of this type is allowed to be placed into `graph` right now — trivially true for
+ * any non-event node type. An event node (see NodeDef.eventTrigger — On Start/On Interval/On Run)
+ * may only live in the root graph, never inside a function body, and at most one instance of each
+ * event TYPE may exist per graph, mirroring how Unreal only allows one BeginPlay/EventTick per
+ * Blueprint. Used to filter both the node-creation menu and paste. */
+export function canPlaceNodeType(type: string, graph: Graph, isFunctionBody: boolean): boolean {
+  const def = getNodeDef(type);
+  if (!def.eventTrigger) return true;
+  if (isFunctionBody) return false;
+  return !graph.nodes.some((n) => n.type === type);
+}
+
 /** Entry and Return nodes are structural — a function body must always be able to receive its
  * inputs and produce its outputs, so these two types can never be removed via removeNode (not
  * even by the user's own Delete key). Callers that legitimately clean up OTHER node types bound to
