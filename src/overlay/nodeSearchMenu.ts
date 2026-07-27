@@ -1,5 +1,5 @@
 import type { NodeDef } from "../engine/types";
-import { allGroupPaths, buildMenuTree, flattenVisible, type MenuNode, type VisibleRow } from "./nodeMenuTree";
+import { buildMenuTree, flattenVisible, type MenuNode, type VisibleRow } from "./nodeMenuTree";
 
 export interface NodeSearchMenuOptions {
   screenPos: { x: number; y: number };
@@ -9,8 +9,9 @@ export interface NodeSearchMenuOptions {
 }
 
 /** A filtered, keyboard-navigable node-creation popup — the "drag off a pin, get compatible nodes" menu.
- * With no search text, shows the full group tree (sorted, groups expanded by default); typing a query
- * flattens to a plain sorted-by-label list matched against label or group path. */
+ * With no search text, shows the full group tree (sorted, all groups/subgroups collapsed by default);
+ * typing a query flattens to a plain sorted-by-label list matched against label or group path, with
+ * each result's group shown alongside it. */
 export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOptions): void {
   const menu = document.createElement("div");
   menu.className = "node-search-menu";
@@ -28,7 +29,7 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
   menu.appendChild(list);
 
   const tree = buildMenuTree(opts.candidates);
-  const expanded = new Set(allGroupPaths(tree));
+  const expanded = new Set<string>();
 
   let treeRows: VisibleRow[] = flattenVisible(tree, expanded);
   let flatDefs: NodeDef[] = [];
@@ -53,9 +54,18 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
       }
       flatDefs.forEach((def, i) => {
         const li = document.createElement("li");
-        li.textContent = def.label;
-        li.title = def.group;
+        li.className = "node-search-result";
         if (i === highlighted) li.classList.add("highlighted");
+
+        const labelEl = document.createElement("span");
+        labelEl.className = "node-search-result-label";
+        labelEl.textContent = def.label;
+
+        const groupEl = document.createElement("span");
+        groupEl.className = "node-search-result-group";
+        groupEl.textContent = def.group;
+
+        li.append(labelEl, groupEl);
         li.addEventListener("mousedown", (e) => {
           e.preventDefault();
           pick(def);

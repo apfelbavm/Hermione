@@ -278,6 +278,25 @@ html, body {
   color: #b8bec7;
 }
 
+.node-search-result {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.node-search-result-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-search-result-group {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: #9aa0a8;
+}
+
 .comment-title {
   box-sizing: border-box;
   background: transparent;
