@@ -130,6 +130,20 @@ export interface NodeDef {
    * continuation, it's the repeated iteration body, so a disabled loop must skip straight to
    * "completed" and never fire "loop-body" at all — same as if it ran zero iterations. */
   disabledNextExec?: string[];
+  /** Marks this node type as inherently "latent" (Unreal's term for a node that genuinely spans
+   * real time/multiple ticks rather than completing within the current one) — e.g. Delay, Send
+   * Email (mock), HTTP Request. Drawn with a small clock icon in the node's top-right corner (see
+   * drawNodes.ts) so it reads at a glance as "this pauses the exec chain," same as Unreal's latent
+   * function marker. See also latentBodyPin and src/engine/latency.ts for how this propagates
+   * through Call Function / loop nodes that merely CONTAIN a latent node rather than being one. */
+  latent?: boolean;
+  /** Present only on a node whose OWN exec-out pin represents a self-contained sub-chain it
+   * re-enters/awaits on the caller's behalf — currently just "loop-body" for For Loop and the
+   * Array/Set/Map For Each nodes. If that sub-chain transitively contains a latent node, this node
+   * is ALSO latent (same reasoning as a Function whose body contains one — see
+   * src/engine/latency.ts's isNodeLatent/isFunctionLatent) even though the node type itself isn't
+   * unconditionally `latent`. */
+  latentBodyPin?: string;
 }
 
 export interface Pin {

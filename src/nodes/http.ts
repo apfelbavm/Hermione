@@ -27,6 +27,7 @@ registerNode({
     { id: "responseHeaders", label: "Response Headers", type: "string", direction: "output" },
     { id: "error", label: "Error", type: "string", direction: "output" },
   ],
+  latent: true,
   // Fires exec-out exactly once, on both success AND failure (network error, timeout, bad JSON
   // headers) — callers branch off the "success"/"error" outputs themselves via an existing Branch
   // node, same single-exec-out convention as Delay/Send Email rather than inventing separate

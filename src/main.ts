@@ -46,6 +46,7 @@ import { openRowContextMenu, type ContextMenuItem } from "./overlay/rowContextMe
 import { loadGraphFromFile, loadGraphFromLocalStorage } from "./persistence/load";
 import { downloadGraphAsFile, saveGraphToLocalStorage } from "./persistence/save";
 import { downloadCompiledGraph } from "./compiler/codegen";
+import { isNodeLatent } from "./engine/latency";
 
 registerBuiltins();
 
@@ -202,7 +203,10 @@ function render(): void {
   const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
   drawWires(ctx, graph, camera, geometries, firedConnectionIds, variables, functions);
   if (wireDrag) drawWireDragPreview(ctx, wireDrag);
-  drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, variables, functions);
+  const latentNodeIds = new Set(
+    graph.nodes.filter((n) => isNodeLatent(n, graph, store.state.rootGraph)).map((n) => n.id),
+  );
+  drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, variables, functions, latentNodeIds);
   if (marqueeSelection) drawMarqueeSelection(ctx, camera, marqueeSelection);
   widgetSync.sync(geometries);
   commentOverlay.sync();

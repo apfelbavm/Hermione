@@ -35,6 +35,7 @@ export function drawNodes(
   executingNodeId: string | null,
   variables: Variable[],
   functions: FunctionDef[],
+  latentNodeIds: ReadonlySet<string> = new Set(),
 ): void {
   // Text scales with zoom too — a camera zooming over world-space content, same as everything else.
   ctx.font = `${13 * camera.zoom}px Segoe UI, sans-serif`;
@@ -76,6 +77,10 @@ export function drawNodes(
     ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom);
     ctx.stroke();
 
+    if (latentNodeIds.has(node.id)) {
+      drawLatentIcon(ctx, geo.screenX + geo.width, geo.screenY, 8 * camera.zoom);
+    }
+
     ctx.fillStyle = TEXT_PRIMARY;
     ctx.textAlign = "left";
     ctx.fillText(
@@ -114,6 +119,29 @@ export function drawNodes(
   }
   ctx.textAlign = "left";
   ctx.globalAlpha = 1;
+}
+
+/** Draws a small clock icon straddling (cx, cy) — used centered on a node's top-right CORNER so
+ * it sits half outside the node's own border, matching Unreal's latent-node marker (a node that
+ * genuinely spans real time/multiple ticks, e.g. Delay, or a Function/loop that contains one —
+ * see NodeDef.latent/latentBodyPin and engine/latency.ts). */
+function drawLatentIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = "#e8b339";
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, r * 0.12);
+  ctx.strokeStyle = "#7a5a12";
+  ctx.stroke();
+
+  ctx.strokeStyle = "#3a2a08";
+  ctx.lineWidth = Math.max(1, r * 0.18);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx, cy - r * 0.55);
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + r * 0.4, cy - r * 0.15);
+  ctx.stroke();
 }
 
 function drawPinShape(

@@ -22,6 +22,7 @@ registerNode({
     },
     { id: "exec-out", label: "Completed", type: "exec", direction: "output" },
   ],
+  latent: true,
   execute: async ({ inputs }) => {
     await wait(Number(inputs.duration ?? 0));
     return { nextExec: "exec-out" };
@@ -93,6 +94,10 @@ registerNode({
   // generic disabled behavior of firing every exec-out pin (which would run the body once, an
   // actual loop node's body isn't a plain continuation). See NodeDef.disabledNextExec.
   disabledNextExec: ["completed"],
+  // For Loop isn't itself unconditionally latent (a body with no Delay/HTTP Request/etc. completes
+  // within one tick), but if its body DOES contain one, this node shows the clock icon too — same
+  // reasoning as a Function containing a latent node. See NodeDef.latentBodyPin/latency.ts.
+  latentBodyPin: "loop-body",
   // Runs the ENTIRE chain wired to "loop-body" to completion once per index from Start up to AND
   // INCLUDING End, awaiting each iteration before starting the next — mirrors function.call
   // awaiting runFunctionCall, just walking a chain in this SAME graph instead of a function's body.

@@ -16,6 +16,7 @@ registerNode({
     { id: "body", label: "Body", type: "string", direction: "input", defaultValue: "" },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
+  latent: true,
   execute: async ({ inputs, ctx }) => {
     await wait(400); // stands in for a real network call to an email API
     ctx.log(`📧 Sent to ${inputs.to}: "${inputs.subject}"`);
