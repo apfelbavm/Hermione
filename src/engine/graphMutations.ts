@@ -70,7 +70,17 @@ export function addNode(graph: Graph, node: NodeInstance): void {
   graph.nodes.push(node);
 }
 
+/** Entry and Return nodes are structural — a function body must always be able to receive its
+ * inputs and produce its outputs, so these two types can never be removed via removeNode (not
+ * even by the user's own Delete key). Callers that legitimately clean up OTHER node types bound to
+ * a variable/function (removeVariable, removeFunctionDef) never target these types, so this guard
+ * doesn't interfere with them. */
+const UNDELETABLE_NODE_TYPES = new Set(["function.entry", "function.return"]);
+
 export function removeNode(graph: Graph, nodeId: string): void {
+  const node = graph.nodes.find((n) => n.id === nodeId);
+  if (node && UNDELETABLE_NODE_TYPES.has(node.type)) return;
+
   graph.nodes = graph.nodes.filter((n) => n.id !== nodeId);
   graph.connections = graph.connections.filter(
     (c) => c.fromNode !== nodeId && c.toNode !== nodeId,
@@ -225,8 +235,10 @@ export function allGraphs(rootGraph: Graph): Graph[] {
 }
 
 /** Creates a new function with an empty signature and a body containing one auto-placed
- * function.entry node. Requires the node registry to already have "function.entry" registered
- * (i.e. registerBuiltins() must have run), same precondition every other node-instance factory has. */
+ * function.entry node and one auto-placed function.return node — every function graph always has
+ * at least one output node (both are structural and can never be deleted, see removeNode).
+ * Requires the node registry to already have "function.entry"/"function.return" registered (i.e.
+ * registerBuiltins() must have run), same precondition every other node-instance factory has. */
 export function createFunctionDef(name: string): FunctionDef {
   const id = nextId("fn");
   const body = createEmptyGraph(nextId("fnbody"), name);
@@ -236,6 +248,11 @@ export function createFunctionDef(name: string): FunctionDef {
   const entryPins = entryDef.deriveFunctionPins ? entryDef.deriveFunctionPins(fn) : entryDef.pins;
   const entryNode = createNodeInstance("function.entry", { x: 40, y: 120 }, entryPins, nextId("node"), undefined, fn.id);
   body.nodes.push(entryNode);
+
+  const returnDef = getNodeDef("function.return");
+  const returnPins = returnDef.deriveFunctionPins ? returnDef.deriveFunctionPins(fn) : returnDef.pins;
+  const returnNode = createNodeInstance("function.return", { x: 360, y: 120 }, returnPins, nextId("node"), undefined, fn.id);
+  body.nodes.push(returnNode);
 
   return fn;
 }

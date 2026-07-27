@@ -9,6 +9,7 @@ import {
   createFunctionDef,
   createNodeInstance,
   nextId,
+  removeNode,
 } from "./graphMutations";
 import { getNodeDef } from "./registry";
 import { createEmptyGraph, type Graph, type Variable } from "./types";
@@ -198,5 +199,21 @@ describe("function calls", () => {
     // (if locals leaked across calls, this would still read "changed" from the first call — instead
     // each call's own child context starts fresh, so there's nothing left over to observe here)
     expect(ctx.variableValues.size).toBeGreaterThanOrEqual(1); // sanity: globals map untouched/created
+  });
+
+  it("creates a Return node by default, and Entry/Return can never be removed", () => {
+    const fn = createFunctionDef("AlwaysHasAnOutput");
+
+    const entryNode = fn.body.nodes.find((n) => n.type === "function.entry");
+    const returnNode = fn.body.nodes.find((n) => n.type === "function.return");
+    expect(entryNode).toBeDefined();
+    expect(returnNode).toBeDefined();
+
+    removeNode(fn.body, entryNode!.id);
+    removeNode(fn.body, returnNode!.id);
+
+    expect(fn.body.nodes).toContain(entryNode);
+    expect(fn.body.nodes).toContain(returnNode);
+    expect(fn.body.nodes).toHaveLength(2);
   });
 });
