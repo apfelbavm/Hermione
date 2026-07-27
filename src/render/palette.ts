@@ -18,7 +18,8 @@ export const NODE_HEADER_BG: Record<string, string> = {
   Debug: "#6b6b3b",
   Variables: "#7a4f9b",
   Actions: "#9b6b2f",
-  HermioneString: "#2f8a8a",
+  // Same color as a "string" pin/wire, tying the whole node category to that type visually.
+  String: PIN_COLORS.string,
 };
 export const NODE_HEADER_DEFAULT = "#44494f";
 export const NODE_BODY_BG = "#2b2f36";
