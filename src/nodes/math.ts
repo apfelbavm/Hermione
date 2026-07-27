@@ -2,7 +2,7 @@ import { registerNode } from "../engine/registry";
 
 registerNode({
   type: "math.add",
-  label: "Add",
+  label: "Add (A + B)",
   group: "Math.Arithmetic",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -19,7 +19,7 @@ registerNode({
 
 registerNode({
   type: "math.subtract",
-  label: "Subtract",
+  label: "Subtract (A - B)",
   group: "Math.Arithmetic",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -36,7 +36,7 @@ registerNode({
 
 registerNode({
   type: "math.multiply",
-  label: "Multiply (*)",
+  label: "Multiply (A * B)",
   group: "Math.Arithmetic",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -48,6 +48,23 @@ registerNode({
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `(Number(${inputs.a}) * Number(${inputs.b}))`,
+  }),
+});
+
+registerNode({
+  type: "math.divide",
+  label: "Divide (A / B)",
+  group: "Math.Arithmetic",
+  pins: [
+    { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: "B", type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: "Result", type: "number", direction: "output" },
+  ],
+  evaluate: ({ inputs }) => ({
+    result: Number(inputs.a ?? 0) / Number(inputs.b ?? 0),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `(Number(${inputs.a}) / Number(${inputs.b}))`,
   }),
 });
 
