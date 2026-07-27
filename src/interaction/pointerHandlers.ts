@@ -1,4 +1,12 @@
 import {
+  cloneNodesForClipboard,
+  parseClipboardPayload,
+  pasteNodesIntoGraph,
+  pasteVariableIntoGraph,
+  serializeNodesClipboardPayload,
+  serializeVariableClipboardPayload,
+} from "../engine/clipboard";
+import {
   addCommentBox,
   connectPins,
   disconnectPin,
@@ -428,6 +436,48 @@ export function setupPointerInteraction(
       store.state.selectedNodeIds = new Set();
       store.state.selectedCommentId = null;
       store.notify();
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+      e.preventDefault();
+      const { selectedNodeIds, sidebarSelection } = store.state;
+      if (selectedNodeIds.size > 0) {
+        const { nodes, connections } = cloneNodesForClipboard(graph, selectedNodeIds);
+        if (nodes.length > 0) {
+          navigator.clipboard.writeText(serializeNodesClipboardPayload(nodes, connections)).catch(() => {});
+        }
+      } else if (sidebarSelection?.kind === "variable") {
+        const variable = getVisibleVariablesForState(store.state).find((v) => v.id === sidebarSelection.variableId);
+        if (variable) navigator.clipboard.writeText(serializeVariableClipboardPayload(variable)).catch(() => {});
+      }
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
+      e.preventDefault();
+      navigator.clipboard
+        .readText()
+        .then((text) => {
+          const payload = parseClipboardPayload(text);
+          if (!payload) return; // not our own copied data (or nothing/garbage on the clipboard) — no-op
+
+          const pasteGraph = getEditingGraph(store.state);
+          if (payload.kind === "nodes") {
+            const targetTopLeft = screenToWorld(store.state.camera, lastMouseScreenPos.x, lastMouseScreenPos.y);
+            const newIds = pasteNodesIntoGraph(pasteGraph, payload, targetTopLeft);
+            if (newIds.length > 0) {
+              store.state.selectedNodeIds = new Set(newIds);
+              store.state.selectedCommentId = null;
+              store.notify();
+            }
+          } else {
+            const newVariable = pasteVariableIntoGraph(pasteGraph, payload.variable);
+            store.state.sidebarSelection = { kind: "variable", variableId: newVariable.id };
+            store.notify();
+          }
+        })
+        .catch(() => {}); // clipboard permission denied/unavailable — fail silently, nothing to paste
       return;
     }
 

@@ -87,7 +87,7 @@ export function addNode(graph: Graph, node: NodeInstance): void {
  * even by the user's own Delete key). Callers that legitimately clean up OTHER node types bound to
  * a variable/function (removeVariable, removeFunctionDef) never target these types, so this guard
  * doesn't interfere with them. */
-const UNDELETABLE_NODE_TYPES = new Set(["function.entry", "function.return"]);
+export const UNDELETABLE_NODE_TYPES = new Set(["function.entry", "function.return"]);
 
 export function removeNode(graph: Graph, nodeId: string): void {
   const node = graph.nodes.find((n) => n.id === nodeId);
