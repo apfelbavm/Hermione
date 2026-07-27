@@ -27,6 +27,7 @@ export function createCommentOverlay(overlay: HTMLElement, store: Store): Commen
         overlay.appendChild(entry.el);
       }
 
+      // Everything scales together with zoom — like the rest of the graph.
       const rect = computeCommentScreenRect(box, camera);
       const widthPx = Math.max(60, box.text.length * CHAR_WIDTH + 16) * camera.zoom;
       entry.el.style.position = "absolute";

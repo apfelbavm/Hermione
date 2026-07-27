@@ -88,6 +88,8 @@ function setWidgetDisplayValue(el: HTMLInputElement, type: PinType, value: unkno
   }
 }
 
+// Everything scales together with zoom — like the rest of the graph, this is a camera
+// zooming over world-space content, not a fixed screen-space UI overlay.
 function positionWidget(
   el: HTMLInputElement,
   pinScreenPos: { x: number; y: number },

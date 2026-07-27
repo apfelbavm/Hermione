@@ -23,7 +23,8 @@ export function drawNodes(
   selectedNodeIds: ReadonlySet<string>,
   executingNodeId: string | null,
 ): void {
-  ctx.font = "13px Segoe UI, sans-serif";
+  // Text scales with zoom too — a camera zooming over world-space content, same as everything else.
+  ctx.font = `${13 * camera.zoom}px Segoe UI, sans-serif`;
   ctx.textBaseline = "middle";
 
   for (const node of graph.nodes) {
