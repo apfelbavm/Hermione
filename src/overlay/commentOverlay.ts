@@ -1,18 +1,19 @@
-import { COMMENT_HEADER_HEIGHT, computeCommentScreenRect } from "../render/commentGeometry";
+import { COMMENT_HEADER_HEIGHT, computeCommentScreenRect, DEFAULT_COMMENT_COLOR } from "../render/commentGeometry";
 import { CHAR_WIDTH } from "../render/layout";
 import type { Store } from "../state/store";
 
-interface TitleEntry {
-  el: HTMLInputElement;
+interface CommentEntry {
+  titleEl: HTMLInputElement;
+  colorEl: HTMLInputElement;
 }
 
 export interface CommentOverlay {
   sync: () => void;
 }
 
-/** Keeps one editable title <input> per comment box, sized to its text and pinned to the header. */
+/** Keeps one editable title <input> and one color swatch per comment box, pinned to its header. */
 export function createCommentOverlay(overlay: HTMLElement, store: Store): CommentOverlay {
-  const titles = new Map<string, TitleEntry>();
+  const entries = new Map<string, CommentEntry>();
 
   function sync(): void {
     const { graph, camera } = store.state;
@@ -20,32 +21,55 @@ export function createCommentOverlay(overlay: HTMLElement, store: Store): Commen
 
     for (const box of graph.commentBoxes) {
       seen.add(box.id);
-      let entry = titles.get(box.id);
+      let entry = entries.get(box.id);
       if (!entry) {
-        entry = createTitleEntry(box.id, store);
-        titles.set(box.id, entry);
-        overlay.appendChild(entry.el);
+        entry = createCommentEntry(box.id, store);
+        entries.set(box.id, entry);
+        overlay.appendChild(entry.titleEl);
+        overlay.appendChild(entry.colorEl);
       }
 
       // Everything scales together with zoom — like the rest of the graph.
       const rect = computeCommentScreenRect(box, camera);
-      const widthPx = Math.max(60, box.text.length * CHAR_WIDTH + 16) * camera.zoom;
-      entry.el.style.position = "absolute";
-      entry.el.style.left = `${rect.screenX + 6 * camera.zoom}px`;
-      entry.el.style.top = `${rect.screenY}px`;
-      entry.el.style.width = `${Math.min(widthPx, rect.width - 12 * camera.zoom)}px`;
-      entry.el.style.height = `${COMMENT_HEADER_HEIGHT * camera.zoom}px`;
-      entry.el.style.fontSize = `${12 * camera.zoom}px`;
+      const headerHeightPx = COMMENT_HEADER_HEIGHT * camera.zoom;
+      const swatchMargin = 6 * camera.zoom;
+      const swatchSize = Math.max(10, Math.min(16 * camera.zoom, headerHeightPx - 4 * camera.zoom));
 
-      if (document.activeElement !== entry.el) {
-        entry.el.value = box.text;
+      entry.colorEl.style.position = "absolute";
+      entry.colorEl.style.left = `${rect.screenX + rect.width - swatchSize - swatchMargin}px`;
+      entry.colorEl.style.top = `${rect.screenY + (headerHeightPx - swatchSize) / 2}px`;
+      entry.colorEl.style.width = `${swatchSize}px`;
+      entry.colorEl.style.height = `${swatchSize}px`;
+      if (document.activeElement !== entry.colorEl) {
+        entry.colorEl.value = box.color ?? DEFAULT_COMMENT_COLOR;
+      }
+
+      const titleLeft = rect.screenX + 6 * camera.zoom;
+      const titleMaxWidth = Math.max(
+        0,
+        rect.screenX + rect.width - swatchSize - swatchMargin * 2 - titleLeft,
+      );
+      const widthPx = Math.min(
+        Math.max(60, box.text.length * CHAR_WIDTH + 16) * camera.zoom,
+        titleMaxWidth,
+      );
+      entry.titleEl.style.position = "absolute";
+      entry.titleEl.style.left = `${titleLeft}px`;
+      entry.titleEl.style.top = `${rect.screenY}px`;
+      entry.titleEl.style.width = `${widthPx}px`;
+      entry.titleEl.style.height = `${headerHeightPx}px`;
+      entry.titleEl.style.fontSize = `${12 * camera.zoom}px`;
+
+      if (document.activeElement !== entry.titleEl) {
+        entry.titleEl.value = box.text;
       }
     }
 
-    for (const [id, entry] of titles) {
+    for (const [id, entry] of entries) {
       if (!seen.has(id)) {
-        entry.el.remove();
-        titles.delete(id);
+        entry.titleEl.remove();
+        entry.colorEl.remove();
+        entries.delete(id);
       }
     }
   }
@@ -53,19 +77,28 @@ export function createCommentOverlay(overlay: HTMLElement, store: Store): Commen
   return { sync };
 }
 
-function createTitleEntry(commentId: string, store: Store): TitleEntry {
-  const el = document.createElement("input");
-  el.type = "text";
-  el.className = "comment-title";
-  el.autocomplete = "off";
-
-  const commit = () => {
+function createCommentEntry(commentId: string, store: Store): CommentEntry {
+  const titleEl = document.createElement("input");
+  titleEl.type = "text";
+  titleEl.className = "comment-title";
+  titleEl.autocomplete = "off";
+  titleEl.addEventListener("input", () => {
     const box = store.state.graph.commentBoxes.find((b) => b.id === commentId);
-    if (box) box.text = el.value;
+    if (box) box.text = titleEl.value;
     store.notify();
-  };
-  el.addEventListener("input", commit);
-  el.addEventListener("mousedown", (e) => e.stopPropagation());
+  });
+  titleEl.addEventListener("mousedown", (e) => e.stopPropagation());
 
-  return { el };
+  const colorEl = document.createElement("input");
+  colorEl.type = "color";
+  colorEl.className = "comment-color-swatch";
+  colorEl.title = "Comment box color";
+  colorEl.addEventListener("input", () => {
+    const box = store.state.graph.commentBoxes.find((b) => b.id === commentId);
+    if (box) box.color = colorEl.value;
+    store.notify();
+  });
+  colorEl.addEventListener("mousedown", (e) => e.stopPropagation());
+
+  return { titleEl, colorEl };
 }

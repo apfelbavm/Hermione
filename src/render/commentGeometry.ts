@@ -4,6 +4,9 @@ import { worldToScreen, type Camera } from "./camera";
 export const COMMENT_HEADER_HEIGHT = 26;
 export const COMMENT_RESIZE_HANDLE_SCREEN_SIZE = 14;
 export const COMMENT_MIN_SIZE = 80;
+export const DEFAULT_COMMENT_COLOR = "#ffffff";
+export const DEFAULT_COMMENT_WIDTH = 300;
+export const DEFAULT_COMMENT_HEIGHT = 200;
 
 export interface CommentScreenRect {
   screenX: number;

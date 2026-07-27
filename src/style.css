@@ -292,3 +292,21 @@ html, body {
 .comment-title:focus {
   outline: none;
 }
+
+.comment-color-swatch {
+  box-sizing: border-box;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
+}
+
+.comment-color-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.comment-color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}

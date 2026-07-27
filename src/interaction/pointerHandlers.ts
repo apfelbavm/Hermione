@@ -8,9 +8,16 @@ import {
   resolvePinDefs,
 } from "../engine/graphMutations";
 import { isPinTypeCompatible } from "../engine/registry";
-import type { CommentBox, PinDef } from "../engine/types";
+import type { CommentBox, Graph, PinDef } from "../engine/types";
 import { panCamera, screenToWorld, zoomCameraAt } from "../render/camera";
-import { COMMENT_HEADER_HEIGHT, COMMENT_MIN_SIZE, rectContains } from "../render/commentGeometry";
+import {
+  COMMENT_HEADER_HEIGHT,
+  COMMENT_MIN_SIZE,
+  DEFAULT_COMMENT_COLOR,
+  DEFAULT_COMMENT_HEIGHT,
+  DEFAULT_COMMENT_WIDTH,
+  rectContains,
+} from "../render/commentGeometry";
 import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGeometry";
 import {
   hitTestCommentHeader,
@@ -40,8 +47,23 @@ export interface PointerInteractionCallbacks {
   onWireDroppedInEmptySpace: (anchor: WireAnchor, screenPos: { x: number; y: number }) => void;
 }
 
-function findConnectionToInput(graph: import("../engine/types").Graph, nodeId: string, pinId: string) {
+function findConnectionToInput(graph: Graph, nodeId: string, pinId: string) {
   return graph.connections.find((c) => c.toNode === nodeId && c.toPin === pinId);
+}
+
+/** Recomputes which nodes currently sit geometrically inside a comment box's body — called
+ * fresh whenever a header-drag starts, so it picks up nodes moved into the box since it was
+ * last resized, matching Unreal's "whatever's actually inside moves with it" behavior. */
+function recomputeContainment(graph: Graph, box: CommentBox): void {
+  const innerBounds = {
+    x: box.position.x,
+    y: box.position.y + COMMENT_HEADER_HEIGHT,
+    width: box.size.width,
+    height: box.size.height - COMMENT_HEADER_HEIGHT,
+  };
+  box.containedNodeIds = graph.nodes
+    .filter((n) => rectContains(innerBounds, computeNodeWorldRect(n, resolvePinDefs(n, graph.variables))))
+    .map((n) => n.id);
 }
 
 export function setupPointerInteraction(
@@ -50,6 +72,9 @@ export function setupPointerInteraction(
   callbacks: PointerInteractionCallbacks,
 ): void {
   let drag: DragMode = { kind: "none" };
+  // Tracked continuously so the "C" comment-box shortcut knows where the cursor is —
+  // keydown events carry no pointer coordinates of their own.
+  let lastMouseScreenPos = { x: 0, y: 0 };
 
   function screenPos(e: MouseEvent) {
     const rect = canvas.getBoundingClientRect();
@@ -117,6 +142,7 @@ export function setupPointerInteraction(
     const headerHit = hitTestCommentHeader(graph, camera, pos.x, pos.y);
     if (headerHit) {
       const box = graph.commentBoxes.find((b) => b.id === headerHit.commentId)!;
+      recomputeContainment(graph, box);
       const worldPos = screenToWorld(camera, pos.x, pos.y);
       store.state.selectedCommentId = box.id;
       store.state.selectedNodeIds = new Set();
@@ -137,6 +163,7 @@ export function setupPointerInteraction(
   });
 
   window.addEventListener("mousemove", (e) => {
+    lastMouseScreenPos = screenPos(e);
     if (drag.kind === "none") return;
     const { graph, camera } = store.state;
 
@@ -253,17 +280,7 @@ export function setupPointerInteraction(
       const { graph } = store.state;
       const { commentId } = drag;
       const box = graph.commentBoxes.find((b) => b.id === commentId);
-      if (box) {
-        const innerBounds = {
-          x: box.position.x,
-          y: box.position.y + COMMENT_HEADER_HEIGHT,
-          width: box.size.width,
-          height: box.size.height - COMMENT_HEADER_HEIGHT,
-        };
-        box.containedNodeIds = graph.nodes
-          .filter((n) => rectContains(innerBounds, computeNodeWorldRect(n, resolvePinDefs(n, graph.variables))))
-          .map((n) => n.id);
-      }
+      if (box) recomputeContainment(graph, box);
       drag = { kind: "none" };
       store.notify();
       return;
@@ -301,31 +318,48 @@ export function setupPointerInteraction(
     }
 
     if (e.key.toLowerCase() === "c" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const { graph, selectedNodeIds } = store.state;
-      if (selectedNodeIds.size === 0) return;
+      const { graph, camera, selectedNodeIds } = store.state;
 
-      const rects = [...selectedNodeIds]
-        .map((id) => graph.nodes.find((n) => n.id === id))
-        .filter((n): n is NonNullable<typeof n> => !!n)
-        .map((n) => computeNodeWorldRect(n, resolvePinDefs(n, graph.variables)));
+      if (selectedNodeIds.size > 0) {
+        // Nodes selected: wrap them, Unreal-style.
+        const rects = [...selectedNodeIds]
+          .map((id) => graph.nodes.find((n) => n.id === id))
+          .filter((n): n is NonNullable<typeof n> => !!n)
+          .map((n) => computeNodeWorldRect(n, resolvePinDefs(n, graph.variables)));
 
-      const minX = Math.min(...rects.map((r) => r.x));
-      const minY = Math.min(...rects.map((r) => r.y));
-      const maxX = Math.max(...rects.map((r) => r.x + r.width));
-      const maxY = Math.max(...rects.map((r) => r.y + r.height));
-      const PAD = 30;
-      const HEADER_PAD = COMMENT_HEADER_HEIGHT + 16;
+        const minX = Math.min(...rects.map((r) => r.x));
+        const minY = Math.min(...rects.map((r) => r.y));
+        const maxX = Math.max(...rects.map((r) => r.x + r.width));
+        const maxY = Math.max(...rects.map((r) => r.y + r.height));
+        const PAD = 30;
+        const HEADER_PAD = COMMENT_HEADER_HEIGHT + 16;
 
-      const box: CommentBox = {
-        id: nextId("comment"),
-        text: "Comment",
-        position: { x: minX - PAD, y: minY - HEADER_PAD },
-        size: { width: maxX - minX + PAD * 2, height: maxY - minY + HEADER_PAD + PAD },
-        containedNodeIds: [...selectedNodeIds],
-      };
-      addCommentBox(graph, box);
-      store.state.selectedCommentId = box.id;
-      store.notify();
+        const box: CommentBox = {
+          id: nextId("comment"),
+          text: "Comment",
+          position: { x: minX - PAD, y: minY - HEADER_PAD },
+          size: { width: maxX - minX + PAD * 2, height: maxY - minY + HEADER_PAD + PAD },
+          containedNodeIds: [...selectedNodeIds],
+          color: DEFAULT_COMMENT_COLOR,
+        };
+        addCommentBox(graph, box);
+        store.state.selectedCommentId = box.id;
+        store.notify();
+      } else {
+        // Nothing selected: drop a default-sized empty box at the cursor.
+        const worldPos = screenToWorld(camera, lastMouseScreenPos.x, lastMouseScreenPos.y);
+        const box: CommentBox = {
+          id: nextId("comment"),
+          text: "Comment",
+          position: { x: worldPos.x, y: worldPos.y },
+          size: { width: DEFAULT_COMMENT_WIDTH, height: DEFAULT_COMMENT_HEIGHT },
+          containedNodeIds: [],
+          color: DEFAULT_COMMENT_COLOR,
+        };
+        addCommentBox(graph, box);
+        store.state.selectedCommentId = box.id;
+        store.notify();
+      }
     }
   });
 }
