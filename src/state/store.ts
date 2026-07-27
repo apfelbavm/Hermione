@@ -15,6 +15,14 @@ export interface MarqueeSelectionState {
   currentWorld: { x: number; y: number };
 }
 
+/** Whichever Functions/Variables sidebar row was last clicked — drives the Details section at the
+ * bottom of the sidebar (Unreal-style: click an item in a list, its details show below). Distinct
+ * from activeFunctionId/openFunctionTabs (which tab is open on the canvas) — clicking a function's
+ * name does both, but they can diverge (e.g. switching tabs via the graph-tab strip). */
+export type SidebarSelection =
+  | { kind: "variable"; variableId: string }
+  | { kind: "function"; functionId: string };
+
 export interface AppState {
   /** Always the true whole program — what Run/Compile/Save/Load and the Functions/global
    * Variables panels operate on, regardless of what's currently open for editing. */
@@ -32,6 +40,7 @@ export interface AppState {
   firedConnectionIds: Set<string>;
   wireDrag: WireDragState | null;
   marqueeSelection: MarqueeSelectionState | null;
+  sidebarSelection: SidebarSelection | null;
 }
 
 /** The graph currently open for editing on the canvas — the root graph, or a function's body. */

@@ -5,7 +5,6 @@ import { setupCollapsibleSection } from "./collapsibleSection";
 import { VARIABLE_DRAG_MIME } from "./dragTypes";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
-import { createTypeSelect, createTypedValueInput } from "./typedValueInput";
 import { nextAvailableName } from "./uniqueName";
 
 export interface VariablePanelElements {
@@ -17,10 +16,11 @@ export interface VariablePanelElements {
 
 /** Wires up a Variables-style side panel: collapsible, "+" creates a variable with an unused
  * default name and immediately enters rename mode, right-click > Edit renames an existing one.
- * Rows are drag-and-drop sources — dropping one onto the canvas (see main.ts) pops up a Get/Set
- * choice at the drop point instead of a dedicated button here. Generalized over `getGraph` so the
- * same factory drives both the always-visible global Variables panel (bound to the root graph)
- * and the Local Variables panel (bound to whichever function's body is currently open). */
+ * Clicking a row's name selects it (highlighted here, and its type/value shown in the shared
+ * Details section — see detailsPanel.ts). Rows are also drag-and-drop sources — dropping one onto
+ * the canvas (see main.ts) pops up a Get/Set choice at the drop point. Generalized over `getGraph`
+ * so the same factory drives both the always-visible global Variables panel (bound to the root
+ * graph) and the Local Variables panel (bound to whichever function's body is currently open). */
 export function createVariablePanel(
   elements: VariablePanelElements,
   store: Store,
@@ -49,9 +49,11 @@ export function createVariablePanel(
     elements.list.innerHTML = "";
     for (const variable of getGraph().variables) {
       const isEditing = editingId === variable.id;
+      const isSelected =
+        store.state.sidebarSelection?.kind === "variable" && store.state.sidebarSelection.variableId === variable.id;
 
       const row = document.createElement("div");
-      row.className = "variable-row";
+      row.className = "variable-row" + (isSelected ? " variable-row-selected" : "");
       row.draggable = !isEditing;
       row.addEventListener("dragstart", (e) => {
         e.dataTransfer?.setData(VARIABLE_DRAG_MIME, variable.id);
@@ -72,36 +74,36 @@ export function createVariablePanel(
             nameInputToFocus = input;
             return input;
           })()
-        : createEditableNameLabel(variable.name, (screenPos) => {
-            openRowContextMenu(screenPos, [
-              {
-                label: "Edit",
-                onClick: () => {
-                  editingId = variable.id;
-                  store.notify();
+        : (() => {
+            const label = createEditableNameLabel(variable.name, (screenPos) => {
+              openRowContextMenu(screenPos, [
+                {
+                  label: "Edit",
+                  onClick: () => {
+                    editingId = variable.id;
+                    store.notify();
+                  },
                 },
-              },
-            ]);
-          });
-
-      const type = createTypeSelect(variable.type, (type) => {
-        updateVariable(store.state.rootGraph, variable.id, { type });
-        store.notify();
-      });
-
-      const value = createTypedValueInput(variable.type, variable.defaultValue, (defaultValue) => {
-        updateVariable(store.state.rootGraph, variable.id, { defaultValue });
-        store.notify();
-      });
+              ]);
+            });
+            label.addEventListener("click", () => {
+              store.state.sidebarSelection = { kind: "variable", variableId: variable.id };
+              store.notify();
+            });
+            return label;
+          })();
 
       const delBtn = document.createElement("button");
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", () => {
         removeVariable(getGraph(), variable.id);
+        if (store.state.sidebarSelection?.kind === "variable" && store.state.sidebarSelection.variableId === variable.id) {
+          store.state.sidebarSelection = null;
+        }
         store.notify();
       });
 
-      row.append(nameEl, type, value, delBtn);
+      row.append(nameEl, delBtn);
       elements.list.appendChild(row);
       if (nameInputToFocus) focusAndSelect(nameInputToFocus);
     }

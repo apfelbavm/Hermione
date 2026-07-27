@@ -41,8 +41,10 @@ export function createFunctionsPanel(elements: FunctionsPanelElements, store: St
     for (const fn of store.state.rootGraph.functions) {
       const isEditing = editingId === fn.id;
 
+      const isSelected =
+        store.state.sidebarSelection?.kind === "function" && store.state.sidebarSelection.functionId === fn.id;
       const row = document.createElement("div");
-      row.className = "variable-row" + (store.state.activeFunctionId === fn.id ? " function-row-active" : "");
+      row.className = "variable-row" + (isSelected ? " function-row-active" : "");
       row.draggable = !isEditing;
       row.addEventListener("dragstart", (e) => {
         e.dataTransfer?.setData(FUNCTION_DRAG_MIME, fn.id);
@@ -79,6 +81,7 @@ export function createFunctionsPanel(elements: FunctionsPanelElements, store: St
             label.title = "Click to open this function's graph in a tab";
             label.addEventListener("click", () => {
               openFunctionTab(store.state, fn.id);
+              store.state.sidebarSelection = { kind: "function", functionId: fn.id };
               store.notify();
             });
             return label;
@@ -89,6 +92,9 @@ export function createFunctionsPanel(elements: FunctionsPanelElements, store: St
       delBtn.addEventListener("click", () => {
         closeFunctionTab(store.state, fn.id);
         removeFunctionDef(store.state.rootGraph, fn.id);
+        if (store.state.sidebarSelection?.kind === "function" && store.state.sidebarSelection.functionId === fn.id) {
+          store.state.sidebarSelection = null;
+        }
         store.notify();
       });
 

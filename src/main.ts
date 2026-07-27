@@ -25,6 +25,7 @@ import { createCommentOverlay } from "./overlay/commentOverlay";
 import { createVariablePanel } from "./overlay/variablePanel";
 import { createFunctionsPanel } from "./overlay/functionsPanel";
 import { createFunctionIoPanel } from "./overlay/functionIoPanel";
+import { createDetailsPanel } from "./overlay/detailsPanel";
 import { createGraphTabs } from "./overlay/graphTabs";
 import { openNodeSearchMenu } from "./overlay/nodeSearchMenu";
 import { FUNCTION_DRAG_MIME, VARIABLE_DRAG_MIME } from "./overlay/dragTypes";
@@ -58,6 +59,7 @@ const store = createStore({
   firedConnectionIds: new Set(),
   wireDrag: null,
   marqueeSelection: null,
+  sidebarSelection: null,
 });
 
 function resizeCanvas(): void {
@@ -90,6 +92,16 @@ function getActiveFunction(): FunctionDef | null {
   return store.state.rootGraph.functions.find((f) => f.id === id) ?? null;
 }
 
+/** The function currently shown in the Details section — driven by sidebarSelection (whichever
+ * row was last clicked), not activeFunctionId (which tab is open on the canvas). The two usually
+ * agree (clicking a function's name does both) but can diverge, e.g. switching tabs via the
+ * graph-tab strip instead of the Functions list. */
+function getSelectedFunctionForDetails(): FunctionDef | null {
+  const selection = store.state.sidebarSelection;
+  if (selection?.kind !== "function") return null;
+  return store.state.rootGraph.functions.find((f) => f.id === selection.functionId) ?? null;
+}
+
 const functionsPanel = createFunctionsPanel(
   {
     section: document.getElementById("functions-section") as HTMLDivElement,
@@ -110,7 +122,7 @@ const inputsPanel = createFunctionIoPanel(
   store,
   canvas,
   "input",
-  getActiveFunction,
+  getSelectedFunctionForDetails,
 );
 
 const outputsPanel = createFunctionIoPanel(
@@ -124,7 +136,7 @@ const outputsPanel = createFunctionIoPanel(
   store,
   canvas,
   "output",
-  getActiveFunction,
+  getSelectedFunctionForDetails,
 );
 
 const localVariablesSection = document.getElementById("local-variables-section") as HTMLDivElement;
@@ -140,6 +152,17 @@ const localVariablePanel = createVariablePanel(
 );
 
 const graphTabs = createGraphTabs(document.getElementById("graph-tabs") as HTMLDivElement, store);
+
+const detailsPanel = createDetailsPanel(
+  {
+    section: document.getElementById("details-section") as HTMLDivElement,
+    variableContent: document.getElementById("variable-details") as HTMLDivElement,
+    variableNameLabel: document.getElementById("variable-details-name") as HTMLDivElement,
+    variableFieldsContainer: document.getElementById("variable-details-fields") as HTMLDivElement,
+    functionContent: document.getElementById("function-details") as HTMLDivElement,
+  },
+  store,
+);
 
 function render(): void {
   const {
@@ -171,6 +194,7 @@ function render(): void {
   inputsPanel.render();
   outputsPanel.render();
   graphTabs.render();
+  detailsPanel.render();
 
   const activeFn = getActiveFunction();
   localVariablesSection.style.display = activeFn ? "" : "none";
@@ -374,6 +398,7 @@ loadFileInput.addEventListener("change", async () => {
     store.state.rootGraph = graph;
     store.state.activeFunctionId = null;
     store.state.openFunctionTabs = [];
+    store.state.sidebarSelection = null;
     store.state.selectedNodeIds = new Set();
     store.state.selectedCommentId = null;
     store.state.executingNodeId = null;

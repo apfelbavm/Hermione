@@ -150,6 +150,40 @@ html, body {
   border-bottom: 1px solid #33383f;
 }
 
+/* Unreal-style Details section: pinned to the bottom of the sidebar (margin-top: auto pushes it
+ * down when the lists above leave room), separated by a bold top divider, occupying roughly the
+ * bottom third of the panel when there's enough vertical space. Hidden entirely (via JS) when
+ * nothing is selected. */
+#details-section {
+  flex: 0 0 auto;
+  margin-top: auto;
+  min-height: 33%;
+  border-top: 2px solid #454a52;
+  display: flex;
+  flex-direction: column;
+}
+
+.details-header {
+  padding: 10px 12px;
+  font-weight: 600;
+  border-bottom: 1px solid #33383f;
+}
+
+.details-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.details-item-name {
+  padding: 10px 12px 4px;
+  font-weight: 600;
+  color: #e8b339;
+}
+
+#variable-details-fields {
+  padding: 0 6px 6px;
+}
+
 .panel-header {
   display: flex;
   align-items: center;
@@ -246,9 +280,19 @@ html, body {
   cursor: pointer;
 }
 
+.function-row-active {
+  background: #2f4a5e;
+  outline: 1px solid #3b6b8a;
+}
+
 .function-row-active .function-name {
   color: #e8b339;
   font-weight: 600;
+}
+
+.variable-row-selected {
+  background: #2f4a5e;
+  outline: 1px solid #3b6b8a;
 }
 
 .editable-name-label {
