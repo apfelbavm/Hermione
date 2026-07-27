@@ -11,6 +11,33 @@ const CONTAINER_LABELS: Record<PinContainer, string> = {
   map: "Map",
 };
 
+/** Small DOM icon matching the container's canvas pin shape (see drawNodes.ts's drawPinShape) —
+ * a 3x3 grid of quads for Array, the same grid with its middle row's first two quads merged into
+ * one wide quad for Map, and a "{ }" brace pair for Set. "single" has no icon (a plain value has
+ * no container to distinguish). */
+function createContainerIcon(container: PinContainer): HTMLElement | null {
+  if (container === "single") return null;
+
+  if (container === "set") {
+    const braces = document.createElement("span");
+    braces.className = "container-icon-braces";
+    braces.textContent = "{}";
+    return braces;
+  }
+
+  const grid = document.createElement("span");
+  grid.className = "container-icon";
+  const cellCount = container === "map" ? 8 : 9;
+  for (let i = 0; i < cellCount; i++) {
+    const cell = document.createElement("span");
+    cell.className = "container-icon-cell";
+    // The 4th cell appended is the middle row's first cell — merge it into a wide quad for Map.
+    if (container === "map" && i === 3) cell.classList.add("container-icon-cell-wide");
+    grid.appendChild(cell);
+  }
+  return grid;
+}
+
 interface MapEntry {
   key: unknown;
   value: unknown;
@@ -226,7 +253,15 @@ function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinTyp
 }
 
 function openContainerMenu(screenPos: { x: number; y: number }, onPick: (container: PinContainer) => void): void {
-  openPickList(screenPos, PIN_CONTAINER_OPTIONS, (c) => [document.createTextNode(CONTAINER_LABELS[c])], onPick);
+  openPickList(
+    screenPos,
+    PIN_CONTAINER_OPTIONS,
+    (c) => {
+      const icon = createContainerIcon(c);
+      return icon ? [icon, document.createTextNode(CONTAINER_LABELS[c])] : [document.createTextNode(CONTAINER_LABELS[c])];
+    },
+    onPick,
+  );
 }
 
 /** A custom dropdown (not a native <select> — those can't show arbitrary markup per option) for
@@ -264,8 +299,8 @@ export function createTypeSelect(current: PinType, onChange: (type: PinType) => 
 }
 
 /** Sibling of createTypeSelect for picking a variable's/pin's CONTAINER (Single/Array/Set/Map) —
- * same button+flyout shape, plain text options (no color dot — container is orthogonal to type,
- * see PinContainer's own doc comment in engine/types.ts). */
+ * same button+flyout shape. Each option (and the closed button itself) shows the container's icon
+ * — see createContainerIcon — matching the shape drawn on its canvas pins (drawNodes.ts). */
 export function createContainerSelect(current: PinContainer, onChange: (container: PinContainer) => void): HTMLElement {
   const button = document.createElement("button");
   button.type = "button";
@@ -273,9 +308,11 @@ export function createContainerSelect(current: PinContainer, onChange: (containe
 
   function renderButton(container: PinContainer): void {
     button.innerHTML = "";
+    const icon = createContainerIcon(container);
     const caret = document.createElement("span");
     caret.className = "typed-value-type-caret";
     caret.textContent = "▾";
+    if (icon) button.append(icon);
     button.append(document.createTextNode(CONTAINER_LABELS[container]), caret);
   }
   renderButton(current);

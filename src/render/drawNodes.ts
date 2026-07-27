@@ -138,32 +138,64 @@ function drawPinShape(
 
   switch (pin.container) {
     case "array":
-      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      // A 3x3 grid of filled quads with gaps — mirrors the container-select dropdown's icon (see
+      // typedValueInput.ts's createContainerIcon).
+      drawContainerGrid(ctx, x, y, r, false);
       break;
     case "set":
-      // A ring: filled circle at the element's radius, plus a stroked circle just outside it.
-      ctx.beginPath();
-      ctx.arc(x, y, r * 0.7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(x, y, r * 1.15, 0, Math.PI * 2);
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = PIN_COLORS[pin.type];
-      ctx.stroke();
+      drawSetBraces(ctx, x, y, r);
       break;
     case "map":
-      // A diamond (square rotated 45°).
-      ctx.beginPath();
-      ctx.moveTo(x, y - r * 1.2);
-      ctx.lineTo(x + r * 1.2, y);
-      ctx.lineTo(x, y + r * 1.2);
-      ctx.lineTo(x - r * 1.2, y);
-      ctx.closePath();
-      ctx.fill();
+      // Same 3x3 grid as array, but the middle row's first two quads merge into one wide quad
+      // spanning columns 1-2 — visually distinct from a plain Array pin.
+      drawContainerGrid(ctx, x, y, r, true);
       break;
     default:
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
   }
+}
+
+/** Draws a 3x3 grid of filled quads centered at (x, y), each `quad` size apart with a gap between
+ * them. When `mergeMiddleRowLeft` is set (Map pins), the middle row's first two quads merge into
+ * one wide quad spanning columns 1-2 instead of being drawn separately (Array pins never merge). */
+function drawContainerGrid(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  mergeMiddleRowLeft: boolean,
+): void {
+  const quad = r * 0.42;
+  const gap = r * 0.18;
+  const step = quad + gap;
+  const colX = [x - step, x, x + step];
+  const rowY = [y - step, y, y + step];
+
+  for (let row = 0; row < 3; row++) {
+    if (row === 1 && mergeMiddleRowLeft) {
+      const left = colX[0] - quad / 2;
+      const right = colX[1] + quad / 2;
+      ctx.fillRect(left, rowY[1] - quad / 2, right - left, quad);
+      ctx.fillRect(colX[2] - quad / 2, rowY[1] - quad / 2, quad, quad);
+    } else {
+      for (let col = 0; col < 3; col++) {
+        ctx.fillRect(colX[col] - quad / 2, rowY[row] - quad / 2, quad, quad);
+      }
+    }
+  }
+}
+
+/** Draws a "{ }" curly-brace pair centered at (x, y) — the Set pin icon. Restores whatever font
+ * was active beforehand, since drawNodes.ts reuses ctx.font for every subsequent label/pin. */
+function drawSetBraces(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  const savedFont = ctx.font;
+  const savedAlign = ctx.textAlign;
+  ctx.font = `${Math.round(r * 2.4)}px Georgia, serif`;
+  ctx.textAlign = "center";
+  ctx.fillText("{", x - r * 0.55, y);
+  ctx.fillText("}", x + r * 0.55, y);
+  ctx.font = savedFont;
+  ctx.textAlign = savedAlign;
 }

@@ -417,6 +417,35 @@ html, body {
   gap: 6px;
 }
 
+/* Container-type icons (Array/Set/Map) — see typedValueInput.ts's createContainerIcon, matching
+   the shape drawn on their canvas pins in drawNodes.ts's drawPinShape. */
+.container-icon {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1px;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.container-icon-cell {
+  background: currentColor;
+  border-radius: 1px;
+}
+
+.container-icon-cell-wide {
+  grid-column: span 2;
+}
+
+.container-icon-braces {
+  flex: 0 0 auto;
+  font-family: Georgia, serif;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+
 .typed-value-placeholder {
   flex: 0 0 20px;
   text-align: center;
