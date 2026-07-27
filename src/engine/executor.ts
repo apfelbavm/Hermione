@@ -131,48 +131,58 @@ export async function runExecFrom(
     }
     const step = queue.shift()!;
     const node = findNode(ctx.graph, step.nodeId);
-    const def = getNodeDef(node.type);
-    if (!def.execute) {
-      throw new Error(`Node "${node.type}" (${node.id}) has no execute() but is on the exec chain`);
-    }
 
-    await ctx.onNodeStart?.(node.id);
+    let nextExecPins: string[];
 
-    // Cleared per exec-step (not once per run): a variable read must reflect whatever the
-    // most recent Set Variable step wrote, not a value cached from an earlier step. Within
-    // this one step, resolving a diamond-shaped pure subgraph still dedups correctly, since
-    // the cache only clears *between* steps.
-    ctx.tickCache.clear();
-
-    const pinDefs = resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions);
-    const inputs: Record<string, unknown> = {};
-    for (const pinDef of pinDefs) {
-      if (pinDef.direction === "input" && pinDef.type !== "exec") {
-        inputs[pinDef.id] = await resolveDataPin(node.id, pinDef.id, ctx);
+    if (node.disabled) {
+      // Disabled (see NodeInstance.disabled): its own logic never runs — no execute(), no
+      // onNodeStart flash, no data outputs produced — but the exec chain still continues past it,
+      // firing every exec-OUTPUT pin it has (there's no execute() result to tell us which one its
+      // own logic would have picked, e.g. a disabled Branch's condition). For the common case of a
+      // single exec-in/exec-out node this is exactly "skip what it does, keep going."
+      nextExecPins = resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions)
+        .filter((p) => p.direction === "output" && p.type === "exec")
+        .map((p) => p.id);
+    } else {
+      const def = getNodeDef(node.type);
+      if (!def.execute) {
+        throw new Error(`Node "${node.type}" (${node.id}) has no execute() but is on the exec chain`);
       }
-    }
 
-    const result = await def.execute({ node, inputs, ctx });
+      await ctx.onNodeStart?.(node.id);
 
-    // Clear this node's own prior output-pin entries FIRST, then write whatever it produced this
-    // time (possibly nothing) — otherwise a node that produces outputs on one run but not the next
-    // would silently keep serving the earlier run's stale value instead of a clear "not run yet" error.
-    for (const pinDef of pinDefs) {
-      if (pinDef.direction === "output" && pinDef.type !== "exec") {
-        ctx.execOutputs.delete(`${node.id}:${pinDef.id}`);
+      // Cleared per exec-step (not once per run): a variable read must reflect whatever the
+      // most recent Set Variable step wrote, not a value cached from an earlier step. Within
+      // this one step, resolving a diamond-shaped pure subgraph still dedups correctly, since
+      // the cache only clears *between* steps.
+      ctx.tickCache.clear();
+
+      const pinDefs = resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions);
+      const inputs: Record<string, unknown> = {};
+      for (const pinDef of pinDefs) {
+        if (pinDef.direction === "input" && pinDef.type !== "exec") {
+          inputs[pinDef.id] = await resolveDataPin(node.id, pinDef.id, ctx);
+        }
       }
-    }
-    if (result.outputs) {
-      for (const [pinId, value] of Object.entries(result.outputs)) {
-        ctx.execOutputs.set(`${node.id}:${pinId}`, value);
-      }
-    }
 
-    const nextExecPins = result.nextExec
-      ? Array.isArray(result.nextExec)
-        ? result.nextExec
-        : [result.nextExec]
-      : [];
+      const result = await def.execute({ node, inputs, ctx });
+
+      // Clear this node's own prior output-pin entries FIRST, then write whatever it produced this
+      // time (possibly nothing) — otherwise a node that produces outputs on one run but not the next
+      // would silently keep serving the earlier run's stale value instead of a clear "not run yet" error.
+      for (const pinDef of pinDefs) {
+        if (pinDef.direction === "output" && pinDef.type !== "exec") {
+          ctx.execOutputs.delete(`${node.id}:${pinDef.id}`);
+        }
+      }
+      if (result.outputs) {
+        for (const [pinId, value] of Object.entries(result.outputs)) {
+          ctx.execOutputs.set(`${node.id}:${pinId}`, value);
+        }
+      }
+
+      nextExecPins = result.nextExec ? (Array.isArray(result.nextExec) ? result.nextExec : [result.nextExec]) : [];
+    }
 
     for (const execOutPin of nextExecPins) {
       for (const conn of connectionsFrom(ctx.graph, node.id, execOutPin)) {

@@ -106,6 +106,10 @@ export interface NodeInstance {
   variableId?: string;
   /** Binds this node to a FunctionDef — used by function.entry/return/call, sibling to variableId. */
   functionId?: string;
+  /** Toggled via the canvas right-click menu (see graphMutations.ts's canToggleDisabled/
+   * hasConnectedDataOutput) — a disabled node's execute()/compileExecute() is never invoked, by
+   * the interpreter or the compiler, and the exec chain simply doesn't continue past it. */
+  disabled?: boolean;
 }
 
 export interface Connection {

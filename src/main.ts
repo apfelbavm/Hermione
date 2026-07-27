@@ -4,10 +4,13 @@ import { createExecutionContext, runExecFrom } from "./engine/executor";
 import {
   addNode,
   canPlaceNodeType,
+  canToggleDisabled,
   connectPins,
   createNodeInstance,
+  hasConnectedDataOutput,
   removeConnection,
   removeInstancePin,
+  removeNode,
   resolveNodeLabel,
 } from "./engine/graphMutations";
 import { connectionsTouchingPin } from "./engine/graphQueries";
@@ -22,7 +25,7 @@ import type { FunctionDef, NodeDef, Variable } from "./engine/types";
 import { buildDemoGraph } from "./demoGraph";
 import { createCamera, screenToWorld } from "./render/camera";
 import { computeAllNodeGeometries } from "./render/nodeGeometry";
-import { hitTestPin } from "./render/hitTest";
+import { hitTestNode, hitTestPin } from "./render/hitTest";
 import { drawComments } from "./render/drawComments";
 import { drawGrid, snapPositionToGrid } from "./render/drawGrid";
 import { drawNodes } from "./render/drawNodes";
@@ -341,6 +344,40 @@ canvas.addEventListener("contextmenu", (e) => {
       openRowContextMenu({ x: e.clientX, y: e.clientY }, items);
       return;
     }
+  }
+
+  // Right-clicking a node's body (not a pin) offers to delete it, and — for anything that can
+  // actually execute — toggle it disabled/enabled.
+  const nodeHit = hitTestNode(graph, geometries, screenPos.x, screenPos.y);
+  if (nodeHit) {
+    const node = graph.nodes.find((n) => n.id === nodeHit.nodeId)!;
+    const items: ContextMenuItem[] = [
+      {
+        label: "Delete (Del)",
+        onClick: () => {
+          removeNode(graph, variables, functions, node.id);
+          store.notify();
+        },
+      },
+    ];
+
+    if (canToggleDisabled(node, variables, functions)) {
+      const isDisabled = !!node.disabled;
+      // Re-enabling is always allowed; disabling is blocked while something depends on one of this
+      // node's data outputs, since a disabled node's evaluate() never runs to produce it.
+      const blocked = !isDisabled && hasConnectedDataOutput(graph, node.id, variables, functions);
+      items.push({
+        label: isDisabled ? "Enable" : "Disable",
+        disabled: blocked,
+        onClick: () => {
+          node.disabled = !isDisabled;
+          store.notify();
+        },
+      });
+    }
+
+    openRowContextMenu({ x: e.clientX, y: e.clientY }, items);
+    return;
   }
 
   const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);

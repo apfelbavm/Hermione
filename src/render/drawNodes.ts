@@ -45,6 +45,10 @@ export function drawNodes(
     const geo = geometries.get(node.id);
     if (!geo) continue;
 
+    // Dimmed rather than hidden — its wires stay visible too (drawWires.ts doesn't check this),
+    // so it's clear at a glance both that it's disabled and what it would otherwise still connect to.
+    ctx.globalAlpha = node.disabled ? 0.45 : 1;
+
     ctx.beginPath();
     ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom);
     ctx.fillStyle = NODE_BODY_BG;
@@ -109,6 +113,7 @@ export function drawNodes(
     }
   }
   ctx.textAlign = "left";
+  ctx.globalAlpha = 1;
 }
 
 function drawPinShape(

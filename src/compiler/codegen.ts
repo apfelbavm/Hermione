@@ -81,6 +81,26 @@ function compileFrom(
   visiting.add(key);
 
   const node = findNode(graph, nodeId);
+  // Disabled (see NodeInstance.disabled): its own compileExecute never runs — instead, splice in
+  // the compiled statements for EVERY exec-out pin's downstream chain, back to back. Mirrors
+  // runExecFrom firing every exec-out pin for a disabled node (see its own comment for why: there's
+  // no result to tell us which one its logic would have picked, e.g. a disabled Branch), so Run and
+  // Compile never disagree. For the common single exec-in/exec-out node this is just "splice in
+  // whatever comes next, unconditionally."
+  if (node.disabled) {
+    const execOutPins = resolvePinDefs(node, graph.variables, graph.functions)
+      .filter((p) => p.direction === "output" && p.type === "exec")
+      .map((p) => p.id);
+
+    const statements: string[] = [];
+    for (const pinId of execOutPins) {
+      for (const conn of connectionsFrom(graph, node.id, pinId)) {
+        statements.push(...compileFrom(graph, conn.toNode, conn.toPin, visiting, helpers));
+      }
+    }
+    visiting.delete(key);
+    return statements;
+  }
   const def = getNodeDef(node.type);
   if (!def.compileExecute) {
     throw new Error(`Node type "${node.type}" has no compileExecute — cannot compile this graph yet`);

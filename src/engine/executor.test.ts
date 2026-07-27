@@ -236,4 +236,45 @@ describe("executor", () => {
     expect(intoCompareA).toHaveLength(1);
     expect(intoCompareA[0].fromNode).toBe(add2.id);
   });
+
+  it("a disabled node's execute() never runs, but the exec chain still continues past it", async () => {
+    const graph = createEmptyGraph("g11", "test");
+    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const print1 = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print1");
+    const print2 = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "print2");
+    print1.pins.message.value = "first";
+    print2.pins.message.value = "second";
+    print1.disabled = true;
+
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: print1.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: print1.id, fromPin: "exec-out", toNode: print2.id, toPin: "exec-in" });
+
+    const logs: string[] = [];
+    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
+    await runExecFrom(start.id, "exec-out", ctx);
+
+    expect(logs).toEqual(["second"]); // print1 (disabled) is skipped, but print2 downstream still runs
+  });
+
+  it("firing every exec-out pin of a disabled multi-branch node runs every branch, since there's no condition to pick one", async () => {
+    const graph = createEmptyGraph("g13", "test");
+    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const branch = addBuiltinNode(graph, "flow.branch", { x: 100, y: 0 }, "branch");
+    const printTrue = addBuiltinNode(graph, "debug.print", { x: 200, y: -50 }, "printTrue");
+    const printFalse = addBuiltinNode(graph, "debug.print", { x: 200, y: 50 }, "printFalse");
+    printTrue.pins.message.value = "true branch";
+    printFalse.pins.message.value = "false branch";
+    branch.pins.condition.value = true; // irrelevant once disabled — condition is never read
+    branch.disabled = true;
+
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: branch.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "true", toNode: printTrue.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "false", toNode: printFalse.id, toPin: "exec-in" });
+
+    const logs: string[] = [];
+    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
+    await runExecFrom(start.id, "exec-out", ctx);
+
+    expect(logs.sort()).toEqual(["false branch", "true branch"]);
+  });
 });

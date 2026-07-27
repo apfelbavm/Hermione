@@ -225,4 +225,27 @@ describe("compileGraph", () => {
 
     expect(() => compileGraph(graph)).toThrow(/[Cc]yclic exec flow/);
   });
+
+  it("a disabled node compiles to nothing, but the chain still continues past it — matching the interpreter", async () => {
+    const graph = createEmptyGraph("g12", "test");
+    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const print1 = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print1");
+    const print2 = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "print2");
+    print1.pins.message.value = "first";
+    print2.pins.message.value = "second";
+    print1.disabled = true;
+
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: print1.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: print1.id, fromPin: "exec-out", toNode: print2.id, toPin: "exec-in" });
+
+    const { code, manifest } = compileGraph(graph);
+    const compiled = await loadCompiled(code);
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
+
+    const logs: string[] = [];
+    await trigger({ state: createInitialState(), log: (m: string) => logs.push(m) });
+
+    expect(logs).toEqual(["second"]); // print1 (disabled) is skipped, but print2 downstream still runs
+  });
 });

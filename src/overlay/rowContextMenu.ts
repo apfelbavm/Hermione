@@ -1,6 +1,8 @@
 export interface ContextMenuItem {
   label: string;
   onClick: () => void;
+  /** Shown greyed out and unclickable — e.g. "Disable" when the node has a connected data output. */
+  disabled?: boolean;
 }
 
 /** A tiny floating context menu — e.g. "Edit" for a sidebar row, or "Get"/"Set" when a variable is
@@ -15,12 +17,14 @@ export function openRowContextMenu(screenPos: { x: number; y: number }, items: C
 
   for (const item of items) {
     const el = document.createElement("div");
-    el.className = "row-context-menu-item";
+    el.className = "row-context-menu-item" + (item.disabled ? " row-context-menu-item-disabled" : "");
     el.textContent = item.label;
-    el.addEventListener("click", () => {
-      close();
-      item.onClick();
-    });
+    if (!item.disabled) {
+      el.addEventListener("click", () => {
+        close();
+        item.onClick();
+      });
+    }
     menu.appendChild(el);
   }
 

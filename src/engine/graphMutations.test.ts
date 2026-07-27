@@ -3,8 +3,10 @@ import { registerBuiltins } from "../nodes";
 import {
   addVariable,
   canPlaceNodeType,
+  canToggleDisabled,
   connectPins,
   createNodeInstance,
+  hasConnectedDataOutput,
   removeNode,
   removeVariable,
   resolveNodeLabel,
@@ -135,5 +137,53 @@ describe("resolveNodeLabel", () => {
     const node = createNodeInstance("math.add", { x: 0, y: 0 }, addDef.pins, "add");
 
     expect(resolveNodeLabel(node, addDef, [], [])).toBe(addDef.label);
+  });
+});
+
+describe("canToggleDisabled", () => {
+  it("is false for a pure data node with no execution pin at all", () => {
+    const def = getNodeDef("math.add");
+    const node = createNodeInstance("math.add", { x: 0, y: 0 }, def.pins, "add");
+    expect(canToggleDisabled(node, [], [])).toBe(false);
+  });
+
+  it("is true for an ordinary exec-capable node", () => {
+    const def = getNodeDef("debug.print");
+    const node = createNodeInstance("debug.print", { x: 0, y: 0 }, def.pins, "print");
+    expect(canToggleDisabled(node, [], [])).toBe(true);
+  });
+
+  it("is false for an event trigger, even though it has an execution pin", () => {
+    const def = getNodeDef("event.run");
+    const node = createNodeInstance("event.run", { x: 0, y: 0 }, def.pins, "run");
+    expect(canToggleDisabled(node, [], [])).toBe(false);
+  });
+});
+
+describe("hasConnectedDataOutput", () => {
+  it("is false when a node's data output has no connection", () => {
+    const graph = createEmptyGraph("g", "root");
+    const def = getNodeDef("math.add");
+    graph.nodes.push(createNodeInstance("math.add", { x: 0, y: 0 }, def.pins, "add"));
+    expect(hasConnectedDataOutput(graph, "add", [], [])).toBe(false);
+  });
+
+  it("is true once the data output feeds something else", () => {
+    const graph = createEmptyGraph("g", "root");
+    const addDef = getNodeDef("math.add");
+    graph.nodes.push(createNodeInstance("math.add", { x: 0, y: 0 }, addDef.pins, "add1"));
+    graph.nodes.push(createNodeInstance("math.add", { x: 0, y: 0 }, addDef.pins, "add2"));
+    connectPins(graph, [], [], { fromNode: "add1", fromPin: "result", toNode: "add2", toPin: "a" });
+    expect(hasConnectedDataOutput(graph, "add1", [], [])).toBe(true);
+  });
+
+  it("ignores a connection leaving an exec output — only DATA outputs count", () => {
+    const graph = createEmptyGraph("g", "root");
+    const branchDef = getNodeDef("flow.branch");
+    const printDef = getNodeDef("debug.print");
+    graph.nodes.push(createNodeInstance("flow.branch", { x: 0, y: 0 }, branchDef.pins, "branch"));
+    graph.nodes.push(createNodeInstance("debug.print", { x: 0, y: 0 }, printDef.pins, "print"));
+    connectPins(graph, [], [], { fromNode: "branch", fromPin: "true", toNode: "print", toPin: "exec-in" });
+    expect(hasConnectedDataOutput(graph, "branch", [], [])).toBe(false);
   });
 });

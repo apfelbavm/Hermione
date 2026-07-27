@@ -9,7 +9,7 @@ import { hexToRgba } from "./palette";
 
 const BOX_FILL = "rgba(255, 255, 255, 0.04)";
 const SELECTED_BORDER = "#e8b339";
-const COLOR_OPACITY = 0.75;
+const COLOR_OPACITY = 0.5;
 
 export function drawComments(
   ctx: CanvasRenderingContext2D,

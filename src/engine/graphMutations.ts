@@ -105,6 +105,36 @@ export function canPlaceNodeType(type: string, graph: Graph, isFunctionBody: boo
   return !graph.nodes.some((n) => n.type === type);
 }
 
+/** True if this node's canvas right-click menu should offer a Disable/Enable toggle at all — it
+ * must have at least one execution pin (a pure data node has no "code" to skip) and must not be an
+ * event trigger (an entry point always has to be reachable). Whether disabling is CURRENTLY
+ * allowed (vs. greyed out) is a separate question — see hasConnectedDataOutput. */
+export function canToggleDisabled(node: NodeInstance, variables: Variable[], functions: FunctionDef[]): boolean {
+  const def = getNodeDef(node.type);
+  if (def.eventTrigger) return false;
+  return resolvePinDefs(node, variables, functions).some((p) => p.type === "exec");
+}
+
+/** True if any of this node's DATA (non-exec) output pins feeds something else. A node can only be
+ * disabled while this is false — disabling it anyway would silently starve whatever's downstream of
+ * a real value, since a disabled node's execute()/evaluate() never runs. Re-enabling has no such
+ * restriction, so this only gates the "Disable" direction of the toggle, not "Enable". */
+export function hasConnectedDataOutput(
+  graph: Graph,
+  nodeId: string,
+  variables: Variable[],
+  functions: FunctionDef[],
+): boolean {
+  const node = graph.nodes.find((n) => n.id === nodeId);
+  if (!node) return false;
+  const dataOutputIds = new Set(
+    resolvePinDefs(node, variables, functions)
+      .filter((p) => p.direction === "output" && p.type !== "exec")
+      .map((p) => p.id),
+  );
+  return graph.connections.some((c) => c.fromNode === nodeId && dataOutputIds.has(c.fromPin));
+}
+
 /** Entry and Return nodes are structural — a function body must always be able to receive its
  * inputs and produce its outputs, so these two types can never be removed via removeNode (not
  * even by the user's own Delete key). Callers that legitimately clean up OTHER node types bound to

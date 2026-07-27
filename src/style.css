@@ -350,6 +350,15 @@ html, body {
   background: #3b6b8a;
 }
 
+.row-context-menu-item-disabled {
+  color: #6a7078;
+  cursor: default;
+}
+
+.row-context-menu-item-disabled:hover {
+  background: none;
+}
+
 .typed-value-input {
   box-sizing: border-box;
   background: #14161a;
