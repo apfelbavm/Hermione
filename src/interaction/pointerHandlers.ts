@@ -332,6 +332,17 @@ export function setupPointerInteraction(
 
   window.addEventListener("mousemove", (e) => {
     lastMouseScreenPos = screenPos(e);
+
+    // Resize-cursor hover feedback over the comment box's corner handle — shown while just
+    // hovering it (not dragging anything) or throughout an active resize (keeps it consistent for
+    // the whole drag, rather than flickering back to the default cursor mid-resize).
+    if (drag.kind === "none" || drag.kind === "comment-resize") {
+      const hovering =
+        drag.kind === "comment-resize" ||
+        !!hitTestCommentResizeHandle(getEditingGraph(store.state), store.state.camera, lastMouseScreenPos.x, lastMouseScreenPos.y);
+      canvas.style.cursor = hovering ? "nwse-resize" : "";
+    }
+
     if (drag.kind === "none") return;
     const graph = getEditingGraph(store.state);
     const { camera } = store.state;

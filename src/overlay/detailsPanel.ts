@@ -1,6 +1,7 @@
 import { allGraphs, resolveNodeLabel, setPinLiteralValue, updateVariable } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
-import type { NodeInstance, PinDef } from "../engine/types";
+import type { CommentBox, NodeInstance, PinDef } from "../engine/types";
+import { DEFAULT_COMMENT_COLOR } from "../render/commentGeometry";
 import { getEditingGraph, getVisibleVariablesForState, type Store } from "../state/store";
 import { createTypeSelect, createTypedValueInput } from "./typedValueInput";
 
@@ -16,6 +17,10 @@ export interface DetailsPanelElements {
   nodeContent: HTMLElement;
   nodeNameLabel: HTMLElement;
   nodeFieldsContainer: HTMLElement;
+  /** Comment sub-view: a selected comment box's color (its title stays inline-editable on the
+   * canvas itself — see commentOverlay.ts). */
+  commentContent: HTMLElement;
+  commentFieldsContainer: HTMLElement;
   /** Function sub-view: just a visibility toggle — the actual Inputs/Outputs content lives in the
    * pre-existing functionIoPanel instances, relocated into this wrapper in index.html. They
    * already self-hide when their own accessor resolves to null, so nothing else to render here. */
@@ -55,6 +60,30 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
     }
   }
 
+  function renderCommentColor(box: CommentBox): void {
+    if (elements.commentFieldsContainer.contains(document.activeElement)) return;
+
+    elements.commentFieldsContainer.innerHTML = "";
+    const row = document.createElement("div");
+    row.className = "variable-row";
+
+    const label = document.createElement("span");
+    label.className = "variable-name";
+    label.textContent = "Color";
+
+    const colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.className = "comment-color-swatch";
+    colorInput.value = box.color ?? DEFAULT_COMMENT_COLOR;
+    colorInput.addEventListener("input", () => {
+      box.color = colorInput.value;
+      store.notify();
+    });
+
+    row.append(label, colorInput);
+    elements.commentFieldsContainer.appendChild(row);
+  }
+
   function render(): void {
     const selection = store.state.sidebarSelection;
 
@@ -83,12 +112,22 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
       }
     }
 
-    elements.section.style.display = variable || validFunction || selectedNode ? "" : "none";
+    // Same fallthrough rule as selectedNode above — a comment box only takes over once nothing
+    // else claims the panel. selectedNodeIds/selectedCommentId are already mutually exclusive (see
+    // pointerHandlers.ts), so this mainly guards against a stale sidebarSelection.
+    let selectedComment: CommentBox | undefined;
+    if (!variable && !validFunction && !selectedNode && store.state.selectedCommentId) {
+      selectedComment = getEditingGraph(store.state).commentBoxes.find((b) => b.id === store.state.selectedCommentId);
+    }
+
+    elements.section.style.display = variable || validFunction || selectedNode || selectedComment ? "" : "none";
     elements.variableContent.style.display = variable ? "" : "none";
     elements.functionContent.style.display = validFunction ? "" : "none";
     elements.nodeContent.style.display = selectedNode ? "" : "none";
+    elements.commentContent.style.display = selectedComment ? "" : "none";
 
     if (selectedNode && nodeProperties) renderNodeProperties(selectedNode, nodeProperties);
+    if (selectedComment) renderCommentColor(selectedComment);
 
     if (!variable) return;
 

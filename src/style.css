@@ -593,6 +593,10 @@ html, body {
   color: #f0e6c8;
   font-weight: 600;
   padding: 0 4px;
+  overflow: hidden;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.25;
 }
 
 .comment-title:hover,

@@ -89,7 +89,7 @@ function resizeCanvas(): void {
 }
 
 const widgetSync = createWidgetSync(overlay, store);
-const commentOverlay = createCommentOverlay(overlay, store);
+const commentOverlay = createCommentOverlay(overlay, canvas, store);
 const variablePanel = createVariablePanel(
   {
     section: document.getElementById("variables-section") as HTMLDivElement,
@@ -174,6 +174,8 @@ const detailsPanel = createDetailsPanel(
     nodeContent: document.getElementById("node-details") as HTMLDivElement,
     nodeNameLabel: document.getElementById("node-details-name") as HTMLDivElement,
     nodeFieldsContainer: document.getElementById("node-details-fields") as HTMLDivElement,
+    commentContent: document.getElementById("comment-details") as HTMLDivElement,
+    commentFieldsContainer: document.getElementById("comment-details-fields") as HTMLDivElement,
     functionContent: document.getElementById("function-details") as HTMLDivElement,
   },
   store,

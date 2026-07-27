@@ -1,7 +1,10 @@
 import type { CommentBox } from "../engine/types";
 import { worldToScreen, type Camera } from "./camera";
 
-export const COMMENT_HEADER_HEIGHT = 26;
+// Tall enough for a wrapped title to show ~2 lines (see commentOverlay.ts) before clipping —
+// deliberately not dynamic: every render/hit-test/containment call site treats this as one fixed
+// constant, so a title needing more room just means resizing the box, not the header growing on its own.
+export const COMMENT_HEADER_HEIGHT = 36;
 export const COMMENT_RESIZE_HANDLE_SCREEN_SIZE = 14;
 export const COMMENT_MIN_SIZE = 80;
 export const DEFAULT_COMMENT_COLOR = "#ffffff";
