@@ -63,10 +63,16 @@ export function resolvePinDefs(node: NodeInstance, variables: Variable[], functi
   return def.pins;
 }
 
-/** The display label for a node instance — normally its NodeDef's static label, except a
- * function.call node shows the name of the function it's bound to (so the graph reads e.g.
+/** The display label for a node instance — normally its NodeDef's static label, except: a node
+ * bound to a Variable (Get/Set) shows that variable's name (so the graph reads e.g. "Score", not
+ * the generic "Get Variable" — its own pin is left unlabeled since the title already says it), and
+ * a function.call node shows the name of the function it's bound to (so the graph reads e.g.
  * "Double", not the generic "Call Function"), matching how its pins already reflect that function. */
-export function resolveNodeLabel(node: NodeInstance, def: NodeDef, functions: FunctionDef[]): string {
+export function resolveNodeLabel(node: NodeInstance, def: NodeDef, variables: Variable[], functions: FunctionDef[]): string {
+  if (node.variableId) {
+    const variable = variables.find((v) => v.id === node.variableId);
+    if (variable) return variable.name;
+  }
   if (node.type === "function.call" && node.functionId) {
     const fn = functions.find((f) => f.id === node.functionId);
     if (fn) return fn.name;

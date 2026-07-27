@@ -271,6 +271,13 @@ html, body {
   background: #1c1f24;
 }
 
+.variable-type-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
 .variable-row .variable-name {
   flex: 1 1 auto;
   overflow: hidden;

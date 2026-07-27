@@ -1,5 +1,6 @@
 import { addVariable, DEFAULT_VALUE_BY_TYPE, getVisibleVariables, nextId, removeVariable, updateVariable } from "../engine/graphMutations";
 import type { Graph, PinType, Variable } from "../engine/types";
+import { PIN_COLORS } from "../render/palette";
 import type { Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
 import { VARIABLE_DRAG_MIME } from "./dragTypes";
@@ -60,6 +61,12 @@ export function createVariablePanel(
         if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
       });
 
+      // Same color its pin/node header would use on the canvas — a quick visual cue for the type.
+      const typeDot = document.createElement("span");
+      typeDot.className = "variable-type-dot";
+      typeDot.style.backgroundColor = PIN_COLORS[variable.type];
+      typeDot.title = variable.type;
+
       let nameInputToFocus: HTMLInputElement | null = null;
       const nameEl = isEditing
         ? (() => {
@@ -104,7 +111,7 @@ export function createVariablePanel(
         store.notify();
       });
 
-      row.append(nameEl, delBtn);
+      row.append(typeDot, nameEl, delBtn);
       elements.list.appendChild(row);
       if (nameInputToFocus) focusAndSelect(nameInputToFocus);
     }

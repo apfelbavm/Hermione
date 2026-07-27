@@ -25,9 +25,8 @@ registerNode({
   label: "Get Variable",
   group: "Variables",
   pins: [], // real pins are derived per-instance from the bound Variable via derivePins
-  derivePins: (variable) => [
-    { id: "value", label: variable.name, type: variable.type, direction: "output" },
-  ],
+  // Unlabeled — the node's own title already shows the variable's name (see resolveNodeLabel).
+  derivePins: (variable) => [{ id: "value", label: "", type: variable.type, direction: "output" }],
   evaluate: ({ node, ctx }) => ({
     value: node.variableId ? getVariableValue(ctx, node.variableId) : undefined,
   }),
@@ -41,9 +40,10 @@ registerNode({
   label: "Set Variable",
   group: "Variables",
   pins: [],
+  // "value" is unlabeled too — the node's own title already shows the variable's name.
   derivePins: (variable) => [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "value", label: variable.name, type: variable.type, direction: "input", defaultValue: variable.defaultValue },
+    { id: "value", label: "", type: variable.type, direction: "input", defaultValue: variable.defaultValue },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
   execute: ({ node, inputs, ctx }) => {

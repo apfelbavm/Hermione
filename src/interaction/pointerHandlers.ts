@@ -120,7 +120,7 @@ function recomputeContainment(graph: Graph, variables: Variable[], functions: Fu
     height: box.size.height - COMMENT_HEADER_HEIGHT,
   };
   box.containedNodeIds = graph.nodes
-    .filter((n) => rectContains(innerBounds, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), functions)))
+    .filter((n) => rectContains(innerBounds, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), variables, functions)))
     .map((n) => n.id);
 }
 
@@ -483,7 +483,7 @@ export function setupPointerInteraction(
           height: Math.abs(marquee.currentWorld.y - marquee.startWorld.y),
         };
         const touched = graph.nodes.filter((n) =>
-          rectIntersects(box, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), functions)),
+          rectIntersects(box, computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), variables, functions)),
         );
         store.state.selectedNodeIds = new Set(touched.map((n) => n.id));
       }
@@ -596,7 +596,7 @@ export function setupPointerInteraction(
         const rects = [...selectedNodeIds]
           .map((id) => graph.nodes.find((n) => n.id === id))
           .filter((n): n is NonNullable<typeof n> => !!n)
-          .map((n) => computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), functions));
+          .map((n) => computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), variables, functions));
 
         const minX = Math.min(...rects.map((r) => r.x));
         const minY = Math.min(...rects.map((r) => r.y));

@@ -1,6 +1,6 @@
 import { resolveNodeLabel } from "../engine/graphMutations";
 import { getNodeDef, topLevelGroup } from "../engine/registry";
-import type { FunctionDef, Graph } from "../engine/types";
+import type { FunctionDef, Graph, NodeDef, NodeInstance, PinType, Variable } from "../engine/types";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
 import { NODE_HEADER_HEIGHT, PIN_RADIUS } from "./layout";
@@ -14,7 +14,17 @@ import {
   TEXT_MUTED,
   TEXT_PRIMARY,
 } from "./palette";
-import type { PinType } from "../engine/types";
+
+/** A node bound to a Variable (Get/Set) is colored by that variable's TYPE (the same color its pin
+ * would be) instead of the generic "Variables" group color — so at a glance, a graph full of
+ * getters/setters reads by what KIND of data they move, not just that they're variable nodes. */
+function resolveNodeHeaderColor(node: NodeInstance, def: NodeDef, variables: Variable[]): string {
+  if (node.variableId) {
+    const variable = variables.find((v) => v.id === node.variableId);
+    if (variable) return PIN_COLORS[variable.type];
+  }
+  return NODE_HEADER_BG[topLevelGroup(def.group)] ?? NODE_HEADER_DEFAULT;
+}
 
 export function drawNodes(
   ctx: CanvasRenderingContext2D,
@@ -23,6 +33,7 @@ export function drawNodes(
   geometries: ReadonlyMap<string, NodeScreenGeometry>,
   selectedNodeIds: ReadonlySet<string>,
   executingNodeId: string | null,
+  variables: Variable[],
   functions: FunctionDef[],
 ): void {
   // Text scales with zoom too — a camera zooming over world-space content, same as everything else.
@@ -47,7 +58,7 @@ export function drawNodes(
       0,
       0,
     ]);
-    ctx.fillStyle = NODE_HEADER_BG[topLevelGroup(def.group)] ?? NODE_HEADER_DEFAULT;
+    ctx.fillStyle = resolveNodeHeaderColor(node, def, variables);
     ctx.fill();
 
     const isExecuting = executingNodeId === node.id;
@@ -64,7 +75,7 @@ export function drawNodes(
     ctx.fillStyle = TEXT_PRIMARY;
     ctx.textAlign = "left";
     ctx.fillText(
-      resolveNodeLabel(node, def, functions),
+      resolveNodeLabel(node, def, variables, functions),
       geo.screenX + 10 * camera.zoom,
       geo.screenY + headerHeight / 2,
     );

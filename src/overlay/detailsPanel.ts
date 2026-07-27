@@ -1,7 +1,7 @@
 import { allGraphs, resolveNodeLabel, setPinLiteralValue, updateVariable } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import type { NodeInstance, PinDef } from "../engine/types";
-import { getEditingGraph, type Store } from "../state/store";
+import { getEditingGraph, getVisibleVariablesForState, type Store } from "../state/store";
 import { createTypeSelect, createTypedValueInput } from "./typedValueInput";
 
 export interface DetailsPanelElements {
@@ -32,7 +32,7 @@ export interface DetailsPanelElements {
 export function createDetailsPanel(elements: DetailsPanelElements, store: Store): { render: () => void } {
   function renderNodeProperties(node: NodeInstance, properties: PinDef[]): void {
     const def = getNodeDef(node.type);
-    elements.nodeNameLabel.textContent = resolveNodeLabel(node, def, store.state.rootGraph.functions);
+    elements.nodeNameLabel.textContent = resolveNodeLabel(node, def, getVisibleVariablesForState(store.state), store.state.rootGraph.functions);
     // Don't wipe the fields while the user is actively editing one of them.
     if (elements.nodeFieldsContainer.contains(document.activeElement)) return;
 

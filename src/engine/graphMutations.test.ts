@@ -1,6 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../nodes";
-import { addVariable, canPlaceNodeType, connectPins, createNodeInstance, removeNode, removeVariable } from "./graphMutations";
+import {
+  addVariable,
+  canPlaceNodeType,
+  connectPins,
+  createNodeInstance,
+  removeNode,
+  removeVariable,
+  resolveNodeLabel,
+} from "./graphMutations";
 import { getNodeDef } from "./registry";
 import { createEmptyGraph, type Variable } from "./types";
 
@@ -103,5 +111,29 @@ describe("removeVariable", () => {
     // value would stay stuck at undefined (surfacing as "null") instead of falling back to a real default.
     expect(addNode.pins.a.connectionId).toBeUndefined();
     expect(addNode.pins.a.value).toBe(0);
+  });
+});
+
+describe("resolveNodeLabel", () => {
+  it("shows the bound variable's name for a Get/Set node instead of the generic def label", () => {
+    const variable: Variable = { id: "v1", name: "Score", type: "number", defaultValue: 0 };
+    const getDef = getNodeDef("variable.get");
+    const node = createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
+
+    expect(resolveNodeLabel(node, getDef, [variable], [])).toBe("Score");
+  });
+
+  it("falls back to the def's generic label when the bound variable can't be found", () => {
+    const getDef = getNodeDef("variable.get");
+    const node = createNodeInstance("variable.get", { x: 0, y: 0 }, [], "get", "missing-variable-id");
+
+    expect(resolveNodeLabel(node, getDef, [], [])).toBe("Get Variable");
+  });
+
+  it("has no effect on ordinary node types", () => {
+    const addDef = getNodeDef("math.add");
+    const node = createNodeInstance("math.add", { x: 0, y: 0 }, addDef.pins, "add");
+
+    expect(resolveNodeLabel(node, addDef, [], [])).toBe(addDef.label);
   });
 });

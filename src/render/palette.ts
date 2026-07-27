@@ -3,7 +3,7 @@ import type { PinType } from "../engine/types";
 export const PIN_COLORS: Record<PinType, string> = {
   exec: "#f2f2f2",
   boolean: "#a5322f",
-  number: "#5db85c",
+  number: "#3b8a5c",
   string: "#c542a0",
   object: "#4f9bd6",
 };

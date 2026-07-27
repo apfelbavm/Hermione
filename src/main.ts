@@ -197,7 +197,7 @@ function render(): void {
   const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
   drawWires(ctx, graph, camera, geometries, firedConnectionIds, variables, functions);
   if (wireDrag) drawWireDragPreview(ctx, wireDrag);
-  drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, functions);
+  drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, variables, functions);
   if (marqueeSelection) drawMarqueeSelection(ctx, camera, marqueeSelection);
   widgetSync.sync(geometries);
   commentOverlay.sync();
@@ -325,7 +325,7 @@ canvas.addEventListener("contextmenu", (e) => {
     for (const conn of touching) {
       const otherIsFromEnd = conn.toNode === pinHit.nodeId && conn.toPin === pinHit.pinId;
       const otherNode = graph.nodes.find((n) => n.id === (otherIsFromEnd ? conn.fromNode : conn.toNode));
-      const otherLabel = otherNode ? resolveNodeLabel(otherNode, getNodeDef(otherNode.type), functions) : "?";
+      const otherLabel = otherNode ? resolveNodeLabel(otherNode, getNodeDef(otherNode.type), variables, functions) : "?";
       items.push({
         // Only distinguish by destination when there's more than one to choose between (a fanned-out
         // data output, or an exec input converging several branches) — otherwise it's unambiguous.

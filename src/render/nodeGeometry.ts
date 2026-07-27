@@ -49,14 +49,14 @@ export function computeNodeScreenGeometry(
 }
 
 /** A node's bounding box in world units (independent of camera) — used for comment-box containment tests. */
-export function computeNodeWorldRect(node: NodeInstance, pinDefs: PinDef[], functions: FunctionDef[]): {
+export function computeNodeWorldRect(node: NodeInstance, pinDefs: PinDef[], variables: Variable[], functions: FunctionDef[]): {
   x: number;
   y: number;
   width: number;
   height: number;
 } {
   const def = getNodeDef(node.type);
-  const layout = computeNodeLayout(resolveNodeLabel(node, def, functions), pinDefs, {
+  const layout = computeNodeLayout(resolveNodeLabel(node, def, variables, functions), pinDefs, {
     showAddButton: !!def.addInstancePinEntry,
   });
   return { x: node.position.x, y: node.position.y, width: layout.width, height: layout.height };
@@ -77,7 +77,7 @@ export function computeAllNodeGeometries(
     const pinDefs = resolvePinDefs(node, variables, functions);
     map.set(
       node.id,
-      computeNodeScreenGeometry(node, resolveNodeLabel(node, def, functions), pinDefs, camera, !!def.addInstancePinEntry),
+      computeNodeScreenGeometry(node, resolveNodeLabel(node, def, variables, functions), pinDefs, camera, !!def.addInstancePinEntry),
     );
   }
   return map;
