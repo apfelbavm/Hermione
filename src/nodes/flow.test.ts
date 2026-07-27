@@ -68,14 +68,14 @@ describe("flow.forLoop", () => {
     expect(logs).toEqual(["Done"]);
   });
 
-  it("truncates non-integer start/end toward zero", async () => {
+  it("rounds a non-integer start/end to the nearest whole number", async () => {
     const { graph } = buildLoopGraph(0.9, 3.2);
     const logs: string[] = [];
     const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
 
     await runExecFrom("loop", "exec-in", ctx);
 
-    expect(logs).toEqual(["0", "1", "2", "Done"]); // start truncates to 0, end to 3
+    expect(logs).toEqual(["1", "2", "Done"]); // start rounds to 1, end to 3
   });
 
   it("throws instead of hanging when the range would exceed the iteration cap", async () => {

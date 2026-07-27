@@ -12,6 +12,10 @@ export interface PinDef {
    * canvas's right-click "Delete" menu (see removeInstancePin) — e.g. one of Append String's
    * string slots, but never its fixed output pin. */
   removable?: boolean;
+  /** A "number" pin whose literal value is always rounded to the nearest whole number — e.g. For
+   * Loop's Start/End (see widgetSync.ts). Wiring is unaffected: it stays type "number" so it can
+   * still connect to/from any other number pin, this only governs the canvas literal-input widget. */
+  integer?: boolean;
 }
 
 export interface ExecuteResult {

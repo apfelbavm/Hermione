@@ -36,7 +36,7 @@ registerNode({
 
 registerNode({
   type: "math.multiply",
-  label: "Multiply",
+  label: "Multiply (*)",
   group: "Math.Arithmetic",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },

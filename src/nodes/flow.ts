@@ -13,7 +13,13 @@ registerNode({
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "duration", label: "Duration (ms)", type: "number", direction: "input", defaultValue: 500 },
+    {
+      id: "duration",
+      label: "Duration (ms)",
+      type: "number",
+      direction: "input",
+      defaultValue: 500,
+    },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
   execute: async ({ inputs }) => {
@@ -33,7 +39,13 @@ registerNode({
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "condition", label: "Condition", type: "boolean", direction: "input", defaultValue: false },
+    {
+      id: "condition",
+      label: "Condition",
+      type: "boolean",
+      direction: "input",
+      defaultValue: false,
+    },
     { id: "true", label: "True", type: "exec", direction: "output" },
     { id: "false", label: "False", type: "exec", direction: "output" },
   ],
@@ -57,8 +69,22 @@ registerNode({
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "start", label: "Start", type: "number", direction: "input", defaultValue: 0 },
-    { id: "end", label: "End", type: "number", direction: "input", defaultValue: 0 },
+    {
+      id: "start",
+      label: "Start",
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+      integer: true,
+    },
+    {
+      id: "end",
+      label: "End",
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+      integer: true,
+    },
     { id: "loop-body", label: "Loop Body", type: "exec", direction: "output" },
     { id: "index", label: "Index", type: "number", direction: "output" },
     { id: "completed", label: "Completed", type: "exec", direction: "output" },
@@ -70,16 +96,19 @@ registerNode({
   // ctx.execOutputs before each iteration's body runs, so anything wired to Loop Body can read it
   // via the normal input-pin resolution machinery.
   execute: async ({ node, inputs, ctx }) => {
-    const start = Math.trunc(Number(inputs.start ?? 0));
-    const end = Math.trunc(Number(inputs.end ?? 0));
-    if (end - start > MAX_FOR_LOOP_ITERATIONS) {
+    // Rounded here too (not just at the literal-input widget, see PinDef.integer) since a wired
+    // Start/End can come from any number-producing node, not only a literal the user typed.
+    const start = Math.round(Number(inputs.start ?? 0));
+    const end = Math.round(Number(inputs.end ?? 0));
+
+    if (end - start + 1 > MAX_FOR_LOOP_ITERATIONS) {
       throw new Error(
-        `For Loop (${node.id}) would run ${end - start} iterations, over the ${MAX_FOR_LOOP_ITERATIONS} limit — check its Start/End.`,
+        `For Loop (${node.id}) would run ${end - start + 1} iterations, over the ${MAX_FOR_LOOP_ITERATIONS} limit — check its Start/End.`,
       );
     }
 
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
-    for (let i = start; i < end; i++) {
+    for (let i = start; i <= end; i++) {
       ctx.execOutputs.set(`${node.id}:index`, i);
       for (const conn of bodyTargets) {
         await runExecFrom(conn.toNode, conn.toPin, ctx);

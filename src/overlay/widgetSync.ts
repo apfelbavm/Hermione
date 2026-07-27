@@ -40,14 +40,14 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
 
         let entry = widgets.get(key);
         if (!entry) {
-          entry = createWidgetEntry(pinDef.type, node.id, pinDef.id, store);
+          entry = createWidgetEntry(pinDef, node.id, pinDef.id, store);
           widgets.set(key, entry);
           overlay.appendChild(entry.el);
         }
 
         positionWidget(entry.el, geo.pinScreen[pinDef.id], pinDef, camera);
         if (document.activeElement !== entry.el) {
-          setWidgetDisplayValue(entry.el, pinDef.type, pin?.value);
+          setWidgetDisplayValue(entry.el, pinDef, pin?.value);
         }
       }
     }
@@ -63,27 +63,40 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
   return { sync };
 }
 
-function createWidgetEntry(type: PinType, nodeId: string, pinId: string, store: Store): WidgetEntry {
+function createWidgetEntry(pinDef: PinDef, nodeId: string, pinId: string, store: Store): WidgetEntry {
+  const type = pinDef.type;
   const el = document.createElement("input");
   el.className = "pin-widget";
   el.type = type === "boolean" ? "checkbox" : type === "number" ? "number" : "text";
   el.autocomplete = "off";
+  if (pinDef.integer) el.step = "1";
 
-  const commit = () => {
-    const value = type === "boolean" ? el.checked : type === "number" ? Number(el.value) : el.value;
+  // On every keystroke ("input") the graph's own value always rounds immediately if this is an
+  // integer pin — but the textbox itself is only corrected once the user's done editing ("change",
+  // i.e. blur/Enter): rewriting it mid-keystroke would fight typing a decimal at all (e.g. the "."
+  // in "2.7" would be stripped the instant it's typed, before the "7" ever lands).
+  const commit = (redisplay: boolean) => {
+    let value: unknown;
+    if (type === "boolean") value = el.checked;
+    else if (type === "number") value = pinDef.integer ? Math.round(Number(el.value)) : Number(el.value);
+    else value = el.value;
+
     setPinLiteralValue(getEditingGraph(store.state), nodeId, pinId, value);
+    if (redisplay && type === "number" && pinDef.integer) el.value = String(value);
     store.notify();
   };
-  el.addEventListener("change", commit);
-  if (type !== "boolean") el.addEventListener("input", commit);
+  el.addEventListener("change", () => commit(true));
+  if (type !== "boolean") el.addEventListener("input", () => commit(false));
   el.addEventListener("mousedown", (e) => e.stopPropagation());
 
   return { el };
 }
 
-function setWidgetDisplayValue(el: HTMLInputElement, type: PinType, value: unknown): void {
-  if (type === "boolean") {
+function setWidgetDisplayValue(el: HTMLInputElement, pinDef: PinDef, value: unknown): void {
+  if (pinDef.type === "boolean") {
     el.checked = Boolean(value);
+  } else if (pinDef.type === "number" && pinDef.integer && typeof value === "number") {
+    el.value = String(Math.round(value));
   } else {
     el.value = value == null ? "" : String(value);
   }
