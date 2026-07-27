@@ -43,3 +43,9 @@ export function findCompatibleNodeDefs(
     ),
   );
 }
+
+/** The first segment of a dot-separated group path, e.g. "Math" for "Math.Comparison" — used
+ * wherever a nested subgroup should still behave like its parent (header color, filtering). */
+export function topLevelGroup(group: string): string {
+  return group.split(".")[0] ?? group;
+}

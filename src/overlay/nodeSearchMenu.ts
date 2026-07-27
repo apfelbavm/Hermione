@@ -1,4 +1,5 @@
 import type { NodeDef } from "../engine/types";
+import { allGroupPaths, buildMenuTree, flattenVisible, type MenuNode, type VisibleRow } from "./nodeMenuTree";
 
 export interface NodeSearchMenuOptions {
   screenPos: { x: number; y: number };
@@ -7,7 +8,9 @@ export interface NodeSearchMenuOptions {
   onCancel: () => void;
 }
 
-/** A filtered, keyboard-navigable node-creation popup — the "drag off a pin, get compatible nodes" menu. */
+/** A filtered, keyboard-navigable node-creation popup — the "drag off a pin, get compatible nodes" menu.
+ * With no search text, shows the full group tree (sorted, groups expanded by default); typing a query
+ * flattens to a plain sorted-by-label list matched against label or group path. */
 export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOptions): void {
   const menu = document.createElement("div");
   menu.className = "node-search-menu";
@@ -24,39 +27,84 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
   list.className = "node-search-list";
   menu.appendChild(list);
 
-  let filtered = opts.candidates;
+  const tree = buildMenuTree(opts.candidates);
+  const expanded = new Set(allGroupPaths(tree));
+
+  let treeRows: VisibleRow[] = flattenVisible(tree, expanded);
+  let flatDefs: NodeDef[] = [];
+  let query = "";
   let highlighted = 0;
   let closed = false;
 
+  function currentRowCount(): number {
+    return query ? flatDefs.length : treeRows.length;
+  }
+
   function renderList(): void {
     list.innerHTML = "";
-    if (filtered.length === 0) {
-      const empty = document.createElement("li");
-      empty.className = "node-search-empty";
-      empty.textContent = "No matching nodes";
-      list.appendChild(empty);
+
+    if (query) {
+      if (flatDefs.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "node-search-empty";
+        empty.textContent = "No matching nodes";
+        list.appendChild(empty);
+        return;
+      }
+      flatDefs.forEach((def, i) => {
+        const li = document.createElement("li");
+        li.textContent = def.label;
+        li.title = def.group;
+        if (i === highlighted) li.classList.add("highlighted");
+        li.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          pick(def);
+        });
+        list.appendChild(li);
+      });
       return;
     }
-    filtered.forEach((def, i) => {
+
+    treeRows.forEach((row, i) => {
       const li = document.createElement("li");
-      li.textContent = def.label;
-      li.title = def.category;
+      li.style.paddingLeft = `${8 + row.depth * 14}px`;
       if (i === highlighted) li.classList.add("highlighted");
-      li.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        pick(def);
-      });
+
+      if (row.node.kind === "group") {
+        li.className = "node-search-group";
+        li.textContent = `${expanded.has(row.node.path) ? "▾" : "▸"} ${row.node.name}`;
+        li.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          toggleGroup(row.node as MenuNode & { kind: "group" });
+        });
+      } else {
+        const def = row.node.def;
+        li.textContent = def.label;
+        li.title = def.group;
+        li.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          pick(def);
+        });
+      }
       list.appendChild(li);
     });
   }
 
+  function toggleGroup(group: Extract<MenuNode, { kind: "group" }>): void {
+    if (expanded.has(group.path)) expanded.delete(group.path);
+    else expanded.add(group.path);
+    treeRows = flattenVisible(tree, expanded);
+    highlighted = Math.min(highlighted, Math.max(0, treeRows.length - 1));
+    renderList();
+  }
+
   function applyFilter(): void {
-    const q = input.value.trim().toLowerCase();
-    filtered = q
-      ? opts.candidates.filter(
-          (d) => d.label.toLowerCase().includes(q) || d.category.toLowerCase().includes(q),
-        )
-      : opts.candidates;
+    query = input.value.trim().toLowerCase();
+    if (query) {
+      flatDefs = opts.candidates
+        .filter((d) => d.label.toLowerCase().includes(query) || d.group.toLowerCase().includes(query))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    }
     highlighted = 0;
     renderList();
   }
@@ -82,7 +130,7 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
 
   input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowDown") {
-      highlighted = Math.min(highlighted + 1, filtered.length - 1);
+      highlighted = Math.min(highlighted + 1, currentRowCount() - 1);
       renderList();
       e.preventDefault();
     } else if (e.key === "ArrowUp") {
@@ -90,7 +138,13 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
       renderList();
       e.preventDefault();
     } else if (e.key === "Enter") {
-      if (filtered[highlighted]) pick(filtered[highlighted]);
+      if (query) {
+        if (flatDefs[highlighted]) pick(flatDefs[highlighted]);
+      } else {
+        const row = treeRows[highlighted];
+        if (row?.node.kind === "leaf") pick(row.node.def);
+        else if (row?.node.kind === "group") toggleGroup(row.node);
+      }
       e.preventDefault();
     } else if (e.key === "Escape") {
       close();
@@ -102,7 +156,7 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
   input.addEventListener("input", applyFilter);
 
   overlay.appendChild(menu);
-  applyFilter();
+  renderList();
   input.focus();
 
   // Defer the outside-click closer so the mouseup that triggered this menu doesn't immediately close it.

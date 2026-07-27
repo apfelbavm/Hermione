@@ -8,7 +8,7 @@ function wait(ms: number): Promise<void> {
 registerNode({
   type: "action.sendEmailMock",
   label: "Send Email (mock)",
-  category: "Actions",
+  group: "Actions",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "to", label: "To", type: "string", direction: "input", defaultValue: "" },

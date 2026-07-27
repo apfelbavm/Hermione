@@ -8,7 +8,7 @@ function nameOf(node: { pins: Record<string, { value?: unknown }> }, fallback: s
 registerNode({
   type: "event.start",
   label: "On Start",
-  category: "Events",
+  group: "Events",
   pins: [
     { id: "name", label: "Name", type: "string", direction: "input", defaultValue: "Start" },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
@@ -23,7 +23,7 @@ registerNode({
 registerNode({
   type: "event.interval",
   label: "On Interval",
-  category: "Events",
+  group: "Events",
   pins: [
     { id: "name", label: "Name", type: "string", direction: "input", defaultValue: "Interval" },
     { id: "intervalMs", label: "Interval (ms)", type: "number", direction: "input", defaultValue: 5000 },

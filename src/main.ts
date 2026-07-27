@@ -2,7 +2,13 @@ import "./style.css";
 import { registerBuiltins } from "./nodes";
 import { createExecutionContext, runExecFrom } from "./engine/executor";
 import { addNode, connectPins, createNodeInstance } from "./engine/graphMutations";
-import { allNodeDefs, findCompatibleNodeDefs, getNodeDef, isPinTypeCompatible } from "./engine/registry";
+import {
+  allNodeDefs,
+  findCompatibleNodeDefs,
+  getNodeDef,
+  isPinTypeCompatible,
+  topLevelGroup,
+} from "./engine/registry";
 import type { NodeDef } from "./engine/types";
 import { buildDemoGraph } from "./demoGraph";
 import { createCamera, screenToWorld } from "./render/camera";
@@ -148,7 +154,7 @@ canvas.addEventListener("contextmenu", (e) => {
   openNodeSearchMenu(overlay, {
     screenPos,
     // Get/Set Variable nodes need a variable bound via the Variables panel — not generically creatable here.
-    candidates: allNodeDefs().filter((def) => def.category !== "Variables"),
+    candidates: allNodeDefs().filter((def) => topLevelGroup(def.group) !== "Variables"),
     onPick: (def) => createNodeAndMaybeConnect(def, worldPos),
     onCancel: () => {},
   });

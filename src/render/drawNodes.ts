@@ -1,4 +1,4 @@
-import { getNodeDef } from "../engine/registry";
+import { getNodeDef, topLevelGroup } from "../engine/registry";
 import type { Graph } from "../engine/types";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
@@ -45,7 +45,7 @@ export function drawNodes(
       0,
       0,
     ]);
-    ctx.fillStyle = NODE_HEADER_BG[def.category] ?? NODE_HEADER_DEFAULT;
+    ctx.fillStyle = NODE_HEADER_BG[topLevelGroup(def.group)] ?? NODE_HEADER_DEFAULT;
     ctx.fill();
 
     const isExecuting = executingNodeId === node.id;

@@ -49,7 +49,8 @@ export interface EventTrigger {
 export interface NodeDef {
   type: string;
   label: string;
-  category: string;
+  /** Where this node appears in the node-creation menu, e.g. "Math" or "Math.Comparison" for a nested subgroup. */
+  group: string;
   pins: PinDef[];
   execute?: (args: ExecuteArgs) => Promise<ExecuteResult> | ExecuteResult;
   evaluate?: (

@@ -7,7 +7,7 @@ function variableName(graph: { variables: { id: string; name: string }[] }, vari
 registerNode({
   type: "variable.get",
   label: "Get Variable",
-  category: "Variables",
+  group: "Variables",
   pins: [], // real pins are derived per-instance from the bound Variable via derivePins
   derivePins: (variable) => [
     { id: "value", label: variable.name, type: variable.type, direction: "output" },
@@ -23,7 +23,7 @@ registerNode({
 registerNode({
   type: "variable.set",
   label: "Set Variable",
-  category: "Variables",
+  group: "Variables",
   pins: [],
   derivePins: (variable) => [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

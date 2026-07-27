@@ -8,7 +8,7 @@ function wait(ms: number): Promise<void> {
 registerNode({
   type: "flow.delay",
   label: "Delay",
-  category: "Flow Control",
+  group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "duration", label: "Duration (ms)", type: "number", direction: "input", defaultValue: 500 },
@@ -28,7 +28,7 @@ registerNode({
 registerNode({
   type: "flow.branch",
   label: "Branch",
-  category: "Flow Control",
+  group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "condition", label: "Condition", type: "boolean", direction: "input", defaultValue: false },

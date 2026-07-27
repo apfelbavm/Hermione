@@ -273,6 +273,11 @@ html, body {
   background: none !important;
 }
 
+.node-search-group {
+  font-weight: 600;
+  color: #b8bec7;
+}
+
 .comment-title {
   box-sizing: border-box;
   background: transparent;
