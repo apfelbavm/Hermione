@@ -128,15 +128,23 @@ function createContainerListInput(
         const entryObj: MapEntry = isMapEntry(entry)
           ? entry
           : { key: DEFAULT_VALUE_BY_TYPE[keyType], value: DEFAULT_VALUE_BY_TYPE[type] };
+        // Reads entries[index] fresh at commit time (not the entryObj snapshot captured above) —
+        // editing this row's key then its value never re-renders in between (only Set dedupes
+        // trigger a re-render on edit), so committing off the stale entryObj would silently
+        // discard whichever field was edited first, resetting it back to its pre-edit value.
+        const currentEntry = (): MapEntry => (isMapEntry(entries[index]) ? entries[index] : entryObj);
         const keyInput = createScalarInput(keyType, entryObj.key, (k) => {
-          entries[index] = { key: k, value: entryObj.value };
+          entries[index] = { key: k, value: currentEntry().value };
           commit();
         });
         const valueInput = createScalarInput(type, entryObj.value, (v) => {
-          entries[index] = { key: entryObj.key, value: v };
+          entries[index] = { key: currentEntry().key, value: v };
           commit();
         });
-        row.append(keyInput, valueInput);
+        // Value field first, then Key field — matches the Details panel's own header row order
+        // for a map variable (Type/value-type select, then Container, then Key Type select last),
+        // so the entry list reads left-to-right consistently with the controls above it.
+        row.append(valueInput, keyInput);
       } else {
         const elInput = createScalarInput(type, entry, (v) => {
           entries[index] = v;
