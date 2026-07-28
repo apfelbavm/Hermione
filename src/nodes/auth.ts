@@ -16,8 +16,9 @@ import { registerNode } from "../engine/registry";
 
 /** Basic Auth is defined over Latin1 (RFC 7617 permits UTF-8 too, but this keeps parity with the
  * plain `btoa` this uses both here and in the compiled/codegen output below) — fine for the
- * overwhelmingly common case of ASCII usernames/passwords. */
-function basicAuthHeaderValue(username: string, password: string): string {
+ * overwhelmingly common case of ASCII usernames/passwords. Exported since oauth2AuthCode.ts's
+ * "client_secret_basic" sendAs option needs the exact same client_id:client_secret encoding. */
+export function basicAuthHeaderValue(username: string, password: string): string {
   return `Basic ${btoa(`${username}:${password}`)}`;
 }
 
