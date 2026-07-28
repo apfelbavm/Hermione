@@ -10,6 +10,7 @@ import "./http";
 import "./auth";
 import "./oauth2Saml";
 import "./oauth2AuthCode";
+import "./oauth2ClientCredentials";
 import "./array";
 import "./set";
 import "./map";
