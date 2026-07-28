@@ -201,3 +201,86 @@ registerNode({
   // For Each (no compileExecute yet). Disabling still compiles fine regardless (see codegen.ts's
   // disabled branch, which never needs the node's own compileExecute).
 });
+
+// --- Parallel: fan-out into N branches ("Branch 0", "Branch 1", ...) that all start at once
+// instead of Sequence's one-at-a-time ordering — kicked off together via Promise.all rather than
+// awaited one by one, so a Delay (or any other latent node) partway down one branch no longer
+// blocks the others from making progress meanwhile. Fires the fixed "Completed" pin once every
+// branch's entire chain has finished, regardless of which one took longest — same shape as
+// JS's own Promise.all, just over runExecFrom chains instead of promises directly.
+//
+// Note on shared state: every branch's runExecFrom call shares the SAME ExecutionContext (same
+// ctx.tickCache/ctx.execOutputs) rather than getting an isolated child context, exactly like
+// Sequence's branches and For Loop's body already do — a node reachable from more than one branch
+// (or wired into by two branches that reconverge downstream) can run more than once or have its
+// per-tick cache cleared mid-flight by a sibling branch, same as Unreal's own docs warn is
+// undefined behavior for parallel nodes whose branches reconverge. Not solved here; well-formed
+// graphs (branches that don't share downstream nodes) are unaffected since pure evaluate() results
+// are deterministic regardless of how many times tickCache gets cleared between reads.
+
+const BRANCH_PREFIX = "branch-";
+const MIN_PARALLEL_BRANCHES = 1;
+
+function branchSuffix(pinId: string): number {
+  return Number(pinId.slice(BRANCH_PREFIX.length));
+}
+
+function parallelBranchIds(node: NodeInstance): string[] {
+  return Object.keys(node.pins)
+    .filter((id) => id.startsWith(BRANCH_PREFIX))
+    .sort((a, b) => branchSuffix(a) - branchSuffix(b));
+}
+
+function parallelBranchPinDefs(node: NodeInstance): PinDef[] {
+  const ids = parallelBranchIds(node);
+  return ids.map((id, i) => ({
+    id,
+    label: `Branch ${i}`,
+    type: "exec" as const,
+    direction: "output" as const,
+    removable: ids.length > MIN_PARALLEL_BRANCHES,
+  }));
+}
+
+registerNode({
+  type: "flow.parallel",
+  label: "Parallel",
+  group: "Flow Control",
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    { id: `${BRANCH_PREFIX}0`, label: "Branch 0", type: "exec", direction: "output" },
+    { id: `${BRANCH_PREFIX}1`, label: "Branch 1", type: "exec", direction: "output" },
+    { id: "completed", label: "Completed", type: "exec", direction: "output" },
+  ],
+  deriveInstancePins: (node) => [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    ...parallelBranchPinDefs(node),
+    { id: "completed", label: "Completed", type: "exec", direction: "output" },
+  ],
+  addInstancePinEntry: (node) => {
+    const suffixes = parallelBranchIds(node).map(branchSuffix);
+    const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
+    node.pins[`${BRANCH_PREFIX}${nextSuffix}`] = {};
+  },
+  // Disabled must skip straight to "completed" — never firing any branch — same reasoning as For
+  // Loop: "completed" is a genuine continuation point distinct from the branches themselves (unlike
+  // Sequence, which has no such pin and so fires nothing at all when disabled). See
+  // NodeDef.disabledNextExec.
+  disabledNextExec: ["completed"],
+  // Latent if ANY branch is — same reasoning as Sequence/For Loop. See NodeDef.latentBodyPins.
+  latentBodyPins: (node) => parallelBranchIds(node),
+  execute: async ({ node, ctx }) => {
+    const branchIds = parallelBranchIds(node);
+    await Promise.all(
+      branchIds.flatMap((branchId) =>
+        connectionsFrom(ctx.graph, node.id, branchId).map((conn) =>
+          runExecFrom(conn.toNode, conn.toPin, ctx),
+        ),
+      ),
+    );
+    return { nextExec: "completed" };
+  },
+  // Compiler support is intentionally out of scope for now — same call as Sequence/For Loop/
+  // Array,Set,Map For Each (no compileExecute yet). Disabling still compiles fine regardless (see
+  // codegen.ts's disabled branch, which never needs the node's own compileExecute).
+});

@@ -92,6 +92,28 @@ describe("isNodeLatent — Sequence", () => {
   });
 });
 
+describe("isNodeLatent — Parallel", () => {
+  it("is false when none of its branches contain a latent node", () => {
+    const graph = createEmptyGraph("g", "root");
+    const par = addBuiltinNode(graph, "flow.parallel", "par");
+    addBuiltinNode(graph, "debug.print", "printA");
+    addBuiltinNode(graph, "debug.print", "printB");
+    connectPins(graph, [], [], { fromNode: "par", fromPin: "branch-0", toNode: "printA", toPin: "exec-in" });
+    connectPins(graph, [], [], { fromNode: "par", fromPin: "branch-1", toNode: "printB", toPin: "exec-in" });
+    expect(isNodeLatent(par, graph, graph)).toBe(false);
+  });
+
+  it("is true when ANY of its branches contains a latent node", () => {
+    const graph = createEmptyGraph("g", "root");
+    const par = addBuiltinNode(graph, "flow.parallel", "par");
+    addBuiltinNode(graph, "debug.print", "printA");
+    addBuiltinNode(graph, "flow.delay", "delay");
+    connectPins(graph, [], [], { fromNode: "par", fromPin: "branch-0", toNode: "printA", toPin: "exec-in" });
+    connectPins(graph, [], [], { fromNode: "par", fromPin: "branch-1", toNode: "delay", toPin: "exec-in" });
+    expect(isNodeLatent(par, graph, graph)).toBe(true);
+  });
+});
+
 describe("isNodeLatent — Array/Set/Map For Each", () => {
   it("Array For Each is latent when its body contains a latent node", () => {
     const graph = createEmptyGraph("g", "root");

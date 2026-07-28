@@ -172,3 +172,90 @@ describe("flow.sequence", () => {
     expect(logs).toEqual([]);
   });
 });
+
+describe("flow.parallel", () => {
+  it("starts with exactly two removable 'Branch' pins plus a fixed 'Completed' pin", () => {
+    const def = getNodeDef("flow.parallel");
+    const node = createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
+    const pins = def.deriveInstancePins!(node);
+    expect(pins.map((p) => p.id)).toEqual(["exec-in", "branch-0", "branch-1", "completed"]);
+    expect(pins.find((p) => p.id === "branch-0")?.removable).toBe(true);
+    expect(pins.find((p) => p.id === "branch-1")?.removable).toBe(true);
+    expect(pins.find((p) => p.id === "completed")?.removable).toBeUndefined();
+  });
+
+  it("adds a third 'Branch 2' pin via addInstancePinEntry", () => {
+    const def = getNodeDef("flow.parallel");
+    const node = createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
+    def.addInstancePinEntry!(node);
+    const pins = def.deriveInstancePins!(node);
+    expect(pins.map((p) => p.id)).toEqual(["exec-in", "branch-0", "branch-1", "branch-2", "completed"]);
+    expect(pins.find((p) => p.id === "branch-2")?.label).toBe("Branch 2");
+  });
+
+  it("renumbers labels contiguously after removing a middle entry, keeping the underlying pin ids", () => {
+    const graph = createEmptyGraph("g", "root");
+    const def = getNodeDef("flow.parallel");
+    const node = createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
+    graph.nodes.push(node);
+    def.addInstancePinEntry!(node); // now branch-0, branch-1, branch-2
+
+    removeInstancePin(graph, "par", "branch-1");
+
+    const pins = def.deriveInstancePins!(node);
+    expect(pins.map((p) => p.id)).toEqual(["exec-in", "branch-0", "branch-2", "completed"]);
+    expect(pins.map((p) => p.label)).toEqual(["", "Branch 0", "Branch 1", "Completed"]);
+  });
+
+  it("runs branches concurrently — a faster branch logs before a slower one regardless of pin order — then fires completed only once both finish", async () => {
+    const graph = createEmptyGraph("g", "test");
+    addBuiltinNode(graph, "flow.parallel", "par");
+    const slowDelay = addBuiltinNode(graph, "flow.delay", "slowDelay");
+    slowDelay.pins.duration.value = 20;
+    const fastDelay = addBuiltinNode(graph, "flow.delay", "fastDelay");
+    fastDelay.pins.duration.value = 5;
+    const printSlow = addBuiltinNode(graph, "debug.print", "printSlow");
+    printSlow.pins.message.value = "slow";
+    const printFast = addBuiltinNode(graph, "debug.print", "printFast");
+    printFast.pins.message.value = "fast";
+    const printDone = addBuiltinNode(graph, "debug.print", "printDone");
+    printDone.pins.message.value = "Done";
+
+    // Branch 0 is wired to the SLOWER delay and Branch 1 to the FASTER one — if the node ran
+    // branches one-at-a-time in pin order (like Sequence) instead of truly concurrently, "slow"
+    // would always log before "fast". Only genuine concurrency lets "fast" log first.
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "branch-0", toNode: "slowDelay", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "slowDelay", fromPin: "exec-out", toNode: "printSlow", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "branch-1", toNode: "fastDelay", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "fastDelay", fromPin: "exec-out", toNode: "printFast", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "completed", toNode: "printDone", toPin: "exec-in" });
+
+    const logs: string[] = [];
+    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
+    await runExecFrom("par", "exec-in", ctx);
+
+    expect(logs).toEqual(["fast", "slow", "Done"]);
+  });
+
+  it("when disabled, runs NONE of the branches but still fires completed", async () => {
+    const graph = createEmptyGraph("g", "test");
+    const par = addBuiltinNode(graph, "flow.parallel", "par");
+    par.disabled = true;
+    const printA = addBuiltinNode(graph, "debug.print", "printA");
+    printA.pins.message.value = "A";
+    const printB = addBuiltinNode(graph, "debug.print", "printB");
+    printB.pins.message.value = "B";
+    const printDone = addBuiltinNode(graph, "debug.print", "printDone");
+    printDone.pins.message.value = "Done";
+
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "branch-0", toNode: "printA", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "branch-1", toNode: "printB", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "completed", toNode: "printDone", toPin: "exec-in" });
+
+    const logs: string[] = [];
+    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
+    await runExecFrom("par", "exec-in", ctx);
+
+    expect(logs).toEqual(["Done"]);
+  });
+});
