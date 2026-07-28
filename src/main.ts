@@ -13,6 +13,7 @@ import {
   removeInstancePin,
   removeNode,
   resolveNodeLabel,
+  resolvePinDefs,
 } from "./engine/graphMutations";
 import { connectionsTouchingPin } from "./engine/graphQueries";
 import {
@@ -24,11 +25,12 @@ import {
 } from "./engine/registry";
 import type { FunctionDef, NodeDef, Variable } from "./engine/types";
 import { buildDemoGraph } from "./demoGraph";
-import { createCamera, screenToWorld } from "./render/camera";
-import { computeAllNodeGeometries } from "./render/nodeGeometry";
+import { createCamera, frameRect, screenToWorld } from "./render/camera";
+import { computeAllNodeGeometries, computeNodeWorldRect } from "./render/nodeGeometry";
 import { hitTestNode, hitTestPin, hitTestWire } from "./render/hitTest";
 import { drawComments } from "./render/drawComments";
 import { drawGrid, snapPositionToGrid } from "./render/drawGrid";
+import { drawMouseCoordinates } from "./render/drawHud";
 import { drawNodes } from "./render/drawNodes";
 import { drawWires, drawWireDragPreview } from "./render/drawWires";
 import { drawMarqueeSelection } from "./render/drawMarquee";
@@ -61,9 +63,25 @@ const saveButton = document.getElementById("save-button") as HTMLButtonElement;
 const loadButton = document.getElementById("load-button") as HTMLButtonElement;
 const compileButton = document.getElementById("compile-button") as HTMLButtonElement;
 const snapToGridCheckbox = document.getElementById("snap-to-grid-checkbox") as HTMLInputElement;
+const frameAllButton = document.getElementById("frame-all-button") as HTMLButtonElement;
 const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 if (!ctx) throw new Error("Canvas 2D context unavailable");
+
+// Tracked independently of pointerHandlers.ts's own internal copy (not exposed from there) so the
+// bottom-right coordinate readout (see render() below) has a value from the very first frame —
+// render() itself runs synchronously once during startup (via resizeCanvas(), below), well before
+// setupPointerInteraction() is even called later in this file.
+let lastMouseScreenPos = { x: 0, y: 0 };
+window.addEventListener("mousemove", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  lastMouseScreenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  // render() only ever runs in response to store.notify() (see store.subscribe(render) below) —
+  // a plain hover with nothing being dragged never calls it on its own, so without this the
+  // coordinate readout would sit frozen until some UNRELATED interaction happened to redraw.
+  // store.notify() itself is already throttled to once per animation frame, so this stays cheap.
+  store.notify();
+});
 
 const store = createStore({
   rootGraph: loadGraphFromLocalStorage() ?? buildDemoGraph(),
@@ -210,6 +228,7 @@ function render(): void {
   );
   drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, variables, functions, latentNodeIds);
   if (marqueeSelection) drawMarqueeSelection(ctx, camera, marqueeSelection);
+  drawMouseCoordinates(ctx, screenToWorld(camera, lastMouseScreenPos.x, lastMouseScreenPos.y), width, height);
   widgetSync.sync(geometries);
   commentOverlay.sync();
   variablePanel.render();
@@ -596,4 +615,31 @@ compileButton.addEventListener("click", () => {
   } catch (err) {
     appendLog(`Compile error: ${err instanceof Error ? err.message : String(err)}`);
   }
+});
+
+// --- Frame All: zooms/pans so every node and comment box in the current graph fits on screen
+// (see camera.ts's frameRect) — a no-op when there's nothing to frame.
+frameAllButton.addEventListener("click", () => {
+  const graph = getEditingGraph(store.state);
+  const variables = getVisibleVariablesForState(store.state);
+  const functions = store.state.rootGraph.functions;
+
+  const rects = [
+    ...graph.nodes.map((n) => computeNodeWorldRect(n, resolvePinDefs(n, variables, functions), variables, functions)),
+    ...graph.commentBoxes.map((b) => ({ x: b.position.x, y: b.position.y, width: b.size.width, height: b.size.height })),
+  ];
+  if (rects.length === 0) return;
+
+  const minX = Math.min(...rects.map((r) => r.x));
+  const minY = Math.min(...rects.map((r) => r.y));
+  const maxX = Math.max(...rects.map((r) => r.x + r.width));
+  const maxY = Math.max(...rects.map((r) => r.y + r.height));
+
+  frameRect(
+    store.state.camera,
+    { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
+    canvas.clientWidth,
+    canvas.clientHeight,
+  );
+  store.notify();
 });

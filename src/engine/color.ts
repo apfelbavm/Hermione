@@ -91,6 +91,9 @@ export namespace Colors {
   export const CANVAS_BG = "#1e2126";
   export const GRID_LINE_MINOR = "#2a2e35";
   export const GRID_LINE_MAJOR = "#333842";
+  // The world-space x=0/y=0 origin axes (see drawGrid.ts) — deliberately plain black, heavier than
+  // even the major grid lines, so the true origin always reads as a fixed landmark on the canvas.
+  export const AXIS_LINE = "#000000";
   export const NODE_HEADER_DEFAULT = "#78818b";
   // Referenced by more than one NODE_HEADER_BG entry below — a plain local so those entries can
   // never drift apart from each other.

@@ -154,6 +154,33 @@ html, body {
   overflow: hidden;
 }
 
+/* "Frame All" / zoom-to-fit (see main.ts's frame-all-button handler, camera.ts's frameRect) —
+   faint by default, same "reads as interactive without a permanent visual seam" idea as .resizer,
+   just fully opaque instead of transparent since it needs to stay legible as an icon at rest. */
+.canvas-hud-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #3d4148;
+  border-radius: 4px;
+  background: rgba(43, 47, 54, 0.6);
+  color: #9aa0a8;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.canvas-hud-button:hover {
+  background: #2b2f36;
+  color: #e8e8e8;
+  border-color: #3b6b8a;
+}
+
 #sidebar {
   flex: 0 0 240px;
   display: flex;
