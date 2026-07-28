@@ -1,4 +1,5 @@
 import { resolveNodeLabel } from "../engine/graphMutations";
+import { connectionsTouchingPin } from "../engine/graphQueries";
 import { getNodeDef, topLevelGroup } from "../engine/registry";
 import type { FunctionDef, Graph, NodeDef, NodeInstance, PinDef, Variable } from "../engine/types";
 import type { Camera } from "./camera";
@@ -50,48 +51,64 @@ export function drawNodes(
     // so it's clear at a glance both that it's disabled and what it would otherwise still connect to.
     ctx.globalAlpha = node.disabled ? 0.45 : 1;
 
-    ctx.beginPath();
-    ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom);
-    ctx.fillStyle = NODE_BODY_BG;
-    ctx.fill();
-
-    const headerHeight = NODE_HEADER_HEIGHT * camera.zoom;
-    ctx.beginPath();
-    ctx.roundRect(geo.screenX, geo.screenY, geo.width, headerHeight, [
-      6 * camera.zoom,
-      6 * camera.zoom,
-      0,
-      0,
-    ]);
-    ctx.fillStyle = resolveNodeHeaderColor(node, def, variables);
-    ctx.fill();
-
     const isExecuting = executingNodeId === node.id;
-    ctx.lineWidth = isExecuting ? 2.5 : selectedNodeIds.has(node.id) ? 2 : 1;
-    ctx.strokeStyle = isExecuting
+    const borderWidth = isExecuting ? 2.5 : selectedNodeIds.has(node.id) ? 2 : 1;
+    const borderColor = isExecuting
       ? "#5ad1ff"
       : selectedNodeIds.has(node.id)
         ? NODE_BORDER_SELECTED
         : NODE_BORDER;
-    ctx.beginPath();
-    ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom);
-    ctx.stroke();
 
-    if (latentNodeIds.has(node.id)) {
-      drawLatentIcon(ctx, geo.screenX + geo.width, geo.screenY, 8 * camera.zoom);
+    if (def.compact) {
+      // A reroute "knot" (see NodeDef.compact) — just a small body + border, no header bar or
+      // label; its pins (drawn below, same as any other node) carry all the visual meaning.
+      ctx.beginPath();
+      ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 4 * camera.zoom);
+      ctx.fillStyle = NODE_BODY_BG;
+      ctx.fill();
+      ctx.lineWidth = borderWidth;
+      ctx.strokeStyle = borderColor;
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom);
+      ctx.fillStyle = NODE_BODY_BG;
+      ctx.fill();
+
+      const headerHeight = NODE_HEADER_HEIGHT * camera.zoom;
+      ctx.beginPath();
+      ctx.roundRect(geo.screenX, geo.screenY, geo.width, headerHeight, [
+        6 * camera.zoom,
+        6 * camera.zoom,
+        0,
+        0,
+      ]);
+      ctx.fillStyle = resolveNodeHeaderColor(node, def, variables);
+      ctx.fill();
+
+      ctx.lineWidth = borderWidth;
+      ctx.strokeStyle = borderColor;
+      ctx.beginPath();
+      ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom);
+      ctx.stroke();
+
+      if (latentNodeIds.has(node.id)) {
+        drawLatentIcon(ctx, geo.screenX + geo.width, geo.screenY, 8 * camera.zoom);
+      }
+
+      ctx.fillStyle = TEXT_PRIMARY;
+      ctx.textAlign = "left";
+      ctx.fillText(
+        resolveNodeLabel(node, def, variables, functions),
+        geo.screenX + 10 * camera.zoom,
+        geo.screenY + headerHeight / 2,
+      );
     }
-
-    ctx.fillStyle = TEXT_PRIMARY;
-    ctx.textAlign = "left";
-    ctx.fillText(
-      resolveNodeLabel(node, def, variables, functions),
-      geo.screenX + 10 * camera.zoom,
-      geo.screenY + headerHeight / 2,
-    );
 
     for (const pinLayout of geo.layout.pins) {
       const pos = geo.pinScreen[pinLayout.pin.id];
-      drawPinShape(ctx, pos.x, pos.y, PIN_RADIUS * camera.zoom, pinLayout.pin);
+      const connected = connectionsTouchingPin(graph, node.id, pinLayout.pin.id).length > 0;
+      drawPinShape(ctx, pos.x, pos.y, PIN_RADIUS * camera.zoom, pinLayout.pin, connected);
 
       ctx.fillStyle = TEXT_MUTED;
       if (pinLayout.pin.direction === "input") {
@@ -150,10 +167,12 @@ function drawPinShape(
   y: number,
   r: number,
   pin: PinDef,
+  connected: boolean,
 ): void {
   // Map pins are colored by their VALUE type (pin.type) — the key type isn't drawn on the dot,
   // only visible via the type-select controls (see typedValueInput.ts).
-  ctx.fillStyle = PIN_COLORS[pin.type];
+  const color = PIN_COLORS[pin.type];
+  ctx.fillStyle = color;
   if (pin.type === "exec") {
     ctx.beginPath();
     ctx.moveTo(x - r, y - r);
@@ -179,9 +198,18 @@ function drawPinShape(
       drawContainerGrid(ctx, x, y, r, true);
       break;
     default:
+      // A single-container data pin is hollow (border only) until something's actually wired to
+      // it, filled once it is — same "empty vs. filled circle" convention Unreal uses for its own
+      // data pins. Exec pins (above) and the container shapes stay solid regardless.
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
+      if (connected) {
+        ctx.fill();
+      } else {
+        ctx.lineWidth = Math.max(1, r * 0.3);
+        ctx.strokeStyle = color;
+        ctx.stroke();
+      }
   }
 }
 

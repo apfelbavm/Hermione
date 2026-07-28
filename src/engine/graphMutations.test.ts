@@ -7,6 +7,7 @@ import {
   connectPins,
   createNodeInstance,
   hasConnectedDataOutput,
+  insertRerouteOnConnection,
   removeNode,
   removeVariable,
   resolveNodeLabel,
@@ -264,5 +265,75 @@ describe("updateVariable — container support", () => {
     updateVariable(graph, "v1", { container: "array", defaultValue: [1, 2] });
 
     expect(variable.defaultValue).toEqual([1, 2]);
+  });
+});
+
+describe("insertRerouteOnConnection", () => {
+  it("splices a data reroute node in, freezing its element type to match the spliced wire, and preserves the original endpoints", () => {
+    const graph = createEmptyGraph("g", "root");
+    const add1Def = getNodeDef("math.add");
+    const add2Def = getNodeDef("math.add");
+    const add1 = createNodeInstance("math.add", { x: 0, y: 0 }, add1Def.pins, "add1");
+    const add2 = createNodeInstance("math.add", { x: 200, y: 0 }, add2Def.pins, "add2");
+    graph.nodes.push(add1, add2);
+    const conn = connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "add1",
+      fromPin: "result",
+      toNode: "add2",
+      toPin: "a",
+    });
+
+    insertRerouteOnConnection(graph, graph.variables, graph.functions, conn.id, { x: 100, y: 0 });
+
+    const reroute = graph.nodes.find((n) => n.type === "core.reroute");
+    expect(reroute).toBeDefined();
+    expect(reroute!.elementType).toBe("number");
+    expect(reroute!.container).toBeUndefined();
+
+    expect(graph.connections).toHaveLength(2);
+    const first = graph.connections.find((c) => c.fromNode === "add1");
+    const second = graph.connections.find((c) => c.toNode === "add2");
+    expect(first).toMatchObject({ fromNode: "add1", fromPin: "result", toNode: reroute!.id, toPin: "in" });
+    expect(second).toMatchObject({ fromNode: reroute!.id, fromPin: "out", toNode: "add2", toPin: "a" });
+  });
+
+  it("splices an exec reroute node in for an exec wire, using the exec-in/exec-out pins", () => {
+    const graph = createEmptyGraph("g", "root");
+    const branchDef = getNodeDef("flow.branch");
+    const printDef = getNodeDef("debug.print");
+    const branch = createNodeInstance("flow.branch", { x: 0, y: 0 }, branchDef.pins, "branch");
+    const print = createNodeInstance("debug.print", { x: 200, y: 0 }, printDef.pins, "print");
+    graph.nodes.push(branch, print);
+    const conn = connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "branch",
+      fromPin: "true",
+      toNode: "print",
+      toPin: "exec-in",
+    });
+
+    insertRerouteOnConnection(graph, graph.variables, graph.functions, conn.id, { x: 100, y: 0 });
+
+    const reroute = graph.nodes.find((n) => n.type === "core.rerouteExec");
+    expect(reroute).toBeDefined();
+
+    expect(graph.connections).toHaveLength(2);
+    expect(graph.connections.find((c) => c.fromNode === "branch")).toMatchObject({
+      fromNode: "branch",
+      fromPin: "true",
+      toNode: reroute!.id,
+      toPin: "exec-in",
+    });
+    expect(graph.connections.find((c) => c.toNode === "print")).toMatchObject({
+      fromNode: reroute!.id,
+      fromPin: "exec-out",
+      toNode: "print",
+      toPin: "exec-in",
+    });
+  });
+
+  it("does nothing when the connection id doesn't exist", () => {
+    const graph = createEmptyGraph("g", "root");
+    insertRerouteOnConnection(graph, graph.variables, graph.functions, "nonexistent", { x: 0, y: 0 });
+    expect(graph.nodes).toHaveLength(0);
   });
 });

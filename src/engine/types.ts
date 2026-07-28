@@ -145,6 +145,11 @@ export interface NodeDef {
    * src/engine/latency.ts's isNodeLatent/isFunctionLatent) even though the node type itself isn't
    * unconditionally `latent`. */
   latentBodyPins?: (node: NodeInstance) => string[];
+  /** Marks this node type as rendered as a small unlabeled "knot" (Unreal's reroute-node look) —
+   * no header bar, no label, no literal-value widgets — instead of the normal header+label+pin-rows
+   * box (see layout.ts's computeNodeLayout and drawNodes.ts). Currently only core.reroute/
+   * core.rerouteExec (see reroute.ts) use this. */
+  compact?: boolean;
 }
 
 export interface Pin {
@@ -169,6 +174,12 @@ export interface NodeInstance {
   elementType?: PinType;
   /** Set only for a node whose NodeDef.configurableElementType?.includeKeyType is set. */
   mapKeyType?: PinType;
+  /** Set only for a "core.reroute" data-reroute node (see reroute.ts) — every other
+   * configurableElementType node fixes its container via the node TYPE itself (e.g. array.length is
+   * always "array"), but a single generic reroute node type has to mimic single/array/set/map alike
+   * depending on whichever wire it gets spliced into (see graphMutations.ts's
+   * insertRerouteOnConnection), so its container has to live per-instance too. */
+  container?: PinContainer;
 }
 
 export interface Connection {

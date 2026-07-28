@@ -7,6 +7,9 @@ export const NODE_PADDING_X = 12;
 export const PIN_RADIUS = 5;
 export const PIN_MARGIN = 14;
 export const ADD_BUTTON_SIZE = 16;
+/** Width/height of a "compact" node's whole box (see NodeDef.compact) — just big enough to hold
+ * its one input and one output pin dot side by side, no header/label rows. */
+export const COMPACT_NODE_SIZE = 24;
 /** Gap between a pin's dot and where its label text starts (input side) or ends (output side) —
  * mirrors the same 10px offset drawNodes.ts draws labels at. */
 export const PIN_LABEL_GAP = 10;
@@ -68,8 +71,18 @@ export function pinWidgetWidth(pin: PinDef): number {
 export function computeNodeLayout(
   label: string,
   pinDefs: PinDef[],
-  options?: { showAddButton?: boolean },
+  options?: { showAddButton?: boolean; compact?: boolean },
 ): NodeLayout {
+  if (options?.compact) {
+    const size = COMPACT_NODE_SIZE;
+    const pins: PinLayout[] = pinDefs.map((pin) => ({
+      pin,
+      x: pin.direction === "input" ? 0 : size,
+      y: size / 2,
+    }));
+    return { width: size, height: size, pins, inputWidgetRightX: size };
+  }
+
   const inputs = pinDefs.filter((p) => p.direction === "input");
   const outputs = pinDefs.filter((p) => p.direction === "output");
   const showAddButton = options?.showAddButton ?? false;

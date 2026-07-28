@@ -8,6 +8,7 @@ import {
   connectPins,
   createNodeInstance,
   hasConnectedDataOutput,
+  insertRerouteOnConnection,
   removeConnection,
   removeInstancePin,
   removeNode,
@@ -25,7 +26,7 @@ import type { FunctionDef, NodeDef, Variable } from "./engine/types";
 import { buildDemoGraph } from "./demoGraph";
 import { createCamera, screenToWorld } from "./render/camera";
 import { computeAllNodeGeometries } from "./render/nodeGeometry";
-import { hitTestNode, hitTestPin } from "./render/hitTest";
+import { hitTestNode, hitTestPin, hitTestWire } from "./render/hitTest";
 import { drawComments } from "./render/drawComments";
 import { drawGrid, snapPositionToGrid } from "./render/drawGrid";
 import { drawNodes } from "./render/drawNodes";
@@ -245,12 +246,17 @@ function applySnapIfEnabled(worldPos: { x: number; y: number }): { x: number; y:
 }
 
 /** Narrows a candidate list down to what's actually placeable in the graph currently open for
- * editing — event nodes (On Start/On Interval/On Run) can't go inside a function body, and at most
- * one instance of each event type may exist per graph (see canPlaceNodeType). */
+ * editing — event nodes (On Start/On Interval/On Run) can't go inside a function body, at most one
+ * instance of each event type may exist per graph (see canPlaceNodeType), and reroute nodes (the
+ * "Internal" group — see reroute.ts) are never generically creatable at all: their pin type is
+ * frozen from whatever wire they get spliced into (see insertRerouteOnConnection), so dropped fresh
+ * with no wire context there'd be no sensible type to give them. */
 function filterCreatableHere(defs: NodeDef[]): NodeDef[] {
   const graph = getEditingGraph(store.state);
   const isFunctionBody = store.state.activeFunctionId !== null;
-  return defs.filter((def) => canPlaceNodeType(def.type, graph, isFunctionBody));
+  return defs.filter(
+    (def) => topLevelGroup(def.group) !== "Internal" && canPlaceNodeType(def.type, graph, isFunctionBody),
+  );
 }
 
 /** Creates a node at worldPos and, if any anchors are given, auto-connects ALL of them to the same
@@ -389,6 +395,23 @@ canvas.addEventListener("contextmenu", (e) => {
     }
 
     openRowContextMenu({ x: e.clientX, y: e.clientY }, items);
+    return;
+  }
+
+  // Right-clicking a wire itself (not one of its endpoint pins) offers to splice a Reroute node
+  // into it — Unreal's "Add Reroute Node," purely for bending the wire's path on the canvas.
+  const wireHit = hitTestWire(graph, geometries, store.state.camera, screenPos.x, screenPos.y);
+  if (wireHit) {
+    const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
+    openRowContextMenu({ x: e.clientX, y: e.clientY }, [
+      {
+        label: "Add Reroute Node",
+        onClick: () => {
+          insertRerouteOnConnection(graph, variables, functions, wireHit.connectionId, worldPos);
+          store.notify();
+        },
+      },
+    ]);
     return;
   }
 

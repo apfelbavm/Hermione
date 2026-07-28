@@ -331,6 +331,51 @@ export function removeConnection(
   }
 }
 
+/** Splices a "Reroute" node (see reroute.ts) into an existing connection — Unreal's "Add Reroute
+ * Node," used purely to bend a wire's path on the canvas; it changes nothing about what the graph
+ * actually does. The new node's pin type is frozen to match the connection's own source pin
+ * exactly (see NodeInstance.elementType/container/mapKeyType) — this engine has no wildcard/
+ * inferred-from-wiring pin type (resolvePinDefs has no visibility into graph.connections by
+ * design), so this is the one place a concrete type is available to seed it with; that's also
+ * exactly why reroute nodes are never offered from the generic node-creation menus (see main.ts) —
+ * only this call site has a wire to read a type off of. */
+export function insertRerouteOnConnection(
+  graph: Graph,
+  variables: Variable[],
+  functions: FunctionDef[],
+  connectionId: string,
+  position: { x: number; y: number },
+): void {
+  const conn = graph.connections.find((c) => c.id === connectionId);
+  if (!conn) return;
+  const fromNode = graph.nodes.find((n) => n.id === conn.fromNode);
+  if (!fromNode) return;
+  const fromPinDef = resolvePinDefs(fromNode, variables, functions).find((p) => p.id === conn.fromPin);
+  if (!fromPinDef) return;
+
+  const isExec = fromPinDef.type === "exec";
+  const rerouteType = isExec ? "core.rerouteExec" : "core.reroute";
+  const reroute = createNodeInstance(rerouteType, position, getNodeDef(rerouteType).pins);
+  if (!isExec) {
+    reroute.elementType = fromPinDef.type;
+    reroute.container = fromPinDef.container;
+    reroute.mapKeyType = fromPinDef.keyType;
+  }
+  graph.nodes.push(reroute);
+
+  const inPinId = isExec ? "exec-in" : "in";
+  const outPinId = isExec ? "exec-out" : "out";
+  const { fromNode: origFromNode, fromPin: origFromPin, toNode: origToNode, toPin: origToPin } = conn;
+
+  // Removed first (rather than relying on connectPins' own auto-disconnect) because an exec input
+  // may legally converge several incoming wires — connectPins would happily add the reroute's exec
+  // path ALONGSIDE the original one instead of replacing it (see connectPins' own comment on why
+  // it only auto-prunes the FROM side for exec, the TO side for data).
+  removeConnection(graph, variables, functions, connectionId);
+  connectPins(graph, variables, functions, { fromNode: origFromNode, fromPin: origFromPin, toNode: reroute.id, toPin: inPinId });
+  connectPins(graph, variables, functions, { fromNode: reroute.id, fromPin: outPinId, toNode: origToNode, toPin: origToPin });
+}
+
 export function addVariable(graph: Graph, variable: Variable): void {
   graph.variables.push(variable);
 }

@@ -1,4 +1,5 @@
 import type { Graph, PinDef } from "../engine/types";
+import { bezierControlPoints, sampleBezier } from "./bezier";
 import type { Camera } from "./camera";
 import { computeCommentScreenRect, COMMENT_RESIZE_HANDLE_SCREEN_SIZE } from "./commentGeometry";
 import type { NodeScreenGeometry } from "./nodeGeometry";
@@ -139,6 +140,60 @@ export function hitTestNode(
       screenY <= geo.screenY + geo.height
     ) {
       return { kind: "node", nodeId: node.id };
+    }
+  }
+  return null;
+}
+
+export interface WireHit {
+  kind: "wire";
+  connectionId: string;
+}
+
+const WIRE_HIT_DISTANCE = 6;
+
+function distanceToSegment(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSq = dx * dx + dy * dy;
+  const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
+  const closestX = ax + t * dx;
+  const closestY = ay + t * dy;
+  return Math.hypot(px - closestX, py - closestY);
+}
+
+/** Right-click-on-a-wire support (see main.ts's "Add Reroute Node" menu item) — samples the same
+ * bezier curve drawWires.ts renders (see bezier.ts) into a polyline and finds the closest one
+ * within WIRE_HIT_DISTANCE screen pixels, scaled by zoom so the click tolerance feels consistent at
+ * any zoom level. */
+export function hitTestWire(
+  graph: Graph,
+  geometries: ReadonlyMap<string, NodeScreenGeometry>,
+  camera: Camera,
+  screenX: number,
+  screenY: number,
+): WireHit | null {
+  const tolerance = WIRE_HIT_DISTANCE * camera.zoom;
+  for (let i = graph.connections.length - 1; i >= 0; i--) {
+    const conn = graph.connections[i];
+    const fromGeo = geometries.get(conn.fromNode);
+    const toGeo = geometries.get(conn.toNode);
+    if (!fromGeo || !toGeo) continue;
+    const from = fromGeo.pinScreen[conn.fromPin];
+    const to = toGeo.pinScreen[conn.toPin];
+    if (!from || !to) continue;
+
+    const points = sampleBezier(bezierControlPoints(from.x, from.y, to.x, to.y));
+    for (let j = 0; j < points.length - 1; j++) {
+      const d = distanceToSegment(screenX, screenY, points[j].x, points[j].y, points[j + 1].x, points[j + 1].y);
+      if (d <= tolerance) return { kind: "wire", connectionId: conn.id };
     }
   }
   return null;

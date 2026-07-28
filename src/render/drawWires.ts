@@ -1,5 +1,6 @@
 import { resolvePinDefs } from "../engine/graphMutations";
 import type { FunctionDef, Graph, Variable } from "../engine/types";
+import { bezierControlPoints } from "./bezier";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
 import { PIN_COLORS } from "./palette";
@@ -58,9 +59,9 @@ export function drawWireDragPreview(
 }
 
 function drawBezierWire(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number): void {
-  const dx = Math.max(40, Math.abs(x2 - x1) * 0.5);
+  const g = bezierControlPoints(x1, y1, x2, y2);
   ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.bezierCurveTo(x1 + dx, y1, x2 - dx, y2, x2, y2);
+  ctx.moveTo(g.x1, g.y1);
+  ctx.bezierCurveTo(g.cx1, g.cy1, g.cx2, g.cy2, g.x2, g.y2);
   ctx.stroke();
 }

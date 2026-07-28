@@ -1,4 +1,5 @@
 import { setPinLiteralValue } from "../engine/graphMutations";
+import { getNodeDef } from "../engine/registry";
 import type { PinDef, PinType } from "../engine/types";
 import type { Camera } from "../render/camera";
 import { pinWidgetWidth } from "../render/layout";
@@ -42,6 +43,10 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
     for (const node of graph.nodes) {
       const geo = geometries.get(node.id);
       if (!geo) continue;
+      // A reroute "knot" (see NodeDef.compact) is always meant to be wired straight through — its
+      // pin is drawn far too small to also host a literal-value <input>, so it never gets one even
+      // in the edge case where its incoming wire gets disconnected out from under it.
+      if (getNodeDef(node.type).compact) continue;
 
       for (const pinLayout of geo.layout.pins) {
         const pinDef = pinLayout.pin;

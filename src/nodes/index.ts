@@ -10,6 +10,7 @@ import "./http";
 import "./array";
 import "./set";
 import "./map";
+import "./reroute";
 
 let registered = false;
 

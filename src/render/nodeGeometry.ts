@@ -22,8 +22,9 @@ export function computeNodeScreenGeometry(
   pinDefs: PinDef[],
   camera: Camera,
   showAddButton: boolean = false,
+  compact: boolean = false,
 ): NodeScreenGeometry {
-  const layout = computeNodeLayout(label, pinDefs, { showAddButton });
+  const layout = computeNodeLayout(label, pinDefs, { showAddButton, compact });
   const screen = worldToScreen(camera, node.position.x, node.position.y);
   const pinScreen: Record<string, { x: number; y: number }> = {};
   for (const p of layout.pins) {
@@ -58,6 +59,7 @@ export function computeNodeWorldRect(node: NodeInstance, pinDefs: PinDef[], vari
   const def = getNodeDef(node.type);
   const layout = computeNodeLayout(resolveNodeLabel(node, def, variables, functions), pinDefs, {
     showAddButton: !!def.addInstancePinEntry,
+    compact: !!def.compact,
   });
   return { x: node.position.x, y: node.position.y, width: layout.width, height: layout.height };
 }
@@ -77,7 +79,14 @@ export function computeAllNodeGeometries(
     const pinDefs = resolvePinDefs(node, variables, functions);
     map.set(
       node.id,
-      computeNodeScreenGeometry(node, resolveNodeLabel(node, def, variables, functions), pinDefs, camera, !!def.addInstancePinEntry),
+      computeNodeScreenGeometry(
+        node,
+        resolveNodeLabel(node, def, variables, functions),
+        pinDefs,
+        camera,
+        !!def.addInstancePinEntry,
+        !!def.compact,
+      ),
     );
   }
   return map;
