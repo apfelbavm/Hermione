@@ -149,11 +149,12 @@ export function setupPointerInteraction(
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
-  // --- Auto-pan while dragging a new wire off a pin and holding the cursor near (or past) the
-  // canvas edge — otherwise a wire couldn't reach a pin that's currently off-screen without the
-  // user separately panning first. Runs its own requestAnimationFrame ticker (rather than reacting
-  // only to mousemove) since the whole point is to keep panning while the mouse stays HELD STILL
-  // right at the edge — no further mousemove events fire in that case.
+  // --- Auto-pan while dragging a new wire off a pin, OR dragging node(s) around, and holding the
+  // cursor near (or past) the canvas edge — otherwise a wire (or a node) couldn't reach a spot
+  // that's currently off-screen without the user separately panning first. Runs its own
+  // requestAnimationFrame ticker (rather than reacting only to mousemove) since the whole point is
+  // to keep panning while the mouse stays HELD STILL right at the edge — no further mousemove
+  // events fire in that case.
   const AUTO_PAN_EDGE_MARGIN = 50; // canvas px from an edge where auto-pan kicks in
   const AUTO_PAN_MAX_SPEED = 16; // canvas px panned per animation frame, right at/past the edge
   let autoPanFrame: number | null = null;
@@ -197,16 +198,41 @@ export function setupPointerInteraction(
     store.state.wireDrag.toScreen = lastMouseScreenPos;
   }
 
+  /** Recomputes dragged node(s)' world positions from the CURRENT camera and the cursor's last
+   * known SCREEN position — shared by the mousemove handler and the auto-pan ticker, same reason
+   * as updateWireDragPreview: panning the camera under a stationary cursor changes what world
+   * point that screen position resolves to, exactly as if the cursor itself had moved there. */
+  function updateNodeDragPositions(): void {
+    if (drag.kind !== "nodes") return;
+    const graph = getEditingGraph(store.state);
+    const { camera } = store.state;
+    const { startWorld, initialPositions } = drag;
+    const worldPos = screenToWorld(camera, lastMouseScreenPos.x, lastMouseScreenPos.y);
+    const dx = worldPos.x - startWorld.x;
+    const dy = worldPos.y - startWorld.y;
+    for (const [nodeId, initial] of initialPositions) {
+      const node = graph.nodes.find((n) => n.id === nodeId);
+      if (node) {
+        const next = { x: initial.x + dx, y: initial.y + dy };
+        const snapped = store.state.snapToGrid ? snapPositionToGrid(next) : next;
+        node.position.x = snapped.x;
+        node.position.y = snapped.y;
+      }
+    }
+  }
+
   function startAutoPanLoop(): void {
     if (autoPanFrame !== null) return;
     const tick = () => {
       autoPanFrame = null;
-      if (drag.kind !== "wire" && drag.kind !== "wire-multi") return; // drag ended — stop rescheduling
+      // Drag ended — stop rescheduling.
+      if (drag.kind !== "wire" && drag.kind !== "wire-multi" && drag.kind !== "nodes") return;
       const rect = canvas.getBoundingClientRect();
       const { dx, dy } = computeAutoPanDelta(lastMouseScreenPos, rect.width, rect.height);
       if (dx !== 0 || dy !== 0) {
         panCamera(store.state.camera, dx, dy);
-        updateWireDragPreview();
+        if (drag.kind === "nodes") updateNodeDragPositions();
+        else updateWireDragPreview();
         store.notify();
       }
       autoPanFrame = requestAnimationFrame(tick);
@@ -343,6 +369,7 @@ export function setupPointerInteraction(
         if (n) initialPositions.set(id, { x: n.position.x, y: n.position.y });
       }
       drag = { kind: "nodes", startWorld: worldPos, initialPositions };
+      startAutoPanLoop();
       store.notify();
       return;
     }
@@ -439,20 +466,7 @@ export function setupPointerInteraction(
     }
 
     if (drag.kind === "nodes") {
-      const { startWorld, initialPositions } = drag;
-      const pos = screenPos(e);
-      const worldPos = screenToWorld(camera, pos.x, pos.y);
-      const dx = worldPos.x - startWorld.x;
-      const dy = worldPos.y - startWorld.y;
-      for (const [nodeId, initial] of initialPositions) {
-        const node = graph.nodes.find((n) => n.id === nodeId);
-        if (node) {
-          const next = { x: initial.x + dx, y: initial.y + dy };
-          const snapped = store.state.snapToGrid ? snapPositionToGrid(next) : next;
-          node.position.x = snapped.x;
-          node.position.y = snapped.y;
-        }
-      }
+      updateNodeDragPositions();
       store.notify();
       return;
     }
@@ -509,6 +523,14 @@ export function setupPointerInteraction(
   });
 
   window.addEventListener("mouseup", (e) => {
+    // Stops the auto-pan ticker the instant any drag ends, regardless of which kind — it would
+    // otherwise keep rescheduling itself for one more idle frame before its own drag.kind check
+    // (see startAutoPanLoop) notices the drag is over. A no-op when nothing was scheduled.
+    if (autoPanFrame !== null) {
+      cancelAnimationFrame(autoPanFrame);
+      autoPanFrame = null;
+    }
+
     if (drag.kind === "wire" || drag.kind === "wire-multi") {
       const graph = getEditingGraph(store.state);
       const { camera } = store.state;
@@ -523,10 +545,6 @@ export function setupPointerInteraction(
 
       store.state.wireDrag = null;
       drag = { kind: "none" };
-      if (autoPanFrame !== null) {
-        cancelAnimationFrame(autoPanFrame);
-        autoPanFrame = null;
-      }
       store.notify();
       if (!connected) callbacks.onWireDroppedInEmptySpace(anchors, pos);
       return;
