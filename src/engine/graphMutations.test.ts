@@ -8,6 +8,8 @@ import {
   createNodeInstance,
   hasConnectedDataOutput,
   insertRerouteOnConnection,
+  moveFunction,
+  moveFunctionEntry,
   moveVariable,
   removeNode,
   removeVariable,
@@ -15,7 +17,7 @@ import {
   updateVariable,
 } from "./graphMutations";
 import { getNodeDef } from "./registry";
-import { createEmptyGraph, type Variable } from "./types";
+import { createEmptyGraph, type FunctionDef, type Variable } from "./types";
 
 beforeAll(() => {
   registerBuiltins();
@@ -382,5 +384,67 @@ describe("moveVariable", () => {
     const graph = buildGraphWithVariables("a", "b", "c");
     moveVariable(graph, "a", "nonexistent", "after");
     expect(graph.variables.map((v) => v.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("moveFunction", () => {
+  function buildGraphWithFunctions(...names: string[]) {
+    const graph = createEmptyGraph("g", "root");
+    for (const name of names) {
+      graph.functions.push({ id: name, name, inputs: [], outputs: [], body: createEmptyGraph(`${name}-body`, name) });
+    }
+    return graph;
+  }
+
+  it("moves a function to sit immediately before the target", () => {
+    const graph = buildGraphWithFunctions("a", "b", "c");
+    moveFunction(graph, "c", "a", "before");
+    expect(graph.functions.map((f) => f.id)).toEqual(["c", "a", "b"]);
+  });
+
+  it("moves a function to sit immediately after the target", () => {
+    const graph = buildGraphWithFunctions("a", "b", "c");
+    moveFunction(graph, "a", "b", "after");
+    expect(graph.functions.map((f) => f.id)).toEqual(["b", "a", "c"]);
+  });
+
+  it("is a no-op when dropped onto itself", () => {
+    const graph = buildGraphWithFunctions("a", "b", "c");
+    moveFunction(graph, "b", "b", "after");
+    expect(graph.functions.map((f) => f.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("moveFunctionEntry", () => {
+  function buildFunctionWithInputs(...names: string[]): FunctionDef {
+    return {
+      id: "fn",
+      name: "Fn",
+      inputs: names.map((name) => ({ id: name, name, type: "number" as const, defaultValue: 0 })),
+      outputs: [{ id: "out1", name: "Out1", type: "number", defaultValue: 0 }],
+      body: createEmptyGraph("fn-body", "Fn"),
+    };
+  }
+
+  it("reorders the Inputs list without touching Outputs", () => {
+    const fn = buildFunctionWithInputs("a", "b", "c");
+    moveFunctionEntry(fn, "input", "c", "a", "before");
+    expect(fn.inputs.map((e) => e.id)).toEqual(["c", "a", "b"]);
+    expect(fn.outputs.map((e) => e.id)).toEqual(["out1"]);
+  });
+
+  it("reorders the Outputs list independently of Inputs", () => {
+    const fn = buildFunctionWithInputs("a", "b");
+    fn.outputs.push({ id: "out2", name: "Out2", type: "number", defaultValue: 0 });
+    moveFunctionEntry(fn, "output", "out2", "out1", "before");
+    expect(fn.outputs.map((e) => e.id)).toEqual(["out2", "out1"]);
+    expect(fn.inputs.map((e) => e.id)).toEqual(["a", "b"]);
+  });
+
+  it("is a no-op when the dragged entry id belongs to the other list (input dragged onto an output row)", () => {
+    const fn = buildFunctionWithInputs("a", "b");
+    moveFunctionEntry(fn, "output", "a", "out1", "before");
+    expect(fn.inputs.map((e) => e.id)).toEqual(["a", "b"]);
+    expect(fn.outputs.map((e) => e.id)).toEqual(["out1"]);
   });
 });

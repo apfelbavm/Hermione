@@ -380,29 +380,59 @@ export function addVariable(graph: Graph, variable: Variable): void {
   graph.variables.push(variable);
 }
 
-/** Reorders `graph.variables` by moving `variableId` to sit immediately before/after
- * `targetVariableId` — drives the Variables panel's manual drag-to-reorder (see
- * variablePanel.ts). `graph.variables` is a plain array and already round-trips through
- * save/load and clipboard as-is (no separate "order" field anywhere), so splicing it in place
- * IS the persisted order — nothing else needs updating. */
+/** Reorders any plain `{id}`-bearing array by moving `id` to sit immediately before/after
+ * `targetId` — the shared engine behind every sidebar list's manual drag-to-reorder (Variables,
+ * Functions, and a function's Inputs/Outputs — see variablePanel.ts/functionsPanel.ts/
+ * functionIoPanel.ts). Every one of those arrays is plain and already round-trips through
+ * save/load and clipboard as-is (no separate "order" field anywhere), so splicing it in place IS
+ * the persisted order — nothing else needs updating. */
+function moveInArray<T extends { id: string }>(
+  arr: T[],
+  id: string,
+  targetId: string,
+  position: "before" | "after",
+): void {
+  if (id === targetId) return;
+  const fromIndex = arr.findIndex((item) => item.id === id);
+  if (fromIndex === -1) return;
+  const [item] = arr.splice(fromIndex, 1);
+
+  const targetIndex = arr.findIndex((item) => item.id === targetId);
+  if (targetIndex === -1) {
+    // Target vanished somehow (defensive only) — put it back where it was rather than losing it.
+    arr.splice(fromIndex, 0, item);
+    return;
+  }
+  arr.splice(position === "after" ? targetIndex + 1 : targetIndex, 0, item);
+}
+
 export function moveVariable(
   graph: Graph,
   variableId: string,
   targetVariableId: string,
   position: "before" | "after",
 ): void {
-  if (variableId === targetVariableId) return;
-  const fromIndex = graph.variables.findIndex((v) => v.id === variableId);
-  if (fromIndex === -1) return;
-  const [variable] = graph.variables.splice(fromIndex, 1);
+  moveInArray(graph.variables, variableId, targetVariableId, position);
+}
 
-  const targetIndex = graph.variables.findIndex((v) => v.id === targetVariableId);
-  if (targetIndex === -1) {
-    // Target vanished somehow (defensive only) — put it back where it was rather than losing it.
-    graph.variables.splice(fromIndex, 0, variable);
-    return;
-  }
-  graph.variables.splice(position === "after" ? targetIndex + 1 : targetIndex, 0, variable);
+export function moveFunction(
+  graph: Graph,
+  functionId: string,
+  targetFunctionId: string,
+  position: "before" | "after",
+): void {
+  moveInArray(graph.functions, functionId, targetFunctionId, position);
+}
+
+/** Reorders a function's Inputs or Outputs signature list (whichever `kind` names). */
+export function moveFunctionEntry(
+  fn: FunctionDef,
+  kind: "input" | "output",
+  entryId: string,
+  targetEntryId: string,
+  position: "before" | "after",
+): void {
+  moveInArray(kind === "input" ? fn.inputs : fn.outputs, entryId, targetEntryId, position);
 }
 
 /** Removes a variable along with any Get/Set nodes bound to it — an orphaned binding has no valid

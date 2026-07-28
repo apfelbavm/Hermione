@@ -2,6 +2,7 @@ import {
   addFunctionInput,
   addFunctionOutput,
   DEFAULT_VALUE_BY_TYPE,
+  moveFunctionEntry,
   nextId,
   removeFunctionInput,
   removeFunctionOutput,
@@ -11,6 +12,7 @@ import {
 import type { FunctionDef, PinSignatureEntry, PinType } from "../engine/types";
 import type { Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
+import { FUNCTION_IO_ENTRY_DRAG_MIME } from "./dragTypes";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
 import { createContainerSelect, createTypeSelect, createTypedValueInput } from "./typedValueInput";
@@ -38,6 +40,14 @@ export function createFunctionIoPanel(
   setupCollapsibleSection(elements.header, elements.section);
 
   let editingId: string | null = null;
+  // Same direct-classList (not store.notify()) hover-indicator approach as variablePanel.ts's own
+  // drag-to-reorder — see its comment for why a full re-render mid-drag would be actively harmful.
+  let dropIndicatorRow: HTMLElement | null = null;
+
+  function clearDropIndicator(): void {
+    dropIndicatorRow?.classList.remove("variable-row-drop-above", "variable-row-drop-below");
+    dropIndicatorRow = null;
+  }
 
   function entriesOf(fn: FunctionDef): PinSignatureEntry[] {
     return kind === "input" ? fn.inputs : fn.outputs;
@@ -67,8 +77,41 @@ export function createFunctionIoPanel(
     const removeEntry = kind === "input" ? removeFunctionInput : removeFunctionOutput;
 
     for (const entry of entries) {
+      const isEditing = editingId === entry.id;
       const row = document.createElement("div");
       row.className = "variable-row";
+      row.draggable = !isEditing;
+      row.addEventListener("dragstart", (e) => {
+        e.dataTransfer?.setData(FUNCTION_IO_ENTRY_DRAG_MIME, entry.id);
+        // Just "move" (not "copyMove" like the Variables/Functions rows) — this drag gesture has
+        // only ever one destination, reordering within this same list, never a canvas drop.
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+      });
+      row.addEventListener("dragover", (e) => {
+        if (!e.dataTransfer?.types.includes(FUNCTION_IO_ENTRY_DRAG_MIME)) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+        const rect = row.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
+        if (dropIndicatorRow !== row) clearDropIndicator();
+        row.classList.toggle("variable-row-drop-above", before);
+        row.classList.toggle("variable-row-drop-below", !before);
+        dropIndicatorRow = row;
+      });
+      row.addEventListener("dragleave", () => {
+        if (dropIndicatorRow === row) clearDropIndicator();
+      });
+      row.addEventListener("drop", (e) => {
+        if (!e.dataTransfer?.types.includes(FUNCTION_IO_ENTRY_DRAG_MIME)) return;
+        e.preventDefault();
+        const draggedId = e.dataTransfer.getData(FUNCTION_IO_ENTRY_DRAG_MIME);
+        clearDropIndicator();
+        if (!draggedId) return;
+        const rect = row.getBoundingClientRect();
+        const position = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+        moveFunctionEntry(fn, kind, draggedId, entry.id, position);
+        store.notify();
+      });
 
       let nameInputToFocus: HTMLInputElement | null = null;
       const nameEl =
