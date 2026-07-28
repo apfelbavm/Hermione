@@ -15,10 +15,6 @@
         <button id="save-button">Save</button>
         <button id="load-button">Load</button>
         <button id="compile-button">Compile</button>
-        <label id="snap-to-grid-toggle" class="toolbar-toggle">
-          <input type="checkbox" id="snap-to-grid-checkbox" />
-          Snap to Grid
-        </label>
         <input id="load-file-input" type="file" accept="application/json" style="display: none" />
       </div>
       <div id="main-area">
@@ -27,7 +23,13 @@
           <div id="canvas-container">
             <canvas id="graph-canvas"></canvas>
             <div id="overlay"></div>
-            <button id="frame-all-button" class="canvas-hud-button" title="Fit graph to view">⛶</button>
+            <div id="canvas-hud-toolbar">
+              <label id="snap-to-grid-toggle" class="toolbar-toggle">
+                <input type="checkbox" id="snap-to-grid-checkbox" />
+                Snap to Grid
+              </label>
+              <button id="frame-all-button" class="canvas-hud-button" title="Fit graph to view">⛶</button>
+            </div>
           </div>
         </div>
         <div id="sidebar-resizer" class="resizer resizer-vertical"></div>

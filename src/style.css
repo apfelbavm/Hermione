@@ -154,20 +154,33 @@ html, body {
   overflow: hidden;
 }
 
-/* "Frame All" / zoom-to-fit (see main.ts's frame-all-button handler, camera.ts's frameRect) —
-   faint by default, same "reads as interactive without a permanent visual seam" idea as .resizer,
-   just fully opaque instead of transparent since it needs to stay legible as an icon at rest. */
-.canvas-hud-button {
+/* Small floating toolbar over the canvas's top-right corner — Snap to Grid (moved out of the main
+   #toolbar) to the left of Frame All / zoom-to-fit (see main.ts's frame-all-button handler,
+   camera.ts's frameRect). Same background/border language as the main toolbar, just compact and
+   layered on top of the canvas instead of docked above it. */
+#canvas-hud-toolbar {
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 32px;
-  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid #3d4148;
+  border-radius: 6px;
+  background: rgba(36, 39, 45, 0.85);
+}
+
+/* Faint by default, same "reads as interactive without a permanent visual seam" idea as .resizer,
+   just fully opaque instead of transparent since it needs to stay legible as an icon at rest. */
+.canvas-hud-button {
+  width: 26px;
+  height: 26px;
   border: 1px solid #3d4148;
   border-radius: 4px;
   background: rgba(43, 47, 54, 0.6);
   color: #9aa0a8;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1;
   cursor: pointer;
   transition:
