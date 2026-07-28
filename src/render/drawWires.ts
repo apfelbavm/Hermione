@@ -1,9 +1,9 @@
+import { Colors } from "../engine/color";
 import { resolvePinDefs } from "../engine/graphMutations";
 import type { FunctionDef, Graph, Variable } from "../engine/types";
 import { bezierControlPoints } from "./bezier";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
-import { PIN_COLORS } from "./palette";
 import type { WireDragState } from "../state/store";
 
 export function drawWires(
@@ -27,7 +27,7 @@ export function drawWires(
     const fromNode = graph.nodes.find((n) => n.id === conn.fromNode)!;
     const pinDefs = resolvePinDefs(fromNode, variables, functions);
     const pinDef = pinDefs.find((p) => p.id === conn.fromPin);
-    const color = pinDef ? PIN_COLORS[pinDef.type] : "#888";
+    const color = pinDef ? Colors.PIN_COLORS[pinDef.type] : "#888";
 
     const fired = firedConnectionIds.has(conn.id);
     ctx.strokeStyle = fired ? "#5ad1ff" : color;
@@ -40,7 +40,7 @@ export function drawWireDragPreview(
   ctx: CanvasRenderingContext2D,
   wireDrag: WireDragState,
 ): void {
-  ctx.strokeStyle = PIN_COLORS[wireDrag.pinType];
+  ctx.strokeStyle = Colors.PIN_COLORS[wireDrag.pinType];
   ctx.lineWidth = 2;
   ctx.setLineDash([5, 4]);
   for (const from of wireDrag.fromScreens) {

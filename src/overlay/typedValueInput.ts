@@ -1,6 +1,6 @@
+import { Colors } from "../engine/color";
 import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
 import type { PinContainer, PinType } from "../engine/types";
-import { PIN_COLORS } from "../render/palette";
 
 const PIN_TYPE_OPTIONS: readonly PinType[] = ["number", "boolean", "string", "object"];
 const PIN_CONTAINER_OPTIONS: readonly PinContainer[] = ["single", "array", "set", "map"];
@@ -50,7 +50,7 @@ function isMapEntry(value: unknown): value is MapEntry {
 function createTypeDot(type: PinType): HTMLSpanElement {
   const dot = document.createElement("span");
   dot.className = "variable-type-dot";
-  dot.style.backgroundColor = PIN_COLORS[type];
+  dot.style.backgroundColor = Colors.PIN_COLORS[type];
   return dot;
 }
 

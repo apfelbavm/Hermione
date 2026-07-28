@@ -1,6 +1,6 @@
+import { Colors } from "../engine/color";
 import type { Camera } from "./camera";
 import { screenToWorld } from "./camera";
-import { CANVAS_BG, GRID_LINE_MAJOR, GRID_LINE_MINOR } from "./palette";
 
 export const GRID_SIZE = 20;
 const MINOR_SPACING = GRID_SIZE;
@@ -17,7 +17,7 @@ export function snapPositionToGrid(position: { x: number; y: number }): { x: num
 }
 
 export function drawGrid(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
-  ctx.fillStyle = CANVAS_BG;
+  ctx.fillStyle = Colors.CANVAS_BG;
   ctx.fillRect(0, 0, width, height);
 
   const spacing = MINOR_SPACING * camera.zoom;
@@ -30,7 +30,7 @@ export function drawGrid(ctx: CanvasRenderingContext2D, camera: Camera, width: n
   ctx.lineWidth = 1;
   let col = Math.round(startX / MINOR_SPACING);
   for (let wx = startX, sx = (wx - camera.x) * camera.zoom; sx < width; wx += MINOR_SPACING, sx = (wx - camera.x) * camera.zoom) {
-    ctx.strokeStyle = col % MAJOR_EVERY === 0 ? GRID_LINE_MAJOR : GRID_LINE_MINOR;
+    ctx.strokeStyle = col % MAJOR_EVERY === 0 ? Colors.GRID_LINE_MAJOR : Colors.GRID_LINE_MINOR;
     ctx.beginPath();
     ctx.moveTo(sx, 0);
     ctx.lineTo(sx, height);
@@ -40,7 +40,7 @@ export function drawGrid(ctx: CanvasRenderingContext2D, camera: Camera, width: n
 
   let row = Math.round(startY / MINOR_SPACING);
   for (let wy = startY, sy = (wy - camera.y) * camera.zoom; sy < height; wy += MINOR_SPACING, sy = (wy - camera.y) * camera.zoom) {
-    ctx.strokeStyle = row % MAJOR_EVERY === 0 ? GRID_LINE_MAJOR : GRID_LINE_MINOR;
+    ctx.strokeStyle = row % MAJOR_EVERY === 0 ? Colors.GRID_LINE_MAJOR : Colors.GRID_LINE_MINOR;
     ctx.beginPath();
     ctx.moveTo(0, sy);
     ctx.lineTo(width, sy);

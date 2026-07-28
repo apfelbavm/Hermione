@@ -1,6 +1,6 @@
+import { Colors } from "../engine/color";
 import { addVariable, DEFAULT_VALUE_BY_TYPE, getVisibleVariables, moveVariable, nextId, removeVariable, updateVariable } from "../engine/graphMutations";
 import type { Graph, PinType, Variable } from "../engine/types";
-import { PIN_COLORS } from "../render/palette";
 import type { Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
 import { VARIABLE_DRAG_MIME } from "./dragTypes";
@@ -119,8 +119,8 @@ export function createVariablePanel(
         variable.container && variable.container !== "single" ? createContainerIcon(variable.container) : null;
       const typeIcon = containerIcon ?? document.createElement("span");
       if (!containerIcon) typeIcon.className = "variable-type-dot";
-      typeIcon.style.color = PIN_COLORS[variable.type];
-      typeIcon.style.backgroundColor = containerIcon ? "" : PIN_COLORS[variable.type];
+      typeIcon.style.color = Colors.PIN_COLORS[variable.type];
+      typeIcon.style.backgroundColor = containerIcon ? "" : Colors.PIN_COLORS[variable.type];
       typeIcon.title =
         variable.container && variable.container !== "single"
           ? `${variable.container} of ${variable.type}`

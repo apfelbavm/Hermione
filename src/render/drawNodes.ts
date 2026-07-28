@@ -1,3 +1,4 @@
+import { Colors } from "../engine/color";
 import { resolveNodeLabel } from "../engine/graphMutations";
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { getNodeDef, topLevelGroup } from "../engine/registry";
@@ -5,16 +6,6 @@ import type { FunctionDef, Graph, NodeDef, NodeInstance, PinDef, Variable } from
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
 import { NODE_HEADER_HEIGHT, PIN_RADIUS } from "./layout";
-import {
-  NODE_BODY_BG,
-  NODE_BORDER,
-  NODE_BORDER_SELECTED,
-  NODE_HEADER_BG,
-  NODE_HEADER_DEFAULT,
-  PIN_COLORS,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
-} from "./palette";
 
 /** A node bound to a Variable (Get/Set) is colored by that variable's TYPE (the same color its pin
  * would be) instead of the generic "Variables" group color — so at a glance, a graph full of
@@ -22,9 +13,9 @@ import {
 function resolveNodeHeaderColor(node: NodeInstance, def: NodeDef, variables: Variable[]): string {
   if (node.variableId) {
     const variable = variables.find((v) => v.id === node.variableId);
-    if (variable) return PIN_COLORS[variable.type];
+    if (variable) return Colors.PIN_COLORS[variable.type];
   }
-  return NODE_HEADER_BG[topLevelGroup(def.group)] ?? NODE_HEADER_DEFAULT;
+  return Colors.NODE_HEADER_BG[topLevelGroup(def.group)] ?? Colors.NODE_HEADER_DEFAULT;
 }
 
 export function drawNodes(
@@ -56,15 +47,15 @@ export function drawNodes(
     const borderColor = isExecuting
       ? "#5ad1ff"
       : selectedNodeIds.has(node.id)
-        ? NODE_BORDER_SELECTED
-        : NODE_BORDER;
+        ? Colors.NODE_BORDER_SELECTED
+        : Colors.NODE_BORDER;
 
     if (def.compact) {
       // A reroute "knot" (see NodeDef.compact) — just a small body + border, no header bar or
       // label; its pins (drawn below, same as any other node) carry all the visual meaning.
       ctx.beginPath();
       ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 4 * camera.zoom);
-      ctx.fillStyle = NODE_BODY_BG;
+      ctx.fillStyle = Colors.NODE_BODY_BG;
       ctx.fill();
       ctx.lineWidth = borderWidth;
       ctx.strokeStyle = borderColor;
@@ -72,7 +63,7 @@ export function drawNodes(
     } else {
       ctx.beginPath();
       ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom);
-      ctx.fillStyle = NODE_BODY_BG;
+      ctx.fillStyle = Colors.NODE_BODY_BG;
       ctx.fill();
 
       const headerHeight = NODE_HEADER_HEIGHT * camera.zoom;
@@ -96,7 +87,7 @@ export function drawNodes(
         drawLatentIcon(ctx, geo.screenX + geo.width, geo.screenY, 8 * camera.zoom);
       }
 
-      ctx.fillStyle = TEXT_PRIMARY;
+      ctx.fillStyle = Colors.TEXT_PRIMARY;
       ctx.textAlign = "left";
       ctx.fillText(
         resolveNodeLabel(node, def, variables, functions),
@@ -110,7 +101,7 @@ export function drawNodes(
       const connected = connectionsTouchingPin(graph, node.id, pinLayout.pin.id).length > 0;
       drawPinShape(ctx, pos.x, pos.y, PIN_RADIUS * camera.zoom, pinLayout.pin, connected);
 
-      ctx.fillStyle = TEXT_MUTED;
+      ctx.fillStyle = Colors.TEXT_MUTED;
       if (pinLayout.pin.direction === "input") {
         ctx.textAlign = "left";
         ctx.fillText(pinLayout.pin.label, pos.x + 10 * camera.zoom, pos.y);
@@ -124,12 +115,12 @@ export function drawNodes(
       const r = geo.addButtonScreen;
       ctx.beginPath();
       ctx.roundRect(r.x, r.y, r.width, r.height, 3 * camera.zoom);
-      ctx.fillStyle = NODE_HEADER_DEFAULT;
+      ctx.fillStyle = Colors.NODE_HEADER_DEFAULT;
       ctx.fill();
-      ctx.strokeStyle = NODE_BORDER;
+      ctx.strokeStyle = Colors.NODE_BORDER;
       ctx.lineWidth = 1;
       ctx.stroke();
-      ctx.fillStyle = TEXT_PRIMARY;
+      ctx.fillStyle = Colors.TEXT_PRIMARY;
       ctx.textAlign = "center";
       ctx.fillText("+", r.x + r.width / 2, r.y + r.height / 2 + 1);
     }
@@ -171,7 +162,7 @@ function drawPinShape(
 ): void {
   // Map pins are colored by their VALUE type (pin.type) — the key type isn't drawn on the dot,
   // only visible via the type-select controls (see typedValueInput.ts).
-  const color = PIN_COLORS[pin.type];
+  const color = Colors.PIN_COLORS[pin.type];
   ctx.fillStyle = color;
   if (pin.type === "exec") {
     ctx.beginPath();

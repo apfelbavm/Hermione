@@ -1,6 +1,6 @@
+import { Colors } from "../engine/color";
 import type { MarqueeSelectionState } from "../state/store";
 import { worldToScreen, type Camera } from "./camera";
-import { hexToRgba } from "./palette";
 
 const MARQUEE_COLOR = "#5ad1ff";
 
@@ -18,7 +18,7 @@ export function drawMarqueeSelection(
   const width = Math.abs(current.x - start.x);
   const height = Math.abs(current.y - start.y);
 
-  ctx.fillStyle = hexToRgba(MARQUEE_COLOR, 0.12);
+  ctx.fillStyle = Colors.hexToRgba(MARQUEE_COLOR, 0.12);
   ctx.fillRect(x, y, width, height);
   ctx.strokeStyle = MARQUEE_COLOR;
   ctx.lineWidth = 1;
