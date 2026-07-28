@@ -13,8 +13,9 @@ type VisitingFunctionIds = ReadonlySet<string>;
  * within the current one. True in exactly three cases:
  *   1. Its own NodeDef is unconditionally latent (Delay, Send Email mock, HTTP Request).
  *   2. It's a Call Function node whose target function's body transitively contains a latent node.
- *   3. It's a loop node (NodeDef.latentBodyPin, e.g. For Loop's "loop-body") whose own re-entrant
- *      body sub-chain transitively contains a latent node.
+ *   3. It's a node with its own re-entrant body pin(s) (NodeDef.latentBodyPins — For Loop/Array,
+ *      Set,Map For Each's "loop-body", or Sequence's every "then-N") whose sub-chain(s)
+ *      transitively contain a latent node.
  * A node earlier in the same sequence as a latent node is NOT itself latent — same as Unreal,
  * where only the actual latent node (and any function/macro call wrapping one) gets the clock icon. */
 export function isNodeLatent(
@@ -33,27 +34,27 @@ export function isNodeLatent(
     return isFunctionLatent(fn, rootGraph, new Set([...visitingFunctionIds, node.functionId]));
   }
 
-  if (def.latentBodyPin) {
-    return isChainLatent(graph, rootGraph, node.id, def.latentBodyPin, visitingFunctionIds);
+  if (def.latentBodyPins) {
+    return isChainLatent(graph, rootGraph, node.id, def.latentBodyPins(node), visitingFunctionIds);
   }
 
   return false;
 }
 
-/** True if any node transitively reachable via exec wires starting at (startNodeId, startPinId)
- * is latent (see isNodeLatent) — used for a loop node's own body sub-chain. Walks EVERY exec-out
- * pin of each node it reaches (not just the starting pin), since the body chain can branch/
+/** True if any node transitively reachable via exec wires starting at any of (startNodeId,
+ * startPinIds) is latent (see isNodeLatent) — used for a node's own body sub-chain(s). Walks EVERY
+ * exec-out pin of each node it reaches (not just the starting pin), since a body chain can branch/
  * sequence through several nodes before looping back or ending. */
 function isChainLatent(
   graph: Graph,
   rootGraph: Graph,
   startNodeId: string,
-  startPinId: string,
+  startPinIds: string[],
   visitingFunctionIds: VisitingFunctionIds,
 ): boolean {
   const variables = getVisibleVariables(rootGraph, graph);
   const visitedNodeIds = new Set<string>();
-  const queue: Array<{ nodeId: string; pinId: string }> = [{ nodeId: startNodeId, pinId: startPinId }];
+  const queue: Array<{ nodeId: string; pinId: string }> = startPinIds.map((pinId) => ({ nodeId: startNodeId, pinId }));
 
   while (queue.length > 0) {
     const { nodeId, pinId } = queue.shift()!;

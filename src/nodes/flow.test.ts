@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "./index";
 import { createExecutionContext, runExecFrom } from "../engine/executor";
-import { connectPins, createNodeInstance } from "../engine/graphMutations";
+import { connectPins, createNodeInstance, removeInstancePin } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import { createEmptyGraph, type Graph } from "../engine/types";
 
@@ -94,5 +94,81 @@ describe("flow.forLoop", () => {
     await runExecFrom("loop", "exec-in", ctx);
 
     expect(logs).toEqual(["Done"]);
+  });
+});
+
+describe("flow.sequence", () => {
+  it("starts with exactly two removable 'Then' pins", () => {
+    const def = getNodeDef("flow.sequence");
+    const node = createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
+    const pins = def.deriveInstancePins!(node);
+    expect(pins.map((p) => p.id)).toEqual(["exec-in", "then-0", "then-1"]);
+    expect(pins.find((p) => p.id === "then-0")?.removable).toBe(true);
+    expect(pins.find((p) => p.id === "then-1")?.removable).toBe(true);
+  });
+
+  it("adds a third 'Then 2' pin via addInstancePinEntry", () => {
+    const def = getNodeDef("flow.sequence");
+    const node = createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
+    def.addInstancePinEntry!(node);
+    const pins = def.deriveInstancePins!(node);
+    expect(pins.map((p) => p.id)).toEqual(["exec-in", "then-0", "then-1", "then-2"]);
+    expect(pins.find((p) => p.id === "then-2")?.label).toBe("Then 2");
+  });
+
+  it("renumbers labels contiguously after removing a middle entry, keeping the underlying pin ids", () => {
+    const graph = createEmptyGraph("g", "root");
+    const def = getNodeDef("flow.sequence");
+    const node = createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
+    graph.nodes.push(node);
+    def.addInstancePinEntry!(node); // now then-0, then-1, then-2
+
+    removeInstancePin(graph, "seq", "then-1");
+
+    const pins = def.deriveInstancePins!(node);
+    expect(pins.map((p) => p.id)).toEqual(["exec-in", "then-0", "then-2"]);
+    expect(pins.map((p) => p.label)).toEqual(["", "Then 0", "Then 1"]);
+  });
+
+  it("runs each Then branch's ENTIRE chain to completion, in order, before starting the next — not interleaved", async () => {
+    const graph = createEmptyGraph("g", "test");
+    addBuiltinNode(graph, "flow.sequence", "seq");
+    const delay = addBuiltinNode(graph, "flow.delay", "delay");
+    delay.pins.duration.value = 5;
+    const printA = addBuiltinNode(graph, "debug.print", "printA");
+    printA.pins.message.value = "A";
+    const printB = addBuiltinNode(graph, "debug.print", "printB");
+    printB.pins.message.value = "B";
+
+    // Then 0's chain: Delay -> "A". Then 1: immediately "B". If Then 1 ran interleaved with Then
+    // 0's async delay instead of strictly after it finished, "B" would log BEFORE "A".
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "seq", fromPin: "then-0", toNode: "delay", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "delay", fromPin: "exec-out", toNode: "printA", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "seq", fromPin: "then-1", toNode: "printB", toPin: "exec-in" });
+
+    const logs: string[] = [];
+    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
+    await runExecFrom("seq", "exec-in", ctx);
+
+    expect(logs).toEqual(["A", "B"]);
+  });
+
+  it("when disabled, runs NONE of the Then branches", async () => {
+    const graph = createEmptyGraph("g", "test");
+    const seq = addBuiltinNode(graph, "flow.sequence", "seq");
+    seq.disabled = true;
+    const printA = addBuiltinNode(graph, "debug.print", "printA");
+    printA.pins.message.value = "A";
+    const printB = addBuiltinNode(graph, "debug.print", "printB");
+    printB.pins.message.value = "B";
+
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "seq", fromPin: "then-0", toNode: "printA", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "seq", fromPin: "then-1", toNode: "printB", toPin: "exec-in" });
+
+    const logs: string[] = [];
+    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
+    await runExecFrom("seq", "exec-in", ctx);
+
+    expect(logs).toEqual([]);
   });
 });

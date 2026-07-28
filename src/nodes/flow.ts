@@ -2,6 +2,7 @@ import { registerNode } from "../engine/registry";
 import { DELAY_HELPER_SOURCE, indent } from "../engine/compileUtils";
 import { runExecFrom } from "../engine/executor";
 import { connectionsFrom } from "../engine/graphQueries";
+import type { NodeInstance, PinDef } from "../engine/types";
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -96,8 +97,8 @@ registerNode({
   disabledNextExec: ["completed"],
   // For Loop isn't itself unconditionally latent (a body with no Delay/HTTP Request/etc. completes
   // within one tick), but if its body DOES contain one, this node shows the clock icon too — same
-  // reasoning as a Function containing a latent node. See NodeDef.latentBodyPin/latency.ts.
-  latentBodyPin: "loop-body",
+  // reasoning as a Function containing a latent node. See NodeDef.latentBodyPins/latency.ts.
+  latentBodyPins: () => ["loop-body"],
   // Runs the ENTIRE chain wired to "loop-body" to completion once per index from Start up to AND
   // INCLUDING End, awaiting each iteration before starting the next — mirrors function.call
   // awaiting runFunctionCall, just walking a chain in this SAME graph instead of a function's body.
@@ -129,4 +130,74 @@ registerNode({
   // Compiler support (compileExecute/compileEvaluate) is intentionally out of scope for now — same
   // call as function.entry/return/call in function.ts. Compiling a graph containing one throws the
   // existing "no compileExecute"/"no compileEvaluate" error, an honest failure mode until it lands.
+});
+
+// --- Sequence: Unreal-style ordered fan-out — one exec input, N exec outputs ("Then 0", "Then 1",
+// ...), expandable via the canvas "+" affordance exactly like Append String's string slots (see
+// string.ts) — the NodeInstance's own pins ARE the source of truth for how many "then-N" pins
+// exist. Each one's ENTIRE downstream chain is awaited to completion before the next starts —
+// this needs its own execute() (rather than just returning `nextExec: [...all of them]`) because
+// runExecFrom's shared FIFO queue would otherwise interleave multiple Then branches breadth-first
+// instead of running each one all the way through first, same reasoning as For Loop's body.
+
+const THEN_PREFIX = "then-";
+const MIN_SEQUENCE_ENTRIES = 1;
+
+function thenSuffix(pinId: string): number {
+  return Number(pinId.slice(THEN_PREFIX.length));
+}
+
+function sequenceThenIds(node: NodeInstance): string[] {
+  return Object.keys(node.pins)
+    .filter((id) => id.startsWith(THEN_PREFIX))
+    .sort((a, b) => thenSuffix(a) - thenSuffix(b));
+}
+
+function sequenceThenPinDefs(node: NodeInstance): PinDef[] {
+  const ids = sequenceThenIds(node);
+  return ids.map((id, i) => ({
+    id,
+    label: `Then ${i}`,
+    type: "exec" as const,
+    direction: "output" as const,
+    removable: ids.length > MIN_SEQUENCE_ENTRIES,
+  }));
+}
+
+registerNode({
+  type: "flow.sequence",
+  label: "Sequence",
+  group: "Flow Control",
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    { id: `${THEN_PREFIX}0`, label: "Then 0", type: "exec", direction: "output" },
+    { id: `${THEN_PREFIX}1`, label: "Then 1", type: "exec", direction: "output" },
+  ],
+  deriveInstancePins: (node) => [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    ...sequenceThenPinDefs(node),
+  ],
+  addInstancePinEntry: (node) => {
+    const suffixes = sequenceThenIds(node).map(thenSuffix);
+    const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
+    node.pins[`${THEN_PREFIX}${nextSuffix}`] = {};
+  },
+  // Disabled means "run none of the Then branches" — the generic disabled behavior (fire every
+  // exec-out pin) would instead run every branch once, which is exactly backwards for a node whose
+  // whole purpose IS running its branches; there's nothing else to "continue to" from a Sequence
+  // either way (it has no pin analogous to For Loop's "completed"). See NodeDef.disabledNextExec.
+  disabledNextExec: [],
+  // Latent only if one of its branches is — same reasoning as For Loop. See NodeDef.latentBodyPins.
+  latentBodyPins: (node) => sequenceThenIds(node),
+  execute: async ({ node, ctx }) => {
+    for (const thenId of sequenceThenIds(node)) {
+      for (const conn of connectionsFrom(ctx.graph, node.id, thenId)) {
+        await runExecFrom(conn.toNode, conn.toPin, ctx);
+      }
+    }
+    return {};
+  },
+  // Compiler support is intentionally out of scope for now — same call as For Loop/Array,Set,Map
+  // For Each (no compileExecute yet). Disabling still compiles fine regardless (see codegen.ts's
+  // disabled branch, which never needs the node's own compileExecute).
 });

@@ -137,13 +137,14 @@ export interface NodeDef {
    * function marker. See also latentBodyPin and src/engine/latency.ts for how this propagates
    * through Call Function / loop nodes that merely CONTAIN a latent node rather than being one. */
   latent?: boolean;
-  /** Present only on a node whose OWN exec-out pin represents a self-contained sub-chain it
-   * re-enters/awaits on the caller's behalf — currently just "loop-body" for For Loop and the
-   * Array/Set/Map For Each nodes. If that sub-chain transitively contains a latent node, this node
-   * is ALSO latent (same reasoning as a Function whose body contains one — see
+  /** Present only on a node whose OWN exec-out pin(s) represent self-contained sub-chain(s) it
+   * re-enters/awaits on the caller's behalf — "loop-body" for For Loop and the Array/Set/Map For
+   * Each nodes, or every "then-N" pin for Sequence (hence a function of the instance, not a fixed
+   * list — Sequence's pins are dynamic). If any of those sub-chains transitively contains a latent
+   * node, this node is ALSO latent (same reasoning as a Function whose body contains one — see
    * src/engine/latency.ts's isNodeLatent/isFunctionLatent) even though the node type itself isn't
    * unconditionally `latent`. */
-  latentBodyPin?: string;
+  latentBodyPins?: (node: NodeInstance) => string[];
 }
 
 export interface Pin {

@@ -614,7 +614,7 @@ body.resizing {
 .node-search-menu {
   position: absolute;
   width: 220px;
-  max-height: 280px;
+  max-height: 480px;
   background: #24272d;
   border: 1px solid #454a52;
   border-radius: 6px;
