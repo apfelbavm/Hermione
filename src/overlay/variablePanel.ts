@@ -1,4 +1,4 @@
-import { addVariable, DEFAULT_VALUE_BY_TYPE, getVisibleVariables, nextId, removeVariable, updateVariable } from "../engine/graphMutations";
+import { addVariable, DEFAULT_VALUE_BY_TYPE, getVisibleVariables, moveVariable, nextId, removeVariable, updateVariable } from "../engine/graphMutations";
 import type { Graph, PinType, Variable } from "../engine/types";
 import { PIN_COLORS } from "../render/palette";
 import type { Store } from "../state/store";
@@ -31,6 +31,16 @@ export function createVariablePanel(
   setupCollapsibleSection(elements.header, elements.section);
 
   let editingId: string | null = null;
+  // Tracks the row currently showing the drop-position indicator during a manual reorder drag —
+  // cleared/reassigned directly via classList (NOT store.notify()) so hovering across rows stays
+  // purely cosmetic and never triggers a full re-render mid-drag, which would replace the very DOM
+  // node the browser's native drag gesture is tracking.
+  let dropIndicatorRow: HTMLElement | null = null;
+
+  function clearDropIndicator(): void {
+    dropIndicatorRow?.classList.remove("variable-row-drop-above", "variable-row-drop-below");
+    dropIndicatorRow = null;
+  }
 
   function commitRename(variable: Variable, rawNewName: string): void {
     const trimmed = rawNewName.trim();
@@ -59,7 +69,45 @@ export function createVariablePanel(
       row.draggable = !isEditing;
       row.addEventListener("dragstart", (e) => {
         e.dataTransfer?.setData(VARIABLE_DRAG_MIME, variable.id);
-        if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
+        // "copyMove" (not just "copy") since this ONE drag gesture now serves two different drop
+        // targets with two different effects: dropping on the canvas spawns a Get/Set node (copy,
+        // set by main.ts's own canvas dragover), dropping on another row here reorders in place
+        // (move, set below). A dropEffect the dragstart's effectAllowed doesn't include is exactly
+        // the kind of mismatch real browsers silently refuse to complete the drop for — this bit
+        // us for real (drop simply never fired), even though it's invisible to synthetic/automated
+        // drag-and-drop testing that doesn't enforce it as strictly.
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
+      });
+
+      // Dropping this SAME drag gesture back onto another row in this list reorders variables
+      // in place (see moveVariable) instead of spawning a Get/Set node — that only happens when
+      // the drop lands on the canvas (see main.ts's own dragover/drop on the canvas element,
+      // a completely different drop target, so the two behaviors never conflict).
+      row.addEventListener("dragover", (e) => {
+        if (!e.dataTransfer?.types.includes(VARIABLE_DRAG_MIME)) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+        const rect = row.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
+        if (dropIndicatorRow !== row) clearDropIndicator();
+        row.classList.toggle("variable-row-drop-above", before);
+        row.classList.toggle("variable-row-drop-below", !before);
+        dropIndicatorRow = row;
+      });
+      row.addEventListener("dragleave", () => {
+        if (dropIndicatorRow === row) clearDropIndicator();
+      });
+      row.addEventListener("drop", (e) => {
+        if (!e.dataTransfer?.types.includes(VARIABLE_DRAG_MIME)) return;
+        e.preventDefault();
+        e.stopPropagation(); // don't also let this bubble to the canvas's own drop handler
+        const draggedId = e.dataTransfer.getData(VARIABLE_DRAG_MIME);
+        clearDropIndicator();
+        if (!draggedId) return;
+        const rect = row.getBoundingClientRect();
+        const position = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+        moveVariable(getGraph(), draggedId, variable.id, position);
+        store.notify();
       });
 
       // One icon per row, always colored by the variable's type (same color its pin/node header

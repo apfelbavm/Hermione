@@ -8,6 +8,7 @@ import {
   createNodeInstance,
   hasConnectedDataOutput,
   insertRerouteOnConnection,
+  moveVariable,
   removeNode,
   removeVariable,
   resolveNodeLabel,
@@ -335,5 +336,51 @@ describe("insertRerouteOnConnection", () => {
     const graph = createEmptyGraph("g", "root");
     insertRerouteOnConnection(graph, graph.variables, graph.functions, "nonexistent", { x: 0, y: 0 });
     expect(graph.nodes).toHaveLength(0);
+  });
+});
+
+describe("moveVariable", () => {
+  function buildGraphWithVariables(...names: string[]) {
+    const graph = createEmptyGraph("g", "root");
+    for (const name of names) {
+      graph.variables.push({ id: name, name, type: "number", defaultValue: 0 });
+    }
+    return graph;
+  }
+
+  it("moves a variable to sit immediately before the target", () => {
+    const graph = buildGraphWithVariables("a", "b", "c", "d");
+    moveVariable(graph, "d", "b", "before");
+    expect(graph.variables.map((v) => v.id)).toEqual(["a", "d", "b", "c"]);
+  });
+
+  it("moves a variable to sit immediately after the target", () => {
+    const graph = buildGraphWithVariables("a", "b", "c", "d");
+    moveVariable(graph, "a", "c", "after");
+    expect(graph.variables.map((v) => v.id)).toEqual(["b", "c", "a", "d"]);
+  });
+
+  it("moving a variable backwards past the target lands in the right spot", () => {
+    const graph = buildGraphWithVariables("a", "b", "c", "d");
+    moveVariable(graph, "c", "a", "before");
+    expect(graph.variables.map((v) => v.id)).toEqual(["c", "a", "b", "d"]);
+  });
+
+  it("is a no-op when dropped onto itself", () => {
+    const graph = buildGraphWithVariables("a", "b", "c");
+    moveVariable(graph, "b", "b", "before");
+    expect(graph.variables.map((v) => v.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("is a no-op when the dragged variable id doesn't exist", () => {
+    const graph = buildGraphWithVariables("a", "b", "c");
+    moveVariable(graph, "nonexistent", "b", "after");
+    expect(graph.variables.map((v) => v.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("puts the variable back where it was if the target id doesn't exist", () => {
+    const graph = buildGraphWithVariables("a", "b", "c");
+    moveVariable(graph, "a", "nonexistent", "after");
+    expect(graph.variables.map((v) => v.id)).toEqual(["a", "b", "c"]);
   });
 });

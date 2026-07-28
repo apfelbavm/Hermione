@@ -380,6 +380,31 @@ export function addVariable(graph: Graph, variable: Variable): void {
   graph.variables.push(variable);
 }
 
+/** Reorders `graph.variables` by moving `variableId` to sit immediately before/after
+ * `targetVariableId` — drives the Variables panel's manual drag-to-reorder (see
+ * variablePanel.ts). `graph.variables` is a plain array and already round-trips through
+ * save/load and clipboard as-is (no separate "order" field anywhere), so splicing it in place
+ * IS the persisted order — nothing else needs updating. */
+export function moveVariable(
+  graph: Graph,
+  variableId: string,
+  targetVariableId: string,
+  position: "before" | "after",
+): void {
+  if (variableId === targetVariableId) return;
+  const fromIndex = graph.variables.findIndex((v) => v.id === variableId);
+  if (fromIndex === -1) return;
+  const [variable] = graph.variables.splice(fromIndex, 1);
+
+  const targetIndex = graph.variables.findIndex((v) => v.id === targetVariableId);
+  if (targetIndex === -1) {
+    // Target vanished somehow (defensive only) — put it back where it was rather than losing it.
+    graph.variables.splice(fromIndex, 0, variable);
+    return;
+  }
+  graph.variables.splice(position === "after" ? targetIndex + 1 : targetIndex, 0, variable);
+}
+
 /** Removes a variable along with any Get/Set nodes bound to it — an orphaned binding has no valid
  * pins. `variables`/`functions` must be the full VISIBLE sets for `graph` (see getVisibleVariables)
  * so removeNode can correctly restore a literal default on whatever was downstream of a removed
