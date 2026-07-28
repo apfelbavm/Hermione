@@ -61,7 +61,12 @@ export class Color {
   }
 
   toHex(): string {
-    const value = (((this.r & 255) << 24) | ((this.g & 255) << 16) | ((this.b & 255) << 8) | (this.a & 255)) >>> 0;
+    const value =
+      (((this.r & 255) << 24) |
+        ((this.g & 255) << 16) |
+        ((this.b & 255) << 8) |
+        (this.a & 255)) >>>
+      0;
 
     return `#${value.toString(16).padStart(8, "0").toUpperCase()}`;
   }
@@ -86,23 +91,31 @@ export namespace Colors {
   export const CANVAS_BG = "#1e2126";
   export const GRID_LINE_MINOR = "#2a2e35";
   export const GRID_LINE_MAJOR = "#333842";
+  export const NODE_HEADER_DEFAULT = "#44494f";
+  // Referenced by more than one NODE_HEADER_BG entry below — a plain local so those entries can
+  // never drift apart from each other.
+  const FLOW_CONTROL_BG = "#3b6b8a";
   export const NODE_HEADER_BG: Record<string, string> = {
     Events: "#8a3b3b",
-    "Flow Control": "#3b6b8a",
-    Math: "#3b8a5c",
+    "Flow Control": FLOW_CONTROL_BG,
+    Math: PIN_COLORS.number,
     Debug: "#6b6b3b",
     Variables: "#7a4f9b",
-    Actions: "#9b6b2f",
+    // No separate color of its own anymore — reads as the same category as Flow Control (Branch,
+    // Delay, Sequence, etc.).
+    Actions: FLOW_CONTROL_BG,
     // Same color as a "string" pin/wire, tying the whole node category to that type visually.
     String: PIN_COLORS.string,
     Collections: "#5a4a8a",
     Auth: "#a13d5c",
+    // Entry/Return/Call (see function.ts) — function-flow related, but a distinct concept from
+    // Flow Control itself, so a neutral grey (matching the generic fallback) rather than its own hue.
+    Functions: NODE_HEADER_DEFAULT,
   };
-  export const NODE_HEADER_DEFAULT = "#44494f";
   export const NODE_BODY_BG = "#2b2f36";
   export const NODE_BORDER = "#3d4148";
   export const NODE_BORDER_SELECTED = "#e8b339";
-  export const WIRE_COLOR_EXEC = "#f2f2f2";
+  export const WIRE_COLOR_EXEC = PIN_COLORS.exec;
   export const TEXT_PRIMARY = "#e8e8e8";
   export const TEXT_MUTED = "#9aa0a8";
 
