@@ -8,6 +8,7 @@ import "./function";
 import "./string";
 import "./http";
 import "./auth";
+import "./oauth2Saml";
 import "./array";
 import "./set";
 import "./map";
