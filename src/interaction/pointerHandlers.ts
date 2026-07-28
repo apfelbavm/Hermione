@@ -393,10 +393,23 @@ export function setupPointerInteraction(
     const nodeHit = hitTestNode(graph, geometries, pos.x, pos.y);
     if (!nodeHit) return;
     const node = graph.nodes.find((n) => n.id === nodeHit.nodeId);
-    if (!node || node.type !== "function.call" || !node.functionId) return;
+    if (!node) return;
 
-    openFunctionTab(store.state, node.functionId);
-    store.notify();
+    if (node.type === "function.call" && node.functionId) {
+      openFunctionTab(store.state, node.functionId);
+      store.notify();
+      return;
+    }
+
+    // Any Get/Set Variable node instance — jump to that variable in the sidebar list (highlighting
+    // it there, same as clicking its row directly) and the Details panel, mirroring the Call
+    // Function double-click above. The plain click that precedes this dblclick already cleared
+    // sidebarSelection (see mousedown's unconditional reset) and selected the node itself, so
+    // setting it here afterward correctly wins in detailsPanel.ts's own precedence order.
+    if (node.variableId) {
+      store.state.sidebarSelection = { kind: "variable", variableId: node.variableId };
+      store.notify();
+    }
   });
 
   window.addEventListener("mousemove", (e) => {
