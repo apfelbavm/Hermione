@@ -149,6 +149,71 @@ export function setupPointerInteraction(
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
+  // --- Auto-pan while dragging a new wire off a pin and holding the cursor near (or past) the
+  // canvas edge — otherwise a wire couldn't reach a pin that's currently off-screen without the
+  // user separately panning first. Runs its own requestAnimationFrame ticker (rather than reacting
+  // only to mousemove) since the whole point is to keep panning while the mouse stays HELD STILL
+  // right at the edge — no further mousemove events fire in that case.
+  const AUTO_PAN_EDGE_MARGIN = 50; // canvas px from an edge where auto-pan kicks in
+  const AUTO_PAN_MAX_SPEED = 16; // canvas px panned per animation frame, right at/past the edge
+  let autoPanFrame: number | null = null;
+
+  /** 0 outside the margin, ramping up to `maxSpeed` right at (and beyond) the edge itself. */
+  function edgePanComponent(distanceFromEdge: number, margin: number, maxSpeed: number): number {
+    if (distanceFromEdge >= margin) return 0;
+    const t = 1 - Math.max(0, distanceFromEdge) / margin;
+    return t * maxSpeed;
+  }
+
+  function computeAutoPanDelta(pos: { x: number; y: number }, width: number, height: number) {
+    return {
+      dx: edgePanComponent(pos.x, AUTO_PAN_EDGE_MARGIN, AUTO_PAN_MAX_SPEED) -
+        edgePanComponent(width - pos.x, AUTO_PAN_EDGE_MARGIN, AUTO_PAN_MAX_SPEED),
+      dy: edgePanComponent(pos.y, AUTO_PAN_EDGE_MARGIN, AUTO_PAN_MAX_SPEED) -
+        edgePanComponent(height - pos.y, AUTO_PAN_EDGE_MARGIN, AUTO_PAN_MAX_SPEED),
+    };
+  }
+
+  /** Recomputes the in-flight wire-drag preview's screen endpoints from the CURRENT camera —
+   * shared by the mousemove handler (cursor actually moved) and the auto-pan ticker (camera moved
+   * under a stationary cursor instead), since both change what a fixed-world-position pin's own
+   * screen position resolves to. */
+  function updateWireDragPreview(): void {
+    if ((drag.kind !== "wire" && drag.kind !== "wire-multi") || !store.state.wireDrag) return;
+    const graph = getEditingGraph(store.state);
+    const { camera } = store.state;
+    const variables = getVisibleVariablesForState(store.state);
+    const functions = store.state.rootGraph.functions;
+    const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
+
+    if (drag.kind === "wire") {
+      const anchorScreen = geometries.get(drag.anchor.nodeId)?.pinScreen[drag.anchor.pinId];
+      if (anchorScreen) store.state.wireDrag.fromScreens = [anchorScreen];
+    } else {
+      store.state.wireDrag.fromScreens = drag.anchors
+        .map((a) => geometries.get(a.nodeId)?.pinScreen[a.pinId])
+        .filter((p): p is { x: number; y: number } => !!p);
+    }
+    store.state.wireDrag.toScreen = lastMouseScreenPos;
+  }
+
+  function startAutoPanLoop(): void {
+    if (autoPanFrame !== null) return;
+    const tick = () => {
+      autoPanFrame = null;
+      if (drag.kind !== "wire" && drag.kind !== "wire-multi") return; // drag ended — stop rescheduling
+      const rect = canvas.getBoundingClientRect();
+      const { dx, dy } = computeAutoPanDelta(lastMouseScreenPos, rect.width, rect.height);
+      if (dx !== 0 || dy !== 0) {
+        panCamera(store.state.camera, dx, dy);
+        updateWireDragPreview();
+        store.notify();
+      }
+      autoPanFrame = requestAnimationFrame(tick);
+    };
+    autoPanFrame = requestAnimationFrame(tick);
+  }
+
   canvas.addEventListener("mousedown", (e) => {
     // Any click inside the graph view — regardless of what it hits — stands down whatever
     // Variables/Functions sidebar row was selected, so the Details panel only ever reflects
@@ -212,6 +277,7 @@ export function setupPointerInteraction(
           pinType: anchors[0].pin.type,
           anchorDirection: anchors[0].pin.direction,
         };
+        startAutoPanLoop();
         store.notify();
         return;
       }
@@ -239,6 +305,7 @@ export function setupPointerInteraction(
         pinType: anchor.pin.type,
         anchorDirection: anchor.pin.direction,
       };
+      startAutoPanLoop();
       store.notify();
       return;
     }
@@ -385,31 +452,8 @@ export function setupPointerInteraction(
       return;
     }
 
-    if (drag.kind === "wire") {
-      const pos = screenPos(e);
-      const variables = getVisibleVariablesForState(store.state);
-      const functions = store.state.rootGraph.functions;
-      const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
-      const anchorScreen = geometries.get(drag.anchor.nodeId)?.pinScreen[drag.anchor.pinId];
-      if (anchorScreen && store.state.wireDrag) {
-        store.state.wireDrag.fromScreens = [anchorScreen];
-        store.state.wireDrag.toScreen = pos;
-      }
-      store.notify();
-      return;
-    }
-
-    if (drag.kind === "wire-multi") {
-      const pos = screenPos(e);
-      const variables = getVisibleVariablesForState(store.state);
-      const functions = store.state.rootGraph.functions;
-      const geometries = computeAllNodeGeometries(graph, camera, variables, functions);
-      if (store.state.wireDrag) {
-        store.state.wireDrag.fromScreens = drag.anchors
-          .map((a) => geometries.get(a.nodeId)?.pinScreen[a.pinId])
-          .filter((p): p is { x: number; y: number } => !!p);
-        store.state.wireDrag.toScreen = pos;
-      }
+    if (drag.kind === "wire" || drag.kind === "wire-multi") {
+      updateWireDragPreview();
       store.notify();
       return;
     }
@@ -466,6 +510,10 @@ export function setupPointerInteraction(
 
       store.state.wireDrag = null;
       drag = { kind: "none" };
+      if (autoPanFrame !== null) {
+        cancelAnimationFrame(autoPanFrame);
+        autoPanFrame = null;
+      }
       store.notify();
       if (!connected) callbacks.onWireDroppedInEmptySpace(anchors, pos);
       return;
