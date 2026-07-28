@@ -18,6 +18,9 @@ registerNode({
     },
     { id: "url", label: "URL", type: "string", direction: "input", defaultValue: "" },
     { id: "headers", label: "Headers (JSON)", type: "string", direction: "input", defaultValue: "{}" },
+    // A plain { header, value } object — see auth.ts for why this is a separate node's output
+    // rather than baked-in credential pins here, and how it composes with an object Variable.
+    { id: "auth", label: "Auth", type: "object", direction: "input", defaultValue: null },
     { id: "body", label: "Body", type: "string", direction: "input", defaultValue: "" },
     { id: "timeoutMs", label: "Timeout (ms)", type: "number", direction: "input", defaultValue: 10000, integer: true },
     { id: "exec-out", label: "Completed", type: "exec", direction: "output" },
@@ -43,11 +46,19 @@ registerNode({
 
     try {
       const rawHeaders = String(inputs.headers ?? "").trim();
-      const headers = rawHeaders ? JSON.parse(rawHeaders) : undefined;
+      const headers: Record<string, string> | undefined = rawHeaders ? JSON.parse(rawHeaders) : undefined;
+
+      // See auth.ts — any wired auth node's { header, value } output wins over a same-named entry
+      // typed directly into Headers (JSON), since it's the more explicit/intentional of the two.
+      const auth = inputs.auth as { header?: unknown; value?: unknown } | null | undefined;
+      const mergedHeaders =
+        auth && typeof auth.header === "string" && typeof auth.value === "string"
+          ? { ...(headers ?? {}), [auth.header]: auth.value }
+          : headers;
 
       const res = await fetch(url, {
         method,
-        headers,
+        headers: mergedHeaders,
         body: hasBody ? String(inputs.body ?? "") : undefined,
         signal: controller.signal,
       });

@@ -102,7 +102,12 @@ describe("http.request", () => {
   });
 
   it("reports a malformed Headers JSON as an error rather than crashing the run", async () => {
-    const fetchMock = vi.fn(async () => ({ status: 200, ok: true, text: async () => "", headers: { forEach: () => {} } }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+      status: 200,
+      ok: true,
+      text: async () => "",
+      headers: { forEach: () => {} },
+    }));
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph({ url: "https://example.com/thing", headers: "{not json" });
@@ -112,5 +117,64 @@ describe("http.request", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(ctx.execOutputs.get("req:success")).toBe(false);
     expect(String(ctx.execOutputs.get("req:error"))).not.toBe("");
+  });
+
+  it("merges a wired Auth object's header into the request (see auth.ts)", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+      status: 200,
+      ok: true,
+      text: async () => "",
+      headers: { forEach: () => {} },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { graph } = buildGraph({
+      url: "https://example.com/thing",
+      headers: '{"X-Custom":"1"}',
+      auth: { header: "Authorization", value: "Basic dXNlcjpwYXNz" },
+    });
+    const ctx = createExecutionContext(graph, { log: () => {} });
+    await runExecFrom("req", "exec-in", ctx);
+
+    const [, calledInit] = fetchMock.mock.calls[0];
+    expect(calledInit?.headers).toEqual({ "X-Custom": "1", Authorization: "Basic dXNlcjpwYXNz" });
+  });
+
+  it("an Auth object's header wins over a same-named entry in Headers (JSON)", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+      status: 200,
+      ok: true,
+      text: async () => "",
+      headers: { forEach: () => {} },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { graph } = buildGraph({
+      url: "https://example.com/thing",
+      headers: '{"Authorization":"Bearer stale"}',
+      auth: { header: "Authorization", value: "Basic dXNlcjpwYXNz" },
+    });
+    const ctx = createExecutionContext(graph, { log: () => {} });
+    await runExecFrom("req", "exec-in", ctx);
+
+    const [, calledInit] = fetchMock.mock.calls[0];
+    expect(calledInit?.headers).toEqual({ Authorization: "Basic dXNlcjpwYXNz" });
+  });
+
+  it("leaves headers untouched when Auth is left unwired (default null)", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+      status: 200,
+      ok: true,
+      text: async () => "",
+      headers: { forEach: () => {} },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { graph } = buildGraph({ url: "https://example.com/thing", headers: '{"X-Custom":"1"}' });
+    const ctx = createExecutionContext(graph, { log: () => {} });
+    await runExecFrom("req", "exec-in", ctx);
+
+    const [, calledInit] = fetchMock.mock.calls[0];
+    expect(calledInit?.headers).toEqual({ "X-Custom": "1" });
   });
 });

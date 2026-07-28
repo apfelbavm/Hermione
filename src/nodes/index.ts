@@ -7,6 +7,7 @@ import "./actionsMock";
 import "./function";
 import "./string";
 import "./http";
+import "./auth";
 import "./array";
 import "./set";
 import "./map";
