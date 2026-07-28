@@ -280,7 +280,22 @@ registerNode({
     );
     return { nextExec: "completed" };
   },
-  // Compiler support is intentionally out of scope for now — same call as Sequence/For Loop/
-  // Array,Set,Map For Each (no compileExecute yet). Disabling still compiles fine regardless (see
-  // codegen.ts's disabled branch, which never needs the node's own compileExecute).
+  // Compiles to a native `await Promise.all([...])` wrapping one async IIFE per branch — the same
+  // shape as the interpreter's own Promise.all-over-runExecFrom, one level up: each IIFE's body is
+  // that branch's own compiled statements (which may themselves contain further `await`s, e.g. from
+  // a compiled Delay), so the compiled output genuinely interleaves branches at runtime rather than
+  // just simulating it inside the editor.
+  compileExecute: ({ node, compileFrom }) => {
+    const branchBlocks = parallelBranchIds(node).map((branchId) => [
+      `(async () => {`,
+      ...indent(compileFrom(branchId)),
+      `})(),`,
+    ]);
+    return [
+      `await Promise.all([`,
+      ...indent(branchBlocks.flat()),
+      `]);`,
+      ...compileFrom("completed"),
+    ];
+  },
 });

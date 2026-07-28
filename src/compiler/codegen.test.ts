@@ -277,4 +277,65 @@ describe("compileGraph", () => {
 
     expect(logs).toEqual(["done"]); // loop-body's "body" print never runs, not even once
   });
+
+  it("compiles Parallel's branches into concurrent async IIFEs — a faster branch logs before a slower one, then completed fires once both finish", async () => {
+    const graph = createEmptyGraph("g14", "test");
+    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const par = addBuiltinNode(graph, "flow.parallel", { x: 100, y: 0 }, "par");
+    const slowDelay = addBuiltinNode(graph, "flow.delay", { x: 200, y: 0 }, "slowDelay");
+    const fastDelay = addBuiltinNode(graph, "flow.delay", { x: 200, y: 100 }, "fastDelay");
+    const printSlow = addBuiltinNode(graph, "debug.print", { x: 300, y: 0 }, "printSlow");
+    const printFast = addBuiltinNode(graph, "debug.print", { x: 300, y: 100 }, "printFast");
+    const printDone = addBuiltinNode(graph, "debug.print", { x: 400, y: 50 }, "printDone");
+    slowDelay.pins.duration.value = 20;
+    fastDelay.pins.duration.value = 5;
+    printSlow.pins.message.value = "slow";
+    printFast.pins.message.value = "fast";
+    printDone.pins.message.value = "Done";
+
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: par.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: par.id, fromPin: "branch-0", toNode: slowDelay.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: slowDelay.id, fromPin: "exec-out", toNode: printSlow.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: par.id, fromPin: "branch-1", toNode: fastDelay.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: fastDelay.id, fromPin: "exec-out", toNode: printFast.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: par.id, fromPin: "completed", toNode: printDone.id, toPin: "exec-in" });
+
+    const { code, manifest } = compileGraph(graph);
+    const compiled = await loadCompiled(code);
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
+
+    const logs: string[] = [];
+    await trigger({ state: createInitialState(), log: (m: string) => logs.push(m) });
+
+    expect(logs).toEqual(["fast", "slow", "Done"]);
+  });
+
+  it("a disabled Parallel node compiles straight to 'completed', never running any branch", async () => {
+    const graph = createEmptyGraph("g15", "test");
+    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const par = addBuiltinNode(graph, "flow.parallel", { x: 100, y: 0 }, "par");
+    const printA = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "printA");
+    const printB = addBuiltinNode(graph, "debug.print", { x: 200, y: 100 }, "printB");
+    const printDone = addBuiltinNode(graph, "debug.print", { x: 300, y: 50 }, "printDone");
+    printA.pins.message.value = "A";
+    printB.pins.message.value = "B";
+    printDone.pins.message.value = "Done";
+    par.disabled = true;
+
+    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: par.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: par.id, fromPin: "branch-0", toNode: printA.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: par.id, fromPin: "branch-1", toNode: printB.id, toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: par.id, fromPin: "completed", toNode: printDone.id, toPin: "exec-in" });
+
+    const { code, manifest } = compileGraph(graph);
+    const compiled = await loadCompiled(code);
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
+
+    const logs: string[] = [];
+    await trigger({ state: createInitialState(), log: (m: string) => logs.push(m) });
+
+    expect(logs).toEqual(["Done"]);
+  });
 });
