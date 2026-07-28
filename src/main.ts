@@ -35,6 +35,7 @@ import { createStore, getEditingGraph, getVisibleVariablesForState } from "./sta
 import { setupPointerInteraction, type WireAnchor } from "./interaction/pointerHandlers";
 import { createWidgetSync } from "./overlay/widgetSync";
 import { createCommentOverlay } from "./overlay/commentOverlay";
+import { setupResizablePanels } from "./overlay/resizablePanels";
 import { createVariablePanel } from "./overlay/variablePanel";
 import { createFunctionsPanel } from "./overlay/functionsPanel";
 import { createFunctionIoPanel } from "./overlay/functionIoPanel";
@@ -225,7 +226,12 @@ function render(): void {
 
 store.subscribe(render);
 window.addEventListener("resize", resizeCanvas);
+// Also re-fits the canvas whenever its container's size changes for any OTHER reason — notably
+// dragging the sidebar/log-panel resize handles (see resizablePanels.ts), which changes layout
+// without ever firing a window "resize" event.
+new ResizeObserver(resizeCanvas).observe(container);
 resizeCanvas();
+setupResizablePanels();
 
 snapToGridCheckbox.addEventListener("change", () => {
   store.state.snapToGrid = snapToGridCheckbox.checked;

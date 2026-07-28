@@ -164,6 +164,36 @@ html, body {
   font-size: 13px;
 }
 
+/* Drag handles for the sidebar's width and the log panel's height — see resizablePanels.ts.
+   Transparent by default, colored on hover/drag so they read as interactive without adding a
+   permanent visual seam the rest of the time. */
+.resizer {
+  flex: 0 0 auto;
+  background: transparent;
+  transition: background 0.1s ease;
+}
+
+.resizer:hover,
+.resizer:active {
+  background: #3b6b8a;
+}
+
+.resizer-vertical {
+  width: 5px;
+  cursor: col-resize;
+}
+
+.resizer-horizontal {
+  height: 5px;
+  cursor: row-resize;
+}
+
+/* While a resizer drag is in progress, block text selection anywhere on the page — otherwise a
+   fast drag over the canvas/sidebar/log text selects it instead of just resizing. */
+body.resizing {
+  user-select: none;
+}
+
 .panel-section {
   display: flex;
   flex-direction: column;
