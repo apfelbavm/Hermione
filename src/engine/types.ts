@@ -109,6 +109,13 @@ export interface NodeDef {
   compileExecute?: (args: CompileExecArgs) => string[];
   /** Named helper-function source snippets this node's generated code depends on (e.g. `delay`), deduped by name across the whole compiled file. */
   compileHelpers?: Record<string, string>;
+  /** Literal ESM import statements this node's generated code depends on (e.g. `import { XMLParser } from
+   * "fast-xml-parser";`), deduped verbatim across the whole compiled file and hoisted above every
+   * compileHelpers source. Unlike compileHelpers, this makes the compiled .mjs no longer
+   * dependency-free — running it requires `npm install` the referenced package alongside it — so
+   * this is reserved for logic (e.g. real XML parsing) too involved to reasonably hand-roll as a
+   * portable helper string. */
+  compileImports?: string[];
   /** Marks every pin this node type declares (own `pins`, or produced by deriveInstancePins) as
    * sharing ONE user-chosen element type (and, if includeKeyType, one key type) per NodeInstance —
    * e.g. Array Length must work on Array<Number> and Array<String> alike, but a node's own `pins`

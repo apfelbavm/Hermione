@@ -15,6 +15,8 @@ import "./array";
 import "./set";
 import "./map";
 import "./reroute";
+import "./xml";
+import "./csv";
 
 let registered = false;
 
