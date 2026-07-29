@@ -77,6 +77,79 @@ describe("string.fromNumber / fromBoolean / fromJson", () => {
   });
 });
 
+function evaluate(type: string, inputs: Record<string, unknown>) {
+  return getNodeDef(type).evaluate!({ node: {} as NodeInstance, inputs, ctx: {} as never });
+}
+
+function compile(type: string, inputs: Record<string, string>) {
+  return getNodeDef(type).compileEvaluate!({ node: {} as NodeInstance, inputs, graph: {} as never });
+}
+
+describe("string.length", () => {
+  it("returns the character count", () => {
+    expect(evaluate("string.length", { value: "hello" })).toEqual({ result: 5 });
+  });
+
+  it("compileEvaluate matches evaluate", () => {
+    expect(eval(compile("string.length", { value: '"hello"' }).result)).toBe(5);
+  });
+});
+
+describe("string.replace", () => {
+  it("replaces every occurrence of the search string", () => {
+    expect(evaluate("string.replace", { value: "a-b-a-b", search: "a", replacement: "X" })).toEqual({
+      result: "X-b-X-b",
+    });
+  });
+
+  it("compileEvaluate matches evaluate", () => {
+    const expr = compile("string.replace", {
+      value: '"a-b-a-b"',
+      search: '"a"',
+      replacement: '"X"',
+    }).result;
+    expect(eval(expr)).toBe("X-b-X-b");
+  });
+});
+
+describe("string.substring", () => {
+  it("returns the characters between Start and End", () => {
+    expect(evaluate("string.substring", { value: "hello world", start: 6, end: 11 })).toEqual({
+      result: "world",
+    });
+  });
+
+  it("is order-independent (swaps Start/End if Start > End), matching String.prototype.substring", () => {
+    expect(evaluate("string.substring", { value: "hello world", start: 11, end: 6 })).toEqual({
+      result: "world",
+    });
+  });
+
+  it("compileEvaluate matches evaluate", () => {
+    const expr = compile("string.substring", { value: '"hello world"', start: "6", end: "11" }).result;
+    expect(eval(expr)).toBe("world");
+  });
+});
+
+describe("string.slice", () => {
+  it("returns the characters between Start and End", () => {
+    expect(evaluate("string.slice", { value: "hello world", start: 6, end: 11 })).toEqual({
+      result: "world",
+    });
+  });
+
+  it("supports a negative index counting from the end", () => {
+    expect(evaluate("string.slice", { value: "hello world", start: -5, end: 11 })).toEqual({
+      result: "world",
+    });
+  });
+
+  it("compileEvaluate matches evaluate", () => {
+    const expr = compile("string.slice", { value: '"hello world"', start: "-5", end: "11" }).result;
+    expect(eval(expr)).toBe("world");
+  });
+});
+
 describe("string.append", () => {
   it("starts with exactly two string entries, concatenated in order", () => {
     const node = appendNode();

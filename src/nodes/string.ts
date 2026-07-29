@@ -140,6 +140,86 @@ registerNode({
   }),
 });
 
+registerNode({
+  type: "string.length",
+  label: "Length",
+  description: "Returns how many characters are in the string.",
+  group: "String",
+  pins: [
+    { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
+    { id: "result", label: "Result", type: "number", direction: "output" },
+  ],
+  evaluate: ({ inputs }) => ({ result: String(inputs.value ?? "").length }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `String(${inputs.value}).length`,
+  }),
+});
+
+registerNode({
+  type: "string.replace",
+  label: "Replace",
+  description: "Replaces every occurrence of a substring with another string.",
+  group: "String",
+  pins: [
+    { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
+    { id: "search", label: "Search", type: "string", direction: "input", defaultValue: "" },
+    { id: "replacement", label: "Replacement", type: "string", direction: "input", defaultValue: "" },
+    { id: "result", label: "Result", type: "string", direction: "output" },
+  ],
+  evaluate: ({ inputs }) => ({
+    result: String(inputs.value ?? "").replaceAll(String(inputs.search ?? ""), String(inputs.replacement ?? "")),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `String(${inputs.value}).replaceAll(String(${inputs.search}), String(${inputs.replacement}))`,
+  }),
+});
+
+registerNode({
+  type: "string.substring",
+  label: "Substring",
+  description: "Returns the characters between Start and End (order-independent, clamped to the string's bounds).",
+  group: "String",
+  pins: [
+    { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
+    { id: "start", label: "Start", type: "number", direction: "input", defaultValue: 0, integer: true },
+    { id: "end", label: "End", type: "number", direction: "input", defaultValue: 0, integer: true },
+    { id: "result", label: "Result", type: "string", direction: "output" },
+  ],
+  // Rounded here too (not just at the literal-input widget, see PinDef.integer) since a wired
+  // Start/End can come from any number-producing node, not only a literal the user typed.
+  evaluate: ({ inputs }) => ({
+    result: String(inputs.value ?? "").substring(
+      Math.round(Number(inputs.start ?? 0)),
+      Math.round(Number(inputs.end ?? 0)),
+    ),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `String(${inputs.value}).substring(Math.round(Number(${inputs.start})), Math.round(Number(${inputs.end})))`,
+  }),
+});
+
+registerNode({
+  type: "string.slice",
+  label: "Slice",
+  description: "Returns the characters between Start and End, where a negative index counts from the string's end.",
+  group: "String",
+  pins: [
+    { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
+    { id: "start", label: "Start", type: "number", direction: "input", defaultValue: 0, integer: true },
+    { id: "end", label: "End", type: "number", direction: "input", defaultValue: 0, integer: true },
+    { id: "result", label: "Result", type: "string", direction: "output" },
+  ],
+  evaluate: ({ inputs }) => ({
+    result: String(inputs.value ?? "").slice(
+      Math.round(Number(inputs.start ?? 0)),
+      Math.round(Number(inputs.end ?? 0)),
+    ),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `String(${inputs.value}).slice(Math.round(Number(${inputs.start})), Math.round(Number(${inputs.end})))`,
+  }),
+});
+
 // --- Append String: an Unreal-style node whose number of string inputs grows/shrinks live. Each
 // entry is stored as its own "entry-<n>" pin on the NodeInstance itself (see NodeDef.deriveInstancePins
 // in types.ts) — there's no separate "entry count" field, the pins record IS the source of truth.
