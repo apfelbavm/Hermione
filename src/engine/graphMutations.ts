@@ -37,38 +37,6 @@ export const DEFAULT_VALUE_BY_TYPE: Record<PinType, unknown> = {
   object: null,
 };
 
-/** True if any of this node's DATA (non-exec) output pins feeds something else. A node can only be
- * disabled while this is false — disabling it anyway would silently starve whatever's downstream of
- * a real value, since a disabled node's execute()/evaluate() never runs. Re-enabling has no such
- * restriction, so this only gates the "Disable" direction of the toggle, not "Enable".
- *
- * Exempt: a loop node (NodeDef.disabledNextExec set — For Loop, Array/Set/Map For Each). Its data
- * outputs (index, element, key, value) are only ever meaningfully read from within its OWN
- * loop-body chain, which itself never runs once disabled — there's no downstream consumer left
- * "silently starved," since that consumer never executes at all. Without this exemption, disabling
- * a loop would be blocked in virtually every real graph, since wiring index/element/key/value into
- * the loop body is the entire point of using one. */
-export function hasConnectedDataOutput(
-  graph: Graph,
-  nodeId: string,
-  variables: Variable[],
-  functions: FunctionDef[],
-  scripts: CodeScriptDef[] = [],
-): boolean {
-  const node = graph.nodes.find((n) => n.id === nodeId);
-  if (!node) return false;
-  if (getNodeDef(node.type).disabledNextExec) return false;
-  const dataOutputIds = new Set(
-    node
-      .resolvePinDefs(variables, functions, scripts)
-      .filter((p) => p.direction === "output" && p.type !== "exec")
-      .map((p) => p.id),
-  );
-  return graph.connections.some(
-    (c) => c.fromNode === nodeId && dataOutputIds.has(c.fromPin),
-  );
-}
-
 /** Entry and Return nodes are structural — a function body must always be able to receive its
  * inputs and produce its outputs, so these two types can never be removed via removeNode (not
  * even by the user's own Delete key). Callers that legitimately clean up OTHER node types bound to

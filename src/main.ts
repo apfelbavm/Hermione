@@ -3,7 +3,6 @@ import { registerBuiltins } from "./nodes";
 import { createExecutionContext, runExecFrom } from "./engine/executor";
 import {
   connectPins,
-  hasConnectedDataOutput,
   insertRerouteOnConnection,
   removeInstancePin,
   removeNode,
@@ -630,7 +629,7 @@ canvas.addEventListener("contextmenu", (e) => {
       // node's data outputs, since a disabled node's evaluate() never runs to produce it.
       const blocked =
         !isDisabled &&
-        hasConnectedDataOutput(graph, node.id, variables, functions, scripts);
+        graph.hasConnectedDataOutput(node.id, variables, functions, scripts);
       items.push({
         label: isDisabled ? "Enable" : "Disable",
         disabled: blocked,

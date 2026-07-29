@@ -5,7 +5,6 @@ import {
   addVariable,
   connectPins,
   createCodeScriptDef,
-  hasConnectedDataOutput,
   insertRerouteOnConnection,
   moveFunction,
   moveFunctionEntry,
@@ -276,7 +275,7 @@ describe("hasConnectedDataOutput", () => {
         "add",
       ),
     );
-    expect(hasConnectedDataOutput(graph, "add", [], [])).toBe(false);
+    expect(graph.hasConnectedDataOutput("add", [], [])).toBe(false);
   });
 
   it("is true once the data output feeds something else", () => {
@@ -304,7 +303,7 @@ describe("hasConnectedDataOutput", () => {
       toNode: "add2",
       toPin: "a",
     });
-    expect(hasConnectedDataOutput(graph, "add1", [], [])).toBe(true);
+    expect(graph.hasConnectedDataOutput("add1", [], [])).toBe(true);
   });
 
   it("ignores a connection leaving an exec output — only DATA outputs count", () => {
@@ -333,7 +332,7 @@ describe("hasConnectedDataOutput", () => {
       toNode: "print",
       toPin: "exec-in",
     });
-    expect(hasConnectedDataOutput(graph, "branch", [], [])).toBe(false);
+    expect(graph.hasConnectedDataOutput("branch", [], [])).toBe(false);
   });
 
   it("is false for a loop node even when its data output (e.g. For Loop's Index) is wired — see NodeDef.disabledNextExec", () => {
@@ -362,7 +361,7 @@ describe("hasConnectedDataOutput", () => {
       toNode: "toStr",
       toPin: "value",
     });
-    expect(hasConnectedDataOutput(graph, "loop", [], [])).toBe(false);
+    expect(graph.hasConnectedDataOutput("loop", [], [])).toBe(false);
   });
 });
 
