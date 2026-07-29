@@ -2,7 +2,8 @@ import { registerNode } from "../engine/registry";
 import { DELAY_HELPER_SOURCE, indent } from "../engine/compileUtils";
 import { runExecFrom } from "../engine/executor";
 import { connectionsFrom } from "../engine/graphQueries";
-import type { NodeInstance, PinDef } from "../engine/types";
+import type { PinDef } from "../engine/types";
+import { NodeInstance } from "../engine/nodeInstance";
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -170,8 +171,18 @@ registerNode({
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: `${THEN_PREFIX}0`, label: "Then 0", type: "exec", direction: "output" },
-    { id: `${THEN_PREFIX}1`, label: "Then 1", type: "exec", direction: "output" },
+    {
+      id: `${THEN_PREFIX}0`,
+      label: "Then 0",
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: `${THEN_PREFIX}1`,
+      label: "Then 1",
+      type: "exec",
+      direction: "output",
+    },
   ],
   deriveInstancePins: (node) => [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -248,8 +259,18 @@ registerNode({
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: `${BRANCH_PREFIX}0`, label: "Branch 0", type: "exec", direction: "output" },
-    { id: `${BRANCH_PREFIX}1`, label: "Branch 1", type: "exec", direction: "output" },
+    {
+      id: `${BRANCH_PREFIX}0`,
+      label: "Branch 0",
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: `${BRANCH_PREFIX}1`,
+      label: "Branch 1",
+      type: "exec",
+      direction: "output",
+    },
     { id: "completed", label: "Completed", type: "exec", direction: "output" },
   ],
   deriveInstancePins: (node) => [

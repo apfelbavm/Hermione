@@ -3,13 +3,13 @@ import { resolveNodeLabel, resolvePinDefs } from "../engine/graphMutations";
 import type {
   CodeScriptDef,
   FunctionDef,
-  NodeInstance,
   PinDef,
   Variable,
 } from "../engine/types";
 import { computeNodeLayout, type NodeLayout } from "./layout";
 import type { Camera } from "./camera";
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 export interface NodeScreenGeometry {
   screenX: number;

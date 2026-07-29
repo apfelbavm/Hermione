@@ -8,8 +8,9 @@ import {
   serializeVariableClipboardPayload,
   type NodesClipboardPayload,
 } from "./clipboard";
-import { type Connection, type NodeInstance, type Variable } from "./types";
+import { type Connection, type Variable } from "./types";
 import { Graph } from "./graph";
+import { NodeInstance } from "./nodeInstance";
 
 function node(
   id: string,

@@ -1,4 +1,5 @@
 import { Graph } from "./graph";
+import { NodeInstance } from "./nodeInstance";
 import { getNodeDef, isPinTypeCompatible } from "./registry";
 import type {
   CodeScriptDef,
@@ -6,7 +7,6 @@ import type {
   Connection,
   FunctionDef,
   NodeDef,
-  NodeInstance,
   Pin,
   PinContainer,
   PinDef,
@@ -14,7 +14,6 @@ import type {
   PinType,
   Variable,
 } from "./types";
-
 
 /** Seed element/key type for a freshly-created configurableElementType node instance (see
  * NodeDef.configurableElementType) — arbitrary but consistent defaults, same spirit as
@@ -64,12 +63,24 @@ export function createNodeInstance(
   const detailProperties = def.detailProperties ?? [];
   const pins: Record<string, Pin> = {};
   for (const entry of [...pinDefs, ...detailProperties]) {
-    pins[entry.id] = entry.direction === "input" ? { value: cloneDefaultValue(entry.defaultValue) } : {};
+    pins[entry.id] =
+      entry.direction === "input"
+        ? { value: cloneDefaultValue(entry.defaultValue) }
+        : {};
   }
-  const node: NodeInstance = { id, type, position, pins, variableId, functionId, scriptId };
+  const node: NodeInstance = {
+    id,
+    type,
+    position,
+    pins,
+    variableId,
+    functionId,
+    scriptId,
+  };
   if (def.configurableElementType) {
     node.elementType = DEFAULT_ELEMENT_TYPE;
-    if (def.configurableElementType.includeKeyType) node.mapKeyType = DEFAULT_KEY_TYPE;
+    if (def.configurableElementType.includeKeyType)
+      node.mapKeyType = DEFAULT_KEY_TYPE;
   }
   return node;
 }
@@ -135,7 +146,10 @@ export function resolveNodeLabel(
  * root (global) + currentGraph's own (local) if currentGraph is a function's body. Functions
  * themselves are never merged this way — they're always looked up straight from rootGraph.functions,
  * since a function's own body.functions field is unused (functions are never nested). */
-export function getVisibleVariables(rootGraph: Graph, currentGraph: Graph): Variable[] {
+export function getVisibleVariables(
+  rootGraph: Graph,
+  currentGraph: Graph,
+): Variable[] {
   if (currentGraph === rootGraph) return rootGraph.variables;
   return [...rootGraph.variables, ...currentGraph.variables];
 }
@@ -149,7 +163,11 @@ export function addNode(graph: Graph, node: NodeInstance): void {
  * may only live in the root graph, never inside a function body, and at most one instance of each
  * event TYPE may exist per graph, mirroring how Unreal only allows one BeginPlay/EventTick per
  * Blueprint. Used to filter both the node-creation menu and paste. */
-export function canPlaceNodeType(type: string, graph: Graph, isFunctionBody: boolean): boolean {
+export function canPlaceNodeType(
+  type: string,
+  graph: Graph,
+  isFunctionBody: boolean,
+): boolean {
   const def = getNodeDef(type);
   if (!def.eventTrigger) return true;
   if (isFunctionBody) return false;
@@ -168,7 +186,9 @@ export function canToggleDisabled(
 ): boolean {
   const def = getNodeDef(node.type);
   if (def.eventTrigger) return false;
-  return resolvePinDefs(node, variables, functions, scripts).some((p) => p.type === "exec");
+  return resolvePinDefs(node, variables, functions, scripts).some(
+    (p) => p.type === "exec",
+  );
 }
 
 /** True if any of this node's DATA (non-exec) output pins feeds something else. A node can only be
@@ -197,7 +217,9 @@ export function hasConnectedDataOutput(
       .filter((p) => p.direction === "output" && p.type !== "exec")
       .map((p) => p.id),
   );
-  return graph.connections.some((c) => c.fromNode === nodeId && dataOutputIds.has(c.fromPin));
+  return graph.connections.some(
+    (c) => c.fromNode === nodeId && dataOutputIds.has(c.fromPin),
+  );
 }
 
 /** Entry and Return nodes are structural — a function body must always be able to receive its
@@ -205,7 +227,10 @@ export function hasConnectedDataOutput(
  * even by the user's own Delete key). Callers that legitimately clean up OTHER node types bound to
  * a variable/function (removeVariable, removeFunctionDef) never target these types, so this guard
  * doesn't interfere with them. */
-export const UNDELETABLE_NODE_TYPES = new Set(["function.entry", "function.return"]);
+export const UNDELETABLE_NODE_TYPES = new Set([
+  "function.entry",
+  "function.return",
+]);
 
 export function removeNode(
   graph: Graph,
@@ -222,7 +247,9 @@ export function removeNode(
   // restored to a literal default — a raw filter would leave that pin's connectionId dangling and
   // its value stuck at whatever it was mid-connection (undefined, surfacing as a stray "null"),
   // never falling back to a real default the way an explicit disconnect already does.
-  for (const conn of graph.connections.filter((c) => c.fromNode === nodeId || c.toNode === nodeId)) {
+  for (const conn of graph.connections.filter(
+    (c) => c.fromNode === nodeId || c.toNode === nodeId,
+  )) {
     removeConnection(graph, variables, functions, conn.id, scripts);
   }
 
@@ -240,7 +267,12 @@ export function removeNode(
  * e.g. Make Map's key-N when its paired value-N is the one actually deleted — since this function
  * only ever targets one pin id per call. Guards against a hook that (incorrectly) names a pin
  * that's already gone, so it can never loop. */
-export function removeInstancePin(graph: Graph, nodeId: string, pinId: string, visited: Set<string> = new Set()): void {
+export function removeInstancePin(
+  graph: Graph,
+  nodeId: string,
+  pinId: string,
+  visited: Set<string> = new Set(),
+): void {
   if (visited.has(pinId)) return;
   visited.add(pinId);
 
@@ -248,10 +280,15 @@ export function removeInstancePin(graph: Graph, nodeId: string, pinId: string, v
   if (!node || !(pinId in node.pins)) return;
   delete node.pins[pinId];
   graph.connections = graph.connections.filter(
-    (c) => !((c.fromNode === nodeId && c.fromPin === pinId) || (c.toNode === nodeId && c.toPin === pinId)),
+    (c) =>
+      !(
+        (c.fromNode === nodeId && c.fromPin === pinId) ||
+        (c.toNode === nodeId && c.toPin === pinId)
+      ),
   );
 
-  const extraPinIds = getNodeDef(node.type).onInstancePinRemoved?.(node, pinId) ?? [];
+  const extraPinIds =
+    getNodeDef(node.type).onInstancePinRemoved?.(node, pinId) ?? [];
   for (const extraPinId of extraPinIds) {
     removeInstancePin(graph, nodeId, extraPinId, visited);
   }
@@ -279,8 +316,15 @@ export function connectPins(
   const toNode = graph.nodes.find((n) => n.id === req.toNode);
   if (!fromNode || !toNode) throw new Error("connectPins: node not found");
 
-  const fromPinDef = resolvePinDefs(fromNode, variables, functions, scripts).find((p) => p.id === req.fromPin);
-  const toPinDef = resolvePinDefs(toNode, variables, functions, scripts).find((p) => p.id === req.toPin);
+  const fromPinDef = resolvePinDefs(
+    fromNode,
+    variables,
+    functions,
+    scripts,
+  ).find((p) => p.id === req.fromPin);
+  const toPinDef = resolvePinDefs(toNode, variables, functions, scripts).find(
+    (p) => p.id === req.toPin,
+  );
   if (!fromPinDef || !toPinDef) throw new Error("connectPins: pin not found");
   if (fromPinDef.direction !== "output" || toPinDef.direction !== "input") {
     throw new Error("connectPins: must connect an output pin to an input pin");
@@ -295,7 +339,14 @@ export function connectPins(
     // Exec pins invert the data-pin rule: an input may converge many incoming wires (several
     // branches can all lead to the same next step), but a single output can only ever drive
     // ONE next step — replace any existing wire leaving this output instead.
-    disconnectOutput(graph, variables, functions, req.fromNode, req.fromPin, scripts);
+    disconnectOutput(
+      graph,
+      variables,
+      functions,
+      req.fromNode,
+      req.fromPin,
+      scripts,
+    );
   } else {
     // Data pins: an input takes exactly one source; an output may fan out to many freely.
     disconnectPin(graph, variables, functions, req.toNode, req.toPin, scripts);
@@ -320,7 +371,9 @@ export function disconnectPin(
   pinId: string,
   scripts: CodeScriptDef[] = [],
 ): void {
-  const existing = graph.connections.find((c) => c.toNode === nodeId && c.toPin === pinId);
+  const existing = graph.connections.find(
+    (c) => c.toNode === nodeId && c.toPin === pinId,
+  );
   if (!existing) return;
   removeConnection(graph, variables, functions, existing.id, scripts);
 }
@@ -334,7 +387,9 @@ export function disconnectOutput(
   pinId: string,
   scripts: CodeScriptDef[] = [],
 ): void {
-  const existing = graph.connections.find((c) => c.fromNode === nodeId && c.fromPin === pinId);
+  const existing = graph.connections.find(
+    (c) => c.fromNode === nodeId && c.fromPin === pinId,
+  );
   if (!existing) return;
   removeConnection(graph, variables, functions, existing.id, scripts);
 }
@@ -361,7 +416,9 @@ export function removeConnection(
     toPin.connectionId = remaining?.id;
     if (!remaining) {
       const pinDef = toNode
-        ? resolvePinDefs(toNode, variables, functions, scripts).find((p) => p.id === conn.toPin)
+        ? resolvePinDefs(toNode, variables, functions, scripts).find(
+            (p) => p.id === conn.toPin,
+          )
         : undefined;
       toPin.value = cloneDefaultValue(pinDef?.defaultValue);
     }
@@ -388,12 +445,21 @@ export function insertRerouteOnConnection(
   if (!conn) return;
   const fromNode = graph.nodes.find((n) => n.id === conn.fromNode);
   if (!fromNode) return;
-  const fromPinDef = resolvePinDefs(fromNode, variables, functions, scripts).find((p) => p.id === conn.fromPin);
+  const fromPinDef = resolvePinDefs(
+    fromNode,
+    variables,
+    functions,
+    scripts,
+  ).find((p) => p.id === conn.fromPin);
   if (!fromPinDef) return;
 
   const isExec = fromPinDef.type === "exec";
   const rerouteType = isExec ? "core.rerouteExec" : "core.reroute";
-  const reroute = createNodeInstance(rerouteType, position, getNodeDef(rerouteType).pins);
+  const reroute = createNodeInstance(
+    rerouteType,
+    position,
+    getNodeDef(rerouteType).pins,
+  );
   if (!isExec) {
     reroute.elementType = fromPinDef.type;
     reroute.container = fromPinDef.container;
@@ -403,15 +469,42 @@ export function insertRerouteOnConnection(
 
   const inPinId = isExec ? "exec-in" : "in";
   const outPinId = isExec ? "exec-out" : "out";
-  const { fromNode: origFromNode, fromPin: origFromPin, toNode: origToNode, toPin: origToPin } = conn;
+  const {
+    fromNode: origFromNode,
+    fromPin: origFromPin,
+    toNode: origToNode,
+    toPin: origToPin,
+  } = conn;
 
   // Removed first (rather than relying on connectPins' own auto-disconnect) because an exec input
   // may legally converge several incoming wires — connectPins would happily add the reroute's exec
   // path ALONGSIDE the original one instead of replacing it (see connectPins' own comment on why
   // it only auto-prunes the FROM side for exec, the TO side for data).
   removeConnection(graph, variables, functions, connectionId, scripts);
-  connectPins(graph, variables, functions, { fromNode: origFromNode, fromPin: origFromPin, toNode: reroute.id, toPin: inPinId }, scripts);
-  connectPins(graph, variables, functions, { fromNode: reroute.id, fromPin: outPinId, toNode: origToNode, toPin: origToPin }, scripts);
+  connectPins(
+    graph,
+    variables,
+    functions,
+    {
+      fromNode: origFromNode,
+      fromPin: origFromPin,
+      toNode: reroute.id,
+      toPin: inPinId,
+    },
+    scripts,
+  );
+  connectPins(
+    graph,
+    variables,
+    functions,
+    {
+      fromNode: reroute.id,
+      fromPin: outPinId,
+      toNode: origToNode,
+      toPin: origToPin,
+    },
+    scripts,
+  );
 }
 
 export function addVariable(graph: Graph, variable: Variable): void {
@@ -470,7 +563,12 @@ export function moveFunctionEntry(
   targetEntryId: string,
   position: "before" | "after",
 ): void {
-  moveInArray(kind === "input" ? fn.inputs : fn.outputs, entryId, targetEntryId, position);
+  moveInArray(
+    kind === "input" ? fn.inputs : fn.outputs,
+    entryId,
+    targetEntryId,
+    position,
+  );
 }
 
 /** Removes a variable along with any Get/Set nodes bound to it — an orphaned binding has no valid
@@ -484,7 +582,9 @@ export function removeVariable(
   variableId: string,
   scripts: CodeScriptDef[] = [],
 ): void {
-  const dependentNodeIds = graph.nodes.filter((n) => n.variableId === variableId).map((n) => n.id);
+  const dependentNodeIds = graph.nodes
+    .filter((n) => n.variableId === variableId)
+    .map((n) => n.id);
   for (const nodeId of dependentNodeIds) {
     removeNode(graph, variables, functions, nodeId, scripts);
   }
@@ -499,12 +599,19 @@ export function removeCommentBox(graph: Graph, commentId: string): void {
   graph.commentBoxes = graph.commentBoxes.filter((b) => b.id !== commentId);
 }
 
-export function setPinLiteralValue(graph: Graph, nodeId: string, pinId: string, value: unknown): void {
+export function setPinLiteralValue(
+  graph: Graph,
+  nodeId: string,
+  pinId: string,
+  value: unknown,
+): void {
   const node = graph.nodes.find((n) => n.id === nodeId);
   if (!node) throw new Error(`setPinLiteralValue: node "${nodeId}" not found`);
   const pin = node.pins[pinId] ?? (node.pins[pinId] = {});
   if (pin.connectionId) {
-    throw new Error(`setPinLiteralValue: pin "${nodeId}:${pinId}" is connected, disconnect first`);
+    throw new Error(
+      `setPinLiteralValue: pin "${nodeId}:${pinId}" is connected, disconnect first`,
+    );
   }
   pin.value = value;
 }
@@ -527,7 +634,9 @@ export function changeNodeElementType(
   const node = graph.nodes.find((n) => n.id === nodeId);
   if (!node) return;
 
-  for (const conn of graph.connections.filter((c) => c.fromNode === nodeId || c.toNode === nodeId)) {
+  for (const conn of graph.connections.filter(
+    (c) => c.fromNode === nodeId || c.toNode === nodeId,
+  )) {
     removeConnection(graph, variables, functions, conn.id);
   }
 
@@ -536,7 +645,10 @@ export function changeNodeElementType(
 
   const pins: Record<string, Pin> = {};
   for (const def of resolvePinDefs(node, variables, functions)) {
-    pins[def.id] = def.direction === "input" ? { value: cloneDefaultValue(def.defaultValue) } : {};
+    pins[def.id] =
+      def.direction === "input"
+        ? { value: cloneDefaultValue(def.defaultValue) }
+        : {};
   }
   node.pins = pins;
 }
@@ -558,13 +670,31 @@ export function createFunctionDef(name: string): FunctionDef {
   const fn: FunctionDef = { id, name, inputs: [], outputs: [], body };
 
   const entryDef = getNodeDef("function.entry");
-  const entryPins = entryDef.deriveFunctionPins ? entryDef.deriveFunctionPins(fn) : entryDef.pins;
-  const entryNode = createNodeInstance("function.entry", { x: 40, y: 120 }, entryPins, nextId("node"), undefined, fn.id);
+  const entryPins = entryDef.deriveFunctionPins
+    ? entryDef.deriveFunctionPins(fn)
+    : entryDef.pins;
+  const entryNode = createNodeInstance(
+    "function.entry",
+    { x: 40, y: 120 },
+    entryPins,
+    nextId("node"),
+    undefined,
+    fn.id,
+  );
   body.nodes.push(entryNode);
 
   const returnDef = getNodeDef("function.return");
-  const returnPins = returnDef.deriveFunctionPins ? returnDef.deriveFunctionPins(fn) : returnDef.pins;
-  const returnNode = createNodeInstance("function.return", { x: 360, y: 120 }, returnPins, nextId("node"), undefined, fn.id);
+  const returnPins = returnDef.deriveFunctionPins
+    ? returnDef.deriveFunctionPins(fn)
+    : returnDef.pins;
+  const returnNode = createNodeInstance(
+    "function.return",
+    { x: 360, y: 120 },
+    returnPins,
+    nextId("node"),
+    undefined,
+    fn.id,
+  );
   body.nodes.push(returnNode);
 
   return fn;
@@ -588,7 +718,11 @@ export function removeFunctionDef(rootGraph: Graph, functionId: string): void {
 /** Removes any now-dangling pins/connections referencing a since-removed input/output entry,
  * across every graph that could hold a node bound to this function (its own Entry/Return nodes,
  * and any Call node anywhere). */
-function pruneDanglingFunctionPinReferences(rootGraph: Graph, functionId: string, pinEntryId: string): void {
+function pruneDanglingFunctionPinReferences(
+  rootGraph: Graph,
+  functionId: string,
+  pinEntryId: string,
+): void {
   for (const g of allGraphs(rootGraph)) {
     for (const node of g.nodes) {
       if (node.functionId !== functionId) continue;
@@ -604,20 +738,34 @@ function pruneDanglingFunctionPinReferences(rootGraph: Graph, functionId: string
   }
 }
 
-export function addFunctionInput(fn: FunctionDef, entry: PinSignatureEntry): void {
+export function addFunctionInput(
+  fn: FunctionDef,
+  entry: PinSignatureEntry,
+): void {
   fn.inputs.push(entry);
 }
 
-export function removeFunctionInput(rootGraph: Graph, fn: FunctionDef, entryId: string): void {
+export function removeFunctionInput(
+  rootGraph: Graph,
+  fn: FunctionDef,
+  entryId: string,
+): void {
   fn.inputs = fn.inputs.filter((e) => e.id !== entryId);
   pruneDanglingFunctionPinReferences(rootGraph, fn.id, entryId);
 }
 
-export function addFunctionOutput(fn: FunctionDef, entry: PinSignatureEntry): void {
+export function addFunctionOutput(
+  fn: FunctionDef,
+  entry: PinSignatureEntry,
+): void {
   fn.outputs.push(entry);
 }
 
-export function removeFunctionOutput(rootGraph: Graph, fn: FunctionDef, entryId: string): void {
+export function removeFunctionOutput(
+  rootGraph: Graph,
+  fn: FunctionDef,
+  entryId: string,
+): void {
   fn.outputs = fn.outputs.filter((e) => e.id !== entryId);
   pruneDanglingFunctionPinReferences(rootGraph, fn.id, entryId);
 }
@@ -633,7 +781,10 @@ export interface TypedEntryPatch {
 /** A brand-new default for `type`/`container` — an empty list for any non-"single" container
  * (Array/Set/Map are all backed by a plain array, see PinContainer's own doc comment), otherwise
  * the plain per-type default. */
-function defaultValueFor(type: PinType, container: PinContainer | undefined): unknown {
+function defaultValueFor(
+  type: PinType,
+  container: PinContainer | undefined,
+): unknown {
   return container && container !== "single" ? [] : DEFAULT_VALUE_BY_TYPE[type];
 }
 
@@ -642,7 +793,11 @@ function defaultValueFor(type: PinType, container: PinContainer | undefined): un
  * new one is given in the same patch) and disconnects any wires on this variable's Get/Set nodes'
  * value pin across every graph, since the old wire may no longer be type-compatible — mirrors how
  * removing a function input/output prunes now-invalid pin references after a signature change. */
-export function updateVariable(rootGraph: Graph, variableId: string, patch: TypedEntryPatch): void {
+export function updateVariable(
+  rootGraph: Graph,
+  variableId: string,
+  patch: TypedEntryPatch,
+): void {
   const variable = allGraphs(rootGraph)
     .flatMap((g) => g.variables)
     .find((v) => v.id === variableId);
@@ -656,16 +811,32 @@ export function updateVariable(rootGraph: Graph, variableId: string, patch: Type
   if (patch.type !== undefined) variable.type = patch.type;
   if (patch.container !== undefined) variable.container = patch.container;
   if (patch.keyType !== undefined) variable.keyType = patch.keyType;
-  if (patch.defaultValue !== undefined) variable.defaultValue = patch.defaultValue;
-  else if (signatureChanged) variable.defaultValue = defaultValueFor(variable.type, variable.container);
+  if (patch.defaultValue !== undefined)
+    variable.defaultValue = patch.defaultValue;
+  else if (signatureChanged)
+    variable.defaultValue = defaultValueFor(variable.type, variable.container);
 
   if (signatureChanged) {
     for (const g of allGraphs(rootGraph)) {
       const visibleVariables = getVisibleVariables(rootGraph, g);
       for (const node of g.nodes) {
         if (node.variableId !== variableId) continue;
-        if (node.type === "variable.get") disconnectOutput(g, visibleVariables, rootGraph.functions, node.id, "value");
-        else if (node.type === "variable.set") disconnectPin(g, visibleVariables, rootGraph.functions, node.id, "value");
+        if (node.type === "variable.get")
+          disconnectOutput(
+            g,
+            visibleVariables,
+            rootGraph.functions,
+            node.id,
+            "value",
+          );
+        else if (node.type === "variable.set")
+          disconnectPin(
+            g,
+            visibleVariables,
+            rootGraph.functions,
+            node.id,
+            "value",
+          );
       }
     }
   }
@@ -677,7 +848,11 @@ function updateFunctionEntry(
   entries: PinSignatureEntry[],
   entryId: string,
   patch: TypedEntryPatch,
-  disconnectAcrossGraphs: (g: Graph, visibleVariables: Variable[], node: NodeInstance) => void,
+  disconnectAcrossGraphs: (
+    g: Graph,
+    visibleVariables: Variable[],
+    node: NodeInstance,
+  ) => void,
 ): void {
   const entry = entries.find((e) => e.id === entryId);
   if (!entry) return;
@@ -691,7 +866,8 @@ function updateFunctionEntry(
   if (patch.container !== undefined) entry.container = patch.container;
   if (patch.keyType !== undefined) entry.keyType = patch.keyType;
   if (patch.defaultValue !== undefined) entry.defaultValue = patch.defaultValue;
-  else if (signatureChanged) entry.defaultValue = defaultValueFor(entry.type, entry.container);
+  else if (signatureChanged)
+    entry.defaultValue = defaultValueFor(entry.type, entry.container);
 
   if (signatureChanged) {
     for (const g of allGraphs(rootGraph)) {
@@ -706,20 +882,76 @@ function updateFunctionEntry(
 
 /** Renames/retypes/revalues a function input, live everywhere it's bound (its own Entry node's
  * output pin, and every Call node's matching input pin, across every graph). */
-export function updateFunctionInput(rootGraph: Graph, fn: FunctionDef, entryId: string, patch: TypedEntryPatch): void {
-  updateFunctionEntry(rootGraph, fn, fn.inputs, entryId, patch, (g, visibleVariables, node) => {
-    if (node.type === "function.entry") disconnectOutput(g, visibleVariables, rootGraph.functions, node.id, entryId, rootGraph.scripts);
-    else if (node.type === "function.call") disconnectPin(g, visibleVariables, rootGraph.functions, node.id, entryId, rootGraph.scripts);
-  });
+export function updateFunctionInput(
+  rootGraph: Graph,
+  fn: FunctionDef,
+  entryId: string,
+  patch: TypedEntryPatch,
+): void {
+  updateFunctionEntry(
+    rootGraph,
+    fn,
+    fn.inputs,
+    entryId,
+    patch,
+    (g, visibleVariables, node) => {
+      if (node.type === "function.entry")
+        disconnectOutput(
+          g,
+          visibleVariables,
+          rootGraph.functions,
+          node.id,
+          entryId,
+          rootGraph.scripts,
+        );
+      else if (node.type === "function.call")
+        disconnectPin(
+          g,
+          visibleVariables,
+          rootGraph.functions,
+          node.id,
+          entryId,
+          rootGraph.scripts,
+        );
+    },
+  );
 }
 
 /** Renames/retypes/revalues a function output, live everywhere it's bound (its own Return node's
  * input pin, and every Call node's matching output pin, across every graph). */
-export function updateFunctionOutput(rootGraph: Graph, fn: FunctionDef, entryId: string, patch: TypedEntryPatch): void {
-  updateFunctionEntry(rootGraph, fn, fn.outputs, entryId, patch, (g, visibleVariables, node) => {
-    if (node.type === "function.return") disconnectPin(g, visibleVariables, rootGraph.functions, node.id, entryId, rootGraph.scripts);
-    else if (node.type === "function.call") disconnectOutput(g, visibleVariables, rootGraph.functions, node.id, entryId, rootGraph.scripts);
-  });
+export function updateFunctionOutput(
+  rootGraph: Graph,
+  fn: FunctionDef,
+  entryId: string,
+  patch: TypedEntryPatch,
+): void {
+  updateFunctionEntry(
+    rootGraph,
+    fn,
+    fn.outputs,
+    entryId,
+    patch,
+    (g, visibleVariables, node) => {
+      if (node.type === "function.return")
+        disconnectPin(
+          g,
+          visibleVariables,
+          rootGraph.functions,
+          node.id,
+          entryId,
+          rootGraph.scripts,
+        );
+      else if (node.type === "function.call")
+        disconnectOutput(
+          g,
+          visibleVariables,
+          rootGraph.functions,
+          node.id,
+          entryId,
+          rootGraph.scripts,
+        );
+    },
+  );
 }
 
 // --- Scripts -----------------------------------------------------------------------------------
@@ -768,14 +1000,21 @@ export function moveScriptInput(
   moveInArray(script.inputs, entryId, targetEntryId, position);
 }
 
-export function addScriptInput(script: CodeScriptDef, entry: PinSignatureEntry): void {
+export function addScriptInput(
+  script: CodeScriptDef,
+  entry: PinSignatureEntry,
+): void {
   script.inputs.push(entry);
 }
 
 /** Removes any now-dangling pins/connections referencing a since-removed script input, across
  * every graph that could hold a code.run node bound to this script — mirrors
  * pruneDanglingFunctionPinReferences, just for the one node type instead of Entry/Return/Call. */
-function pruneDanglingScriptPinReferences(rootGraph: Graph, scriptId: string, pinEntryId: string): void {
+function pruneDanglingScriptPinReferences(
+  rootGraph: Graph,
+  scriptId: string,
+  pinEntryId: string,
+): void {
   for (const g of allGraphs(rootGraph)) {
     for (const node of g.nodes) {
       if (node.scriptId !== scriptId) continue;
@@ -791,14 +1030,23 @@ function pruneDanglingScriptPinReferences(rootGraph: Graph, scriptId: string, pi
   }
 }
 
-export function removeScriptInput(rootGraph: Graph, script: CodeScriptDef, entryId: string): void {
+export function removeScriptInput(
+  rootGraph: Graph,
+  script: CodeScriptDef,
+  entryId: string,
+): void {
   script.inputs = script.inputs.filter((e) => e.id !== entryId);
   pruneDanglingScriptPinReferences(rootGraph, script.id, entryId);
 }
 
 /** Renames/retypes/revalues a script input, live everywhere it's bound (every code.run node's
  * matching input pin, across every graph) — mirrors updateFunctionInput. */
-export function updateScriptInput(rootGraph: Graph, script: CodeScriptDef, entryId: string, patch: TypedEntryPatch): void {
+export function updateScriptInput(
+  rootGraph: Graph,
+  script: CodeScriptDef,
+  entryId: string,
+  patch: TypedEntryPatch,
+): void {
   const entry = script.inputs.find((e) => e.id === entryId);
   if (!entry) return;
 
@@ -811,14 +1059,22 @@ export function updateScriptInput(rootGraph: Graph, script: CodeScriptDef, entry
   if (patch.container !== undefined) entry.container = patch.container;
   if (patch.keyType !== undefined) entry.keyType = patch.keyType;
   if (patch.defaultValue !== undefined) entry.defaultValue = patch.defaultValue;
-  else if (signatureChanged) entry.defaultValue = defaultValueFor(entry.type, entry.container);
+  else if (signatureChanged)
+    entry.defaultValue = defaultValueFor(entry.type, entry.container);
 
   if (signatureChanged) {
     for (const g of allGraphs(rootGraph)) {
       const visibleVariables = getVisibleVariables(rootGraph, g);
       for (const node of g.nodes) {
         if (node.scriptId !== script.id || node.type !== "code.run") continue;
-        disconnectPin(g, visibleVariables, rootGraph.functions, node.id, entryId, rootGraph.scripts);
+        disconnectPin(
+          g,
+          visibleVariables,
+          rootGraph.functions,
+          node.id,
+          entryId,
+          rootGraph.scripts,
+        );
       }
     }
   }

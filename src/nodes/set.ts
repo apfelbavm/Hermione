@@ -2,7 +2,8 @@ import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
 import { registerNode } from "../engine/registry";
 import { connectionsFrom } from "../engine/graphQueries";
 import { runExecFrom } from "../engine/executor";
-import type { NodeInstance, PinDef, PinType } from "../engine/types";
+import type { PinDef, PinType } from "../engine/types";
+import { NodeInstance } from "../engine/nodeInstance";
 
 // Sibling of array.ts — same pure-dataflow philosophy (see that file's header comment), just for
 // Set<T>. Backed by a plain deduped array (see the plan's rationale: no real ES Set instance, since
@@ -45,15 +46,34 @@ function compileDedupe(expr: string): string {
 }
 
 function setPin(elementType: PinType, id = "set", label = "Set"): PinDef {
-  return { id, label, type: elementType, direction: "input", container: "set", defaultValue: [] };
+  return {
+    id,
+    label,
+    type: elementType,
+    direction: "input",
+    container: "set",
+    defaultValue: [],
+  };
 }
 
 function setOutPin(elementType: PinType, label = "Set"): PinDef {
-  return { id: "result", label, type: elementType, direction: "output", container: "set" };
+  return {
+    id: "result",
+    label,
+    type: elementType,
+    direction: "output",
+    container: "set",
+  };
 }
 
 function itemPin(id: string, label: string, elementType: PinType): PinDef {
-  return { id, label, type: elementType, direction: "input", defaultValue: DEFAULT_VALUE_BY_TYPE[elementType] };
+  return {
+    id,
+    label,
+    type: elementType,
+    direction: "input",
+    defaultValue: DEFAULT_VALUE_BY_TYPE[elementType],
+  };
 }
 
 // --- Make Set: same variadic-entry mechanism as Make Array (see string.ts's Append String for the
@@ -90,20 +110,36 @@ registerNode({
   group: GROUP,
   configurableElementType: {},
   pins: [
-    { id: `${ENTRY_PREFIX}0`, label: "Element 1", type: "number", direction: "input", defaultValue: 0, removable: true },
+    {
+      id: `${ENTRY_PREFIX}0`,
+      label: "Element 1",
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+      removable: true,
+    },
     setOutPin("number"),
   ],
-  deriveInstancePins: (node) => [...makeSetEntryPins(node), setOutPin(elementTypeOf(node))],
+  deriveInstancePins: (node) => [
+    ...makeSetEntryPins(node),
+    setOutPin(elementTypeOf(node)),
+  ],
   addInstancePinEntry: (node) => {
     const suffixes = makeSetEntryIds(node).map(entrySuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
-    node.pins[`${ENTRY_PREFIX}${nextSuffix}`] = { value: DEFAULT_VALUE_BY_TYPE[elementTypeOf(node)] };
+    node.pins[`${ENTRY_PREFIX}${nextSuffix}`] = {
+      value: DEFAULT_VALUE_BY_TYPE[elementTypeOf(node)],
+    };
   },
-  evaluate: ({ node, inputs }) => ({ result: dedupe(makeSetEntryIds(node).map((id) => inputs[id])) }),
+  evaluate: ({ node, inputs }) => ({
+    result: dedupe(makeSetEntryIds(node).map((id) => inputs[id])),
+  }),
   compileEvaluate: ({ node, inputs }) => ({
-    result: compileDedupe(`[${makeSetEntryIds(node)
-      .map((id) => inputs[id])
-      .join(", ")}]`),
+    result: compileDedupe(
+      `[${makeSetEntryIds(node)
+        .map((id) => inputs[id])
+        .join(", ")}]`,
+    ),
   }),
 });
 
@@ -112,10 +148,18 @@ registerNode({
   label: "Set Length",
   group: GROUP,
   configurableElementType: {},
-  pins: [setPin("number"), { id: "length", label: "Length", type: "number", direction: "output" }],
-  deriveInstancePins: (node) => [setPin(elementTypeOf(node)), { id: "length", label: "Length", type: "number", direction: "output" }],
+  pins: [
+    setPin("number"),
+    { id: "length", label: "Length", type: "number", direction: "output" },
+  ],
+  deriveInstancePins: (node) => [
+    setPin(elementTypeOf(node)),
+    { id: "length", label: "Length", type: "number", direction: "output" },
+  ],
   evaluate: ({ inputs }) => ({ length: asArray(inputs.set).length }),
-  compileEvaluate: ({ inputs }) => ({ length: `(${compileAsArray(inputs.set)}).length` }),
+  compileEvaluate: ({ inputs }) => ({
+    length: `(${compileAsArray(inputs.set)}).length`,
+  }),
 });
 
 registerNode({
@@ -123,15 +167,30 @@ registerNode({
   label: "Set Add",
   group: GROUP,
   configurableElementType: {},
-  pins: [setPin("number"), itemPin("item", "Item", "number"), setOutPin("number"), { id: "added", label: "Added", type: "boolean", direction: "output" }],
+  pins: [
+    setPin("number"),
+    itemPin("item", "Item", "number"),
+    setOutPin("number"),
+    { id: "added", label: "Added", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [setPin(t), itemPin("item", "Item", t), setOutPin(t), { id: "added", label: "Added", type: "boolean", direction: "output" }];
+    return [
+      setPin(t),
+      itemPin("item", "Item", t),
+      setOutPin(t),
+      { id: "added", label: "Added", type: "boolean", direction: "output" },
+    ];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.set);
-    const exists = arr.some((v) => JSON.stringify(v) === JSON.stringify(inputs.item));
-    return { result: exists ? arr.slice() : [...arr, inputs.item], added: !exists };
+    const exists = arr.some(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    );
+    return {
+      result: exists ? arr.slice() : [...arr, inputs.item],
+      added: !exists,
+    };
   },
   compileEvaluate: ({ inputs }) => {
     const exists = `(${compileAsArray(inputs.set)}).some((v) => ${jsonEq("v", inputs.item)})`;
@@ -147,16 +206,30 @@ registerNode({
   label: "Set Remove",
   group: GROUP,
   configurableElementType: {},
-  pins: [setPin("number"), itemPin("item", "Item", "number"), setOutPin("number"), { id: "removed", label: "Removed", type: "boolean", direction: "output" }],
+  pins: [
+    setPin("number"),
+    itemPin("item", "Item", "number"),
+    setOutPin("number"),
+    { id: "removed", label: "Removed", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [setPin(t), itemPin("item", "Item", t), setOutPin(t), { id: "removed", label: "Removed", type: "boolean", direction: "output" }];
+    return [
+      setPin(t),
+      itemPin("item", "Item", t),
+      setOutPin(t),
+      { id: "removed", label: "Removed", type: "boolean", direction: "output" },
+    ];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.set);
-    const index = arr.findIndex((v) => JSON.stringify(v) === JSON.stringify(inputs.item));
+    const index = arr.findIndex(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    );
     const removed = index !== -1;
-    const result = removed ? [...arr.slice(0, index), ...arr.slice(index + 1)] : arr.slice();
+    const result = removed
+      ? [...arr.slice(0, index), ...arr.slice(index + 1)]
+      : arr.slice();
     return { result, removed };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -184,13 +257,32 @@ registerNode({
   label: "Set Contains",
   group: GROUP,
   configurableElementType: {},
-  pins: [setPin("number"), itemPin("item", "Item", "number"), { id: "contains", label: "Contains", type: "boolean", direction: "output" }],
+  pins: [
+    setPin("number"),
+    itemPin("item", "Item", "number"),
+    { id: "contains", label: "Contains", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [setPin(t), itemPin("item", "Item", t), { id: "contains", label: "Contains", type: "boolean", direction: "output" }];
+    return [
+      setPin(t),
+      itemPin("item", "Item", t),
+      {
+        id: "contains",
+        label: "Contains",
+        type: "boolean",
+        direction: "output",
+      },
+    ];
   },
-  evaluate: ({ inputs }) => ({ contains: asArray(inputs.set).some((v) => JSON.stringify(v) === JSON.stringify(inputs.item)) }),
-  compileEvaluate: ({ inputs }) => ({ contains: `(${compileAsArray(inputs.set)}).some((v) => ${jsonEq("v", inputs.item)})` }),
+  evaluate: ({ inputs }) => ({
+    contains: asArray(inputs.set).some(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    ),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    contains: `(${compileAsArray(inputs.set)}).some((v) => ${jsonEq("v", inputs.item)})`,
+  }),
 });
 
 registerNode({
@@ -198,10 +290,18 @@ registerNode({
   label: "Set Is Empty",
   group: GROUP,
   configurableElementType: {},
-  pins: [setPin("number"), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
-  deriveInstancePins: (node) => [setPin(elementTypeOf(node)), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
+  pins: [
+    setPin("number"),
+    { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" },
+  ],
+  deriveInstancePins: (node) => [
+    setPin(elementTypeOf(node)),
+    { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" },
+  ],
   evaluate: ({ inputs }) => ({ isEmpty: asArray(inputs.set).length === 0 }),
-  compileEvaluate: ({ inputs }) => ({ isEmpty: `((${compileAsArray(inputs.set)}).length === 0)` }),
+  compileEvaluate: ({ inputs }) => ({
+    isEmpty: `((${compileAsArray(inputs.set)}).length === 0)`,
+  }),
 });
 
 registerNode({
@@ -209,13 +309,33 @@ registerNode({
   label: "Set To Array",
   group: GROUP,
   configurableElementType: {},
-  pins: [setPin("number"), { id: "result", label: "Array", type: "number", direction: "output", container: "array" }],
+  pins: [
+    setPin("number"),
+    {
+      id: "result",
+      label: "Array",
+      type: "number",
+      direction: "output",
+      container: "array",
+    },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [setPin(t), { id: "result", label: "Array", type: t, direction: "output", container: "array" as const }];
+    return [
+      setPin(t),
+      {
+        id: "result",
+        label: "Array",
+        type: t,
+        direction: "output",
+        container: "array" as const,
+      },
+    ];
   },
   evaluate: ({ inputs }) => ({ result: asArray(inputs.set).slice() }),
-  compileEvaluate: ({ inputs }) => ({ result: `(${compileAsArray(inputs.set)}).slice()` }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `(${compileAsArray(inputs.set)}).slice()`,
+  }),
 });
 
 registerNode({
@@ -223,13 +343,27 @@ registerNode({
   label: "Set Union",
   group: GROUP,
   configurableElementType: {},
-  pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
+  pins: [
+    { ...setPin("number"), id: "a", label: "Set A" },
+    { ...setPin("number"), id: "b", label: "Set B" },
+    setOutPin("number"),
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: "Set A" }, { ...setPin(t), id: "b", label: "Set B" }, setOutPin(t)];
+    return [
+      { ...setPin(t), id: "a", label: "Set A" },
+      { ...setPin(t), id: "b", label: "Set B" },
+      setOutPin(t),
+    ];
   },
-  evaluate: ({ inputs }) => ({ result: dedupe([...asArray(inputs.a), ...asArray(inputs.b)]) }),
-  compileEvaluate: ({ inputs }) => ({ result: compileDedupe(`[...${compileAsArray(inputs.a)}, ...${compileAsArray(inputs.b)}]`) }),
+  evaluate: ({ inputs }) => ({
+    result: dedupe([...asArray(inputs.a), ...asArray(inputs.b)]),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: compileDedupe(
+      `[...${compileAsArray(inputs.a)}, ...${compileAsArray(inputs.b)}]`,
+    ),
+  }),
 });
 
 registerNode({
@@ -237,15 +371,27 @@ registerNode({
   label: "Set Intersection",
   group: GROUP,
   configurableElementType: {},
-  pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
+  pins: [
+    { ...setPin("number"), id: "a", label: "Set A" },
+    { ...setPin("number"), id: "b", label: "Set B" },
+    setOutPin("number"),
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: "Set A" }, { ...setPin(t), id: "b", label: "Set B" }, setOutPin(t)];
+    return [
+      { ...setPin(t), id: "a", label: "Set A" },
+      { ...setPin(t), id: "b", label: "Set B" },
+      setOutPin(t),
+    ];
   },
   evaluate: ({ inputs }) => {
     const a = asArray(inputs.a);
     const b = asArray(inputs.b);
-    return { result: a.filter((v) => b.some((bv) => JSON.stringify(bv) === JSON.stringify(v))) };
+    return {
+      result: a.filter((v) =>
+        b.some((bv) => JSON.stringify(bv) === JSON.stringify(v)),
+      ),
+    };
   },
   compileEvaluate: ({ inputs }) => ({
     result: `(${compileAsArray(inputs.a)}).filter((v) => (${compileAsArray(inputs.b)}).some((bv) => ${jsonEq("bv", "v")}))`,
@@ -257,15 +403,27 @@ registerNode({
   label: "Set Difference",
   group: GROUP,
   configurableElementType: {},
-  pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
+  pins: [
+    { ...setPin("number"), id: "a", label: "Set A" },
+    { ...setPin("number"), id: "b", label: "Set B" },
+    setOutPin("number"),
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: "Set A" }, { ...setPin(t), id: "b", label: "Set B" }, setOutPin(t)];
+    return [
+      { ...setPin(t), id: "a", label: "Set A" },
+      { ...setPin(t), id: "b", label: "Set B" },
+      setOutPin(t),
+    ];
   },
   evaluate: ({ inputs }) => {
     const a = asArray(inputs.a);
     const b = asArray(inputs.b);
-    return { result: a.filter((v) => !b.some((bv) => JSON.stringify(bv) === JSON.stringify(v))) };
+    return {
+      result: a.filter(
+        (v) => !b.some((bv) => JSON.stringify(bv) === JSON.stringify(v)),
+      ),
+    };
   },
   compileEvaluate: ({ inputs }) => ({
     result: `(${compileAsArray(inputs.a)}).filter((v) => !(${compileAsArray(inputs.b)}).some((bv) => ${jsonEq("bv", "v")}))`,
@@ -294,10 +452,20 @@ registerNode({
     return [
       { id: "exec-in", label: "", type: "exec", direction: "input" },
       setPin(t),
-      { id: "loop-body", label: "Loop Body", type: "exec", direction: "output" },
+      {
+        id: "loop-body",
+        label: "Loop Body",
+        type: "exec",
+        direction: "output",
+      },
       { id: "element", label: "Element", type: t, direction: "output" },
       { id: "index", label: "Index", type: "number", direction: "output" },
-      { id: "completed", label: "Completed", type: "exec", direction: "output" },
+      {
+        id: "completed",
+        label: "Completed",
+        type: "exec",
+        direction: "output",
+      },
     ];
   },
   // Disabled must skip straight to "completed" — never firing "loop-body" — same rationale as
@@ -308,7 +476,9 @@ registerNode({
   execute: async ({ node, inputs, ctx }) => {
     const arr = asArray(inputs.set);
     if (arr.length > MAX_SET_FOR_EACH_ITERATIONS) {
-      throw new Error(`Set For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_SET_FOR_EACH_ITERATIONS} limit.`);
+      throw new Error(
+        `Set For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_SET_FOR_EACH_ITERATIONS} limit.`,
+      );
     }
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
     for (let i = 0; i < arr.length; i++) {

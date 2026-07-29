@@ -1,9 +1,9 @@
 import { connectionsFrom, connectionTo } from "../engine/graphQueries";
 import { resolvePinDefs } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
-import type { NodeInstance } from "../engine/types";
 import { indent } from "../engine/compileUtils";
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 export interface TriggerDescriptor {
   nodeId: string;

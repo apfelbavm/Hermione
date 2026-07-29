@@ -2,7 +2,8 @@ import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
 import { registerNode } from "../engine/registry";
 import { connectionsFrom } from "../engine/graphQueries";
 import { runExecFrom } from "../engine/executor";
-import type { NodeInstance, PinDef, PinType } from "../engine/types";
+import type { PinDef, PinType } from "../engine/types";
+import { NodeInstance } from "../engine/nodeInstance";
 
 // Sibling of array.ts/set.ts — same pure-dataflow philosophy (see array.ts's header comment), just
 // for Map<K,V>. Backed by a plain array of {key,value} entries (see the plan's rationale: no real
@@ -38,20 +39,62 @@ function jsonEq(aExpr: string, bExpr: string): string {
   return `(JSON.stringify(${aExpr}) === JSON.stringify(${bExpr}))`;
 }
 
-function mapPin(valueType: PinType, keyType: PinType, id = "map", label = "Map"): PinDef {
-  return { id, label, type: valueType, direction: "input", container: "map", keyType, defaultValue: [] };
+function mapPin(
+  valueType: PinType,
+  keyType: PinType,
+  id = "map",
+  label = "Map",
+): PinDef {
+  return {
+    id,
+    label,
+    type: valueType,
+    direction: "input",
+    container: "map",
+    keyType,
+    defaultValue: [],
+  };
 }
 
-function mapOutPin(valueType: PinType, keyType: PinType, label = "Map"): PinDef {
-  return { id: "result", label, type: valueType, direction: "output", container: "map", keyType };
+function mapOutPin(
+  valueType: PinType,
+  keyType: PinType,
+  label = "Map",
+): PinDef {
+  return {
+    id: "result",
+    label,
+    type: valueType,
+    direction: "output",
+    container: "map",
+    keyType,
+  };
 }
 
 function keyPin(keyType: PinType, id = "key", label = "Key"): PinDef {
-  return { id, label, type: keyType, direction: "input", defaultValue: DEFAULT_VALUE_BY_TYPE[keyType] };
+  return {
+    id,
+    label,
+    type: keyType,
+    direction: "input",
+    defaultValue: DEFAULT_VALUE_BY_TYPE[keyType],
+  };
 }
 
-function valuePin(valueType: PinType, id: string, label: string, direction: "input" | "output" = "input"): PinDef {
-  return { id, label, type: valueType, direction, defaultValue: direction === "input" ? DEFAULT_VALUE_BY_TYPE[valueType] : undefined };
+function valuePin(
+  valueType: PinType,
+  id: string,
+  label: string,
+  direction: "input" | "output" = "input",
+): PinDef {
+  return {
+    id,
+    label,
+    type: valueType,
+    direction,
+    defaultValue:
+      direction === "input" ? DEFAULT_VALUE_BY_TYPE[valueType] : undefined,
+  };
 }
 
 // --- Make Map: variadic KEY+VALUE PAIRS, added/removed together — see NodeDef.onInstancePinRemoved
@@ -78,7 +121,13 @@ function makeMapEntryPins(node: NodeInstance): PinDef[] {
   const valueType = valueTypeOf(node);
   const pins: PinDef[] = [];
   makeMapEntrySuffixes(node).forEach((i, position) => {
-    pins.push({ id: `${KEY_PREFIX}${i}`, label: `Key ${position + 1}`, type: keyType, direction: "input", defaultValue: DEFAULT_VALUE_BY_TYPE[keyType] });
+    pins.push({
+      id: `${KEY_PREFIX}${i}`,
+      label: `Key ${position + 1}`,
+      type: keyType,
+      direction: "input",
+      defaultValue: DEFAULT_VALUE_BY_TYPE[keyType],
+    });
     pins.push({
       id: `${VALUE_PREFIX}${i}`,
       label: `Value ${position + 1}`,
@@ -97,27 +146,53 @@ registerNode({
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [
-    { id: `${KEY_PREFIX}0`, label: "Key 1", type: "string", direction: "input", defaultValue: "" },
-    { id: `${VALUE_PREFIX}0`, label: "Value 1", type: "number", direction: "input", defaultValue: 0, removable: true },
+    {
+      id: `${KEY_PREFIX}0`,
+      label: "Key 1",
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: `${VALUE_PREFIX}0`,
+      label: "Value 1",
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+      removable: true,
+    },
     mapOutPin("number", "string"),
   ],
-  deriveInstancePins: (node) => [...makeMapEntryPins(node), mapOutPin(valueTypeOf(node), keyTypeOf(node))],
+  deriveInstancePins: (node) => [
+    ...makeMapEntryPins(node),
+    mapOutPin(valueTypeOf(node), keyTypeOf(node)),
+  ],
   addInstancePinEntry: (node) => {
     const suffixes = makeMapEntrySuffixes(node);
     const next = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
-    node.pins[`${KEY_PREFIX}${next}`] = { value: DEFAULT_VALUE_BY_TYPE[keyTypeOf(node)] };
-    node.pins[`${VALUE_PREFIX}${next}`] = { value: DEFAULT_VALUE_BY_TYPE[valueTypeOf(node)] };
+    node.pins[`${KEY_PREFIX}${next}`] = {
+      value: DEFAULT_VALUE_BY_TYPE[keyTypeOf(node)],
+    };
+    node.pins[`${VALUE_PREFIX}${next}`] = {
+      value: DEFAULT_VALUE_BY_TYPE[valueTypeOf(node)],
+    };
   },
   onInstancePinRemoved: (_node, removedPinId) => {
     if (!removedPinId.startsWith(VALUE_PREFIX)) return [];
     return [`${KEY_PREFIX}${entrySuffix(removedPinId, VALUE_PREFIX)}`];
   },
   evaluate: ({ node, inputs }) => ({
-    result: makeMapEntrySuffixes(node).map((i) => ({ key: inputs[`${KEY_PREFIX}${i}`], value: inputs[`${VALUE_PREFIX}${i}`] })),
+    result: makeMapEntrySuffixes(node).map((i) => ({
+      key: inputs[`${KEY_PREFIX}${i}`],
+      value: inputs[`${VALUE_PREFIX}${i}`],
+    })),
   }),
   compileEvaluate: ({ node, inputs }) => ({
     result: `[${makeMapEntrySuffixes(node)
-      .map((i) => `{ key: ${inputs[`${KEY_PREFIX}${i}`]}, value: ${inputs[`${VALUE_PREFIX}${i}`]} }`)
+      .map(
+        (i) =>
+          `{ key: ${inputs[`${KEY_PREFIX}${i}`]}, value: ${inputs[`${VALUE_PREFIX}${i}`]} }`,
+      )
       .join(", ")}]`,
   }),
 });
@@ -127,13 +202,18 @@ registerNode({
   label: "Map Length",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), { id: "length", label: "Length", type: "number", direction: "output" }],
+  pins: [
+    mapPin("number", "string"),
+    { id: "length", label: "Length", type: "number", direction: "output" },
+  ],
   deriveInstancePins: (node) => [
     mapPin(valueTypeOf(node), keyTypeOf(node)),
     { id: "length", label: "Length", type: "number", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({ length: asEntries(inputs.map).length }),
-  compileEvaluate: ({ inputs }) => ({ length: `(${compileAsEntries(inputs.map)}).length` }),
+  compileEvaluate: ({ inputs }) => ({
+    length: `(${compileAsEntries(inputs.map)}).length`,
+  }),
 });
 
 registerNode({
@@ -141,15 +221,27 @@ registerNode({
   label: "Map Add",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), keyPin("string"), valuePin("number", "value", "Value"), mapOutPin("number", "string")],
+  pins: [
+    mapPin("number", "string"),
+    keyPin("string"),
+    valuePin("number", "value", "Value"),
+    mapOutPin("number", "string"),
+  ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
     const k = keyTypeOf(node);
-    return [mapPin(v, k), keyPin(k), valuePin(v, "value", "Value"), mapOutPin(v, k)];
+    return [
+      mapPin(v, k),
+      keyPin(k),
+      valuePin(v, "value", "Value"),
+      mapOutPin(v, k),
+    ];
   },
   evaluate: ({ inputs }) => {
     const entries = asEntries(inputs.map).slice();
-    const index = entries.findIndex((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key));
+    const index = entries.findIndex(
+      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
+    );
     if (index !== -1) entries[index] = { key: inputs.key, value: inputs.value };
     else entries.push({ key: inputs.key, value: inputs.value });
     return { result: entries };
@@ -164,17 +256,31 @@ registerNode({
   label: "Map Remove",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), keyPin("string"), mapOutPin("number", "string"), { id: "removed", label: "Removed", type: "boolean", direction: "output" }],
+  pins: [
+    mapPin("number", "string"),
+    keyPin("string"),
+    mapOutPin("number", "string"),
+    { id: "removed", label: "Removed", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
     const k = keyTypeOf(node);
-    return [mapPin(v, k), keyPin(k), mapOutPin(v, k), { id: "removed", label: "Removed", type: "boolean", direction: "output" }];
+    return [
+      mapPin(v, k),
+      keyPin(k),
+      mapOutPin(v, k),
+      { id: "removed", label: "Removed", type: "boolean", direction: "output" },
+    ];
   },
   evaluate: ({ inputs }) => {
     const entries = asEntries(inputs.map);
-    const index = entries.findIndex((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key));
+    const index = entries.findIndex(
+      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
+    );
     const removed = index !== -1;
-    const result = removed ? [...entries.slice(0, index), ...entries.slice(index + 1)] : entries.slice();
+    const result = removed
+      ? [...entries.slice(0, index), ...entries.slice(index + 1)]
+      : entries.slice();
     return { result, removed };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -189,7 +295,10 @@ registerNode({
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), mapOutPin("number", "string")],
-  deriveInstancePins: (node) => [mapPin(valueTypeOf(node), keyTypeOf(node)), mapOutPin(valueTypeOf(node), keyTypeOf(node))],
+  deriveInstancePins: (node) => [
+    mapPin(valueTypeOf(node), keyTypeOf(node)),
+    mapOutPin(valueTypeOf(node), keyTypeOf(node)),
+  ],
   evaluate: () => ({ result: [] }),
   compileEvaluate: () => ({ result: "[]" }),
 });
@@ -199,14 +308,33 @@ registerNode({
   label: "Map Contains Key",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), keyPin("string"), { id: "contains", label: "Contains", type: "boolean", direction: "output" }],
+  pins: [
+    mapPin("number", "string"),
+    keyPin("string"),
+    { id: "contains", label: "Contains", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
     const k = keyTypeOf(node);
-    return [mapPin(v, k), keyPin(k), { id: "contains", label: "Contains", type: "boolean", direction: "output" }];
+    return [
+      mapPin(v, k),
+      keyPin(k),
+      {
+        id: "contains",
+        label: "Contains",
+        type: "boolean",
+        direction: "output",
+      },
+    ];
   },
-  evaluate: ({ inputs }) => ({ contains: asEntries(inputs.map).some((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key)) }),
-  compileEvaluate: ({ inputs }) => ({ contains: `(${compileAsEntries(inputs.map)}).some((e) => ${jsonEq("e.key", inputs.key)})` }),
+  evaluate: ({ inputs }) => ({
+    contains: asEntries(inputs.map).some(
+      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
+    ),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    contains: `(${compileAsEntries(inputs.map)}).some((e) => ${jsonEq("e.key", inputs.key)})`,
+  }),
 });
 
 registerNode({
@@ -214,15 +342,30 @@ registerNode({
   label: "Map Find",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), keyPin("string"), valuePin("number", "value", "Value", "output"), { id: "found", label: "Found", type: "boolean", direction: "output" }],
+  pins: [
+    mapPin("number", "string"),
+    keyPin("string"),
+    valuePin("number", "value", "Value", "output"),
+    { id: "found", label: "Found", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
     const k = keyTypeOf(node);
-    return [mapPin(v, k), keyPin(k), valuePin(v, "value", "Value", "output"), { id: "found", label: "Found", type: "boolean", direction: "output" }];
+    return [
+      mapPin(v, k),
+      keyPin(k),
+      valuePin(v, "value", "Value", "output"),
+      { id: "found", label: "Found", type: "boolean", direction: "output" },
+    ];
   },
   evaluate: ({ node, inputs }) => {
-    const entry = asEntries(inputs.map).find((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key));
-    return { value: entry ? entry.value : DEFAULT_VALUE_BY_TYPE[valueTypeOf(node)], found: !!entry };
+    const entry = asEntries(inputs.map).find(
+      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
+    );
+    return {
+      value: entry ? entry.value : DEFAULT_VALUE_BY_TYPE[valueTypeOf(node)],
+      found: !!entry,
+    };
   },
   compileEvaluate: ({ node, inputs }) => {
     const fallback = JSON.stringify(DEFAULT_VALUE_BY_TYPE[valueTypeOf(node)]);
@@ -238,14 +381,36 @@ registerNode({
   label: "Map Keys",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), { id: "result", label: "Keys", type: "string", direction: "output", container: "array" }],
+  pins: [
+    mapPin("number", "string"),
+    {
+      id: "result",
+      label: "Keys",
+      type: "string",
+      direction: "output",
+      container: "array",
+    },
+  ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
     const k = keyTypeOf(node);
-    return [mapPin(v, k), { id: "result", label: "Keys", type: k, direction: "output", container: "array" as const }];
+    return [
+      mapPin(v, k),
+      {
+        id: "result",
+        label: "Keys",
+        type: k,
+        direction: "output",
+        container: "array" as const,
+      },
+    ];
   },
-  evaluate: ({ inputs }) => ({ result: asEntries(inputs.map).map((e) => e.key) }),
-  compileEvaluate: ({ inputs }) => ({ result: `(${compileAsEntries(inputs.map)}).map((e) => e.key)` }),
+  evaluate: ({ inputs }) => ({
+    result: asEntries(inputs.map).map((e) => e.key),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `(${compileAsEntries(inputs.map)}).map((e) => e.key)`,
+  }),
 });
 
 registerNode({
@@ -253,14 +418,36 @@ registerNode({
   label: "Map Values",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), { id: "result", label: "Values", type: "number", direction: "output", container: "array" }],
+  pins: [
+    mapPin("number", "string"),
+    {
+      id: "result",
+      label: "Values",
+      type: "number",
+      direction: "output",
+      container: "array",
+    },
+  ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
     const k = keyTypeOf(node);
-    return [mapPin(v, k), { id: "result", label: "Values", type: v, direction: "output", container: "array" as const }];
+    return [
+      mapPin(v, k),
+      {
+        id: "result",
+        label: "Values",
+        type: v,
+        direction: "output",
+        container: "array" as const,
+      },
+    ];
   },
-  evaluate: ({ inputs }) => ({ result: asEntries(inputs.map).map((e) => e.value) }),
-  compileEvaluate: ({ inputs }) => ({ result: `(${compileAsEntries(inputs.map)}).map((e) => e.value)` }),
+  evaluate: ({ inputs }) => ({
+    result: asEntries(inputs.map).map((e) => e.value),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `(${compileAsEntries(inputs.map)}).map((e) => e.value)`,
+  }),
 });
 
 registerNode({
@@ -268,13 +455,18 @@ registerNode({
   label: "Map Is Empty",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
+  pins: [
+    mapPin("number", "string"),
+    { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => [
     mapPin(valueTypeOf(node), keyTypeOf(node)),
     { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({ isEmpty: asEntries(inputs.map).length === 0 }),
-  compileEvaluate: ({ inputs }) => ({ isEmpty: `((${compileAsEntries(inputs.map)}).length === 0)` }),
+  compileEvaluate: ({ inputs }) => ({
+    isEmpty: `((${compileAsEntries(inputs.map)}).length === 0)`,
+  }),
 });
 
 // --- Map For Each: same control-flow shape as Array/Set For Each — the one exec node in this
@@ -300,10 +492,20 @@ registerNode({
     return [
       { id: "exec-in", label: "", type: "exec", direction: "input" },
       mapPin(v, k),
-      { id: "loop-body", label: "Loop Body", type: "exec", direction: "output" },
+      {
+        id: "loop-body",
+        label: "Loop Body",
+        type: "exec",
+        direction: "output",
+      },
       { id: "key", label: "Key", type: k, direction: "output" },
       valuePin(v, "value", "Value", "output"),
-      { id: "completed", label: "Completed", type: "exec", direction: "output" },
+      {
+        id: "completed",
+        label: "Completed",
+        type: "exec",
+        direction: "output",
+      },
     ];
   },
   // Disabled must skip straight to "completed" — never firing "loop-body" — same rationale as
@@ -314,7 +516,9 @@ registerNode({
   execute: async ({ node, inputs, ctx }) => {
     const entries = asEntries(inputs.map);
     if (entries.length > MAX_MAP_FOR_EACH_ITERATIONS) {
-      throw new Error(`Map For Each (${node.id}) would run ${entries.length} iterations, over the ${MAX_MAP_FOR_EACH_ITERATIONS} limit.`);
+      throw new Error(
+        `Map For Each (${node.id}) would run ${entries.length} iterations, over the ${MAX_MAP_FOR_EACH_ITERATIONS} limit.`,
+      );
     }
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
     for (const entry of entries) {

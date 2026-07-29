@@ -2,7 +2,8 @@ import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
 import { registerNode } from "../engine/registry";
 import { connectionsFrom } from "../engine/graphQueries";
 import { runExecFrom } from "../engine/executor";
-import type { NodeInstance, PinDef, PinType } from "../engine/types";
+import type { PinDef, PinType } from "../engine/types";
+import { NodeInstance } from "../engine/nodeInstance";
 
 // Every node below operates on Array<T> for a per-INSTANCE-chosen T (see
 // NodeDef.configurableElementType) — an Array Length node must work on Array<Number> and
@@ -32,21 +33,50 @@ function jsonEq(aExpr: string, bExpr: string): string {
 }
 
 function arrayPin(elementType: PinType, defaultValue: unknown = []): PinDef {
-  return { id: "array", label: "Array", type: elementType, direction: "input", container: "array", defaultValue };
+  return {
+    id: "array",
+    label: "Array",
+    type: elementType,
+    direction: "input",
+    container: "array",
+    defaultValue,
+  };
 }
 
 // A distinct id from arrayPin's "array" — several nodes below have BOTH an array input and an
 // array output, and pin ids must be unique within one node (they key NodeInstance.pins and
 // NodeScreenGeometry.pinScreen, both flat Records regardless of direction).
 function arrayOutPin(elementType: PinType, label = "Array"): PinDef {
-  return { id: "result", label, type: elementType, direction: "output", container: "array" };
+  return {
+    id: "result",
+    label,
+    type: elementType,
+    direction: "output",
+    container: "array",
+  };
 }
 
-function itemPin(id: string, label: string, elementType: PinType, direction: "input" | "output" = "input"): PinDef {
-  return { id, label, type: elementType, direction, defaultValue: direction === "input" ? DEFAULT_VALUE_BY_TYPE[elementType] : undefined };
+function itemPin(
+  id: string,
+  label: string,
+  elementType: PinType,
+  direction: "input" | "output" = "input",
+): PinDef {
+  return {
+    id,
+    label,
+    type: elementType,
+    direction,
+    defaultValue:
+      direction === "input" ? DEFAULT_VALUE_BY_TYPE[elementType] : undefined,
+  };
 }
 
-function indexPin(id = "index", label = "Index", direction: "input" | "output" = "input"): PinDef {
+function indexPin(
+  id = "index",
+  label = "Index",
+  direction: "input" | "output" = "input",
+): PinDef {
   return direction === "input"
     ? { id, label, type: "number", direction, defaultValue: 0, integer: true }
     : { id, label, type: "number", direction };
@@ -86,16 +116,30 @@ registerNode({
   group: GROUP,
   configurableElementType: {},
   pins: [
-    { id: `${ENTRY_PREFIX}0`, label: "Element 1", type: "number", direction: "input", defaultValue: 0, removable: true },
+    {
+      id: `${ENTRY_PREFIX}0`,
+      label: "Element 1",
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+      removable: true,
+    },
     arrayOutPin("number"),
   ],
-  deriveInstancePins: (node) => [...makeArrayEntryPins(node), arrayOutPin(elementTypeOf(node))],
+  deriveInstancePins: (node) => [
+    ...makeArrayEntryPins(node),
+    arrayOutPin(elementTypeOf(node)),
+  ],
   addInstancePinEntry: (node) => {
     const suffixes = makeArrayEntryIds(node).map(entrySuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
-    node.pins[`${ENTRY_PREFIX}${nextSuffix}`] = { value: DEFAULT_VALUE_BY_TYPE[elementTypeOf(node)] };
+    node.pins[`${ENTRY_PREFIX}${nextSuffix}`] = {
+      value: DEFAULT_VALUE_BY_TYPE[elementTypeOf(node)],
+    };
   },
-  evaluate: ({ node, inputs }) => ({ result: makeArrayEntryIds(node).map((id) => inputs[id]) }),
+  evaluate: ({ node, inputs }) => ({
+    result: makeArrayEntryIds(node).map((id) => inputs[id]),
+  }),
   compileEvaluate: ({ node, inputs }) => ({
     result: `[${makeArrayEntryIds(node)
       .map((id) => inputs[id])
@@ -108,13 +152,18 @@ registerNode({
   label: "Array Length",
   group: GROUP,
   configurableElementType: {},
-  pins: [arrayPin("number"), { id: "length", label: "Length", type: "number", direction: "output" }],
+  pins: [
+    arrayPin("number"),
+    { id: "length", label: "Length", type: "number", direction: "output" },
+  ],
   deriveInstancePins: (node) => [
     arrayPin(elementTypeOf(node)),
     { id: "length", label: "Length", type: "number", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({ length: asArray(inputs.array).length }),
-  compileEvaluate: ({ inputs }) => ({ length: `(${compileAsArray(inputs.array)}).length` }),
+  compileEvaluate: ({ inputs }) => ({
+    length: `(${compileAsArray(inputs.array)}).length`,
+  }),
 });
 
 registerNode({
@@ -122,16 +171,29 @@ registerNode({
   label: "Array Get",
   group: GROUP,
   configurableElementType: {},
-  pins: [arrayPin("number"), indexPin(), itemPin("element", "Element", "number", "output"), { id: "found", label: "Found", type: "boolean", direction: "output" }],
+  pins: [
+    arrayPin("number"),
+    indexPin(),
+    itemPin("element", "Element", "number", "output"),
+    { id: "found", label: "Found", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), indexPin(), itemPin("element", "Element", t, "output"), { id: "found", label: "Found", type: "boolean", direction: "output" }];
+    return [
+      arrayPin(t),
+      indexPin(),
+      itemPin("element", "Element", t, "output"),
+      { id: "found", label: "Found", type: "boolean", direction: "output" },
+    ];
   },
   evaluate: ({ node, inputs }) => {
     const arr = asArray(inputs.array);
     const index = Math.trunc(Number(inputs.index ?? 0));
     const found = index >= 0 && index < arr.length;
-    return { element: found ? arr[index] : DEFAULT_VALUE_BY_TYPE[elementTypeOf(node)], found };
+    return {
+      element: found ? arr[index] : DEFAULT_VALUE_BY_TYPE[elementTypeOf(node)],
+      found,
+    };
   },
   compileEvaluate: ({ node, inputs }) => {
     const fallback = JSON.stringify(DEFAULT_VALUE_BY_TYPE[elementTypeOf(node)]);
@@ -148,10 +210,22 @@ registerNode({
   label: "Array Set",
   group: GROUP,
   configurableElementType: {},
-  pins: [arrayPin("number"), indexPin(), itemPin("value", "Value", "number"), arrayOutPin("number"), { id: "success", label: "Success", type: "boolean", direction: "output" }],
+  pins: [
+    arrayPin("number"),
+    indexPin(),
+    itemPin("value", "Value", "number"),
+    arrayOutPin("number"),
+    { id: "success", label: "Success", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), indexPin(), itemPin("value", "Value", t), arrayOutPin(t), { id: "success", label: "Success", type: "boolean", direction: "output" }];
+    return [
+      arrayPin(t),
+      indexPin(),
+      itemPin("value", "Value", t),
+      arrayOutPin(t),
+      { id: "success", label: "Success", type: "boolean", direction: "output" },
+    ];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
@@ -172,10 +246,20 @@ registerNode({
   label: "Array Add",
   group: GROUP,
   configurableElementType: {},
-  pins: [arrayPin("number"), itemPin("item", "Item", "number"), arrayOutPin("number"), { id: "index", label: "Index", type: "number", direction: "output" }],
+  pins: [
+    arrayPin("number"),
+    itemPin("item", "Item", "number"),
+    arrayOutPin("number"),
+    { id: "index", label: "Index", type: "number", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), itemPin("item", "Item", t), arrayOutPin(t), { id: "index", label: "Index", type: "number", direction: "output" }];
+    return [
+      arrayPin(t),
+      itemPin("item", "Item", t),
+      arrayOutPin(t),
+      { id: "index", label: "Index", type: "number", direction: "output" },
+    ];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
@@ -201,10 +285,18 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...arrayPin(t), id: "a", label: "Array A" }, { ...arrayPin(t), id: "b", label: "Array B" }, arrayOutPin(t)];
+    return [
+      { ...arrayPin(t), id: "a", label: "Array A" },
+      { ...arrayPin(t), id: "b", label: "Array B" },
+      arrayOutPin(t),
+    ];
   },
-  evaluate: ({ inputs }) => ({ result: [...asArray(inputs.a), ...asArray(inputs.b)] }),
-  compileEvaluate: ({ inputs }) => ({ result: `[...${compileAsArray(inputs.a)}, ...${compileAsArray(inputs.b)}]` }),
+  evaluate: ({ inputs }) => ({
+    result: [...asArray(inputs.a), ...asArray(inputs.b)],
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `[...${compileAsArray(inputs.a)}, ...${compileAsArray(inputs.b)}]`,
+  }),
 });
 
 registerNode({
@@ -212,14 +304,27 @@ registerNode({
   label: "Array Insert",
   group: GROUP,
   configurableElementType: {},
-  pins: [arrayPin("number"), indexPin(), itemPin("item", "Item", "number"), arrayOutPin("number")],
+  pins: [
+    arrayPin("number"),
+    indexPin(),
+    itemPin("item", "Item", "number"),
+    arrayOutPin("number"),
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), indexPin(), itemPin("item", "Item", t), arrayOutPin(t)];
+    return [
+      arrayPin(t),
+      indexPin(),
+      itemPin("item", "Item", t),
+      arrayOutPin(t),
+    ];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
-    const index = Math.max(0, Math.min(arr.length, Math.trunc(Number(inputs.index ?? 0))));
+    const index = Math.max(
+      0,
+      Math.min(arr.length, Math.trunc(Number(inputs.index ?? 0))),
+    );
     arr.splice(index, 0, inputs.item);
     return { result: arr };
   },
@@ -233,10 +338,20 @@ registerNode({
   label: "Array Remove At",
   group: GROUP,
   configurableElementType: {},
-  pins: [arrayPin("number"), indexPin(), arrayOutPin("number"), { id: "success", label: "Success", type: "boolean", direction: "output" }],
+  pins: [
+    arrayPin("number"),
+    indexPin(),
+    arrayOutPin("number"),
+    { id: "success", label: "Success", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), indexPin(), arrayOutPin(t), { id: "success", label: "Success", type: "boolean", direction: "output" }];
+    return [
+      arrayPin(t),
+      indexPin(),
+      arrayOutPin(t),
+      { id: "success", label: "Success", type: "boolean", direction: "output" },
+    ];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
@@ -259,14 +374,26 @@ registerNode({
   label: "Array Remove Item",
   group: GROUP,
   configurableElementType: {},
-  pins: [arrayPin("number"), itemPin("item", "Item", "number"), arrayOutPin("number"), { id: "removed", label: "Removed", type: "boolean", direction: "output" }],
+  pins: [
+    arrayPin("number"),
+    itemPin("item", "Item", "number"),
+    arrayOutPin("number"),
+    { id: "removed", label: "Removed", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), itemPin("item", "Item", t), arrayOutPin(t), { id: "removed", label: "Removed", type: "boolean", direction: "output" }];
+    return [
+      arrayPin(t),
+      itemPin("item", "Item", t),
+      arrayOutPin(t),
+      { id: "removed", label: "Removed", type: "boolean", direction: "output" },
+    ];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
-    const index = arr.findIndex((v) => JSON.stringify(v) === JSON.stringify(inputs.item));
+    const index = arr.findIndex(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    );
     const removed = index !== -1;
     if (removed) arr.splice(index, 1);
     return { result: arr, removed };
@@ -296,13 +423,32 @@ registerNode({
   label: "Array Contains",
   group: GROUP,
   configurableElementType: {},
-  pins: [arrayPin("number"), itemPin("item", "Item", "number"), { id: "contains", label: "Contains", type: "boolean", direction: "output" }],
+  pins: [
+    arrayPin("number"),
+    itemPin("item", "Item", "number"),
+    { id: "contains", label: "Contains", type: "boolean", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), itemPin("item", "Item", t), { id: "contains", label: "Contains", type: "boolean", direction: "output" }];
+    return [
+      arrayPin(t),
+      itemPin("item", "Item", t),
+      {
+        id: "contains",
+        label: "Contains",
+        type: "boolean",
+        direction: "output",
+      },
+    ];
   },
-  evaluate: ({ inputs }) => ({ contains: asArray(inputs.array).some((v) => JSON.stringify(v) === JSON.stringify(inputs.item)) }),
-  compileEvaluate: ({ inputs }) => ({ contains: `(${compileAsArray(inputs.array)}).some((v) => ${jsonEq("v", inputs.item)})` }),
+  evaluate: ({ inputs }) => ({
+    contains: asArray(inputs.array).some(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    ),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    contains: `(${compileAsArray(inputs.array)}).some((v) => ${jsonEq("v", inputs.item)})`,
+  }),
 });
 
 registerNode({
@@ -310,12 +456,24 @@ registerNode({
   label: "Array Find Index",
   group: GROUP,
   configurableElementType: {},
-  pins: [arrayPin("number"), itemPin("item", "Item", "number"), { id: "index", label: "Index", type: "number", direction: "output" }],
+  pins: [
+    arrayPin("number"),
+    itemPin("item", "Item", "number"),
+    { id: "index", label: "Index", type: "number", direction: "output" },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), itemPin("item", "Item", t), { id: "index", label: "Index", type: "number", direction: "output" }];
+    return [
+      arrayPin(t),
+      itemPin("item", "Item", t),
+      { id: "index", label: "Index", type: "number", direction: "output" },
+    ];
   },
-  evaluate: ({ inputs }) => ({ index: asArray(inputs.array).findIndex((v) => JSON.stringify(v) === JSON.stringify(inputs.item)) }),
+  evaluate: ({ inputs }) => ({
+    index: asArray(inputs.array).findIndex(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    ),
+  }),
   compileEvaluate: ({ inputs }) => ({
     index: `(${compileAsArray(inputs.array)}).findIndex((v) => ${jsonEq("v", inputs.item)})`,
   }),
@@ -326,10 +484,18 @@ registerNode({
   label: "Array Is Empty",
   group: GROUP,
   configurableElementType: {},
-  pins: [arrayPin("number"), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
-  deriveInstancePins: (node) => [arrayPin(elementTypeOf(node)), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
+  pins: [
+    arrayPin("number"),
+    { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" },
+  ],
+  deriveInstancePins: (node) => [
+    arrayPin(elementTypeOf(node)),
+    { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" },
+  ],
   evaluate: ({ inputs }) => ({ isEmpty: asArray(inputs.array).length === 0 }),
-  compileEvaluate: ({ inputs }) => ({ isEmpty: `((${compileAsArray(inputs.array)}).length === 0)` }),
+  compileEvaluate: ({ inputs }) => ({
+    isEmpty: `((${compileAsArray(inputs.array)}).length === 0)`,
+  }),
 });
 
 registerNode({
@@ -342,8 +508,12 @@ registerNode({
     const t = elementTypeOf(node);
     return [arrayPin(t), arrayOutPin(t)];
   },
-  evaluate: ({ inputs }) => ({ result: asArray(inputs.array).slice().reverse() }),
-  compileEvaluate: ({ inputs }) => ({ result: `(${compileAsArray(inputs.array)}).slice().reverse()` }),
+  evaluate: ({ inputs }) => ({
+    result: asArray(inputs.array).slice().reverse(),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `(${compileAsArray(inputs.array)}).slice().reverse()`,
+  }),
 });
 
 // --- Array For Each: the one genuinely control-flow (exec) node in this file — mirrors
@@ -369,10 +539,20 @@ registerNode({
     return [
       { id: "exec-in", label: "", type: "exec", direction: "input" },
       arrayPin(t),
-      { id: "loop-body", label: "Loop Body", type: "exec", direction: "output" },
+      {
+        id: "loop-body",
+        label: "Loop Body",
+        type: "exec",
+        direction: "output",
+      },
       itemPin("element", "Element", t, "output"),
       { id: "index", label: "Index", type: "number", direction: "output" },
-      { id: "completed", label: "Completed", type: "exec", direction: "output" },
+      {
+        id: "completed",
+        label: "Completed",
+        type: "exec",
+        direction: "output",
+      },
     ];
   },
   // Disabled must skip straight to "completed" — never firing "loop-body" — same rationale as
@@ -383,7 +563,9 @@ registerNode({
   execute: async ({ node, inputs, ctx }) => {
     const arr = asArray(inputs.array);
     if (arr.length > MAX_ARRAY_FOR_EACH_ITERATIONS) {
-      throw new Error(`Array For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_ARRAY_FOR_EACH_ITERATIONS} limit.`);
+      throw new Error(
+        `Array For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_ARRAY_FOR_EACH_ITERATIONS} limit.`,
+      );
     }
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
     for (let i = 0; i < arr.length; i++) {

@@ -1,9 +1,9 @@
+import { NodeInstance } from "./nodeInstance";
 import type {
   CodeScriptDef,
   CommentBox,
   Connection,
   FunctionDef,
-  NodeInstance,
   Variable,
 } from "./types";
 

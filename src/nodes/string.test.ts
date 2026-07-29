@@ -1,9 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "./index";
-import { createNodeInstance, removeInstancePin, resolvePinDefs } from "../engine/graphMutations";
+import {
+  createNodeInstance,
+  removeInstancePin,
+  resolvePinDefs,
+} from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
-import {  type NodeInstance } from "../engine/types";
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -17,33 +21,58 @@ function appendNode(): NodeInstance {
 describe("string.fromNumber / fromBoolean / fromJson", () => {
   it("stringifies a number", () => {
     const def = getNodeDef("string.fromNumber");
-    expect(def.evaluate!({ node: {} as NodeInstance, inputs: { value: 42 }, ctx: {} as never })).toEqual({
+    expect(
+      def.evaluate!({
+        node: {} as NodeInstance,
+        inputs: { value: 42 },
+        ctx: {} as never,
+      }),
+    ).toEqual({
       result: "42",
     });
   });
 
   it("stringifies a boolean", () => {
     const def = getNodeDef("string.fromBoolean");
-    expect(def.evaluate!({ node: {} as NodeInstance, inputs: { value: true }, ctx: {} as never })).toEqual({
+    expect(
+      def.evaluate!({
+        node: {} as NodeInstance,
+        inputs: { value: true },
+        ctx: {} as never,
+      }),
+    ).toEqual({
       result: "true",
     });
   });
 
   it("JSON-stringifies an object", () => {
     const def = getNodeDef("string.fromJson");
-    const result = def.evaluate!({ node: {} as NodeInstance, inputs: { value: { a: 1 } }, ctx: {} as never });
+    const result = def.evaluate!({
+      node: {} as NodeInstance,
+      inputs: { value: { a: 1 } },
+      ctx: {} as never,
+    });
     expect(result).toEqual({ result: '{"a":1}' });
   });
 
   it("compileEvaluate produces expressions that evaluate to the same result", () => {
     const num = getNodeDef("string.fromNumber");
-    expect(eval(num.compileEvaluate!({ node: {} as NodeInstance, inputs: { value: "7" }, graph: {} as never }).result)).toBe(
-      "7",
-    );
+    expect(
+      eval(
+        num.compileEvaluate!({
+          node: {} as NodeInstance,
+          inputs: { value: "7" },
+          graph: {} as never,
+        }).result,
+      ),
+    ).toBe("7");
 
     const json = getNodeDef("string.fromJson");
-    const expr = json.compileEvaluate!({ node: {} as NodeInstance, inputs: { value: "{ b: 2 }" }, graph: {} as never })
-      .result;
+    const expr = json.compileEvaluate!({
+      node: {} as NodeInstance,
+      inputs: { value: "{ b: 2 }" },
+      graph: {} as never,
+    }).result;
     expect(eval(expr)).toBe('{"b":2}');
   });
 });
@@ -55,11 +84,17 @@ describe("string.append", () => {
     graph.nodes.push(node);
 
     const pinDefs = resolvePinDefs(node, [], []);
-    const entryIds = pinDefs.filter((p) => p.direction === "input").map((p) => p.id);
+    const entryIds = pinDefs
+      .filter((p) => p.direction === "input")
+      .map((p) => p.id);
     expect(entryIds).toEqual(["entry-0", "entry-1"]);
 
     const def = getNodeDef("string.append");
-    const result = def.evaluate!({ node, inputs: { "entry-0": "foo", "entry-1": "bar" }, ctx: {} as never });
+    const result = def.evaluate!({
+      node,
+      inputs: { "entry-0": "foo", "entry-1": "bar" },
+      ctx: {} as never,
+    });
     expect(result).toEqual({ result: "foobar" });
   });
 
@@ -78,7 +113,11 @@ describe("string.append", () => {
     const pinDefs = resolvePinDefs(node, [], []);
     const entries = pinDefs.filter((p) => p.direction === "input");
     expect(entries.map((p) => p.id)).toEqual(["entry-0", "entry-1", "entry-2"]);
-    expect(entries.map((p) => p.label)).toEqual(["String 1", "String 2", "String 3"]);
+    expect(entries.map((p) => p.label)).toEqual([
+      "String 1",
+      "String 2",
+      "String 3",
+    ]);
     expect(node.pins["entry-2"]).toEqual({ value: "" });
   });
 
@@ -86,7 +125,13 @@ describe("string.append", () => {
     const node = appendNode();
     const graph = new Graph("g", "root");
     graph.nodes.push(node);
-    graph.connections.push({ id: "c1", fromNode: "other", fromPin: "out", toNode: node.id, toPin: "entry-0" });
+    graph.connections.push({
+      id: "c1",
+      fromNode: "other",
+      fromPin: "out",
+      toNode: node.id,
+      toPin: "entry-0",
+    });
 
     removeInstancePin(graph, node.id, "entry-0");
 

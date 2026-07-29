@@ -1,9 +1,24 @@
-import { allGraphs, changeNodeElementType, resolveNodeLabel, setPinLiteralValue, updateVariable } from "../engine/graphMutations";
+import {
+  allGraphs,
+  changeNodeElementType,
+  resolveNodeLabel,
+  setPinLiteralValue,
+  updateVariable,
+} from "../engine/graphMutations";
+import { NodeInstance } from "../engine/nodeInstance";
 import { getNodeDef } from "../engine/registry";
-import type { CommentBox, NodeInstance, PinDef } from "../engine/types";
+import type { CommentBox, PinDef } from "../engine/types";
 import { DEFAULT_COMMENT_COLOR } from "../render/commentGeometry";
-import { getEditingGraph, getVisibleVariablesForState, type Store } from "../state/store";
-import { createContainerSelect, createTypeSelect, createTypedValueInput } from "./typedValueInput";
+import {
+  getEditingGraph,
+  getVisibleVariablesForState,
+  type Store,
+} from "../state/store";
+import {
+  createContainerSelect,
+  createTypeSelect,
+  createTypedValueInput,
+} from "./typedValueInput";
 
 export interface DetailsPanelElements {
   /** The whole Details section, including its divider/header — hidden entirely when nothing is selected. */
@@ -37,10 +52,21 @@ export interface DetailsPanelElements {
  * canvas node's own detailProperties (see NodeDef.detailProperties and pointerHandlers.ts, which
  * clears sidebarSelection whenever a fresh node selection is made so this always reflects whichever
  * was clicked last). */
-export function createDetailsPanel(elements: DetailsPanelElements, store: Store): { render: () => void } {
-  function renderNodeProperties(node: NodeInstance, properties: PinDef[]): void {
+export function createDetailsPanel(
+  elements: DetailsPanelElements,
+  store: Store,
+): { render: () => void } {
+  function renderNodeProperties(
+    node: NodeInstance,
+    properties: PinDef[],
+  ): void {
     const def = getNodeDef(node.type);
-    elements.nodeNameLabel.textContent = resolveNodeLabel(node, def, getVisibleVariablesForState(store.state), store.state.rootGraph.functions);
+    elements.nodeNameLabel.textContent = resolveNodeLabel(
+      node,
+      def,
+      getVisibleVariablesForState(store.state),
+      store.state.rootGraph.functions,
+    );
     // Don't wipe the fields while the user is actively editing one of them.
     if (elements.nodeFieldsContainer.contains(document.activeElement)) return;
 
@@ -52,12 +78,21 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
       const elementLabel = document.createElement("span");
       elementLabel.className = "variable-name";
       elementLabel.textContent = "Element Type";
-      const elementSelect = createTypeSelect(node.elementType ?? "number", (elementType) => {
-        changeNodeElementType(getEditingGraph(store.state), getVisibleVariablesForState(store.state), store.state.rootGraph.functions, node.id, {
-          elementType,
-        });
-        store.notify();
-      });
+      const elementSelect = createTypeSelect(
+        node.elementType ?? "number",
+        (elementType) => {
+          changeNodeElementType(
+            getEditingGraph(store.state),
+            getVisibleVariablesForState(store.state),
+            store.state.rootGraph.functions,
+            node.id,
+            {
+              elementType,
+            },
+          );
+          store.notify();
+        },
+      );
       elementRow.append(elementLabel, elementSelect);
       elements.nodeFieldsContainer.appendChild(elementRow);
 
@@ -67,12 +102,21 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
         const keyLabel = document.createElement("span");
         keyLabel.className = "variable-name";
         keyLabel.textContent = "Key Type";
-        const keySelect = createTypeSelect(node.mapKeyType ?? "string", (mapKeyType) => {
-          changeNodeElementType(getEditingGraph(store.state), getVisibleVariablesForState(store.state), store.state.rootGraph.functions, node.id, {
-            mapKeyType,
-          });
-          store.notify();
-        });
+        const keySelect = createTypeSelect(
+          node.mapKeyType ?? "string",
+          (mapKeyType) => {
+            changeNodeElementType(
+              getEditingGraph(store.state),
+              getVisibleVariablesForState(store.state),
+              store.state.rootGraph.functions,
+              node.id,
+              {
+                mapKeyType,
+              },
+            );
+            store.notify();
+          },
+        );
         keyRow.append(keyLabel, keySelect);
         elements.nodeFieldsContainer.appendChild(keyRow);
       }
@@ -86,10 +130,19 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
       label.className = "variable-name";
       label.textContent = prop.label;
 
-      const value = createTypedValueInput(prop.type, node.pins[prop.id]?.value, (newValue) => {
-        setPinLiteralValue(getEditingGraph(store.state), node.id, prop.id, newValue);
-        store.notify();
-      });
+      const value = createTypedValueInput(
+        prop.type,
+        node.pins[prop.id]?.value,
+        (newValue) => {
+          setPinLiteralValue(
+            getEditingGraph(store.state),
+            node.id,
+            prop.id,
+            newValue,
+          );
+          store.notify();
+        },
+      );
 
       row.append(label, value);
       elements.nodeFieldsContainer.appendChild(row);
@@ -97,7 +150,8 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
   }
 
   function renderCommentColor(box: CommentBox): void {
-    if (elements.commentFieldsContainer.contains(document.activeElement)) return;
+    if (elements.commentFieldsContainer.contains(document.activeElement))
+      return;
 
     elements.commentFieldsContainer.innerHTML = "";
     const row = document.createElement("div");
@@ -124,9 +178,13 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
     const selection = store.state.sidebarSelection;
 
     const validFunction =
-      selection?.kind === "function" && store.state.rootGraph.functions.some((f) => f.id === selection.functionId);
+      selection?.kind === "function" &&
+      store.state.rootGraph.functions.some(
+        (f) => f.id === selection.functionId,
+      );
     const validScript =
-      selection?.kind === "script" && store.state.rootGraph.scripts.some((s) => s.id === selection.scriptId);
+      selection?.kind === "script" &&
+      store.state.rootGraph.scripts.some((s) => s.id === selection.scriptId);
     const variable =
       selection?.kind === "variable"
         ? allGraphs(store.state.rootGraph)
@@ -139,13 +197,22 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
     // through correctly the instant the user selects a node.
     let selectedNode: NodeInstance | undefined;
     let nodeProperties: PinDef[] | undefined;
-    if (!variable && !validFunction && !validScript && store.state.selectedNodeIds.size === 1) {
+    if (
+      !variable &&
+      !validFunction &&
+      !validScript &&
+      store.state.selectedNodeIds.size === 1
+    ) {
       const graph = getEditingGraph(store.state);
       const [onlyId] = store.state.selectedNodeIds;
       const node = graph.nodes.find((n) => n.id === onlyId);
       const def = node ? getNodeDef(node.type) : undefined;
       const properties = def?.detailProperties ?? [];
-      if (node && def && (properties.length > 0 || def.configurableElementType)) {
+      if (
+        node &&
+        def &&
+        (properties.length > 0 || def.configurableElementType)
+      ) {
         selectedNode = node;
         nodeProperties = properties;
       }
@@ -155,25 +222,42 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
     // else claims the panel. selectedNodeIds/selectedCommentId are already mutually exclusive (see
     // pointerHandlers.ts), so this mainly guards against a stale sidebarSelection.
     let selectedComment: CommentBox | undefined;
-    if (!variable && !validFunction && !validScript && !selectedNode && store.state.selectedCommentId) {
-      selectedComment = getEditingGraph(store.state).commentBoxes.find((b) => b.id === store.state.selectedCommentId);
+    if (
+      !variable &&
+      !validFunction &&
+      !validScript &&
+      !selectedNode &&
+      store.state.selectedCommentId
+    ) {
+      selectedComment = getEditingGraph(store.state).commentBoxes.find(
+        (b) => b.id === store.state.selectedCommentId,
+      );
     }
 
-    elements.section.style.display = variable || validFunction || validScript || selectedNode || selectedComment ? "" : "none";
+    elements.section.style.display =
+      variable ||
+      validFunction ||
+      validScript ||
+      selectedNode ||
+      selectedComment
+        ? ""
+        : "none";
     elements.variableContent.style.display = variable ? "" : "none";
     elements.functionContent.style.display = validFunction ? "" : "none";
     elements.scriptContent.style.display = validScript ? "" : "none";
     elements.nodeContent.style.display = selectedNode ? "" : "none";
     elements.commentContent.style.display = selectedComment ? "" : "none";
 
-    if (selectedNode && nodeProperties) renderNodeProperties(selectedNode, nodeProperties);
+    if (selectedNode && nodeProperties)
+      renderNodeProperties(selectedNode, nodeProperties);
     if (selectedComment) renderCommentColor(selectedComment);
 
     if (!variable) return;
 
     elements.variableNameLabel.textContent = variable.name;
     // Don't wipe the type/value fields while the user is actively editing one of them.
-    if (elements.variableFieldsContainer.contains(document.activeElement)) return;
+    if (elements.variableFieldsContainer.contains(document.activeElement))
+      return;
 
     elements.variableFieldsContainer.innerHTML = "";
     const row = document.createElement("div");
@@ -183,17 +267,23 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
       updateVariable(store.state.rootGraph, variable.id, { type });
       store.notify();
     });
-    const container = createContainerSelect(variable.container ?? "single", (container) => {
-      updateVariable(store.state.rootGraph, variable.id, { container });
-      store.notify();
-    });
+    const container = createContainerSelect(
+      variable.container ?? "single",
+      (container) => {
+        updateVariable(store.state.rootGraph, variable.id, { container });
+        store.notify();
+      },
+    );
     row.append(type, container);
 
     if (variable.container === "map") {
-      const keyType = createTypeSelect(variable.keyType ?? "string", (keyType) => {
-        updateVariable(store.state.rootGraph, variable.id, { keyType });
-        store.notify();
-      });
+      const keyType = createTypeSelect(
+        variable.keyType ?? "string",
+        (keyType) => {
+          updateVariable(store.state.rootGraph, variable.id, { keyType });
+          store.notify();
+        },
+      );
       row.append(keyType);
     }
 

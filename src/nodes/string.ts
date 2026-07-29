@@ -1,5 +1,6 @@
+import { NodeInstance } from "../engine/nodeInstance";
 import { registerNode } from "../engine/registry";
-import type { NodeInstance, PinDef } from "../engine/types";
+import type { PinDef } from "../engine/types";
 
 registerNode({
   type: "string.fromNumber",

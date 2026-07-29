@@ -1,12 +1,7 @@
 import { Graph } from "./graph";
 import { nextId, UNDELETABLE_NODE_TYPES } from "./graphMutations";
-import type {
-  Connection,
-  NodeInstance,
-  PinContainer,
-  PinType,
-  Variable,
-} from "./types";
+import { NodeInstance } from "./nodeInstance";
+import type { Connection, PinContainer, PinType, Variable } from "./types";
 
 /** Tags copied JSON so paste can tell "this came from our own Ctrl+C" apart from arbitrary
  * clipboard content (plain text, something copied from another app, a hand-edited value). */

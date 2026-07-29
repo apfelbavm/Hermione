@@ -1,7 +1,8 @@
 import { Graph } from "./graph";
 import { getVisibleVariables, resolvePinDefs } from "./graphMutations";
+import { NodeInstance } from "./nodeInstance";
 import { getNodeDef } from "./registry";
-import type { FunctionDef, NodeInstance } from "./types";
+import type { FunctionDef } from "./types";
 
 /** Guards against infinite recursion through (mutually) recursive Call Function chains — a
  * function currently being checked is treated as "not latent" if reached again, which just means

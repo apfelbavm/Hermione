@@ -6,7 +6,6 @@ import type {
   CodeScriptDef,
   FunctionDef,
   NodeDef,
-  NodeInstance,
   PinDef,
   Variable,
 } from "../engine/types";
@@ -14,6 +13,7 @@ import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
 import { NODE_HEADER_HEIGHT, PIN_RADIUS } from "./layout";
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 /** A node bound to a Variable (Get/Set) is colored by that variable's TYPE (the same color its pin
  * would be) instead of the generic "Variables" group color — so at a glance, a graph full of

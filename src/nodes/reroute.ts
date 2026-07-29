@@ -1,5 +1,6 @@
+import { NodeInstance } from "../engine/nodeInstance";
 import { registerNode } from "../engine/registry";
-import type { NodeInstance, PinDef, PinType } from "../engine/types";
+import type { PinDef, PinType } from "../engine/types";
 
 // Unreal-style "reroute"/"knot" nodes — purely organizational, no logic of their own: whatever
 // flows into "in" comes back out of "out" unchanged. Two variants because exec isn't a
@@ -18,7 +19,11 @@ function rerouteElementType(node: NodeInstance): PinType {
   return node.elementType ?? "object";
 }
 
-function reroutePinDef(node: NodeInstance, id: string, direction: "input" | "output"): PinDef {
+function reroutePinDef(
+  node: NodeInstance,
+  id: string,
+  direction: "input" | "output",
+): PinDef {
   return {
     id,
     label: "",
@@ -38,7 +43,10 @@ registerNode({
     { id: "in", label: "", type: "object", direction: "input" },
     { id: "out", label: "", type: "object", direction: "output" },
   ],
-  deriveInstancePins: (node) => [reroutePinDef(node, "in", "input"), reroutePinDef(node, "out", "output")],
+  deriveInstancePins: (node) => [
+    reroutePinDef(node, "in", "input"),
+    reroutePinDef(node, "out", "output"),
+  ],
   evaluate: ({ inputs }) => ({ out: inputs.in }),
   compileEvaluate: ({ inputs }) => ({ out: inputs.in }),
 });

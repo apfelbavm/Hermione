@@ -5,8 +5,9 @@ import {
   resolvePinDefs,
 } from "./graphMutations";
 import { connectionsFrom, connectionTo } from "./graphQueries";
+import { NodeInstance } from "./nodeInstance";
 import { getNodeDef } from "./registry";
-import type { ExecutionContext, FunctionDef, NodeInstance } from "./types";
+import type { ExecutionContext, FunctionDef } from "./types";
 
 export function findNode(graph: Graph, nodeId: string): NodeInstance {
   const node = graph.nodes.find((n) => n.id === nodeId);
