@@ -1,20 +1,7 @@
 import { registerNode } from "../engine/registry";
 import { compileResultVar } from "../engine/compileUtils";
 
-/** The three paging modes SAP's Integration Suite exposes for its own OData V2 adapter, matched
- * here verbatim so this node's dropdown reads the same way — used both as the option values AND
- * the string compared against at runtime, same convention as http.ts's HTTP_METHODS. Mechanically,
- * from an HTTP client's point of view, "cursor-based" and "snapshot-based" server-driven paging are
- * indistinguishable: both are just "keep following whatever next-link the server hands back."
- * Cursor vs. snapshot is a SERVER-side consistency guarantee (whether the underlying data can shift
- * under you mid-traversal, vs. a frozen point-in-time result set) — it changes what the server
- * does when it builds each next-link, not what the client sends to get there. So both server modes
- * share the exact same request-side code path below; they're kept as separate dropdown entries
- * purely so a graph reads as "which server behavior was this built against" at a glance, matching
- * the adapter's own configuration. If SuccessFactors (or another backend) turns out to need an
- * extra header/query param to actually select cursor vs. snapshot mode server-side, that's the one
- * piece this doesn't yet do — add it once we know what it is. */
-const PAGINATION_TYPES = ["Client", "Server (cursor-based)", "Server (snapshot-based)"];
+const PAGINATION_TYPES = ["Client", "Server"];
 
 // Fetches EVERY page of an OData v2 GET request and returns the combined rows — unlike
 // http.request (one call, one response), pagination inherently needs a loop across several
@@ -43,7 +30,7 @@ async function odataV2RequestExecute(baseUrl, rawPageSize, paginationType, rawMa
   const top = Math.max(1, Math.round(Number(rawPageSize)) || 1000);
   const userCap = Math.max(1, Math.round(Number(rawMaxPages)) || 50);
   const cap = Math.min(userCap, HARD_MAX_PAGES);
-  const serverDriven = paginationType !== ${JSON.stringify(PAGINATION_TYPES[0])};
+  const serverDriven = paginationType !== ${PAGINATION_TYPES[0]};
   const timeoutMs = Math.round(Number(rawTimeoutMs) || 0);
 
   const rawHeaders = String(headersJson ?? "").trim();
@@ -159,10 +146,23 @@ registerNode({
   group: "Actions",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "url", label: "URL", type: "string", direction: "input", defaultValue: "" },
+    {
+      id: "url",
+      label: "URL",
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
     // 1000 rows/page by default — a common OData v2 server-side default/cap (e.g. SuccessFactors),
     // so a freshly-dropped node's out-of-the-box behavior already matches what most servers allow.
-    { id: "pageSize", label: "Page Size", type: "number", direction: "input", defaultValue: 1000, integer: true },
+    {
+      id: "pageSize",
+      label: "Page Size",
+      type: "number",
+      direction: "input",
+      defaultValue: 1000,
+      integer: true,
+    },
     {
       id: "paginationType",
       label: "Pagination Type",
@@ -171,16 +171,53 @@ registerNode({
       defaultValue: PAGINATION_TYPES[0],
       options: PAGINATION_TYPES,
     },
-    { id: "maxPages", label: "Max Pages", type: "number", direction: "input", defaultValue: 50, integer: true },
-    { id: "headers", label: "Headers (JSON)", type: "string", direction: "input", defaultValue: "{}" },
+    {
+      id: "maxPages",
+      label: "Max Pages",
+      type: "number",
+      direction: "input",
+      defaultValue: 50,
+      integer: true,
+    },
+    {
+      id: "headers",
+      label: "Headers (JSON)",
+      type: "string",
+      direction: "input",
+      defaultValue: "{}",
+    },
     // Same { header, value } convention as http.request's own Auth pin — see auth.ts.
-    { id: "auth", label: "Auth", type: "object", direction: "input", defaultValue: null },
-    { id: "timeoutMs", label: "Timeout (ms)", type: "number", direction: "input", defaultValue: 10000, integer: true },
+    {
+      id: "auth",
+      label: "Auth",
+      type: "object",
+      direction: "input",
+      defaultValue: null,
+    },
+    {
+      id: "timeoutMs",
+      label: "Timeout (ms)",
+      type: "number",
+      direction: "input",
+      defaultValue: 10000,
+      integer: true,
+    },
     { id: "exec-out", label: "Completed", type: "exec", direction: "output" },
     { id: "success", label: "Success", type: "boolean", direction: "output" },
     { id: "status", label: "Status", type: "number", direction: "output" },
-    { id: "rows", label: "Rows", type: "object", container: "array", direction: "output" },
-    { id: "pageCount", label: "Page Count", type: "number", direction: "output" },
+    {
+      id: "rows",
+      label: "Rows",
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    {
+      id: "pageCount",
+      label: "Page Count",
+      type: "number",
+      direction: "output",
+    },
     { id: "error", label: "Error", type: "string", direction: "output" },
   ],
   latent: true,
