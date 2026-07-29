@@ -110,7 +110,7 @@ registerNode({
 
 registerNode({
   type: "string.equalCaseInsensitive",
-  label: "Equal ( === ) case-insensitive",
+  label: "Equal ( == ) case-insensitive",
   description: "True if two strings are equal, ignoring letter case.",
   group: "String",
   pins: [
