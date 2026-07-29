@@ -12,7 +12,7 @@ function addNode(graph: Graph, type: string, position: { x: number; y: number },
 
 /** A small hand-built graph used to exercise the renderer/executor before the editor UI exists. */
 export function buildDemoGraph(): Graph {
-  const graph = new Graph("demo", "Interview Scheduling Demo");
+  const graph = new Graph("demo", "Graph");
 
   const start = addNode(graph, "event.run", { x: 40, y: 220 }, "start");
   const add = addNode(graph, "math.add", { x: 320, y: 40 }, "add");
