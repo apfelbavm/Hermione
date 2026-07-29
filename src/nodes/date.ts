@@ -10,6 +10,17 @@ function toDate(value: unknown): Date {
 }
 
 registerNode({
+  type: "date.now",
+  label: "Now",
+  group: "Date",
+  pins: [{ id: "result", label: "Result", type: "date", direction: "output" }],
+  evaluate: () => ({ result: new Date() }),
+  compileEvaluate: () => ({
+    result: `new Date()`,
+  }),
+});
+
+registerNode({
   type: "date.fromString",
   label: "To Date (String)",
   group: "Date",

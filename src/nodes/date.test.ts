@@ -27,6 +27,26 @@ function compile(type: string, inputs: Record<string, string>) {
   });
 }
 
+describe("date.now", () => {
+  it("returns the current instant as a Date", () => {
+    const before = Date.now();
+    const { result } = evaluate("date.now", {}) as { result: Date };
+    const after = Date.now();
+    expect(result).toBeInstanceOf(Date);
+    expect(result.getTime()).toBeGreaterThanOrEqual(before);
+    expect(result.getTime()).toBeLessThanOrEqual(after);
+  });
+
+  it("compileEvaluate produces a `new Date()` expression", () => {
+    const before = Date.now();
+    const result = eval(compile("date.now", {}).result) as Date;
+    const after = Date.now();
+    expect(result).toBeInstanceOf(Date);
+    expect(result.getTime()).toBeGreaterThanOrEqual(before);
+    expect(result.getTime()).toBeLessThanOrEqual(after);
+  });
+});
+
 describe("date.fromString / date.fromNumber", () => {
   it("parses an ISO string into a Date", () => {
     const { result } = evaluate("date.fromString", { value: "2020-01-01T00:00:00.000Z" }) as {
