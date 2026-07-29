@@ -51,6 +51,7 @@ import {
   openScriptTab,
   type Store,
 } from "../state/store";
+import type { HistoryManager } from "../state/history";
 import { Graph } from "../engine/graph";
 
 type DragMode =
@@ -191,6 +192,7 @@ export interface PointerInteraction {
 export function setupPointerInteraction(
   canvas: HTMLCanvasElement,
   store: Store,
+  history: HistoryManager,
   callbacks: PointerInteractionCallbacks,
 ): PointerInteraction {
   let drag: DragMode = { kind: "none" };
@@ -863,6 +865,13 @@ export function setupPointerInteraction(
       store.state.selectedNodeIds = selectAllNodes(graph);
       store.state.selectedCommentId = null;
       store.notify();
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      if (e.shiftKey) history.redo();
+      else history.undo();
       return;
     }
 

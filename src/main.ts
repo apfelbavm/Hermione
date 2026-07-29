@@ -16,6 +16,7 @@ import { drawNodes } from "./render/drawNodes";
 import { drawWires, drawWireDragPreview } from "./render/drawWires";
 import { drawMarqueeSelection } from "./render/drawMarquee";
 import { createStore, getEditingGraph, getVisibleVariablesForState } from "./state/store";
+import { createHistoryManager } from "./state/history";
 import { selectAllNodes, setupPointerInteraction, type WireAnchor } from "./interaction/pointerHandlers";
 import { createWidgetSync } from "./overlay/widgetSync";
 import { setupNodeHoverTooltip } from "./overlay/nodeTooltip";
@@ -103,6 +104,8 @@ const store = createStore({
   marqueeSelection: null,
   sidebarSelection: null,
 });
+
+const history = createHistoryManager(store);
 
 function resizeCanvas(): void {
   const dpr = window.devicePixelRatio || 1;
@@ -379,7 +382,7 @@ function createNodeAndMaybeConnect(def: NodeDef, worldPos: { x: number; y: numbe
   store.notify();
 }
 
-const pointerInteraction = setupPointerInteraction(canvas, store, {
+const pointerInteraction = setupPointerInteraction(canvas, store, history, {
   onWireDroppedInEmptySpace: (anchors, screenPos) => {
     const shared = anchors[0].pin;
     const candidates = filterCreatableHere(findCompatibleNodeDefs(shared, shared.direction));
