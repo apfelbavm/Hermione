@@ -2,7 +2,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "./index";
 import { createNodeInstance, removeInstancePin, resolvePinDefs } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
-import { createEmptyGraph, type NodeInstance } from "../engine/types";
+import {  type NodeInstance } from "../engine/types";
+import { Graph } from "../engine/graph";
 
 beforeAll(() => {
   registerBuiltins();
@@ -50,7 +51,7 @@ describe("string.fromNumber / fromBoolean / fromJson", () => {
 describe("string.append", () => {
   it("starts with exactly two string entries, concatenated in order", () => {
     const node = appendNode();
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     graph.nodes.push(node);
 
     const pinDefs = resolvePinDefs(node, [], []);
@@ -83,7 +84,7 @@ describe("string.append", () => {
 
   it("removeInstancePin deletes the pin and prunes connections touching it; remaining entries relabel contiguously", () => {
     const node = appendNode();
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     graph.nodes.push(node);
     graph.connections.push({ id: "c1", fromNode: "other", fromPin: "out", toNode: node.id, toPin: "entry-0" });
 

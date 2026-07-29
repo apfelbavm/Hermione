@@ -1,5 +1,5 @@
 import { Colors } from "../engine/color";
-import type { Graph } from "../engine/types";
+import { Graph } from "../engine/graph";
 import type { Camera } from "./camera";
 import {
   computeCommentScreenRect,
@@ -23,7 +23,10 @@ export function drawComments(
     // The title bar background and the border are both the user-defined color (default
     // white), always rendered at 75% opacity so the box is never fully opaque — matching
     // Unreal's comment-box look. The body stays a neutral, low-opacity fill.
-    const tint = Colors.hexToRgba(box.color ?? DEFAULT_COMMENT_COLOR, COLOR_OPACITY);
+    const tint = Colors.hexToRgba(
+      box.color ?? DEFAULT_COMMENT_COLOR,
+      COLOR_OPACITY,
+    );
 
     ctx.fillStyle = BOX_FILL;
     ctx.fillRect(rect.screenX, rect.screenY, rect.width, rect.height);

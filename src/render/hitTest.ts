@@ -1,7 +1,11 @@
-import type { Graph, PinDef } from "../engine/types";
+import { Graph } from "../engine/graph";
+import { PinDef } from "../engine/types";
 import { bezierControlPoints, sampleBezier } from "./bezier";
 import type { Camera } from "./camera";
-import { computeCommentScreenRect, COMMENT_RESIZE_HANDLE_SCREEN_SIZE } from "./commentGeometry";
+import {
+  computeCommentScreenRect,
+  COMMENT_RESIZE_HANDLE_SCREEN_SIZE,
+} from "./commentGeometry";
 import type { NodeScreenGeometry } from "./nodeGeometry";
 
 export interface PinHit {
@@ -36,7 +40,12 @@ export function hitTestNodeAddButton(
     const node = graph.nodes[i];
     const rect = geometries.get(node.id)?.addButtonScreen;
     if (!rect) continue;
-    if (screenX >= rect.x && screenX <= rect.x + rect.width && screenY >= rect.y && screenY <= rect.y + rect.height) {
+    if (
+      screenX >= rect.x &&
+      screenX <= rect.x + rect.width &&
+      screenY >= rect.y &&
+      screenY <= rect.y + rect.height
+    ) {
       return { kind: "node-add-button", nodeId: node.id };
     }
   }
@@ -95,7 +104,12 @@ export function hitTestCommentResizeHandle(
     const hs = COMMENT_RESIZE_HANDLE_SCREEN_SIZE;
     const hx = rect.screenX + rect.width;
     const hy = rect.screenY + rect.height;
-    if (screenX >= hx - hs && screenX <= hx && screenY >= hy - hs && screenY <= hy) {
+    if (
+      screenX >= hx - hs &&
+      screenX <= hx &&
+      screenY >= hy - hs &&
+      screenY <= hy
+    ) {
       return { kind: "comment-resize", commentId: box.id };
     }
   }
@@ -163,7 +177,10 @@ function distanceToSegment(
   const dx = bx - ax;
   const dy = by - ay;
   const lengthSq = dx * dx + dy * dy;
-  const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
+  const t =
+    lengthSq === 0
+      ? 0
+      : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
   const closestX = ax + t * dx;
   const closestY = ay + t * dy;
   return Math.hypot(px - closestX, py - closestY);
@@ -190,9 +207,18 @@ export function hitTestWire(
     const to = toGeo.pinScreen[conn.toPin];
     if (!from || !to) continue;
 
-    const points = sampleBezier(bezierControlPoints(from.x, from.y, to.x, to.y));
+    const points = sampleBezier(
+      bezierControlPoints(from.x, from.y, to.x, to.y),
+    );
     for (let j = 0; j < points.length - 1; j++) {
-      const d = distanceToSegment(screenX, screenY, points[j].x, points[j].y, points[j + 1].x, points[j + 1].y);
+      const d = distanceToSegment(
+        screenX,
+        screenY,
+        points[j].x,
+        points[j].y,
+        points[j + 1].x,
+        points[j + 1].y,
+      );
       if (d <= tolerance) return { kind: "wire", connectionId: conn.id };
     }
   }

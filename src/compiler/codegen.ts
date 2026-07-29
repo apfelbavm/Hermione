@@ -1,8 +1,9 @@
 import { connectionsFrom, connectionTo } from "../engine/graphQueries";
 import { resolvePinDefs } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
-import type { Graph, NodeInstance } from "../engine/types";
+import type { NodeInstance } from "../engine/types";
 import { indent } from "../engine/compileUtils";
+import { Graph } from "../engine/graph";
 
 export interface TriggerDescriptor {
   nodeId: string;
@@ -64,17 +65,32 @@ function compileResolveDataPin(
     );
   }
 
-  const upstreamPinDefs = resolvePinDefs(upstreamNode, graph.variables, graph.functions, graph.scripts);
+  const upstreamPinDefs = resolvePinDefs(
+    upstreamNode,
+    graph.variables,
+    graph.functions,
+    graph.scripts,
+  );
   const upstreamInputs: Record<string, string> = {};
   for (const pinDef of upstreamPinDefs) {
     if (pinDef.direction === "input" && pinDef.type !== "exec") {
-      upstreamInputs[pinDef.id] = compileResolveDataPin(graph, upstreamNode.id, pinDef.id, helpers, imports);
+      upstreamInputs[pinDef.id] = compileResolveDataPin(
+        graph,
+        upstreamNode.id,
+        pinDef.id,
+        helpers,
+        imports,
+      );
     }
   }
 
   collectHelpers(upstreamDef.compileHelpers, helpers);
   collectImports(upstreamDef.compileImports, imports);
-  const outputs = upstreamDef.compileEvaluate({ node: upstreamNode, inputs: upstreamInputs, graph });
+  const outputs = upstreamDef.compileEvaluate({
+    node: upstreamNode,
+    inputs: upstreamInputs,
+    graph,
+  });
   const expr = outputs[conn.fromPin];
   if (expr === undefined) {
     throw new Error(
@@ -84,14 +100,20 @@ function compileResolveDataPin(
   return expr;
 }
 
-function collectHelpers(defHelpers: Record<string, string> | undefined, helpers: Map<string, string>): void {
+function collectHelpers(
+  defHelpers: Record<string, string> | undefined,
+  helpers: Map<string, string>,
+): void {
   if (!defHelpers) return;
   for (const [name, source] of Object.entries(defHelpers)) {
     helpers.set(name, source);
   }
 }
 
-function collectImports(defImports: string[] | undefined, imports: Set<string>): void {
+function collectImports(
+  defImports: string[] | undefined,
+  imports: Set<string>,
+): void {
   if (!defImports) return;
   for (const line of defImports) {
     imports.add(line);
@@ -109,7 +131,9 @@ function compileFrom(
 ): string[] {
   const key = `${nodeId}:${execInPin}`;
   if (visiting.has(key)) {
-    throw new Error(`Cyclic exec flow detected at ${key} — loop nodes aren't supported yet`);
+    throw new Error(
+      `Cyclic exec flow detected at ${key} — loop nodes aren't supported yet`,
+    );
   }
   visiting.add(key);
 
@@ -131,7 +155,16 @@ function compileFrom(
     const statements: string[] = [];
     for (const pinId of execOutPins) {
       for (const conn of connectionsFrom(graph, node.id, pinId)) {
-        statements.push(...compileFrom(graph, conn.toNode, conn.toPin, visiting, helpers, imports));
+        statements.push(
+          ...compileFrom(
+            graph,
+            conn.toNode,
+            conn.toPin,
+            visiting,
+            helpers,
+            imports,
+          ),
+        );
       }
     }
     visiting.delete(key);
@@ -139,14 +172,27 @@ function compileFrom(
   }
   const def = getNodeDef(node.type);
   if (!def.compileExecute) {
-    throw new Error(`Node type "${node.type}" has no compileExecute — cannot compile this graph yet`);
+    throw new Error(
+      `Node type "${node.type}" has no compileExecute — cannot compile this graph yet`,
+    );
   }
 
-  const pinDefs = resolvePinDefs(node, graph.variables, graph.functions, graph.scripts);
+  const pinDefs = resolvePinDefs(
+    node,
+    graph.variables,
+    graph.functions,
+    graph.scripts,
+  );
   const inputs: Record<string, string> = {};
   for (const pinDef of pinDefs) {
     if (pinDef.direction === "input" && pinDef.type !== "exec") {
-      inputs[pinDef.id] = compileResolveDataPin(graph, node.id, pinDef.id, helpers, imports);
+      inputs[pinDef.id] = compileResolveDataPin(
+        graph,
+        node.id,
+        pinDef.id,
+        helpers,
+        imports,
+      );
     }
   }
 
@@ -168,7 +214,14 @@ function compileFrom(
       }
       if (outgoing.length === 0) return [];
       const [conn] = outgoing;
-      return compileFrom(graph, conn.toNode, conn.toPin, visiting, helpers, imports);
+      return compileFrom(
+        graph,
+        conn.toNode,
+        conn.toPin,
+        visiting,
+        helpers,
+        imports,
+      );
     },
   });
 
@@ -177,13 +230,21 @@ function compileFrom(
 }
 
 function functionNameFor(node: NodeInstance, usedNames: Set<string>): string {
-  const rawName = typeof node.pins.name?.value === "string" ? node.pins.name.value : node.type;
-  const slug = rawName
-    .replace(/[^a-zA-Z0-9]+/g, " ")
-    .trim()
-    .split(" ")
-    .map((word, i) => (i === 0 ? word.charAt(0).toLowerCase() + word.slice(1) : word.charAt(0).toUpperCase() + word.slice(1)))
-    .join("") || "trigger";
+  const rawName =
+    typeof node.pins.name?.value === "string"
+      ? node.pins.name.value
+      : node.type;
+  const slug =
+    rawName
+      .replace(/[^a-zA-Z0-9]+/g, " ")
+      .trim()
+      .split(" ")
+      .map((word, i) =>
+        i === 0
+          ? word.charAt(0).toLowerCase() + word.slice(1)
+          : word.charAt(0).toUpperCase() + word.slice(1),
+      )
+      .join("") || "trigger";
 
   let candidate = slug;
   let suffix = 2;
@@ -219,11 +280,22 @@ export function compileGraph(graph: Graph): CompileResult {
               );
             }
             const [conn] = outgoing;
-            return compileFrom(graph, conn.toNode, conn.toPin, new Set(), helpers, imports);
+            return compileFrom(
+              graph,
+              conn.toNode,
+              conn.toPin,
+              new Set(),
+              helpers,
+              imports,
+            );
           })();
 
     functionBlocks.push(
-      [`export async function ${functionName}(rt) {`, ...indent(body), `}`].join("\n"),
+      [
+        `export async function ${functionName}(rt) {`,
+        ...indent(body),
+        `}`,
+      ].join("\n"),
     );
 
     triggers.push({
@@ -235,7 +307,10 @@ export function compileGraph(graph: Graph): CompileResult {
   }
 
   const stateEntries = graph.variables
-    .map((v) => `    ${JSON.stringify(v.id)}: ${JSON.stringify(v.defaultValue)}, // ${v.name}`)
+    .map(
+      (v) =>
+        `    ${JSON.stringify(v.id)}: ${JSON.stringify(v.defaultValue)}, // ${v.name}`,
+    )
     .join("\n");
 
   const parts: string[] = [
@@ -269,7 +344,10 @@ export function compileGraph(graph: Graph): CompileResult {
 
 /** Compiles the graph and triggers a browser download of the generated source. `.mjs` (not `.js`) so the
  * file runs as ESM under plain `node` regardless of any surrounding package.json — see scripts/compileGraph.ts. */
-export function downloadCompiledGraph(graph: Graph, filename: string = `${graph.name || "graph"}.compiled.mjs`): void {
+export function downloadCompiledGraph(
+  graph: Graph,
+  filename: string = `${graph.name || "graph"}.compiled.mjs`,
+): void {
   const { code } = compileGraph(graph);
   const blob = new Blob([code], { type: "text/javascript" });
   const url = URL.createObjectURL(blob);

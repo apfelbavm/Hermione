@@ -1,5 +1,6 @@
+import { Graph } from "../engine/graph";
 import { getVisibleVariables } from "../engine/graphMutations";
-import type { Graph, PinDirection, PinType, Variable } from "../engine/types";
+import type { PinDirection, PinType, Variable } from "../engine/types";
 import type { Camera } from "../render/camera";
 
 export interface WireDragState {
@@ -66,7 +67,9 @@ export interface AppState {
 /** The graph currently open for editing on the canvas — the root graph, or a function's body. */
 export function getEditingGraph(state: AppState): Graph {
   if (!state.activeFunctionId) return state.rootGraph;
-  const fn = state.rootGraph.functions.find((f) => f.id === state.activeFunctionId);
+  const fn = state.rootGraph.functions.find(
+    (f) => f.id === state.activeFunctionId,
+  );
   return fn ? fn.body : state.rootGraph;
 }
 
@@ -85,7 +88,10 @@ export function closeFunctionTab(state: AppState, functionId: string): void {
   if (index === -1) return;
   state.openFunctionTabs.splice(index, 1);
   if (state.activeFunctionId === functionId) {
-    state.activeFunctionId = state.openFunctionTabs[index] ?? state.openFunctionTabs[index - 1] ?? null;
+    state.activeFunctionId =
+      state.openFunctionTabs[index] ??
+      state.openFunctionTabs[index - 1] ??
+      null;
   }
 }
 
@@ -111,7 +117,8 @@ export function closeScriptTab(state: AppState, scriptId: string): void {
   if (index === -1) return;
   state.openScriptTabs.splice(index, 1);
   if (state.activeLowerTabId === scriptId) {
-    state.activeLowerTabId = state.openScriptTabs[index] ?? state.openScriptTabs[index - 1] ?? null;
+    state.activeLowerTabId =
+      state.openScriptTabs[index] ?? state.openScriptTabs[index - 1] ?? null;
   }
 }
 

@@ -12,7 +12,8 @@ import {
   removeNode,
 } from "./graphMutations";
 import { getNodeDef } from "./registry";
-import { createEmptyGraph, type Graph, type Variable } from "./types";
+import {  type Variable } from "./types";
+import { Graph } from "./graph";
 
 function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);
@@ -41,7 +42,7 @@ beforeAll(() => {
 
 describe("function calls", () => {
   it("runFunctionCall computes the declared output from resolved arguments (Entry -> Add -> Return)", async () => {
-    const rootGraph = createEmptyGraph("root", "test");
+    const rootGraph = new Graph("root", "test");
     const fn = createFunctionDef("AddTen");
     rootGraph.functions.push(fn);
 
@@ -81,7 +82,7 @@ describe("function calls", () => {
   });
 
   it("a Call node in a root graph produces the correct output, readable by the next step", async () => {
-    const rootGraph = createEmptyGraph("root", "test");
+    const rootGraph = new Graph("root", "test");
     const fn = createFunctionDef("Double");
     rootGraph.functions.push(fn);
 
@@ -122,7 +123,7 @@ describe("function calls", () => {
   });
 
   it("caller continues even if the function body never reaches a Return node, using declared defaults", async () => {
-    const rootGraph = createEmptyGraph("root", "test");
+    const rootGraph = new Graph("root", "test");
     const fn = createFunctionDef("NeverReturns");
     rootGraph.functions.push(fn);
     const resultOutput = { id: nextId("io"), name: "result", type: "string" as const, defaultValue: "fallback" };
@@ -150,7 +151,7 @@ describe("function calls", () => {
   });
 
   it("an unbounded self-recursive call trips the call-depth guard with a clear error", async () => {
-    const rootGraph = createEmptyGraph("root", "test");
+    const rootGraph = new Graph("root", "test");
     const fn = createFunctionDef("Infinite");
     rootGraph.functions.push(fn);
 
@@ -165,7 +166,7 @@ describe("function calls", () => {
   });
 
   it("a function's local variable is isolated from a global variable and from other calls", async () => {
-    const rootGraph = createEmptyGraph("root", "test");
+    const rootGraph = new Graph("root", "test");
     const globalVar: Variable = { id: "shared-id-does-not-collide", name: "Counter", type: "string", defaultValue: "global" };
     addVariable(rootGraph, globalVar);
 

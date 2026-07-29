@@ -1,7 +1,12 @@
-import { cloneDefaultValue, getVisibleVariables, resolvePinDefs } from "./graphMutations";
+import { Graph } from "./graph";
+import {
+  cloneDefaultValue,
+  getVisibleVariables,
+  resolvePinDefs,
+} from "./graphMutations";
 import { connectionsFrom, connectionTo } from "./graphQueries";
 import { getNodeDef } from "./registry";
-import type { ExecutionContext, FunctionDef, Graph, NodeInstance } from "./types";
+import type { ExecutionContext, FunctionDef, NodeInstance } from "./types";
 
 export function findNode(graph: Graph, nodeId: string): NodeInstance {
   const node = graph.nodes.find((n) => n.id === nodeId);
@@ -56,7 +61,8 @@ export async function resolveDataPin(
   // this is what makes a diamond-shaped data dependency evaluate only once per tick,
   // regardless of how many downstream input pins pull from the same output.
   const outputCacheKey = `${conn.fromNode}:${conn.fromPin}`;
-  if (ctx.tickCache.has(outputCacheKey)) return ctx.tickCache.get(outputCacheKey);
+  if (ctx.tickCache.has(outputCacheKey))
+    return ctx.tickCache.get(outputCacheKey);
 
   const upstreamNode = findNode(ctx.graph, conn.fromNode);
   const upstreamDef = getNodeDef(upstreamNode.type);
@@ -86,7 +92,12 @@ export async function resolveDataPin(
 
   // Pins actually in effect for this instance — not the static def.pins, which is empty
   // for variable-derived node types (Get/Set Variable) whose pins depend on the bound Variable.
-  const upstreamPinDefs = resolvePinDefs(upstreamNode, visibleVariables(ctx), ctx.rootGraph.functions, ctx.rootGraph.scripts);
+  const upstreamPinDefs = resolvePinDefs(
+    upstreamNode,
+    visibleVariables(ctx),
+    ctx.rootGraph.functions,
+    ctx.rootGraph.scripts,
+  );
 
   const upstreamInputs: Record<string, unknown> = {};
   for (const pinDef of upstreamPinDefs) {
@@ -100,7 +111,11 @@ export async function resolveDataPin(
     }
   }
 
-  const outputs = await upstreamDef.evaluate({ node: upstreamNode, inputs: upstreamInputs, ctx });
+  const outputs = await upstreamDef.evaluate({
+    node: upstreamNode,
+    inputs: upstreamInputs,
+    ctx,
+  });
   resolving.delete(outputCacheKey);
 
   for (const pinDef of upstreamPinDefs) {
@@ -120,7 +135,9 @@ export async function runExecFrom(
   execInPin: string,
   ctx: ExecutionContext,
 ): Promise<void> {
-  const queue: Array<{ nodeId: string; execInPin: string }> = [{ nodeId, execInPin }];
+  const queue: Array<{ nodeId: string; execInPin: string }> = [
+    { nodeId, execInPin },
+  ];
   let steps = 0;
 
   while (queue.length > 0) {
@@ -145,13 +162,20 @@ export async function runExecFrom(
       const disabledNextExec = getNodeDef(node.type).disabledNextExec;
       nextExecPins =
         disabledNextExec ??
-        resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions, ctx.rootGraph.scripts)
+        resolvePinDefs(
+          node,
+          visibleVariables(ctx),
+          ctx.rootGraph.functions,
+          ctx.rootGraph.scripts,
+        )
           .filter((p) => p.direction === "output" && p.type === "exec")
           .map((p) => p.id);
     } else {
       const def = getNodeDef(node.type);
       if (!def.execute) {
-        throw new Error(`Node "${node.type}" (${node.id}) has no execute() but is on the exec chain`);
+        throw new Error(
+          `Node "${node.type}" (${node.id}) has no execute() but is on the exec chain`,
+        );
       }
 
       await ctx.onNodeStart?.(node.id);
@@ -162,7 +186,12 @@ export async function runExecFrom(
       // the cache only clears *between* steps.
       ctx.tickCache.clear();
 
-      const pinDefs = resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions, ctx.rootGraph.scripts);
+      const pinDefs = resolvePinDefs(
+        node,
+        visibleVariables(ctx),
+        ctx.rootGraph.functions,
+        ctx.rootGraph.scripts,
+      );
       const inputs: Record<string, unknown> = {};
       for (const pinDef of pinDefs) {
         if (pinDef.direction === "input" && pinDef.type !== "exec") {
@@ -186,7 +215,11 @@ export async function runExecFrom(
         }
       }
 
-      nextExecPins = result.nextExec ? (Array.isArray(result.nextExec) ? result.nextExec : [result.nextExec]) : [];
+      nextExecPins = result.nextExec
+        ? Array.isArray(result.nextExec)
+          ? result.nextExec
+          : [result.nextExec]
+        : [];
     }
 
     for (const execOutPin of nextExecPins) {
@@ -219,7 +252,10 @@ export async function runFunctionCall(
 
   const localVariableValues = new Map<string, unknown>();
   for (const variable of fn.body.variables) {
-    localVariableValues.set(variable.id, cloneDefaultValue(variable.defaultValue));
+    localVariableValues.set(
+      variable.id,
+      cloneDefaultValue(variable.defaultValue),
+    );
   }
 
   const outputs: Record<string, unknown> = {};
@@ -240,7 +276,9 @@ export async function runFunctionCall(
     },
   };
 
-  const entryNode = fn.body.nodes.find((n) => n.type === "function.entry" && n.functionId === fn.id);
+  const entryNode = fn.body.nodes.find(
+    (n) => n.type === "function.entry" && n.functionId === fn.id,
+  );
   if (entryNode) {
     await runExecFrom(entryNode.id, "exec-out", childCtx);
   }

@@ -25,7 +25,8 @@ import {
   updateVariable,
 } from "./graphMutations";
 import { getNodeDef } from "./registry";
-import { createEmptyGraph, type CodeScriptDef, type FunctionDef, type Variable } from "./types";
+import {  type CodeScriptDef, type FunctionDef, type Variable } from "./types";
+import { Graph } from "./graph";
 
 beforeAll(() => {
   registerBuiltins();
@@ -33,25 +34,25 @@ beforeAll(() => {
 
 describe("canPlaceNodeType", () => {
   it("always allows a non-event node type, root or function body, regardless of what's already there", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     expect(canPlaceNodeType("math.add", graph, false)).toBe(true);
     expect(canPlaceNodeType("math.add", graph, true)).toBe(true);
   });
 
   it("blocks any event node type inside a function body", () => {
-    const graph = createEmptyGraph("g", "body");
+    const graph = new Graph("g", "body");
     expect(canPlaceNodeType("event.start", graph, true)).toBe(false);
     expect(canPlaceNodeType("event.interval", graph, true)).toBe(false);
     expect(canPlaceNodeType("event.run", graph, true)).toBe(false);
   });
 
   it("allows an event node type in the root graph if no instance of it exists yet", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     expect(canPlaceNodeType("event.run", graph, false)).toBe(true);
   });
 
   it("blocks a second instance of the same event type in the same graph", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const def = getNodeDef("event.run");
     graph.nodes.push(createNodeInstance("event.run", { x: 0, y: 0 }, def.pins));
 
@@ -59,7 +60,7 @@ describe("canPlaceNodeType", () => {
   });
 
   it("still allows a DIFFERENT event type even if one event type is already present", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const runDef = getNodeDef("event.run");
     graph.nodes.push(createNodeInstance("event.run", { x: 0, y: 0 }, runDef.pins));
 
@@ -69,7 +70,7 @@ describe("canPlaceNodeType", () => {
 
 describe("removeNode", () => {
   it("restores a downstream input pin to its literal default instead of leaving it wired-but-dangling", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const addDef = getNodeDef("math.add");
     const addNode = createNodeInstance("math.add", { x: 100, y: 0 }, addDef.pins, "add");
     graph.nodes.push(addNode);
@@ -99,7 +100,7 @@ describe("removeNode", () => {
 
 describe("removeVariable", () => {
   it("removes the Get node AND restores whatever it fed into, rather than leaving a dangling wired-looking pin", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const addDef = getNodeDef("math.add");
     const addNode = createNodeInstance("math.add", { x: 100, y: 0 }, addDef.pins, "add");
     graph.nodes.push(addNode);
@@ -183,14 +184,14 @@ describe("canToggleDisabled", () => {
 
 describe("hasConnectedDataOutput", () => {
   it("is false when a node's data output has no connection", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const def = getNodeDef("math.add");
     graph.nodes.push(createNodeInstance("math.add", { x: 0, y: 0 }, def.pins, "add"));
     expect(hasConnectedDataOutput(graph, "add", [], [])).toBe(false);
   });
 
   it("is true once the data output feeds something else", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const addDef = getNodeDef("math.add");
     graph.nodes.push(createNodeInstance("math.add", { x: 0, y: 0 }, addDef.pins, "add1"));
     graph.nodes.push(createNodeInstance("math.add", { x: 0, y: 0 }, addDef.pins, "add2"));
@@ -199,7 +200,7 @@ describe("hasConnectedDataOutput", () => {
   });
 
   it("ignores a connection leaving an exec output — only DATA outputs count", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const branchDef = getNodeDef("flow.branch");
     const printDef = getNodeDef("debug.print");
     graph.nodes.push(createNodeInstance("flow.branch", { x: 0, y: 0 }, branchDef.pins, "branch"));
@@ -209,7 +210,7 @@ describe("hasConnectedDataOutput", () => {
   });
 
   it("is false for a loop node even when its data output (e.g. For Loop's Index) is wired — see NodeDef.disabledNextExec", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const loopDef = getNodeDef("flow.forLoop");
     const toStrDef = getNodeDef("string.fromNumber");
     graph.nodes.push(createNodeInstance("flow.forLoop", { x: 0, y: 0 }, loopDef.pins, "loop"));
@@ -221,7 +222,7 @@ describe("hasConnectedDataOutput", () => {
 
 describe("updateVariable — container support", () => {
   it("resets the default value to an empty list and disconnects wires when switching to Array", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const variable: Variable = { id: "v1", name: "Nums", type: "number", defaultValue: 7 };
     addVariable(graph, variable);
     const getDef = getNodeDef("variable.get");
@@ -240,7 +241,7 @@ describe("updateVariable — container support", () => {
   });
 
   it("resets the default value again when switching container back to single", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const variable: Variable = { id: "v1", name: "Nums", type: "number", defaultValue: [1, 2, 3], container: "array" };
     addVariable(graph, variable);
 
@@ -251,7 +252,7 @@ describe("updateVariable — container support", () => {
   });
 
   it("resets the default value when only the map key type changes (container/type unchanged)", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const variable: Variable = {
       id: "v1",
       name: "Scores",
@@ -269,7 +270,7 @@ describe("updateVariable — container support", () => {
   });
 
   it("leaves the default value alone when the patch itself supplies one", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const variable: Variable = { id: "v1", name: "Nums", type: "number", defaultValue: 0 };
     addVariable(graph, variable);
 
@@ -281,7 +282,7 @@ describe("updateVariable — container support", () => {
 
 describe("insertRerouteOnConnection", () => {
   it("splices a data reroute node in, freezing its element type to match the spliced wire, and preserves the original endpoints", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const add1Def = getNodeDef("math.add");
     const add2Def = getNodeDef("math.add");
     const add1 = createNodeInstance("math.add", { x: 0, y: 0 }, add1Def.pins, "add1");
@@ -309,7 +310,7 @@ describe("insertRerouteOnConnection", () => {
   });
 
   it("splices an exec reroute node in for an exec wire, using the exec-in/exec-out pins", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const branchDef = getNodeDef("flow.branch");
     const printDef = getNodeDef("debug.print");
     const branch = createNodeInstance("flow.branch", { x: 0, y: 0 }, branchDef.pins, "branch");
@@ -343,7 +344,7 @@ describe("insertRerouteOnConnection", () => {
   });
 
   it("does nothing when the connection id doesn't exist", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     insertRerouteOnConnection(graph, graph.variables, graph.functions, "nonexistent", { x: 0, y: 0 });
     expect(graph.nodes).toHaveLength(0);
   });
@@ -351,7 +352,7 @@ describe("insertRerouteOnConnection", () => {
 
 describe("moveVariable", () => {
   function buildGraphWithVariables(...names: string[]) {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     for (const name of names) {
       graph.variables.push({ id: name, name, type: "number", defaultValue: 0 });
     }
@@ -397,9 +398,9 @@ describe("moveVariable", () => {
 
 describe("moveFunction", () => {
   function buildGraphWithFunctions(...names: string[]) {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     for (const name of names) {
-      graph.functions.push({ id: name, name, inputs: [], outputs: [], body: createEmptyGraph(`${name}-body`, name) });
+      graph.functions.push({ id: name, name, inputs: [], outputs: [], body: new Graph(`${name}-body`, name) });
     }
     return graph;
   }
@@ -430,7 +431,7 @@ describe("moveFunctionEntry", () => {
       name: "Fn",
       inputs: names.map((name) => ({ id: name, name, type: "number" as const, defaultValue: 0 })),
       outputs: [{ id: "out1", name: "Out1", type: "number", defaultValue: 0 }],
-      body: createEmptyGraph("fn-body", "Fn"),
+      body: new Graph("fn-body", "Fn"),
     };
   }
 
@@ -470,7 +471,7 @@ describe("createCodeScriptDef", () => {
 
 describe("removeCodeScriptDef", () => {
   it("removes the bound code.run node AND restores whatever it fed into, rather than leaving a dangling wired-looking pin", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const script = createCodeScriptDef("Greet");
     graph.scripts.push(script);
 
@@ -506,7 +507,7 @@ describe("removeCodeScriptDef", () => {
   });
 
   it("only removes code.run nodes bound to THIS script, leaving other scripts' nodes untouched", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const keep = createCodeScriptDef("Keep");
     const drop = createCodeScriptDef("Drop");
     graph.scripts.push(keep, drop);
@@ -526,7 +527,7 @@ describe("removeCodeScriptDef", () => {
 
 describe("addScriptInput / removeScriptInput", () => {
   function buildGraphWithBoundCodeNode(script: CodeScriptDef) {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     graph.scripts.push(script);
     const codeDef = getNodeDef("code.run");
     const codeNode = createNodeInstance(
@@ -579,7 +580,7 @@ describe("updateScriptInput", () => {
   it("renaming an input does NOT disconnect its wire", () => {
     const script = createCodeScriptDef("Greet");
     script.inputs.push({ id: "name", name: "name", type: "string", defaultValue: "" });
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     graph.scripts.push(script);
 
     const codeDef = getNodeDef("code.run");
@@ -600,7 +601,7 @@ describe("updateScriptInput", () => {
   it("retyping an input DOES disconnect its wire (the old wire may no longer be type-compatible)", () => {
     const script = createCodeScriptDef("Greet");
     script.inputs.push({ id: "name", name: "name", type: "string", defaultValue: "" });
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     graph.scripts.push(script);
 
     const codeDef = getNodeDef("code.run");
@@ -621,7 +622,7 @@ describe("updateScriptInput", () => {
 
 describe("moveScript", () => {
   it("reorders scripts on the graph", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     graph.scripts.push(createCodeScriptDef("a"), createCodeScriptDef("b"), createCodeScriptDef("c"));
     const [a, b, c] = graph.scripts;
     moveScript(graph, c.id, a.id, "before");

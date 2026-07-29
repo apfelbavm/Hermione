@@ -1,10 +1,24 @@
 import { Colors } from "../engine/color";
-import { addVariable, DEFAULT_VALUE_BY_TYPE, getVisibleVariables, moveVariable, nextId, removeVariable, updateVariable } from "../engine/graphMutations";
-import type { Graph, PinType, Variable } from "../engine/types";
+import { Graph } from "../engine/graph";
+import {
+  addVariable,
+  DEFAULT_VALUE_BY_TYPE,
+  getVisibleVariables,
+  moveVariable,
+  nextId,
+  removeVariable,
+  updateVariable,
+} from "../engine/graphMutations";
+import type { PinType, Variable } from "../engine/types";
 import type { Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
 import { VARIABLE_DRAG_MIME } from "./dragTypes";
-import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
+import {
+  createEditableNameInput,
+  createEditableNameLabel,
+  focusAndSelect,
+  isRenamingWithinList,
+} from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
 import { createContainerIcon } from "./typedValueInput";
 import { nextAvailableName } from "./uniqueName";
@@ -38,14 +52,20 @@ export function createVariablePanel(
   let dropIndicatorRow: HTMLElement | null = null;
 
   function clearDropIndicator(): void {
-    dropIndicatorRow?.classList.remove("variable-row-drop-above", "variable-row-drop-below");
+    dropIndicatorRow?.classList.remove(
+      "variable-row-drop-above",
+      "variable-row-drop-below",
+    );
     dropIndicatorRow = null;
   }
 
   function commitRename(variable: Variable, rawNewName: string): void {
     const trimmed = rawNewName.trim();
     const isDuplicate =
-      trimmed.length === 0 || getGraph().variables.some((v) => v.id !== variable.id && v.name === trimmed);
+      trimmed.length === 0 ||
+      getGraph().variables.some(
+        (v) => v.id !== variable.id && v.name === trimmed,
+      );
     if (!isDuplicate) {
       updateVariable(store.state.rootGraph, variable.id, { name: trimmed });
     }
@@ -62,10 +82,12 @@ export function createVariablePanel(
     for (const variable of getGraph().variables) {
       const isEditing = editingId === variable.id;
       const isSelected =
-        store.state.sidebarSelection?.kind === "variable" && store.state.sidebarSelection.variableId === variable.id;
+        store.state.sidebarSelection?.kind === "variable" &&
+        store.state.sidebarSelection.variableId === variable.id;
 
       const row = document.createElement("div");
-      row.className = "variable-row" + (isSelected ? " variable-row-selected" : "");
+      row.className =
+        "variable-row" + (isSelected ? " variable-row-selected" : "");
       row.draggable = !isEditing;
       row.addEventListener("dragstart", (e) => {
         e.dataTransfer?.setData(VARIABLE_DRAG_MIME, variable.id);
@@ -105,7 +127,8 @@ export function createVariablePanel(
         clearDropIndicator();
         if (!draggedId) return;
         const rect = row.getBoundingClientRect();
-        const position = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+        const position =
+          e.clientY < rect.top + rect.height / 2 ? "before" : "after";
         moveVariable(getGraph(), draggedId, variable.id, position);
         store.notify();
       });
@@ -116,11 +139,15 @@ export function createVariablePanel(
       // drawPinShape) — the container icon REPLACES the dot rather than sitting alongside it, since
       // a variable only ever has one "kind" to show at a glance.
       const containerIcon =
-        variable.container && variable.container !== "single" ? createContainerIcon(variable.container) : null;
+        variable.container && variable.container !== "single"
+          ? createContainerIcon(variable.container)
+          : null;
       const typeIcon = containerIcon ?? document.createElement("span");
       if (!containerIcon) typeIcon.className = "variable-type-dot";
       typeIcon.style.color = Colors.PIN_COLORS[variable.type];
-      typeIcon.style.backgroundColor = containerIcon ? "" : Colors.PIN_COLORS[variable.type];
+      typeIcon.style.backgroundColor = containerIcon
+        ? ""
+        : Colors.PIN_COLORS[variable.type];
       typeIcon.title =
         variable.container && variable.container !== "single"
           ? `${variable.container} of ${variable.type}`
@@ -141,19 +168,25 @@ export function createVariablePanel(
             return input;
           })()
         : (() => {
-            const label = createEditableNameLabel(variable.name, (screenPos) => {
-              openRowContextMenu(screenPos, [
-                {
-                  label: "Edit",
-                  onClick: () => {
-                    editingId = variable.id;
-                    store.notify();
+            const label = createEditableNameLabel(
+              variable.name,
+              (screenPos) => {
+                openRowContextMenu(screenPos, [
+                  {
+                    label: "Edit",
+                    onClick: () => {
+                      editingId = variable.id;
+                      store.notify();
+                    },
                   },
-                },
-              ]);
-            });
+                ]);
+              },
+            );
             label.addEventListener("click", () => {
-              store.state.sidebarSelection = { kind: "variable", variableId: variable.id };
+              store.state.sidebarSelection = {
+                kind: "variable",
+                variableId: variable.id,
+              };
               store.notify();
             });
             return label;
@@ -163,8 +196,16 @@ export function createVariablePanel(
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", () => {
         const graph = getGraph();
-        removeVariable(graph, getVisibleVariables(store.state.rootGraph, graph), store.state.rootGraph.functions, variable.id);
-        if (store.state.sidebarSelection?.kind === "variable" && store.state.sidebarSelection.variableId === variable.id) {
+        removeVariable(
+          graph,
+          getVisibleVariables(store.state.rootGraph, graph),
+          store.state.rootGraph.functions,
+          variable.id,
+        );
+        if (
+          store.state.sidebarSelection?.kind === "variable" &&
+          store.state.sidebarSelection.variableId === variable.id
+        ) {
           store.state.sidebarSelection = null;
         }
         store.notify();
@@ -180,9 +221,17 @@ export function createVariablePanel(
     e.stopPropagation(); // don't also toggle the section's collapse state
     elements.section.classList.remove("collapsed");
     const graph = getGraph();
-    const name = nextAvailableName(graph.variables.map((v) => v.name), "NewVariable");
+    const name = nextAvailableName(
+      graph.variables.map((v) => v.name),
+      "NewVariable",
+    );
     const type: PinType = "number";
-    const variable: Variable = { id: nextId("var"), name, type, defaultValue: DEFAULT_VALUE_BY_TYPE[type] };
+    const variable: Variable = {
+      id: nextId("var"),
+      name,
+      type,
+      defaultValue: DEFAULT_VALUE_BY_TYPE[type],
+    };
     addVariable(graph, variable);
     editingId = variable.id;
     store.notify();

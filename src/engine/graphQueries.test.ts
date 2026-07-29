@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { connectionsFrom, connectionsTouchingPin, connectionTo } from "./graphQueries";
-import { createEmptyGraph, type Connection } from "./types";
+import {  type Connection } from "./types";
+import { Graph } from "./graph";
 
 function conn(id: string, fromNode: string, fromPin: string, toNode: string, toPin: string): Connection {
   return { id, fromNode, fromPin, toNode, toPin };
@@ -8,7 +9,7 @@ function conn(id: string, fromNode: string, fromPin: string, toNode: string, toP
 
 describe("connectionsTouchingPin", () => {
   it("finds a connection whether the pin is the source or destination end", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     graph.connections.push(conn("c1", "a", "out", "b", "in"));
 
     expect(connectionsTouchingPin(graph, "a", "out").map((c) => c.id)).toEqual(["c1"]);
@@ -17,7 +18,7 @@ describe("connectionsTouchingPin", () => {
   });
 
   it("returns every incoming branch on an exec input that fans in from several sources — unlike connectionTo, which only ever returns one", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     graph.connections.push(
       conn("c1", "branch1", "exec-out", "target", "exec-in"),
       conn("c2", "branch2", "exec-out", "target", "exec-in"),
@@ -29,7 +30,7 @@ describe("connectionsTouchingPin", () => {
   });
 
   it("returns every fan-out branch on a data output feeding several inputs", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     graph.connections.push(
       conn("c1", "source", "value", "consumer1", "in"),
       conn("c2", "source", "value", "consumer2", "in"),
@@ -40,7 +41,7 @@ describe("connectionsTouchingPin", () => {
   });
 
   it("returns an empty array for a pin with no connections", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     expect(connectionsTouchingPin(graph, "lonely", "pin")).toEqual([]);
   });
 });

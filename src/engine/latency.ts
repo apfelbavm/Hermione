@@ -1,6 +1,7 @@
+import { Graph } from "./graph";
 import { getVisibleVariables, resolvePinDefs } from "./graphMutations";
 import { getNodeDef } from "./registry";
-import type { FunctionDef, Graph, NodeInstance } from "./types";
+import type { FunctionDef, NodeInstance } from "./types";
 
 /** Guards against infinite recursion through (mutually) recursive Call Function chains — a
  * function currently being checked is treated as "not latent" if reached again, which just means
@@ -31,11 +32,21 @@ export function isNodeLatent(
     if (visitingFunctionIds.has(node.functionId)) return false;
     const fn = rootGraph.functions.find((f) => f.id === node.functionId);
     if (!fn) return false;
-    return isFunctionLatent(fn, rootGraph, new Set([...visitingFunctionIds, node.functionId]));
+    return isFunctionLatent(
+      fn,
+      rootGraph,
+      new Set([...visitingFunctionIds, node.functionId]),
+    );
   }
 
   if (def.latentBodyPins) {
-    return isChainLatent(graph, rootGraph, node.id, def.latentBodyPins(node), visitingFunctionIds);
+    return isChainLatent(
+      graph,
+      rootGraph,
+      node.id,
+      def.latentBodyPins(node),
+      visitingFunctionIds,
+    );
   }
 
   return false;
@@ -54,7 +65,9 @@ function isChainLatent(
 ): boolean {
   const variables = getVisibleVariables(rootGraph, graph);
   const visitedNodeIds = new Set<string>();
-  const queue: Array<{ nodeId: string; pinId: string }> = startPinIds.map((pinId) => ({ nodeId: startNodeId, pinId }));
+  const queue: Array<{ nodeId: string; pinId: string }> = startPinIds.map(
+    (pinId) => ({ nodeId: startNodeId, pinId }),
+  );
 
   while (queue.length > 0) {
     const { nodeId, pinId } = queue.shift()!;
@@ -65,11 +78,15 @@ function isChainLatent(
 
       const nextNode = graph.nodes.find((n) => n.id === conn.toNode);
       if (!nextNode) continue;
-      if (isNodeLatent(nextNode, graph, rootGraph, visitingFunctionIds)) return true;
+      if (isNodeLatent(nextNode, graph, rootGraph, visitingFunctionIds))
+        return true;
 
-      const execOutPins = resolvePinDefs(nextNode, variables, rootGraph.functions, rootGraph.scripts).filter(
-        (p) => p.direction === "output" && p.type === "exec",
-      );
+      const execOutPins = resolvePinDefs(
+        nextNode,
+        variables,
+        rootGraph.functions,
+        rootGraph.scripts,
+      ).filter((p) => p.direction === "output" && p.type === "exec");
       for (const p of execOutPins) {
         queue.push({ nodeId: nextNode.id, pinId: p.id });
       }
@@ -87,5 +104,7 @@ export function isFunctionLatent(
   rootGraph: Graph,
   visitingFunctionIds: VisitingFunctionIds = new Set(),
 ): boolean {
-  return fn.body.nodes.some((n) => isNodeLatent(n, fn.body, rootGraph, visitingFunctionIds));
+  return fn.body.nodes.some((n) =>
+    isNodeLatent(n, fn.body, rootGraph, visitingFunctionIds),
+  );
 }

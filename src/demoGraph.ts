@@ -1,6 +1,6 @@
 import { getNodeDef } from "./engine/registry";
 import { connectPins, createNodeInstance } from "./engine/graphMutations";
-import { createEmptyGraph, type Graph } from "./engine/types";
+import { Graph } from "./engine/graph";
 
 function addNode(graph: Graph, type: string, position: { x: number; y: number }, id: string) {
   const def = getNodeDef(type);
@@ -11,7 +11,7 @@ function addNode(graph: Graph, type: string, position: { x: number; y: number },
 
 /** A small hand-built graph used to exercise the renderer/executor before the editor UI exists. */
 export function buildDemoGraph(): Graph {
-  const graph = createEmptyGraph("demo", "Interview Scheduling Demo");
+  const graph = new Graph("demo", "Interview Scheduling Demo");
 
   const start = addNode(graph, "event.run", { x: 40, y: 220 }, "start");
   const add = addNode(graph, "math.add", { x: 320, y: 40 }, "add");

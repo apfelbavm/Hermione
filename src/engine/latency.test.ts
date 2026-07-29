@@ -3,7 +3,7 @@ import { registerBuiltins } from "../nodes";
 import { connectPins, createFunctionDef, createNodeInstance } from "./graphMutations";
 import { isFunctionLatent, isNodeLatent } from "./latency";
 import { getNodeDef } from "./registry";
-import { createEmptyGraph, type Graph } from "./types";
+import { Graph } from "./graph";
 
 beforeAll(() => {
   registerBuiltins();
@@ -18,13 +18,13 @@ function addBuiltinNode(graph: Graph, type: string, id: string, position = { x: 
 
 describe("isNodeLatent — plain nodes", () => {
   it("is false for an ordinary pure node", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const node = addBuiltinNode(graph, "math.add", "add");
     expect(isNodeLatent(node, graph, graph)).toBe(false);
   });
 
   it("is true for Delay, Send Email (mock), and HTTP Request", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const delay = addBuiltinNode(graph, "flow.delay", "delay");
     const email = addBuiltinNode(graph, "action.sendEmailMock", "email");
     const httpReq = addBuiltinNode(graph, "http.request", "http");
@@ -34,7 +34,7 @@ describe("isNodeLatent — plain nodes", () => {
   });
 
   it("does NOT mark a node merely sequenced before a latent one — only the latent node itself is latent", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const print1 = addBuiltinNode(graph, "debug.print", "print1");
     const delay = addBuiltinNode(graph, "flow.delay", "delay");
     connectPins(graph, [], [], { fromNode: "print1", fromPin: "exec-out", toNode: "delay", toPin: "exec-in" });
@@ -45,7 +45,7 @@ describe("isNodeLatent — plain nodes", () => {
 
 describe("isNodeLatent — For Loop", () => {
   it("is false when the loop body has no latent node", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const loop = addBuiltinNode(graph, "flow.forLoop", "loop");
     addBuiltinNode(graph, "debug.print", "print");
     connectPins(graph, [], [], { fromNode: "loop", fromPin: "loop-body", toNode: "print", toPin: "exec-in" });
@@ -53,7 +53,7 @@ describe("isNodeLatent — For Loop", () => {
   });
 
   it("is true when the loop body contains a latent node, even indirectly through another node", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const loop = addBuiltinNode(graph, "flow.forLoop", "loop");
     addBuiltinNode(graph, "debug.print", "print");
     addBuiltinNode(graph, "flow.delay", "delay");
@@ -63,7 +63,7 @@ describe("isNodeLatent — For Loop", () => {
   });
 
   it("is false when a latent node exists in the graph but is NOT reachable from loop-body", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const loop = addBuiltinNode(graph, "flow.forLoop", "loop");
     addBuiltinNode(graph, "flow.delay", "unrelatedDelay"); // never wired to anything
     expect(isNodeLatent(loop, graph, graph)).toBe(false);
@@ -72,7 +72,7 @@ describe("isNodeLatent — For Loop", () => {
 
 describe("isNodeLatent — Sequence", () => {
   it("is false when none of its Then branches contain a latent node", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const seq = addBuiltinNode(graph, "flow.sequence", "seq");
     addBuiltinNode(graph, "debug.print", "printA");
     addBuiltinNode(graph, "debug.print", "printB");
@@ -82,7 +82,7 @@ describe("isNodeLatent — Sequence", () => {
   });
 
   it("is true when ANY of its Then branches contains a latent node", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const seq = addBuiltinNode(graph, "flow.sequence", "seq");
     addBuiltinNode(graph, "debug.print", "printA");
     addBuiltinNode(graph, "flow.delay", "delay");
@@ -94,7 +94,7 @@ describe("isNodeLatent — Sequence", () => {
 
 describe("isNodeLatent — Parallel", () => {
   it("is false when none of its branches contain a latent node", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const par = addBuiltinNode(graph, "flow.parallel", "par");
     addBuiltinNode(graph, "debug.print", "printA");
     addBuiltinNode(graph, "debug.print", "printB");
@@ -104,7 +104,7 @@ describe("isNodeLatent — Parallel", () => {
   });
 
   it("is true when ANY of its branches contains a latent node", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const par = addBuiltinNode(graph, "flow.parallel", "par");
     addBuiltinNode(graph, "debug.print", "printA");
     addBuiltinNode(graph, "flow.delay", "delay");
@@ -116,7 +116,7 @@ describe("isNodeLatent — Parallel", () => {
 
 describe("isNodeLatent — Array/Set/Map For Each", () => {
   it("Array For Each is latent when its body contains a latent node", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const forEachDef = getNodeDef("array.forEach");
     const forEach = createNodeInstance("array.forEach", { x: 0, y: 0 }, forEachDef.pins, "forEach");
     graph.nodes.push(forEach);
@@ -126,7 +126,7 @@ describe("isNodeLatent — Array/Set/Map For Each", () => {
   });
 
   it("Set For Each and Map For Each are not latent with an empty/non-latent body", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const setDef = getNodeDef("set.forEach");
     const mapDef = getNodeDef("map.forEach");
     const setForEach = createNodeInstance("set.forEach", { x: 0, y: 0 }, setDef.pins, "setForEach");
@@ -139,7 +139,7 @@ describe("isNodeLatent — Array/Set/Map For Each", () => {
 
 describe("isFunctionLatent / Call Function propagation", () => {
   it("a function with no latent nodes is not latent, and neither is a Call Function node targeting it", () => {
-    const rootGraph = createEmptyGraph("g", "root");
+    const rootGraph = new Graph("g", "root");
     const fn = createFunctionDef("Plain");
     rootGraph.functions.push(fn);
     addBuiltinNode(fn.body, "debug.print", "print");
@@ -152,7 +152,7 @@ describe("isFunctionLatent / Call Function propagation", () => {
   });
 
   it("a function containing a latent node is latent, and so is every Call Function node targeting it", () => {
-    const rootGraph = createEmptyGraph("g", "root");
+    const rootGraph = new Graph("g", "root");
     const fn = createFunctionDef("SendsEmail");
     rootGraph.functions.push(fn);
     addBuiltinNode(fn.body, "action.sendEmailMock", "email");
@@ -165,7 +165,7 @@ describe("isFunctionLatent / Call Function propagation", () => {
   });
 
   it("a For Loop whose body calls a latent function is itself latent (composed propagation)", () => {
-    const rootGraph = createEmptyGraph("g", "root");
+    const rootGraph = new Graph("g", "root");
     const fn = createFunctionDef("SendsEmail");
     rootGraph.functions.push(fn);
     addBuiltinNode(fn.body, "action.sendEmailMock", "email");
@@ -180,7 +180,7 @@ describe("isFunctionLatent / Call Function propagation", () => {
   });
 
   it("does not infinite-loop on a self-recursive function and resolves to non-latent", () => {
-    const rootGraph = createEmptyGraph("g", "root");
+    const rootGraph = new Graph("g", "root");
     const fn = createFunctionDef("Recursive");
     rootGraph.functions.push(fn);
     const callDef = getNodeDef("function.call");

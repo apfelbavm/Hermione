@@ -5,8 +5,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../nodes";
 import { connectPins, createNodeInstance } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
-import { createEmptyGraph, type Graph } from "../engine/types";
 import { compileGraph } from "./codegen";
+import { Graph } from "../engine/graph";
 
 function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);
@@ -39,7 +39,7 @@ async function loadCompiledWithRealImports(code: string): Promise<Record<string,
 
 describe("compileGraph — compileImports", () => {
   it("dedupes a compileImports line shared by two node instances into a single import statement", () => {
-    const graph = createEmptyGraph("g", "test");
+    const graph = new Graph("g", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const print = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print");
     const xml1 = addBuiltinNode(graph, "xml.toJson", { x: 0, y: 100 }, "xml1");
@@ -58,7 +58,7 @@ describe("compileGraph — compileImports", () => {
   });
 
   it("compiled output actually runs under plain Node with fast-xml-parser resolved from node_modules", async () => {
-    const graph = createEmptyGraph("g2", "test");
+    const graph = new Graph("g2", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const print = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "print");
     const xmlNode = addBuiltinNode(graph, "xml.toJson", { x: 0, y: 100 }, "xmlNode");

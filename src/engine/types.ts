@@ -1,3 +1,5 @@
+import { Graph } from "./graph";
+
 export type PinType = "exec" | "number" | "boolean" | "string" | "object";
 
 /** Orthogonal to PinType (see PinDef.container/Variable.container) — "single" (the default, a
@@ -126,7 +128,9 @@ export interface NodeDef {
    * never a fresh computation, since re-running the actual side-effecting call per reference would
    * be wrong. compileFrom's downstream walk already guarantees the ordering: compileExecute's
    * returned statements always precede whatever `compileFrom(execOutPin)` appends after them. */
-  compileExecuteOutputs?: (args: { node: NodeInstance }) => Record<string, string>;
+  compileExecuteOutputs?: (args: {
+    node: NodeInstance;
+  }) => Record<string, string>;
   /** Named helper-function source snippets this node's generated code depends on (e.g. `delay`), deduped by name across the whole compiled file. */
   compileHelpers?: Record<string, string>;
   /** Literal ESM import statements this node's generated code depends on (e.g. `import { XMLParser } from
@@ -280,17 +284,6 @@ export interface CodeScriptDef {
   inputs: PinSignatureEntry[];
 }
 
-export interface Graph {
-  id: string;
-  name: string;
-  nodes: NodeInstance[];
-  connections: Connection[];
-  variables: Variable[];
-  commentBoxes: CommentBox[];
-  functions: FunctionDef[];
-  scripts: CodeScriptDef[];
-}
-
 export interface ExecutionContext {
   /** The graph currently being walked — swapped to a function's body inside a nested call. */
   graph: Graph;
@@ -316,8 +309,4 @@ export interface ExecutionContext {
   /** May return a Promise to introduce a visualization pause between exec steps; awaited by the executor. */
   onNodeStart?: (nodeId: string) => void | Promise<void>;
   onExecFire?: (connectionId: string) => void;
-}
-
-export function createEmptyGraph(id: string, name: string): Graph {
-  return { id, name, nodes: [], connections: [], variables: [], commentBoxes: [], functions: [], scripts: [] };
 }

@@ -3,7 +3,8 @@ import { registerBuiltins } from "./index";
 import { createExecutionContext, runExecFrom } from "../engine/executor";
 import { connectPins, createNodeInstance } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
-import { createEmptyGraph, type Graph } from "../engine/types";
+import { Graph } from "../engine/graph";
+
 
 beforeAll(() => {
   registerBuiltins();
@@ -44,7 +45,7 @@ describe("core.reroute (data)", () => {
   });
 
   it("passes a real value through end to end via math.add -> string.fromNumber -> reroute -> debug.print", async () => {
-    const graph = createEmptyGraph("g", "test");
+    const graph = new Graph("g", "test");
     addBuiltinNode(graph, "event.start", "start");
     const add = addBuiltinNode(graph, "math.add", "add");
     add.pins.a.value = 2;
@@ -80,7 +81,7 @@ describe("core.rerouteExec", () => {
   });
 
   it("runs a real exec chain through unchanged: On Run -> reroute -> Print", async () => {
-    const graph = createEmptyGraph("g", "test");
+    const graph = new Graph("g", "test");
     addBuiltinNode(graph, "event.start", "start");
     addBuiltinNode(graph, "core.rerouteExec", "reroute");
     const print = addBuiltinNode(graph, "debug.print", "print");

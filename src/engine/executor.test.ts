@@ -3,7 +3,7 @@ import { registerBuiltins } from "../nodes";
 import { createExecutionContext, runExecFrom } from "./executor";
 import { createNodeInstance, connectPins } from "./graphMutations";
 import { getNodeDef } from "./registry";
-import { createEmptyGraph, type Graph } from "./types";
+import { Graph } from "./graph";
 
 function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);
@@ -18,7 +18,7 @@ beforeAll(() => {
 
 describe("executor", () => {
   it("walks Start -> Print and logs the message", async () => {
-    const graph = createEmptyGraph("g1", "test");
+    const graph = new Graph("g1", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const print = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print");
     print.pins.message.value = "hello world";
@@ -33,7 +33,7 @@ describe("executor", () => {
   });
 
   it("Branch follows the true exec pin when condition is true", async () => {
-    const graph = createEmptyGraph("g2", "test");
+    const graph = new Graph("g2", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const branch = addBuiltinNode(graph, "flow.branch", { x: 100, y: 0 }, "branch");
     const printTrue = addBuiltinNode(graph, "debug.print", { x: 200, y: -50 }, "printTrue");
@@ -54,7 +54,7 @@ describe("executor", () => {
   });
 
   it("pulls a chain of pure data nodes (Add -> Compare) into a Branch decision", async () => {
-    const graph = createEmptyGraph("g3", "test");
+    const graph = new Graph("g3", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const add = addBuiltinNode(graph, "math.add", { x: 0, y: 100 }, "add");
     const compare = addBuiltinNode(graph, "math.greaterThan", { x: 100, y: 100 }, "compare");
@@ -79,7 +79,7 @@ describe("executor", () => {
   });
 
   it("Set Variable then Get Variable round-trips a value through ctx.variableValues", async () => {
-    const graph = createEmptyGraph("g5", "test");
+    const graph = new Graph("g5", "test");
     const variable = { id: "var1", name: "Greeting", type: "string" as const, defaultValue: "" };
     graph.variables.push(variable);
 
@@ -109,7 +109,7 @@ describe("executor", () => {
   });
 
   it("Get Variable reflects the current value across exec steps, not a stale per-tick cache", async () => {
-    const graph = createEmptyGraph("g7", "test");
+    const graph = new Graph("g7", "test");
     const variable = { id: "x", name: "X", type: "string" as const, defaultValue: "" };
     graph.variables.push(variable);
 
@@ -147,7 +147,7 @@ describe("executor", () => {
   });
 
   it("awaits async nodes in order: Delay -> Send Email (mock) -> Print", async () => {
-    const graph = createEmptyGraph("g6", "test");
+    const graph = new Graph("g6", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const delay = addBuiltinNode(graph, "flow.delay", { x: 100, y: 0 }, "delay");
     const sendEmail = addBuiltinNode(graph, "action.sendEmailMock", { x: 200, y: 0 }, "sendEmail");
@@ -172,7 +172,7 @@ describe("executor", () => {
   });
 
   it("connectPins rejects incompatible pin types", () => {
-    const graph = createEmptyGraph("g4", "test");
+    const graph = new Graph("g4", "test");
     const add = addBuiltinNode(graph, "math.add", { x: 0, y: 0 }, "add");
     const branch = addBuiltinNode(graph, "flow.branch", { x: 100, y: 0 }, "branch");
 
@@ -182,7 +182,7 @@ describe("executor", () => {
   });
 
   it("exec input pins accept multiple incoming wires (branches can converge)", async () => {
-    const graph = createEmptyGraph("g8", "test");
+    const graph = new Graph("g8", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const branch = addBuiltinNode(graph, "flow.branch", { x: 100, y: 0 }, "branch");
     const shared = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "shared");
@@ -205,7 +205,7 @@ describe("executor", () => {
   });
 
   it("exec output pins allow only one outgoing wire — a second connect replaces the first", () => {
-    const graph = createEmptyGraph("g9", "test");
+    const graph = new Graph("g9", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const print1 = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print1");
     const print2 = addBuiltinNode(graph, "debug.print", { x: 100, y: 100 }, "print2");
@@ -219,7 +219,7 @@ describe("executor", () => {
   });
 
   it("data pins keep the original cardinality: one input takes one source, one output fans out freely", () => {
-    const graph = createEmptyGraph("g10", "test");
+    const graph = new Graph("g10", "test");
     const add1 = addBuiltinNode(graph, "math.add", { x: 0, y: 0 }, "add1");
     const add2 = addBuiltinNode(graph, "math.add", { x: 0, y: 100 }, "add2");
     const compare = addBuiltinNode(graph, "math.greaterThan", { x: 100, y: 0 }, "compare");
@@ -238,7 +238,7 @@ describe("executor", () => {
   });
 
   it("a disabled node's execute() never runs, but the exec chain still continues past it", async () => {
-    const graph = createEmptyGraph("g11", "test");
+    const graph = new Graph("g11", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const print1 = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print1");
     const print2 = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "print2");
@@ -257,7 +257,7 @@ describe("executor", () => {
   });
 
   it("firing every exec-out pin of a disabled multi-branch node runs every branch, since there's no condition to pick one", async () => {
-    const graph = createEmptyGraph("g13", "test");
+    const graph = new Graph("g13", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const branch = addBuiltinNode(graph, "flow.branch", { x: 100, y: 0 }, "branch");
     const printTrue = addBuiltinNode(graph, "debug.print", { x: 200, y: -50 }, "printTrue");

@@ -1,8 +1,15 @@
 import { getNodeDef } from "../engine/registry";
 import { resolveNodeLabel, resolvePinDefs } from "../engine/graphMutations";
-import type { CodeScriptDef, FunctionDef, Graph, NodeInstance, PinDef, Variable } from "../engine/types";
+import type {
+  CodeScriptDef,
+  FunctionDef,
+  NodeInstance,
+  PinDef,
+  Variable,
+} from "../engine/types";
 import { computeNodeLayout, type NodeLayout } from "./layout";
 import type { Camera } from "./camera";
+import { Graph } from "../engine/graph";
 
 export interface NodeScreenGeometry {
   screenX: number;
@@ -28,7 +35,10 @@ export function computeNodeScreenGeometry(
   const screen = camera.worldToScreen(node.position.x, node.position.y);
   const pinScreen: Record<string, { x: number; y: number }> = {};
   for (const p of layout.pins) {
-    pinScreen[p.pin.id] = { x: screen.x + p.x * camera.zoom, y: screen.y + p.y * camera.zoom };
+    pinScreen[p.pin.id] = {
+      x: screen.x + p.x * camera.zoom,
+      y: screen.y + p.y * camera.zoom,
+    };
   }
   const addButtonScreen = layout.addButton
     ? {
@@ -63,11 +73,20 @@ export function computeNodeWorldRect(
   height: number;
 } {
   const def = getNodeDef(node.type);
-  const layout = computeNodeLayout(resolveNodeLabel(node, def, variables, functions, scripts), pinDefs, {
-    showAddButton: !!def.addInstancePinEntry,
-    compact: !!def.compact,
-  });
-  return { x: node.position.x, y: node.position.y, width: layout.width, height: layout.height };
+  const layout = computeNodeLayout(
+    resolveNodeLabel(node, def, variables, functions, scripts),
+    pinDefs,
+    {
+      showAddButton: !!def.addInstancePinEntry,
+      compact: !!def.compact,
+    },
+  );
+  return {
+    x: node.position.x,
+    y: node.position.y,
+    width: layout.width,
+    height: layout.height,
+  };
 }
 
 /** Computes screen geometry for every node once per frame, reused by drawing, hit-testing, and the DOM overlay.

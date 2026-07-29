@@ -3,7 +3,8 @@ import { registerBuiltins } from "./index";
 import { createExecutionContext, runExecFrom } from "../engine/executor";
 import { connectPins, createNodeInstance, removeInstancePin } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
-import { createEmptyGraph, type Graph } from "../engine/types";
+import { Graph } from "../engine/graph";
+
 
 beforeAll(() => {
   registerBuiltins();
@@ -39,7 +40,7 @@ describe("map.make", () => {
     const outputs = await def.evaluate!({
       node,
       inputs: { "key-0": "a", "value-0": 1, "key-1": "b", "value-1": 2 },
-      ctx: ctxFor(createEmptyGraph("g", "r")),
+      ctx: ctxFor(new Graph("g", "r")),
     });
     expect(outputs.result).toEqual([
       { key: "a", value: 1 },
@@ -49,7 +50,7 @@ describe("map.make", () => {
     const compiled = def.compileEvaluate!({
       node,
       inputs: { "key-0": '"a"', "value-0": "1", "key-1": '"b"', "value-1": "2" },
-      graph: createEmptyGraph("g", "r"),
+      graph: new Graph("g", "r"),
     });
     expect(evalExpr(compiled.result)).toEqual([
       { key: "a", value: 1 },
@@ -58,7 +59,7 @@ describe("map.make", () => {
   });
 
   it("removing a value-N pin (the only removable side) also removes its paired key-N", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const def = getNodeDef("map.make");
     const node = createNodeInstance("map.make", { x: 0, y: 0 }, def.pins, "make");
     graph.nodes.push(node);
@@ -79,7 +80,7 @@ describe("map.set (Add)", () => {
   const node = createNodeInstance("map.set", { x: 0, y: 0 }, def.pins, "set");
 
   it("appends a new key", async () => {
-    const outputs = await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "b", value: 2 }, ctx: ctxFor(createEmptyGraph("g", "r")) });
+    const outputs = await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "b", value: 2 }, ctx: ctxFor(new Graph("g", "r")) });
     expect(outputs.result).toEqual([
       { key: "a", value: 1 },
       { key: "b", value: 2 },
@@ -87,7 +88,7 @@ describe("map.set (Add)", () => {
   });
 
   it("overwrites the value for an existing key instead of duplicating it", async () => {
-    const outputs = await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "a", value: 99 }, ctx: ctxFor(createEmptyGraph("g", "r")) });
+    const outputs = await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "a", value: 99 }, ctx: ctxFor(new Graph("g", "r")) });
     expect(outputs.result).toEqual([{ key: "a", value: 99 }]);
   });
 });
@@ -100,13 +101,13 @@ describe("map.remove", () => {
     const outputs = await def.evaluate!({
       node,
       inputs: { map: [{ key: "a", value: 1 }, { key: "b", value: 2 }], key: "a" },
-      ctx: ctxFor(createEmptyGraph("g", "r")),
+      ctx: ctxFor(new Graph("g", "r")),
     });
     expect(outputs).toEqual({ result: [{ key: "b", value: 2 }], removed: true });
   });
 
   it("reports removed=false for a missing key", async () => {
-    const outputs = await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "z" }, ctx: ctxFor(createEmptyGraph("g", "r")) });
+    const outputs = await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "z" }, ctx: ctxFor(new Graph("g", "r")) });
     expect(outputs).toEqual({ result: [{ key: "a", value: 1 }], removed: false });
   });
 });
@@ -116,12 +117,12 @@ describe("map.find", () => {
   const node = createNodeInstance("map.find", { x: 0, y: 0 }, def.pins, "find");
 
   it("returns the value and found=true for an existing key", async () => {
-    const outputs = await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "a" }, ctx: ctxFor(createEmptyGraph("g", "r")) });
+    const outputs = await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "a" }, ctx: ctxFor(new Graph("g", "r")) });
     expect(outputs).toEqual({ value: 1, found: true });
   });
 
   it("returns the value type's default and found=false for a missing key", async () => {
-    const outputs = await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "z" }, ctx: ctxFor(createEmptyGraph("g", "r")) });
+    const outputs = await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "z" }, ctx: ctxFor(new Graph("g", "r")) });
     expect(outputs).toEqual({ value: 0, found: false });
   });
 
@@ -129,7 +130,7 @@ describe("map.find", () => {
     const compiled = def.compileEvaluate!({
       node,
       inputs: { map: JSON.stringify([{ key: "a", value: 1 }]), key: '"a"' },
-      graph: createEmptyGraph("g", "r"),
+      graph: new Graph("g", "r"),
     });
     expect(evalExpr(compiled.value)).toBe(1);
     expect(evalExpr(compiled.found)).toBe(true);
@@ -140,14 +141,14 @@ describe("map.clear / containsKey / keys / values / isEmpty", () => {
   it("Clear always returns an empty map", async () => {
     const def = getNodeDef("map.clear");
     const node = createNodeInstance("map.clear", { x: 0, y: 0 }, def.pins, "clear");
-    expect((await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }] }, ctx: ctxFor(createEmptyGraph("g", "r")) })).result).toEqual([]);
+    expect((await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }] }, ctx: ctxFor(new Graph("g", "r")) })).result).toEqual([]);
   });
 
   it("Contains Key checks key equality", async () => {
     const def = getNodeDef("map.containsKey");
     const node = createNodeInstance("map.containsKey", { x: 0, y: 0 }, def.pins, "containsKey");
-    expect((await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "a" }, ctx: ctxFor(createEmptyGraph("g", "r")) })).contains).toBe(true);
-    expect((await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "z" }, ctx: ctxFor(createEmptyGraph("g", "r")) })).contains).toBe(false);
+    expect((await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "a" }, ctx: ctxFor(new Graph("g", "r")) })).contains).toBe(true);
+    expect((await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }], key: "z" }, ctx: ctxFor(new Graph("g", "r")) })).contains).toBe(false);
   });
 
   it("Keys returns an Array-container pin of just the keys, in order", async () => {
@@ -156,7 +157,7 @@ describe("map.clear / containsKey / keys / values / isEmpty", () => {
     const outputs = await def.evaluate!({
       node,
       inputs: { map: [{ key: "a", value: 1 }, { key: "b", value: 2 }] },
-      ctx: ctxFor(createEmptyGraph("g", "r")),
+      ctx: ctxFor(new Graph("g", "r")),
     });
     expect(outputs.result).toEqual(["a", "b"]);
     const pins = def.deriveInstancePins!(node);
@@ -169,7 +170,7 @@ describe("map.clear / containsKey / keys / values / isEmpty", () => {
     const outputs = await def.evaluate!({
       node,
       inputs: { map: [{ key: "a", value: 1 }, { key: "b", value: 2 }] },
-      ctx: ctxFor(createEmptyGraph("g", "r")),
+      ctx: ctxFor(new Graph("g", "r")),
     });
     expect(outputs.result).toEqual([1, 2]);
   });
@@ -177,14 +178,14 @@ describe("map.clear / containsKey / keys / values / isEmpty", () => {
   it("Is Empty reflects the map's length", async () => {
     const def = getNodeDef("map.isEmpty");
     const node = createNodeInstance("map.isEmpty", { x: 0, y: 0 }, def.pins, "isEmpty");
-    expect((await def.evaluate!({ node, inputs: { map: [] }, ctx: ctxFor(createEmptyGraph("g", "r")) })).isEmpty).toBe(true);
-    expect((await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }] }, ctx: ctxFor(createEmptyGraph("g", "r")) })).isEmpty).toBe(false);
+    expect((await def.evaluate!({ node, inputs: { map: [] }, ctx: ctxFor(new Graph("g", "r")) })).isEmpty).toBe(true);
+    expect((await def.evaluate!({ node, inputs: { map: [{ key: "a", value: 1 }] }, ctx: ctxFor(new Graph("g", "r")) })).isEmpty).toBe(false);
   });
 });
 
 describe("map.forEach", () => {
   it("runs the loop-body chain once per entry, exposing Key and Value, then fires Completed", async () => {
-    const graph = createEmptyGraph("g", "test");
+    const graph = new Graph("g", "test");
     const forEachDef = getNodeDef("map.forEach");
     const forEach = createNodeInstance("map.forEach", { x: 0, y: 0 }, forEachDef.pins, "forEach");
     graph.nodes.push(forEach);
@@ -210,7 +211,7 @@ describe("map.forEach", () => {
   });
 
   it("when disabled, never runs the loop body (even with a non-empty map) and fires only Completed", async () => {
-    const graph = createEmptyGraph("g", "test");
+    const graph = new Graph("g", "test");
     const forEachDef = getNodeDef("map.forEach");
     const forEach = createNodeInstance("map.forEach", { x: 0, y: 0 }, forEachDef.pins, "forEach");
     forEach.disabled = true;

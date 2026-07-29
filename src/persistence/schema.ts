@@ -1,4 +1,4 @@
-import type { Graph } from "../engine/types";
+import { Graph } from "../engine/graph";
 
 export const CURRENT_FORMAT_VERSION = 3;
 export const LOCAL_STORAGE_KEY = "hermione:last-graph";

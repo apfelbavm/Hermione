@@ -1,10 +1,10 @@
+import { Graph } from "./graph";
 import { getNodeDef, isPinTypeCompatible } from "./registry";
 import type {
   CodeScriptDef,
   CommentBox,
   Connection,
   FunctionDef,
-  Graph,
   NodeDef,
   NodeInstance,
   Pin,
@@ -14,7 +14,7 @@ import type {
   PinType,
   Variable,
 } from "./types";
-import { createEmptyGraph } from "./types";
+
 
 /** Seed element/key type for a freshly-created configurableElementType node instance (see
  * NodeDef.configurableElementType) — arbitrary but consistent defaults, same spirit as
@@ -554,7 +554,7 @@ export function allGraphs(rootGraph: Graph): Graph[] {
  * registerBuiltins() must have run), same precondition every other node-instance factory has. */
 export function createFunctionDef(name: string): FunctionDef {
   const id = nextId("fn");
-  const body = createEmptyGraph(nextId("fnbody"), name);
+  const body = new Graph(nextId("fnbody"), name);
   const fn: FunctionDef = { id, name, inputs: [], outputs: [], body };
 
   const entryDef = getNodeDef("function.entry");

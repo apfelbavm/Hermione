@@ -3,7 +3,8 @@ import { registerBuiltins } from "./index";
 import { createExecutionContext, runExecFrom } from "../engine/executor";
 import { connectPins, createNodeInstance, removeInstancePin } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
-import { createEmptyGraph, type Graph } from "../engine/types";
+import { Graph } from "../engine/graph";
+
 
 beforeAll(() => {
   registerBuiltins();
@@ -19,7 +20,7 @@ function addBuiltinNode(graph: Graph, type: string, id: string, position = { x: 
 /** Wires a For Loop with a body that logs each index (via string.fromNumber -> debug.print) and a
  * "Done" print after it completes. Returns the graph and the loop node. */
 function buildLoopGraph(start: number, end: number) {
-  const graph = createEmptyGraph("g", "test");
+  const graph = new Graph("g", "test");
   const loop = addBuiltinNode(graph, "flow.forLoop", "loop");
   loop.pins.start.value = start;
   loop.pins.end.value = end;
@@ -117,7 +118,7 @@ describe("flow.sequence", () => {
   });
 
   it("renumbers labels contiguously after removing a middle entry, keeping the underlying pin ids", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const def = getNodeDef("flow.sequence");
     const node = createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
     graph.nodes.push(node);
@@ -131,7 +132,7 @@ describe("flow.sequence", () => {
   });
 
   it("runs each Then branch's ENTIRE chain to completion, in order, before starting the next — not interleaved", async () => {
-    const graph = createEmptyGraph("g", "test");
+    const graph = new Graph("g", "test");
     addBuiltinNode(graph, "flow.sequence", "seq");
     const delay = addBuiltinNode(graph, "flow.delay", "delay");
     delay.pins.duration.value = 5;
@@ -154,7 +155,7 @@ describe("flow.sequence", () => {
   });
 
   it("when disabled, runs NONE of the Then branches", async () => {
-    const graph = createEmptyGraph("g", "test");
+    const graph = new Graph("g", "test");
     const seq = addBuiltinNode(graph, "flow.sequence", "seq");
     seq.disabled = true;
     const printA = addBuiltinNode(graph, "debug.print", "printA");
@@ -194,7 +195,7 @@ describe("flow.parallel", () => {
   });
 
   it("renumbers labels contiguously after removing a middle entry, keeping the underlying pin ids", () => {
-    const graph = createEmptyGraph("g", "root");
+    const graph = new Graph("g", "root");
     const def = getNodeDef("flow.parallel");
     const node = createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
     graph.nodes.push(node);
@@ -208,7 +209,7 @@ describe("flow.parallel", () => {
   });
 
   it("runs branches concurrently — a faster branch logs before a slower one regardless of pin order — then fires completed only once both finish", async () => {
-    const graph = createEmptyGraph("g", "test");
+    const graph = new Graph("g", "test");
     addBuiltinNode(graph, "flow.parallel", "par");
     const slowDelay = addBuiltinNode(graph, "flow.delay", "slowDelay");
     slowDelay.pins.duration.value = 20;
@@ -238,7 +239,7 @@ describe("flow.parallel", () => {
   });
 
   it("when disabled, runs NONE of the branches but still fires completed", async () => {
-    const graph = createEmptyGraph("g", "test");
+    const graph = new Graph("g", "test");
     const par = addBuiltinNode(graph, "flow.parallel", "par");
     par.disabled = true;
     const printA = addBuiltinNode(graph, "debug.print", "printA");

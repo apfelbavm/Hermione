@@ -1,4 +1,4 @@
-import type { Graph } from "../engine/types";
+import { Graph } from "../engine/graph";
 import { fromDocument, LOCAL_STORAGE_KEY, type SavedDocument } from "./schema";
 
 export function deserializeGraph(json: string): Graph {
