@@ -1,31 +1,13 @@
 import "./style.css";
 import { registerBuiltins } from "./nodes";
 import { createExecutionContext, runExecFrom } from "./engine/executor";
-import {
-  connectPins,
-  insertRerouteOnConnection,
-  removeInstancePin,
-} from "./engine/graphMutations";
+import { connectPins, insertRerouteOnConnection, removeInstancePin } from "./engine/graphMutations";
 import { connectionsTouchingPin } from "./engine/graphQueries";
-import {
-  allNodeDefs,
-  findCompatibleNodeDefs,
-  getNodeDef,
-  isPinTypeCompatible,
-  topLevelGroup,
-} from "./engine/registry";
-import type {
-  CodeScriptDef,
-  FunctionDef,
-  NodeDef,
-  Variable,
-} from "./engine/types";
+import { allNodeDefs, findCompatibleNodeDefs, getNodeDef, isPinTypeCompatible, topLevelGroup } from "./engine/registry";
+import type { CodeScriptDef, FunctionDef, NodeDef, Variable } from "./engine/types";
 import { buildDemoGraph } from "./demoGraph";
 import { Camera } from "./render/camera";
-import {
-  computeAllNodeGeometries,
-  computeNodeWorldRect,
-} from "./render/nodeGeometry";
+import { computeAllNodeGeometries, computeNodeWorldRect } from "./render/nodeGeometry";
 import { hitTestNode, hitTestPin, hitTestWire } from "./render/hitTest";
 import { drawComments } from "./render/drawComments";
 import { drawGrid, snapPositionToGrid } from "./render/drawGrid";
@@ -33,15 +15,8 @@ import { drawMouseCoordinates } from "./render/drawHud";
 import { drawNodes } from "./render/drawNodes";
 import { drawWires, drawWireDragPreview } from "./render/drawWires";
 import { drawMarqueeSelection } from "./render/drawMarquee";
-import {
-  createStore,
-  getEditingGraph,
-  getVisibleVariablesForState,
-} from "./state/store";
-import {
-  setupPointerInteraction,
-  type WireAnchor,
-} from "./interaction/pointerHandlers";
+import { createStore, getEditingGraph, getVisibleVariablesForState } from "./state/store";
+import { setupPointerInteraction, type WireAnchor } from "./interaction/pointerHandlers";
 import { createWidgetSync } from "./overlay/widgetSync";
 import { setupNodeHoverTooltip } from "./overlay/nodeTooltip";
 import { createCommentOverlay } from "./overlay/commentOverlay";
@@ -55,23 +30,10 @@ import { createScriptEditor } from "./overlay/scriptEditor";
 import { createDetailsPanel } from "./overlay/detailsPanel";
 import { createGraphTabs } from "./overlay/graphTabs";
 import { openNodeSearchMenu } from "./overlay/nodeSearchMenu";
-import {
-  FUNCTION_DRAG_MIME,
-  SCRIPT_DRAG_MIME,
-  VARIABLE_DRAG_MIME,
-} from "./overlay/dragTypes";
-import {
-  openRowContextMenu,
-  type ContextMenuItem,
-} from "./overlay/rowContextMenu";
-import {
-  loadGraphFromFile,
-  loadGraphFromLocalStorage,
-} from "./persistence/load";
-import {
-  downloadGraphAsFile,
-  saveGraphToLocalStorage,
-} from "./persistence/save";
+import { FUNCTION_DRAG_MIME, SCRIPT_DRAG_MIME, VARIABLE_DRAG_MIME } from "./overlay/dragTypes";
+import { openRowContextMenu, type ContextMenuItem } from "./overlay/rowContextMenu";
+import { loadGraphFromFile, loadGraphFromLocalStorage } from "./persistence/load";
+import { downloadGraphAsFile, saveGraphToLocalStorage } from "./persistence/save";
 import { downloadCompiledGraph } from "./compiler/codegen";
 import { isNodeLatent } from "./engine/latency";
 import { NodeInstance } from "./engine/nodeInstance";
@@ -82,36 +44,18 @@ const canvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
 const container = document.getElementById("canvas-container") as HTMLDivElement;
 const overlay = document.getElementById("overlay") as HTMLDivElement;
 const logPanel = document.getElementById("log-panel") as HTMLDivElement;
-const logClearButton = document.getElementById(
-  "log-clear-button",
-) as HTMLButtonElement;
-const logTabsDynamic = document.getElementById(
-  "log-tabs-dynamic",
-) as HTMLDivElement;
-const monacoContainer = document.getElementById(
-  "monaco-container",
-) as HTMLDivElement;
-const logSaveButton = document.getElementById(
-  "log-save-button",
-) as HTMLButtonElement;
-const logSaveStatus = document.getElementById(
-  "log-save-status",
-) as HTMLSpanElement;
+const logClearButton = document.getElementById("log-clear-button") as HTMLButtonElement;
+const logTabsDynamic = document.getElementById("log-tabs-dynamic") as HTMLDivElement;
+const monacoContainer = document.getElementById("monaco-container") as HTMLDivElement;
+const logSaveButton = document.getElementById("log-save-button") as HTMLButtonElement;
+const logSaveStatus = document.getElementById("log-save-status") as HTMLSpanElement;
 const runButton = document.getElementById("run-button") as HTMLButtonElement;
 const saveButton = document.getElementById("save-button") as HTMLButtonElement;
 const loadButton = document.getElementById("load-button") as HTMLButtonElement;
-const compileButton = document.getElementById(
-  "compile-button",
-) as HTMLButtonElement;
-const snapToGridCheckbox = document.getElementById(
-  "snap-to-grid-checkbox",
-) as HTMLInputElement;
-const frameAllButton = document.getElementById(
-  "frame-all-button",
-) as HTMLButtonElement;
-const loadFileInput = document.getElementById(
-  "load-file-input",
-) as HTMLInputElement;
+const compileButton = document.getElementById("compile-button") as HTMLButtonElement;
+const snapToGridCheckbox = document.getElementById("snap-to-grid-checkbox") as HTMLInputElement;
+const frameAllButton = document.getElementById("frame-all-button") as HTMLButtonElement;
+const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 if (!ctx) throw new Error("Canvas 2D context unavailable");
 
@@ -179,9 +123,7 @@ const variablePanel = createVariablePanel(
     section: document.getElementById("variables-section") as HTMLDivElement,
     header: document.getElementById("variables-header") as HTMLDivElement,
     list: document.getElementById("variables-list") as HTMLDivElement,
-    addButton: document.getElementById(
-      "add-variable-button",
-    ) as HTMLButtonElement,
+    addButton: document.getElementById("add-variable-button") as HTMLButtonElement,
   },
   store,
   () => store.state.rootGraph,
@@ -200,11 +142,7 @@ function getActiveFunction(): FunctionDef | null {
 function getSelectedFunctionForDetails(): FunctionDef | null {
   const selection = store.state.sidebarSelection;
   if (selection?.kind !== "function") return null;
-  return (
-    store.state.rootGraph.functions.find(
-      (f) => f.id === selection.functionId,
-    ) ?? null
-  );
+  return store.state.rootGraph.functions.find((f) => f.id === selection.functionId) ?? null;
 }
 
 const functionsPanel = createFunctionsPanel(
@@ -212,9 +150,7 @@ const functionsPanel = createFunctionsPanel(
     section: document.getElementById("functions-section") as HTMLDivElement,
     header: document.getElementById("functions-header") as HTMLDivElement,
     list: document.getElementById("functions-list") as HTMLDivElement,
-    addButton: document.getElementById(
-      "add-function-button",
-    ) as HTMLButtonElement,
+    addButton: document.getElementById("add-function-button") as HTMLButtonElement,
   },
   store,
 );
@@ -236,9 +172,7 @@ const outputsPanel = createFunctionIoPanel(
     section: document.getElementById("outputs-section") as HTMLDivElement,
     header: document.getElementById("outputs-header") as HTMLDivElement,
     list: document.getElementById("outputs-list") as HTMLDivElement,
-    addButton: document.getElementById(
-      "add-output-button",
-    ) as HTMLButtonElement,
+    addButton: document.getElementById("add-output-button") as HTMLButtonElement,
   },
   store,
   "output",
@@ -250,9 +184,7 @@ const scriptsPanel = createScriptsPanel(
     section: document.getElementById("scripts-section") as HTMLDivElement,
     header: document.getElementById("scripts-header") as HTMLDivElement,
     list: document.getElementById("scripts-list") as HTMLDivElement,
-    addButton: document.getElementById(
-      "add-script-button",
-    ) as HTMLButtonElement,
+    addButton: document.getElementById("add-script-button") as HTMLButtonElement,
   },
   store,
 );
@@ -261,10 +193,7 @@ const scriptsPanel = createScriptsPanel(
 function getSelectedScriptForDetails(): CodeScriptDef | null {
   const selection = store.state.sidebarSelection;
   if (selection?.kind !== "script") return null;
-  return (
-    store.state.rootGraph.scripts.find((s) => s.id === selection.scriptId) ??
-    null
-  );
+  return store.state.rootGraph.scripts.find((s) => s.id === selection.scriptId) ?? null;
 }
 
 const scriptInputsPanel = createScriptIoPanel(
@@ -272,9 +201,7 @@ const scriptInputsPanel = createScriptIoPanel(
     section: document.getElementById("script-inputs-section") as HTMLDivElement,
     header: document.getElementById("script-inputs-header") as HTMLDivElement,
     list: document.getElementById("script-inputs-list") as HTMLDivElement,
-    addButton: document.getElementById(
-      "add-script-input-button",
-    ) as HTMLButtonElement,
+    addButton: document.getElementById("add-script-input-button") as HTMLButtonElement,
   },
   store,
   "input",
@@ -286,9 +213,7 @@ const scriptOutputsPanel = createScriptIoPanel(
     section: document.getElementById("script-outputs-section") as HTMLDivElement,
     header: document.getElementById("script-outputs-header") as HTMLDivElement,
     list: document.getElementById("script-outputs-list") as HTMLDivElement,
-    addButton: document.getElementById(
-      "add-script-output-button",
-    ) as HTMLButtonElement,
+    addButton: document.getElementById("add-script-output-button") as HTMLButtonElement,
   },
   store,
   "output",
@@ -307,58 +232,33 @@ const scriptEditor = createScriptEditor(
   store,
 );
 
-const localVariablesSection = document.getElementById(
-  "local-variables-section",
-) as HTMLDivElement;
+const localVariablesSection = document.getElementById("local-variables-section") as HTMLDivElement;
 const localVariablePanel = createVariablePanel(
   {
     section: localVariablesSection,
     header: document.getElementById("local-variables-header") as HTMLDivElement,
     list: document.getElementById("local-variables-list") as HTMLDivElement,
-    addButton: document.getElementById(
-      "add-local-variable-button",
-    ) as HTMLButtonElement,
+    addButton: document.getElementById("add-local-variable-button") as HTMLButtonElement,
   },
   store,
   () => getActiveFunction()?.body ?? store.state.rootGraph,
 );
 
-const graphTabs = createGraphTabs(
-  document.getElementById("graph-tabs") as HTMLDivElement,
-  store,
-);
+const graphTabs = createGraphTabs(document.getElementById("graph-tabs") as HTMLDivElement, store);
 
 const detailsPanel = createDetailsPanel(
   {
     section: document.getElementById("details-section") as HTMLDivElement,
-    variableContent: document.getElementById(
-      "variable-details",
-    ) as HTMLDivElement,
-    variableNameLabel: document.getElementById(
-      "variable-details-name",
-    ) as HTMLDivElement,
-    variableFieldsContainer: document.getElementById(
-      "variable-details-fields",
-    ) as HTMLDivElement,
+    variableContent: document.getElementById("variable-details") as HTMLDivElement,
+    variableNameLabel: document.getElementById("variable-details-name") as HTMLDivElement,
+    variableFieldsContainer: document.getElementById("variable-details-fields") as HTMLDivElement,
     nodeContent: document.getElementById("node-details") as HTMLDivElement,
-    nodeNameLabel: document.getElementById(
-      "node-details-name",
-    ) as HTMLDivElement,
-    nodeFieldsContainer: document.getElementById(
-      "node-details-fields",
-    ) as HTMLDivElement,
-    commentContent: document.getElementById(
-      "comment-details",
-    ) as HTMLDivElement,
-    commentFieldsContainer: document.getElementById(
-      "comment-details-fields",
-    ) as HTMLDivElement,
-    functionContent: document.getElementById(
-      "function-details",
-    ) as HTMLDivElement,
-    functionFieldsContainer: document.getElementById(
-      "function-details-fields",
-    ) as HTMLDivElement,
+    nodeNameLabel: document.getElementById("node-details-name") as HTMLDivElement,
+    nodeFieldsContainer: document.getElementById("node-details-fields") as HTMLDivElement,
+    commentContent: document.getElementById("comment-details") as HTMLDivElement,
+    commentFieldsContainer: document.getElementById("comment-details-fields") as HTMLDivElement,
+    functionContent: document.getElementById("function-details") as HTMLDivElement,
+    functionFieldsContainer: document.getElementById("function-details-fields") as HTMLDivElement,
     scriptContent: document.getElementById("script-details") as HTMLDivElement,
   },
   store,
@@ -368,15 +268,7 @@ const detailsPanel = createDetailsPanel(
  * top of it (widgetSync, comment titles). Safe to run on every mousemove regardless of the graph's
  * size — unlike render() below, it never touches a sidebar panel's DOM. */
 function renderCanvas(): void {
-  const {
-    camera,
-    selectedNodeIds,
-    selectedCommentId,
-    executingNodeId,
-    firedConnectionIds,
-    wireDrag,
-    marqueeSelection,
-  } = store.state;
+  const { camera, selectedNodeIds, selectedCommentId, executingNodeId, firedConnectionIds, wireDrag, marqueeSelection } = store.state;
   const graph = getEditingGraph(store.state);
   const variables = getVisibleVariablesForState(store.state);
   const functions = store.state.rootGraph.functions;
@@ -386,48 +278,13 @@ function renderCanvas(): void {
 
   drawGrid(ctx, camera, width, height);
   drawComments(ctx, graph, camera, selectedCommentId);
-  const geometries = computeAllNodeGeometries(
-    graph,
-    camera,
-    variables,
-    functions,
-    scripts,
-  );
-  drawWires(
-    ctx,
-    graph,
-    camera,
-    geometries,
-    firedConnectionIds,
-    variables,
-    functions,
-    scripts,
-  );
+  const geometries = computeAllNodeGeometries(graph, camera, variables, functions, scripts);
+  drawWires(ctx, graph, camera, geometries, firedConnectionIds, variables, functions, scripts);
   if (wireDrag) drawWireDragPreview(ctx, wireDrag);
-  const latentNodeIds = new Set(
-    graph.nodes
-      .filter((n) => isNodeLatent(n, graph, store.state.rootGraph))
-      .map((n) => n.id),
-  );
-  drawNodes(
-    ctx,
-    graph,
-    camera,
-    geometries,
-    selectedNodeIds,
-    executingNodeId,
-    variables,
-    functions,
-    scripts,
-    latentNodeIds,
-  );
+  const latentNodeIds = new Set(graph.nodes.filter((n) => isNodeLatent(n, graph, store.state.rootGraph)).map((n) => n.id));
+  drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, variables, functions, scripts, latentNodeIds);
   if (marqueeSelection) drawMarqueeSelection(ctx, camera, marqueeSelection);
-  drawMouseCoordinates(
-    ctx,
-    camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y),
-    width,
-    height,
-  );
+  drawMouseCoordinates(ctx, camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y), width, height);
   widgetSync.sync(geometries);
   commentOverlay.sync();
 }
@@ -483,46 +340,26 @@ function applySnapIfEnabled(worldPos: { x: number; y: number }): {
 function filterCreatableHere(defs: NodeDef[]): NodeDef[] {
   const graph = getEditingGraph(store.state);
   const isFunctionBody = store.state.activeFunctionId !== null;
-  return defs.filter(
-    (def) =>
-      topLevelGroup(def.group) !== "Internal" &&
-      graph.canPlaceNodeType(def.type, isFunctionBody),
-  );
+  return defs.filter((def) => topLevelGroup(def.group) !== "Internal" && graph.canPlaceNodeType(def.type, isFunctionBody));
 }
 
 /** Creates a node at worldPos and, if any anchors are given, auto-connects ALL of them to the same
  * first compatible pin (a plain pick passes one anchor; picking a node after a Ctrl+drag pickup —
  * see pointerHandlers.ts's "wire-multi" mode — passes every anchor it grabbed, reconnecting them
  * all to this one new node in a single motion). */
-function createNodeAndMaybeConnect(
-  def: NodeDef,
-  worldPos: { x: number; y: number },
-  anchors: WireAnchor[] = [],
-): void {
+function createNodeAndMaybeConnect(def: NodeDef, worldPos: { x: number; y: number }, anchors: WireAnchor[] = []): void {
   const graph = getEditingGraph(store.state);
-  const node = NodeInstance.createNodeInstance(
-    def.type,
-    applySnapIfEnabled(worldPos),
-    def.pins,
-  );
+  const node = NodeInstance.createNodeInstance(def.type, applySnapIfEnabled(worldPos), def.pins);
   graph.addNode(node);
 
   if (anchors.length > 0) {
-    const wantDirection =
-      anchors[0].pin.direction === "output" ? "input" : "output";
-    const matchPin = def.pins.find(
-      (p) =>
-        p.direction === wantDirection && isPinTypeCompatible(anchors[0].pin, p),
-    );
+    const wantDirection = anchors[0].pin.direction === "output" ? "input" : "output";
+    const matchPin = def.pins.find((p) => p.direction === wantDirection && isPinTypeCompatible(anchors[0].pin, p));
     if (matchPin) {
       for (const anchor of anchors) {
         const anchorIsOutput = anchor.pin.direction === "output";
-        const outputEnd = anchorIsOutput
-          ? anchor
-          : { nodeId: node.id, pinId: matchPin.id };
-        const inputEnd = anchorIsOutput
-          ? { nodeId: node.id, pinId: matchPin.id }
-          : anchor;
+        const outputEnd = anchorIsOutput ? anchor : { nodeId: node.id, pinId: matchPin.id };
+        const inputEnd = anchorIsOutput ? { nodeId: node.id, pinId: matchPin.id } : anchor;
         connectPins(
           graph,
           getVisibleVariablesForState(store.state),
@@ -545,9 +382,7 @@ function createNodeAndMaybeConnect(
 const pointerInteraction = setupPointerInteraction(canvas, store, {
   onWireDroppedInEmptySpace: (anchors, screenPos) => {
     const shared = anchors[0].pin;
-    const candidates = filterCreatableHere(
-      findCompatibleNodeDefs(shared, shared.direction),
-    );
+    const candidates = filterCreatableHere(findCompatibleNodeDefs(shared, shared.direction));
     const worldPos = store.state.camera.screenToWorld(screenPos.x, screenPos.y);
     openNodeSearchMenu(overlay, {
       screenPos,
@@ -572,13 +407,7 @@ canvas.addEventListener("contextmenu", (e) => {
   const variables = getVisibleVariablesForState(store.state);
   const functions = store.state.rootGraph.functions;
   const scripts = store.state.rootGraph.scripts;
-  const geometries = computeAllNodeGeometries(
-    graph,
-    store.state.camera,
-    variables,
-    functions,
-    scripts,
-  );
+  const geometries = computeAllNodeGeometries(graph, store.state.camera, variables, functions, scripts);
   const pinHit = hitTestPin(graph, geometries, screenPos.x, screenPos.y);
   if (pinHit) {
     const items: ContextMenuItem[] = [];
@@ -595,26 +424,13 @@ canvas.addEventListener("contextmenu", (e) => {
 
     const touching = connectionsTouchingPin(graph, pinHit.nodeId, pinHit.pinId);
     for (const conn of touching) {
-      const otherIsFromEnd =
-        conn.toNode === pinHit.nodeId && conn.toPin === pinHit.pinId;
-      const otherNode = graph.nodes.find(
-        (n) => n.id === (otherIsFromEnd ? conn.fromNode : conn.toNode),
-      );
-      const otherLabel = otherNode
-        ? otherNode.resolveNodeLabel(
-            getNodeDef(otherNode.type),
-            variables,
-            functions,
-            scripts,
-          )
-        : "?";
+      const otherIsFromEnd = conn.toNode === pinHit.nodeId && conn.toPin === pinHit.pinId;
+      const otherNode = graph.nodes.find((n) => n.id === (otherIsFromEnd ? conn.fromNode : conn.toNode));
+      const otherLabel = otherNode ? otherNode.resolveNodeLabel(getNodeDef(otherNode.type), variables, functions, scripts) : "?";
       items.push({
         // Only distinguish by destination when there's more than one to choose between (a fanned-out
         // data output, or an exec input converging several branches) — otherwise it's unambiguous.
-        label:
-          touching.length > 1
-            ? `Break Connection → ${otherLabel}`
-            : "Break Connection",
+        label: touching.length > 1 ? `Break Connection → ${otherLabel}` : "Break Connection",
         onClick: () => {
           graph.removeConnection(variables, functions, conn.id, scripts);
           store.notify();
@@ -647,9 +463,7 @@ canvas.addEventListener("contextmenu", (e) => {
       const isDisabled = !!node.disabled;
       // Re-enabling is always allowed; disabling is blocked while something depends on one of this
       // node's data outputs, since a disabled node's evaluate() never runs to produce it.
-      const blocked =
-        !isDisabled &&
-        graph.hasConnectedDataOutput(node.id, variables, functions, scripts);
+      const blocked = !isDisabled && graph.hasConnectedDataOutput(node.id, variables, functions, scripts);
       items.push({
         label: isDisabled ? "Enable" : "Disable",
         disabled: blocked,
@@ -666,27 +480,14 @@ canvas.addEventListener("contextmenu", (e) => {
 
   // Right-clicking a wire itself (not one of its endpoint pins) offers to splice a Reroute node
   // into it — Unreal's "Add Reroute Node," purely for bending the wire's path on the canvas.
-  const wireHit = hitTestWire(
-    graph,
-    geometries,
-    store.state.camera,
-    screenPos.x,
-    screenPos.y,
-  );
+  const wireHit = hitTestWire(graph, geometries, store.state.camera, screenPos.x, screenPos.y);
   if (wireHit) {
     const worldPos = store.state.camera.screenToWorld(screenPos.x, screenPos.y);
     openRowContextMenu({ x: e.clientX, y: e.clientY }, [
       {
         label: "Add Reroute Node",
         onClick: () => {
-          insertRerouteOnConnection(
-            graph,
-            variables,
-            functions,
-            wireHit.connectionId,
-            worldPos,
-            scripts,
-          );
+          insertRerouteOnConnection(graph, variables, functions, wireHit.connectionId, worldPos, scripts);
           store.notify();
         },
       },
@@ -706,18 +507,10 @@ canvas.addEventListener("contextmenu", (e) => {
     // Get/Set Variable nodes need a variable bound via the Variables panel, Entry/Call nodes need a
     // function bound via the Functions panel, and Code needs a script bound via the Scripts panel —
     // none of the three is generically creatable here.
-    candidates: filterCreatableHere(
-      allNodeDefs().filter(
-        (def) =>
-          !["Variables", "Functions", "Code"].includes(
-            topLevelGroup(def.group),
-          ),
-      ),
-    ),
+    candidates: filterCreatableHere(allNodeDefs().filter((def) => !["Variables", "Functions", "Code"].includes(topLevelGroup(def.group)))),
     pinned: returnDef ? [returnDef] : undefined,
     onPick: (def) => {
-      if (def.type === "function.return" && activeFn)
-        spawnReturnNodeAt(activeFn, worldPos);
+      if (def.type === "function.return" && activeFn) spawnReturnNodeAt(activeFn, worldPos);
       else createNodeAndMaybeConnect(def, worldPos);
     },
     onCancel: () => {},
@@ -726,88 +519,43 @@ canvas.addEventListener("contextmenu", (e) => {
 
 // --- Drag a Functions/Variables sidebar row onto the canvas: dropping a function spawns a Call
 // node bound to it at the drop point; dropping a variable pops a Get/Set choice at the drop point.
-function spawnCallNodeAt(
-  fn: FunctionDef,
-  worldPos: { x: number; y: number },
-): void {
+function spawnCallNodeAt(fn: FunctionDef, worldPos: { x: number; y: number }): void {
   const def = getNodeDef("function.call");
   const pinDefs = def.deriveFunctionPins!(fn);
-  const node = NodeInstance.createNodeInstance(
-    "function.call",
-    applySnapIfEnabled(worldPos),
-    pinDefs,
-    undefined,
-    undefined,
-    fn.id,
-  );
+  const node = NodeInstance.createNodeInstance("function.call", applySnapIfEnabled(worldPos), pinDefs, undefined, undefined, fn.id);
   getEditingGraph(store.state).addNode(node);
   store.notify();
 }
 
-function spawnVariableNodeAt(
-  type: "variable.get" | "variable.set",
-  variable: Variable,
-  worldPos: { x: number; y: number },
-): void {
+function spawnVariableNodeAt(type: "variable.get" | "variable.set", variable: Variable, worldPos: { x: number; y: number }): void {
   const def = getNodeDef(type);
   const pinDefs = def.derivePins!(variable);
-  const node = NodeInstance.createNodeInstance(
-    type,
-    applySnapIfEnabled(worldPos),
-    pinDefs,
-    undefined,
-    variable.id,
-  );
+  const node = NodeInstance.createNodeInstance(type, applySnapIfEnabled(worldPos), pinDefs, undefined, variable.id);
   getEditingGraph(store.state).addNode(node);
   store.notify();
 }
 
-function spawnCodeNodeAt(
-  script: CodeScriptDef,
-  worldPos: { x: number; y: number },
-): void {
+function spawnCodeNodeAt(script: CodeScriptDef, worldPos: { x: number; y: number }): void {
   const def = getNodeDef("code.run");
   const pinDefs = def.deriveScriptPins!(script);
-  const node = NodeInstance.createNodeInstance(
-    "code.run",
-    applySnapIfEnabled(worldPos),
-    pinDefs,
-    undefined,
-    undefined,
-    undefined,
-    script.id,
-  );
+  const node = NodeInstance.createNodeInstance("code.run", applySnapIfEnabled(worldPos), pinDefs, undefined, undefined, undefined, script.id);
   getEditingGraph(store.state).addNode(node);
   store.notify();
 }
 
 /** Placed by picking "Return" from the right-click menu inside a function's body (see the
  * contextmenu handler above) — a function body can hold several, one per exec branch. */
-function spawnReturnNodeAt(
-  fn: FunctionDef,
-  worldPos: { x: number; y: number },
-): void {
+function spawnReturnNodeAt(fn: FunctionDef, worldPos: { x: number; y: number }): void {
   const def = getNodeDef("function.return");
   const pinDefs = def.deriveFunctionPins!(fn);
-  const node = NodeInstance.createNodeInstance(
-    "function.return",
-    applySnapIfEnabled(worldPos),
-    pinDefs,
-    undefined,
-    undefined,
-    fn.id,
-  );
+  const node = NodeInstance.createNodeInstance("function.return", applySnapIfEnabled(worldPos), pinDefs, undefined, undefined, fn.id);
   fn.body.addNode(node);
   store.notify();
 }
 
 canvas.addEventListener("dragover", (e) => {
   const types = e.dataTransfer?.types;
-  if (
-    types?.includes(FUNCTION_DRAG_MIME) ||
-    types?.includes(VARIABLE_DRAG_MIME) ||
-    types?.includes(SCRIPT_DRAG_MIME)
-  ) {
+  if (types?.includes(FUNCTION_DRAG_MIME) || types?.includes(VARIABLE_DRAG_MIME) || types?.includes(SCRIPT_DRAG_MIME)) {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
   }
@@ -837,9 +585,7 @@ canvas.addEventListener("drop", (e) => {
   }
 
   if (variableId) {
-    const variable = getVisibleVariablesForState(store.state).find(
-      (v) => v.id === variableId,
-    );
+    const variable = getVisibleVariablesForState(store.state).find((v) => v.id === variableId);
     if (!variable) return;
     openRowContextMenu({ x: e.clientX, y: e.clientY }, [
       {
@@ -884,9 +630,7 @@ runButton.addEventListener("click", async () => {
 
   // On Start/On Interval describe how a *compiled* graph gets triggered outside the editor —
   // the Run button only ever fires On Run nodes.
-  const eventRoots = store.state.rootGraph.nodes.filter(
-    (n) => n.type === "event.run",
-  );
+  const eventRoots = store.state.rootGraph.nodes.filter((n) => n.type === "event.run");
   if (eventRoots.length === 0) {
     appendLog('No "On Run" node in graph — nothing to run.');
     runButton.disabled = false;
@@ -947,9 +691,7 @@ loadFileInput.addEventListener("change", async () => {
     saveGraphToLocalStorage(graph);
     store.notify();
   } catch (err) {
-    appendLog(
-      `Failed to load graph: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    appendLog(`Failed to load graph: ${err instanceof Error ? err.message : String(err)}`);
   }
 });
 
@@ -958,9 +700,7 @@ compileButton.addEventListener("click", () => {
   try {
     downloadCompiledGraph(store.state.rootGraph);
   } catch (err) {
-    appendLog(
-      `Compile error: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    appendLog(`Compile error: ${err instanceof Error ? err.message : String(err)}`);
   }
 });
 
@@ -973,15 +713,7 @@ frameAllButton.addEventListener("click", () => {
   const scripts = store.state.rootGraph.scripts;
 
   const rects = [
-    ...graph.nodes.map((n) =>
-      computeNodeWorldRect(
-        n,
-        n.resolvePinDefs(variables, functions, scripts),
-        variables,
-        functions,
-        scripts,
-      ),
-    ),
+    ...graph.nodes.map((n) => computeNodeWorldRect(n, n.resolvePinDefs(variables, functions, scripts), variables, functions, scripts)),
     ...graph.commentBoxes.map((b) => ({
       x: b.position.x,
       y: b.position.y,
@@ -996,10 +728,6 @@ frameAllButton.addEventListener("click", () => {
   const maxX = Math.max(...rects.map((r) => r.x + r.width));
   const maxY = Math.max(...rects.map((r) => r.y + r.height));
 
-  store.state.camera.frameRect(
-    { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
-    canvas.clientWidth,
-    canvas.clientHeight,
-  );
+  store.state.camera.frameRect({ x: minX, y: minY, width: maxX - minX, height: maxY - minY }, canvas.clientWidth, canvas.clientHeight);
   store.notify();
 });
