@@ -5,7 +5,6 @@ import {
   connectPins,
   insertRerouteOnConnection,
   removeInstancePin,
-  removeNode,
 } from "./engine/graphMutations";
 import { connectionsTouchingPin } from "./engine/graphQueries";
 import {
@@ -617,7 +616,7 @@ canvas.addEventListener("contextmenu", (e) => {
       {
         label: "Delete (Del)",
         onClick: () => {
-          removeNode(graph, variables, functions, node.id, scripts);
+          graph.removeNode(variables, functions, node.id, scripts);
           store.notify();
         },
       },

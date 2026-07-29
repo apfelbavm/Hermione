@@ -12,7 +12,6 @@ import {
   moveScriptInput,
   moveVariable,
   removeCodeScriptDef,
-  removeNode,
   removeScriptInput,
   removeVariable,
   updateScriptInput,
@@ -104,7 +103,7 @@ describe("removeNode", () => {
     });
     expect(addNode.pins.a.connectionId).toBeDefined();
 
-    removeNode(graph, graph.variables, graph.functions, "get");
+    graph.removeNode(graph.variables, graph.functions, "get");
 
     expect(graph.nodes.find((n) => n.id === "get")).toBeUndefined();
     expect(graph.connections).toHaveLength(0);

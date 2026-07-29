@@ -153,4 +153,40 @@ export class Graph {
       (c) => c.fromNode === nodeId && dataOutputIds.has(c.fromPin),
     );
   }
+
+  /** Entry and Return nodes are structural — a function body must always be able to receive its
+   * inputs and produce its outputs, so these two types can never be removed via removeNode (not
+   * even by the user's own Delete key). Callers that legitimately clean up OTHER node types bound to
+   * a variable/function (removeVariable, removeFunctionDef) never target these types, so this guard
+   * doesn't interfere with them. */
+  static UNDELETABLE_NODE_TYPES = new Set([
+    "function.entry",
+    "function.return",
+  ]);
+
+  removeNode(
+    variables: Variable[],
+    functions: FunctionDef[],
+    nodeId: string,
+    scripts: CodeScriptDef[] = [],
+  ): void {
+    const node = this.nodes.find((n) => n.id === nodeId);
+    if (!node || Graph.UNDELETABLE_NODE_TYPES.has(node.type)) return;
+
+    // Prune every connection touching this node through removeConnection (not a raw array filter) so
+    // whichever OTHER node sat on the far end of an outgoing wire gets its input pin properly
+    // restored to a literal default — a raw filter would leave that pin's connectionId dangling and
+    // its value stuck at whatever it was mid-connection (undefined, surfacing as a stray "null"),
+    // never falling back to a real default the way an explicit disconnect already does.
+    for (const conn of this.connections.filter(
+      (c) => c.fromNode === nodeId || c.toNode === nodeId,
+    )) {
+      this.removeConnection(variables, functions, conn.id, scripts);
+    }
+
+    this.nodes = this.nodes.filter((n) => n.id !== nodeId);
+    for (const box of this.commentBoxes) {
+      box.containedNodeIds = box.containedNodeIds.filter((id) => id !== nodeId);
+    }
+  }
 }

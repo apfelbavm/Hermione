@@ -12,7 +12,6 @@ import {
   disconnectPin,
   nextId,
   removeCommentBox,
-  removeNode,
 } from "../engine/graphMutations";
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { getNodeDef, isPinTypeCompatible } from "../engine/registry";
@@ -832,7 +831,7 @@ export function setupPointerInteraction(
       const functions = store.state.rootGraph.functions;
       const scripts = store.state.rootGraph.scripts;
       for (const nodeId of selectedNodeIds) {
-        removeNode(graph, variables, functions, nodeId, scripts);
+        graph.removeNode(variables, functions, nodeId, scripts);
       }
       if (selectedCommentId) removeCommentBox(graph, selectedCommentId);
       store.state.selectedNodeIds = new Set();

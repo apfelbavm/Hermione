@@ -1,5 +1,5 @@
 import { Graph } from "./graph";
-import { nextId, UNDELETABLE_NODE_TYPES } from "./graphMutations";
+import { nextId } from "./graphMutations";
 import { NodeInstance } from "./nodeInstance";
 import type { Connection, PinContainer, PinType, Variable } from "./types";
 
@@ -191,7 +191,7 @@ export function cloneNodesForClipboard(
   nodeIds: Set<string>,
 ): { nodes: NodeInstance[]; connections: Connection[] } {
   const selectedNodes = graph.nodes.filter(
-    (n) => nodeIds.has(n.id) && !UNDELETABLE_NODE_TYPES.has(n.type),
+    (n) => nodeIds.has(n.id) && !Graph.UNDELETABLE_NODE_TYPES.has(n.type),
   );
   const copyableIds = new Set(selectedNodes.map((n) => n.id));
   const nodes = selectedNodes.map((n) => {

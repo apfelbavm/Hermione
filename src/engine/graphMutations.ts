@@ -37,43 +37,6 @@ export const DEFAULT_VALUE_BY_TYPE: Record<PinType, unknown> = {
   object: null,
 };
 
-/** Entry and Return nodes are structural — a function body must always be able to receive its
- * inputs and produce its outputs, so these two types can never be removed via removeNode (not
- * even by the user's own Delete key). Callers that legitimately clean up OTHER node types bound to
- * a variable/function (removeVariable, removeFunctionDef) never target these types, so this guard
- * doesn't interfere with them. */
-export const UNDELETABLE_NODE_TYPES = new Set([
-  "function.entry",
-  "function.return",
-]);
-
-export function removeNode(
-  graph: Graph,
-  variables: Variable[],
-  functions: FunctionDef[],
-  nodeId: string,
-  scripts: CodeScriptDef[] = [],
-): void {
-  const node = graph.nodes.find((n) => n.id === nodeId);
-  if (!node || UNDELETABLE_NODE_TYPES.has(node.type)) return;
-
-  // Prune every connection touching this node through removeConnection (not a raw array filter) so
-  // whichever OTHER node sat on the far end of an outgoing wire gets its input pin properly
-  // restored to a literal default — a raw filter would leave that pin's connectionId dangling and
-  // its value stuck at whatever it was mid-connection (undefined, surfacing as a stray "null"),
-  // never falling back to a real default the way an explicit disconnect already does.
-  for (const conn of graph.connections.filter(
-    (c) => c.fromNode === nodeId || c.toNode === nodeId,
-  )) {
-    graph.removeConnection(variables, functions, conn.id, scripts);
-  }
-
-  graph.nodes = graph.nodes.filter((n) => n.id !== nodeId);
-  for (const box of graph.commentBoxes) {
-    box.containedNodeIds = box.containedNodeIds.filter((id) => id !== nodeId);
-  }
-}
-
 /** Removes one entry pin from a node with an expandable, user-editable pin list (see
  * NodeDef.deriveInstancePins) — deletes its Pin record and prunes any connection touching it.
  * Generic across every such node type; which of its derived pins are eligible for this is up to
@@ -364,7 +327,7 @@ export function removeVariable(
     .filter((n) => n.variableId === variableId)
     .map((n) => n.id);
   for (const nodeId of dependentNodeIds) {
-    removeNode(graph, variables, functions, nodeId, scripts);
+    graph.removeNode(variables, functions, nodeId, scripts);
   }
   graph.variables = graph.variables.filter((v) => v.id !== variableId);
 }
@@ -393,7 +356,6 @@ export function setPinLiteralValue(
   }
   pin.value = value;
 }
-
 
 // --- Functions -------------------------------------------------------------------------------
 
@@ -451,7 +413,7 @@ export function removeFunctionDef(rootGraph: Graph, functionId: string): void {
       .filter((n) => n.functionId === functionId && n.type === "function.call")
       .map((n) => n.id);
     for (const nodeId of dependentNodeIds) {
-      removeNode(g, variables, rootGraph.functions, nodeId);
+      g.removeNode(variables, rootGraph.functions, nodeId);
     }
   }
   rootGraph.functions = rootGraph.functions.filter((f) => f.id !== functionId);
@@ -718,7 +680,7 @@ export function removeCodeScriptDef(rootGraph: Graph, scriptId: string): void {
       .filter((n) => n.scriptId === scriptId && n.type === "code.run")
       .map((n) => n.id);
     for (const nodeId of dependentNodeIds) {
-      removeNode(g, variables, rootGraph.functions, nodeId, rootGraph.scripts);
+      g.removeNode(variables, rootGraph.functions, nodeId, rootGraph.scripts);
     }
   }
   rootGraph.scripts = rootGraph.scripts.filter((s) => s.id !== scriptId);
