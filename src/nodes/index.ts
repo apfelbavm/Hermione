@@ -9,6 +9,7 @@ import "./actionsMock";
 import "./function";
 import "./string";
 import "./http";
+import "./odata";
 import "./auth";
 import "./oauth2Saml";
 import "./oauth2ClientCredentials";
