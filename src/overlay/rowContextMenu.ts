@@ -5,6 +5,11 @@ export interface ContextMenuItem {
   disabled?: boolean;
 }
 
+// Kept clear of the window's own edge when the menu is opened near it (see the clamp below) —
+// otherwise a right-click/drop close to the border could open a menu that's partly (or entirely)
+// off-screen and unreachable.
+const MENU_EDGE_PADDING = 16;
+
 /** A tiny floating context menu — e.g. "Edit" for a sidebar row, or "Get"/"Set" when a variable is
  * dropped onto the canvas. Positioned in viewport (fixed) coordinates so it works the same
  * whether triggered from the canvas or the scrollable sidebar. Dismissed by clicking outside,
@@ -12,8 +17,6 @@ export interface ContextMenuItem {
 export function openRowContextMenu(screenPos: { x: number; y: number }, items: ContextMenuItem[]): void {
   const menu = document.createElement("div");
   menu.className = "row-context-menu";
-  menu.style.left = `${screenPos.x}px`;
-  menu.style.top = `${screenPos.y}px`;
 
   for (const item of items) {
     const el = document.createElement("div");
@@ -41,6 +44,15 @@ export function openRowContextMenu(screenPos: { x: number; y: number }, items: C
   }
 
   document.body.appendChild(menu);
+
+  // Clamp into the browser window now that the menu has a real, laid-out size to measure — only
+  // pulls it inward from whichever edge(s) it would overflow, never repositions it otherwise.
+  const menuRect = menu.getBoundingClientRect();
+  const maxLeft = Math.max(MENU_EDGE_PADDING, window.innerWidth - menuRect.width - MENU_EDGE_PADDING);
+  const maxTop = Math.max(MENU_EDGE_PADDING, window.innerHeight - menuRect.height - MENU_EDGE_PADDING);
+  menu.style.left = `${Math.min(Math.max(screenPos.x, MENU_EDGE_PADDING), maxLeft)}px`;
+  menu.style.top = `${Math.min(Math.max(screenPos.y, MENU_EDGE_PADDING), maxTop)}px`;
+
   // Defer the outside-click closer so the right-click/mousedown/drop that opened this menu
   // doesn't immediately close it — same pattern as the node-search menu.
   setTimeout(() => {

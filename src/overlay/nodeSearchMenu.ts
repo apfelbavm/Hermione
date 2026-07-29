@@ -17,11 +17,14 @@ export interface NodeSearchMenuOptions {
  * With no search text, shows the full group tree (sorted, all groups/subgroups collapsed by default);
  * typing a query flattens to a plain sorted-by-label list matched against label or group path, with
  * each result's group shown alongside it. */
+// Kept clear of the canvas's own edge when the menu is opened near it (see the clamp below) —
+// otherwise a right-click/wire-drop close to the border could open a menu that's partly (or
+// entirely) unreachable outside the graph area.
+const MENU_EDGE_PADDING = 16;
+
 export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOptions): void {
   const menu = document.createElement("div");
   menu.className = "node-search-menu";
-  menu.style.left = `${opts.screenPos.x}px`;
-  menu.style.top = `${opts.screenPos.y}px`;
 
   const input = document.createElement("input");
   input.type = "text";
@@ -207,6 +210,18 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
   overlay.appendChild(menu);
   renderList();
   input.focus();
+
+  // Clamp into the graph area (== overlay's own bounds, see style.css's #overlay — screenPos is
+  // already relative to that same origin) now that the menu has a real, laid-out size to measure —
+  // its width is fixed but its height depends on how many rows rendered above. Only pulls the menu
+  // INWARD from whichever edge(s) it would overflow; never repositions it away from the cursor
+  // otherwise.
+  const bounds = overlay.getBoundingClientRect();
+  const menuRect = menu.getBoundingClientRect();
+  const maxLeft = Math.max(MENU_EDGE_PADDING, bounds.width - menuRect.width - MENU_EDGE_PADDING);
+  const maxTop = Math.max(MENU_EDGE_PADDING, bounds.height - menuRect.height - MENU_EDGE_PADDING);
+  menu.style.left = `${Math.min(Math.max(opts.screenPos.x, MENU_EDGE_PADDING), maxLeft)}px`;
+  menu.style.top = `${Math.min(Math.max(opts.screenPos.y, MENU_EDGE_PADDING), maxTop)}px`;
 
   // Defer the outside-click closer so the mouseup that triggered this menu doesn't immediately close it.
   setTimeout(() => document.addEventListener("mousedown", onDocMouseDown, true), 0);

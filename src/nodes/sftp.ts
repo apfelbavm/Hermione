@@ -95,7 +95,7 @@ registerNode({
   label: "SFTP Upload",
   description:
     "Uploads a file to an SFTP server, with reconnect handling and configurable existing-file behavior. Compiled output only — see this node's own tooltip note below.",
-  group: "Conversion",
+  group: "Request",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "host", label: "Host", type: "string", direction: "input", defaultValue: "" },
