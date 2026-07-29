@@ -158,6 +158,25 @@ registerNode({
 registerNode({
   type: "string.replace",
   label: "Replace",
+  description: "Replaces only the first occurrence of a substring with another string.",
+  group: "String",
+  pins: [
+    { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
+    { id: "search", label: "Search", type: "string", direction: "input", defaultValue: "" },
+    { id: "replacement", label: "Replacement", type: "string", direction: "input", defaultValue: "" },
+    { id: "result", label: "Result", type: "string", direction: "output" },
+  ],
+  evaluate: ({ inputs }) => ({
+    result: String(inputs.value ?? "").replace(String(inputs.search ?? ""), String(inputs.replacement ?? "")),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `String(${inputs.value}).replace(String(${inputs.search}), String(${inputs.replacement}))`,
+  }),
+});
+
+registerNode({
+  type: "string.replaceAll",
+  label: "Replace All",
   description: "Replaces every occurrence of a substring with another string.",
   group: "String",
   pins: [

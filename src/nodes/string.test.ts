@@ -96,14 +96,31 @@ describe("string.length", () => {
 });
 
 describe("string.replace", () => {
-  it("replaces every occurrence of the search string", () => {
+  it("replaces only the first occurrence of the search string", () => {
     expect(evaluate("string.replace", { value: "a-b-a-b", search: "a", replacement: "X" })).toEqual({
-      result: "X-b-X-b",
+      result: "X-b-a-b",
     });
   });
 
   it("compileEvaluate matches evaluate", () => {
     const expr = compile("string.replace", {
+      value: '"a-b-a-b"',
+      search: '"a"',
+      replacement: '"X"',
+    }).result;
+    expect(eval(expr)).toBe("X-b-a-b");
+  });
+});
+
+describe("string.replaceAll", () => {
+  it("replaces every occurrence of the search string", () => {
+    expect(evaluate("string.replaceAll", { value: "a-b-a-b", search: "a", replacement: "X" })).toEqual({
+      result: "X-b-X-b",
+    });
+  });
+
+  it("compileEvaluate matches evaluate", () => {
+    const expr = compile("string.replaceAll", {
       value: '"a-b-a-b"',
       search: '"a"',
       replacement: '"X"',
