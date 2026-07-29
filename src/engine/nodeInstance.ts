@@ -3,6 +3,7 @@ import { getNodeDef } from "./registry";
 import {
   CodeScriptDef,
   FunctionDef,
+  NodeDef,
   Pin,
   PinContainer,
   PinDef,
@@ -125,5 +126,36 @@ export class NodeInstance {
     }
     if (def.deriveInstancePins) return def.deriveInstancePins(this);
     return def.pins;
+  }
+
+  /** The display label for a node instance — normally its NodeDef's static label, except: a node
+   * bound to a Variable (Get/Set) shows "Get "/"Set " followed by that variable's name (so the graph
+   * reads e.g. "Get Score", not the generic "Get Variable" — its own pin is left unlabeled since the
+   * title already says it), and a function.call node shows the name of the function it's bound to
+   * (so the graph reads e.g. "Double", not the generic "Call Function"), matching how its pins
+   * already reflect that function. */
+  resolveNodeLabel(
+    def: NodeDef,
+    variables: Variable[],
+    functions: FunctionDef[],
+    scripts: CodeScriptDef[] = [],
+  ): string {
+    if (this.variableId) {
+      const variable = variables.find((v) => v.id === this.variableId);
+      if (variable) {
+        if (this.type === "variable.get") return `Get ${variable.name}`;
+        if (this.type === "variable.set") return `Set ${variable.name}`;
+        return variable.name;
+      }
+    }
+    if (this.type === "function.call" && this.functionId) {
+      const fn = functions.find((f) => f.id === this.functionId);
+      if (fn) return fn.name;
+    }
+    if (this.type === "code.run" && this.scriptId) {
+      const script = scripts.find((s) => s.id === this.scriptId);
+      if (script) return script.name;
+    }
+    return def.label;
   }
 }

@@ -1,5 +1,4 @@
 import { Colors } from "../engine/color";
-import { resolveNodeLabel } from "../engine/graphMutations";
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { getNodeDef, topLevelGroup } from "../engine/registry";
 import type {
@@ -170,7 +169,7 @@ export function drawNodes(
       ctx.fillStyle = Colors.TEXT_PRIMARY;
       ctx.textAlign = "left";
       ctx.fillText(
-        resolveNodeLabel(node, def, variables, functions, scripts),
+        node.resolveNodeLabel(def, variables, functions, scripts),
         geo.screenX + 10 * camera.zoom,
         geo.screenY + headerHeight / 2,
       );

@@ -9,7 +9,6 @@ import {
   removeConnection,
   removeInstancePin,
   removeNode,
-  resolveNodeLabel,
 } from "./engine/graphMutations";
 import { connectionsTouchingPin } from "./engine/graphQueries";
 import {
@@ -585,8 +584,7 @@ canvas.addEventListener("contextmenu", (e) => {
         (n) => n.id === (otherIsFromEnd ? conn.fromNode : conn.toNode),
       );
       const otherLabel = otherNode
-        ? resolveNodeLabel(
-            otherNode,
+        ? otherNode.resolveNodeLabel(
             getNodeDef(otherNode.type),
             variables,
             functions,

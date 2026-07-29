@@ -1,5 +1,4 @@
 import { getNodeDef } from "../engine/registry";
-import { resolveNodeLabel } from "../engine/graphMutations";
 import type {
   CodeScriptDef,
   FunctionDef,
@@ -74,7 +73,7 @@ export function computeNodeWorldRect(
 } {
   const def = getNodeDef(node.type);
   const layout = computeNodeLayout(
-    resolveNodeLabel(node, def, variables, functions, scripts),
+    node.resolveNodeLabel(def, variables, functions, scripts),
     pinDefs,
     {
       showAddButton: !!def.addInstancePinEntry,
@@ -108,7 +107,7 @@ export function computeAllNodeGeometries(
       node.id,
       computeNodeScreenGeometry(
         node,
-        resolveNodeLabel(node, def, variables, functions, scripts),
+        node.resolveNodeLabel(def, variables, functions, scripts),
         pinDefs,
         camera,
         !!def.addInstancePinEntry,

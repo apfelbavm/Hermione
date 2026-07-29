@@ -6,7 +6,6 @@ import {
   canToggleDisabled,
   connectPins,
   createCodeScriptDef,
-  
   hasConnectedDataOutput,
   insertRerouteOnConnection,
   moveFunction,
@@ -18,7 +17,6 @@ import {
   removeNode,
   removeScriptInput,
   removeVariable,
-  resolveNodeLabel,
   updateScriptInput,
   updateVariable,
 } from "./graphMutations";
@@ -53,7 +51,9 @@ describe("canPlaceNodeType", () => {
   it("blocks a second instance of the same event type in the same graph", () => {
     const graph = new Graph("g", "root");
     const def = getNodeDef("event.run");
-    graph.nodes.push(NodeInstance.createNodeInstance("event.run", { x: 0, y: 0 }, def.pins));
+    graph.nodes.push(
+      NodeInstance.createNodeInstance("event.run", { x: 0, y: 0 }, def.pins),
+    );
 
     expect(graph.canPlaceNodeType("event.run", false)).toBe(false);
   });
@@ -182,7 +182,7 @@ describe("resolveNodeLabel", () => {
       variable.id,
     );
 
-    expect(resolveNodeLabel(node, getDef, [variable], [])).toBe("Get Score");
+    expect(node.resolveNodeLabel(getDef, [variable], [])).toBe("Get Score");
   });
 
   it("prefixes a Set node's label with 'Set ' followed by the bound variable's name", () => {
@@ -201,7 +201,7 @@ describe("resolveNodeLabel", () => {
       variable.id,
     );
 
-    expect(resolveNodeLabel(node, setDef, [variable], [])).toBe("Set Score");
+    expect(node.resolveNodeLabel(setDef, [variable], [])).toBe("Set Score");
   });
 
   it("falls back to the def's generic label when the bound variable can't be found", () => {
@@ -214,7 +214,7 @@ describe("resolveNodeLabel", () => {
       "missing-variable-id",
     );
 
-    expect(resolveNodeLabel(node, getDef, [], [])).toBe("Get Variable");
+    expect(node.resolveNodeLabel(getDef, [], [])).toBe("Get Variable");
   });
 
   it("has no effect on ordinary node types", () => {
@@ -226,7 +226,7 @@ describe("resolveNodeLabel", () => {
       "add",
     );
 
-    expect(resolveNodeLabel(node, addDef, [], [])).toBe(addDef.label);
+    expect(node.resolveNodeLabel(addDef, [], [])).toBe(addDef.label);
   });
 });
 
@@ -270,7 +270,12 @@ describe("hasConnectedDataOutput", () => {
     const graph = new Graph("g", "root");
     const def = getNodeDef("math.add");
     graph.nodes.push(
-      NodeInstance.createNodeInstance("math.add", { x: 0, y: 0 }, def.pins, "add"),
+      NodeInstance.createNodeInstance(
+        "math.add",
+        { x: 0, y: 0 },
+        def.pins,
+        "add",
+      ),
     );
     expect(hasConnectedDataOutput(graph, "add", [], [])).toBe(false);
   });
@@ -279,10 +284,20 @@ describe("hasConnectedDataOutput", () => {
     const graph = new Graph("g", "root");
     const addDef = getNodeDef("math.add");
     graph.nodes.push(
-      NodeInstance.createNodeInstance("math.add", { x: 0, y: 0 }, addDef.pins, "add1"),
+      NodeInstance.createNodeInstance(
+        "math.add",
+        { x: 0, y: 0 },
+        addDef.pins,
+        "add1",
+      ),
     );
     graph.nodes.push(
-      NodeInstance.createNodeInstance("math.add", { x: 0, y: 0 }, addDef.pins, "add2"),
+      NodeInstance.createNodeInstance(
+        "math.add",
+        { x: 0, y: 0 },
+        addDef.pins,
+        "add2",
+      ),
     );
     connectPins(graph, [], [], {
       fromNode: "add1",
@@ -306,7 +321,12 @@ describe("hasConnectedDataOutput", () => {
       ),
     );
     graph.nodes.push(
-      NodeInstance.createNodeInstance("debug.print", { x: 0, y: 0 }, printDef.pins, "print"),
+      NodeInstance.createNodeInstance(
+        "debug.print",
+        { x: 0, y: 0 },
+        printDef.pins,
+        "print",
+      ),
     );
     connectPins(graph, [], [], {
       fromNode: "branch",
@@ -322,7 +342,12 @@ describe("hasConnectedDataOutput", () => {
     const loopDef = getNodeDef("flow.forLoop");
     const toStrDef = getNodeDef("string.fromNumber");
     graph.nodes.push(
-      NodeInstance.createNodeInstance("flow.forLoop", { x: 0, y: 0 }, loopDef.pins, "loop"),
+      NodeInstance.createNodeInstance(
+        "flow.forLoop",
+        { x: 0, y: 0 },
+        loopDef.pins,
+        "loop",
+      ),
     );
     graph.nodes.push(
       NodeInstance.createNodeInstance(
@@ -363,7 +388,12 @@ describe("updateVariable — container support", () => {
     graph.nodes.push(getNode);
     const addDef = getNodeDef("math.add");
     graph.nodes.push(
-      NodeInstance.createNodeInstance("math.add", { x: 100, y: 0 }, addDef.pins, "add"),
+      NodeInstance.createNodeInstance(
+        "math.add",
+        { x: 100, y: 0 },
+        addDef.pins,
+        "add",
+      ),
     );
     connectPins(graph, graph.variables, graph.functions, {
       fromNode: "get",

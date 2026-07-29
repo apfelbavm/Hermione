@@ -1,7 +1,6 @@
 import {
   allGraphs,
   changeNodeElementType,
-  resolveNodeLabel,
   setPinLiteralValue,
   updateVariable,
 } from "../engine/graphMutations";
@@ -61,8 +60,7 @@ export function createDetailsPanel(
     properties: PinDef[],
   ): void {
     const def = getNodeDef(node.type);
-    elements.nodeNameLabel.textContent = resolveNodeLabel(
-      node,
+    elements.nodeNameLabel.textContent = node.resolveNodeLabel(
       def,
       getVisibleVariablesForState(store.state),
       store.state.rootGraph.functions,
