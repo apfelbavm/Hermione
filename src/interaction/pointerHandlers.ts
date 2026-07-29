@@ -49,6 +49,7 @@ import {
   getVisibleVariablesForState,
   openFunctionTab,
   openScriptTab,
+  type MarqueeSelectionState,
   type Store,
 } from "../state/store";
 import type { HistoryManager } from "../state/history";
@@ -180,6 +181,32 @@ function recomputeContainment(
       ),
     )
     .map((n) => n.id);
+}
+
+/** Every node id whose world rect intersects a marquee-select box (start/current corners, in either
+ * order) — shared by the marquee's own mousemove (so the selection updates live as the box is
+ * dragged, matching Unreal/most node editors) and its mouseup (which just finalizes the same
+ * computation one last time before clearing the drag). */
+function computeMarqueeSelectedNodeIds(
+  graph: Graph,
+  variables: Variable[],
+  functions: FunctionDef[],
+  scripts: CodeScriptDef[],
+  marquee: MarqueeSelectionState,
+): Set<string> {
+  const box = {
+    x: Math.min(marquee.startWorld.x, marquee.currentWorld.x),
+    y: Math.min(marquee.startWorld.y, marquee.currentWorld.y),
+    width: Math.abs(marquee.currentWorld.x - marquee.startWorld.x),
+    height: Math.abs(marquee.currentWorld.y - marquee.startWorld.y),
+  };
+  const touched = graph.nodes.filter((n) =>
+    rectIntersects(
+      box,
+      computeNodeWorldRect(n, n.resolvePinDefs(variables, functions, scripts), variables, functions, scripts),
+    ),
+  );
+  return new Set(touched.map((n) => n.id));
 }
 
 export interface PointerInteraction {
@@ -658,8 +685,14 @@ export function setupPointerInteraction(
     if (drag.kind === "marquee") {
       const pos = screenPos(e);
       const worldPos = camera.screenToWorld(pos.x, pos.y);
-      if (store.state.marqueeSelection)
-        store.state.marqueeSelection.currentWorld = worldPos;
+      const marquee = store.state.marqueeSelection;
+      if (marquee) {
+        marquee.currentWorld = worldPos;
+        const variables = getVisibleVariablesForState(store.state);
+        const functions = store.state.rootGraph.functions;
+        const scripts = store.state.rootGraph.scripts;
+        store.state.selectedNodeIds = computeMarqueeSelectedNodeIds(graph, variables, functions, scripts, marquee);
+      }
       store.notify();
       return;
     }
@@ -785,25 +818,7 @@ export function setupPointerInteraction(
         const variables = getVisibleVariablesForState(store.state);
         const functions = store.state.rootGraph.functions;
         const scripts = store.state.rootGraph.scripts;
-        const box = {
-          x: Math.min(marquee.startWorld.x, marquee.currentWorld.x),
-          y: Math.min(marquee.startWorld.y, marquee.currentWorld.y),
-          width: Math.abs(marquee.currentWorld.x - marquee.startWorld.x),
-          height: Math.abs(marquee.currentWorld.y - marquee.startWorld.y),
-        };
-        const touched = graph.nodes.filter((n) =>
-          rectIntersects(
-            box,
-            computeNodeWorldRect(
-              n,
-              n.resolvePinDefs(variables, functions, scripts),
-              variables,
-              functions,
-              scripts,
-            ),
-          ),
-        );
-        store.state.selectedNodeIds = new Set(touched.map((n) => n.id));
+        store.state.selectedNodeIds = computeMarqueeSelectedNodeIds(graph, variables, functions, scripts, marquee);
       }
       store.state.marqueeSelection = null;
       drag = { kind: "none" };
