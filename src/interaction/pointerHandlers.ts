@@ -821,7 +821,17 @@ export function setupPointerInteraction(
   );
 
   window.addEventListener("keydown", (e) => {
-    if (document.activeElement instanceof HTMLInputElement) return; // don't hijack text-field editing
+    // Don't hijack text-field editing — covers plain <input>s, but just as importantly every
+    // <textarea> (the multiline pin-value popup, and — most visibly — Monaco's own hidden
+    // "inputarea" textarea it routes all keyboard input through, see scriptEditor.ts) and any
+    // contenteditable region. Without this, e.g. Ctrl+C/Ctrl+V while typing in the Code node's
+    // editor never reached Monaco at all: this handler ran first, called preventDefault(), and
+    // wrote/read the GRAPH's own clipboard payload instead — Monaco's native copy/paste silently
+    // never got a chance to fire.
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || (active instanceof HTMLElement && active.isContentEditable)) {
+      return;
+    }
     const graph = getEditingGraph(store.state);
 
     if (e.key === "Delete" || e.key === "Backspace") {

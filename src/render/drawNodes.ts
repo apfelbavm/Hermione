@@ -1,13 +1,7 @@
 import { Colors } from "../engine/color";
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { getNodeDef, topLevelGroup } from "../engine/registry";
-import type {
-  CodeScriptDef,
-  FunctionDef,
-  NodeDef,
-  PinDef,
-  Variable,
-} from "../engine/types";
+import type { CodeScriptDef, FunctionDef, NodeDef, PinDef, Variable } from "../engine/types";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
 import { NODE_HEADER_HEIGHT, PIN_RADIUS } from "./layout";
@@ -17,19 +11,12 @@ import { NodeInstance } from "../engine/nodeInstance";
 /** A node bound to a Variable (Get/Set) is colored by that variable's TYPE (the same color its pin
  * would be) instead of the generic "Variables" group color — so at a glance, a graph full of
  * getters/setters reads by what KIND of data they move, not just that they're variable nodes. */
-function resolveNodeHeaderColor(
-  node: NodeInstance,
-  def: NodeDef,
-  variables: Variable[],
-): string {
+function resolveNodeHeaderColor(node: NodeInstance, def: NodeDef, variables: Variable[]): string {
   if (node.variableId) {
     const variable = variables.find((v) => v.id === node.variableId);
     if (variable) return Colors.PIN_COLORS[variable.type];
   }
-  return (
-    Colors.NODE_HEADER_BG[topLevelGroup(def.group)] ??
-    Colors.NODE_HEADER_DEFAULT
-  );
+  return Colors.NODE_HEADER_BG[topLevelGroup(def.group)] ?? Colors.NODE_HEADER_DEFAULT;
 }
 
 export function drawNodes(
@@ -69,124 +56,53 @@ export function drawNodes(
     if (def.compact) {
       // A reroute "knot" (see NodeDef.compact) — just a small body + border, no header bar or
       // label; its pins (drawn below, same as any other node) carry all the visual meaning.
-      drawNodeShadow(
-        ctx,
-        geo.screenX,
-        geo.screenY,
-        geo.width,
-        geo.height,
-        4 * camera.zoom,
-        camera.zoom,
-      );
-      drawTopHighlight(
-        ctx,
-        geo.screenX,
-        geo.screenY,
-        geo.width,
-        geo.height,
-        4 * camera.zoom,
-        camera.zoom,
-      );
+      drawNodeShadow(ctx, geo.screenX, geo.screenY, geo.width, geo.height, 4 * camera.zoom, camera.zoom);
+      drawTopHighlight(ctx, geo.screenX, geo.screenY, geo.width, geo.height, 4 * camera.zoom, camera.zoom);
       if (showStateBorder) {
         ctx.lineWidth = borderWidth;
         ctx.strokeStyle = borderColor;
         ctx.beginPath();
-        ctx.roundRect(
-          geo.screenX,
-          geo.screenY,
-          geo.width,
-          geo.height,
-          4 * camera.zoom,
-        );
+        ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 4 * camera.zoom);
         ctx.stroke();
       }
     } else {
-      drawNodeShadow(
-        ctx,
-        geo.screenX,
-        geo.screenY,
-        geo.width,
-        geo.height,
-        6 * camera.zoom,
-        camera.zoom,
-      );
+      drawNodeShadow(ctx, geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom, camera.zoom);
 
       const headerHeight = NODE_HEADER_HEIGHT * camera.zoom;
       ctx.beginPath();
-      ctx.roundRect(geo.screenX, geo.screenY, geo.width, headerHeight, [
-        6 * camera.zoom,
-        6 * camera.zoom,
-        0,
-        0,
-      ]);
+      ctx.roundRect(geo.screenX, geo.screenY, geo.width, headerHeight, [6 * camera.zoom, 6 * camera.zoom, 0, 0]);
       ctx.fillStyle = resolveNodeHeaderColor(node, def, variables);
       ctx.fill();
       // A left-to-right black falloff over the header's own color — same path, no beginPath()
       // needed (fill() doesn't clear it) — reads as a subtle depth/sheen rather than a flat block.
-      const headerShade = ctx.createLinearGradient(
-        geo.screenX,
-        0,
-        geo.screenX + geo.width,
-        0,
-      );
+      const headerShade = ctx.createLinearGradient(geo.screenX, 0, geo.screenX + geo.width, 0);
       headerShade.addColorStop(0, "rgba(0, 0, 0, 0.75)");
       headerShade.addColorStop(1, "rgba(0, 0, 0, 0)");
       ctx.fillStyle = headerShade;
       ctx.fill();
 
-      drawTopHighlight(
-        ctx,
-        geo.screenX,
-        geo.screenY,
-        geo.width,
-        geo.height,
-        6 * camera.zoom,
-        camera.zoom,
-      );
+      drawTopHighlight(ctx, geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom, camera.zoom);
       if (showStateBorder) {
         ctx.lineWidth = borderWidth;
         ctx.strokeStyle = borderColor;
         ctx.beginPath();
-        ctx.roundRect(
-          geo.screenX,
-          geo.screenY,
-          geo.width,
-          geo.height,
-          6 * camera.zoom,
-        );
+        ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom);
         ctx.stroke();
       }
 
       if (latentNodeIds.has(node.id)) {
-        drawLatentIcon(
-          ctx,
-          geo.screenX + geo.width,
-          geo.screenY,
-          8 * camera.zoom,
-        );
+        drawLatentIcon(ctx, geo.screenX + geo.width, geo.screenY, 8 * camera.zoom);
       }
 
       ctx.fillStyle = Colors.TEXT_PRIMARY;
       ctx.textAlign = "left";
-      ctx.fillText(
-        node.resolveNodeLabel(def, variables, functions, scripts),
-        geo.screenX + 10 * camera.zoom,
-        geo.screenY + headerHeight / 2,
-      );
+      ctx.fillText(node.resolveNodeLabel(def, variables, functions, scripts), geo.screenX + 10 * camera.zoom, geo.screenY + headerHeight / 2);
     }
 
     for (const pinLayout of geo.layout.pins) {
       const pos = geo.pinScreen[pinLayout.pin.id];
-      const connected =
-        connectionsTouchingPin(graph, node.id, pinLayout.pin.id).length > 0;
-      drawPinShape(
-        ctx,
-        pos.x,
-        pos.y,
-        PIN_RADIUS * camera.zoom,
-        pinLayout.pin,
-        connected,
-      );
+      const connected = connectionsTouchingPin(graph, node.id, pinLayout.pin.id).length > 0;
+      drawPinShape(ctx, pos.x, pos.y, PIN_RADIUS * camera.zoom, pinLayout.pin, connected);
 
       ctx.fillStyle = Colors.TEXT_MUTED;
       if (pinLayout.pin.direction === "input") {
@@ -225,15 +141,7 @@ export function drawNodes(
  * falls toward the bottom-right — equal X/Y offsets, since a 45° direction is exactly where those
  * two agree. (drawTopHighlight below simplifies this to a top-only cue, so the two no longer
  * share an identical light angle — a deliberate simplicity-over-precision tradeoff.) */
-function drawNodeShadow(
-  ctx: CanvasRenderingContext2D,
-  screenX: number,
-  screenY: number,
-  width: number,
-  height: number,
-  cornerRadius: number,
-  zoom: number,
-): void {
+function drawNodeShadow(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, width: number, height: number, cornerRadius: number, zoom: number): void {
   ctx.save();
   ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
   ctx.shadowBlur = 10 * zoom;
@@ -251,24 +159,11 @@ function drawNodeShadow(
  * Simpler than an actual inset-shadow simulation (no clip/shadow-offset trick needed) — a
  * gradient fill already only paints within the current path, so this reads as a thin top-lit
  * sheen at a fraction of the cost and code of clipping + casting a shadow. */
-function drawTopHighlight(
-  ctx: CanvasRenderingContext2D,
-  screenX: number,
-  screenY: number,
-  width: number,
-  height: number,
-  cornerRadius: number,
-  zoom: number,
-): void {
+function drawTopHighlight(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, width: number, height: number, cornerRadius: number, zoom: number): void {
   ctx.beginPath();
   ctx.roundRect(screenX, screenY, width, height, cornerRadius);
   const fadeDistance = 4 * zoom;
-  const highlight = ctx.createLinearGradient(
-    0,
-    screenY,
-    0,
-    screenY + fadeDistance,
-  );
+  const highlight = ctx.createLinearGradient(0, screenY, 0, screenY + fadeDistance);
   highlight.addColorStop(0, "rgba(255, 255, 255, 0.3)");
   highlight.addColorStop(1, "rgba(255, 255, 255, 0)");
   ctx.fillStyle = highlight;
@@ -279,12 +174,7 @@ function drawTopHighlight(
  * it sits half outside the node's own border, matching Unreal's latent-node marker (a node that
  * genuinely spans real time/multiple ticks, e.g. Delay, or a Function/loop that contains one —
  * see NodeDef.latent/latentBodyPin and engine/latency.ts). */
-function drawLatentIcon(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  r: number,
-): void {
+function drawLatentIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fillStyle = "#e8b339";
@@ -303,14 +193,7 @@ function drawLatentIcon(
   ctx.stroke();
 }
 
-function drawPinShape(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  r: number,
-  pin: PinDef,
-  connected: boolean,
-): void {
+function drawPinShape(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, pin: PinDef, connected: boolean): void {
   // Map pins are colored by their VALUE type (pin.type) — the key type isn't drawn on the dot,
   // only visible via the type-select controls (see typedValueInput.ts).
   const color = Colors.PIN_COLORS[pin.type];
@@ -367,13 +250,7 @@ function drawPinShape(
 /** Draws a 3x3 grid of filled quads centered at (x, y), each `quad` size apart with a gap between
  * them. When `mergeMiddleRowLeft` is set (Map pins), the middle row's first two quads merge into
  * one wide quad spanning columns 1-2 instead of being drawn separately (Array pins never merge). */
-function drawContainerGrid(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  r: number,
-  mergeMiddleRowLeft: boolean,
-): void {
+function drawContainerGrid(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, mergeMiddleRowLeft: boolean): void {
   const quad = r * 0.42;
   const gap = r * 0.18;
   const step = quad + gap;
@@ -396,12 +273,7 @@ function drawContainerGrid(
 
 /** Draws a "{ }" curly-brace pair centered at (x, y) — the Set pin icon. Restores whatever font
  * was active beforehand, since drawNodes.ts reuses ctx.font for every subsequent label/pin. */
-function drawSetBraces(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  r: number,
-): void {
+function drawSetBraces(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
   const savedFont = ctx.font;
   const savedAlign = ctx.textAlign;
   ctx.font = `${Math.round(r * 2.4)}px Georgia, serif`;

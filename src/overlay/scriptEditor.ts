@@ -1,5 +1,6 @@
 import { transpileScript } from "../engine/transpile";
 import type { CodeScriptDef } from "../engine/types";
+import type { Graph } from "../engine/graph";
 import { closeScriptTab, type Store } from "../state/store";
 
 export interface ScriptEditorElements {
@@ -64,6 +65,15 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
   // The script id whose model the shared editor currently displays — null while showing the Log
   // tab (the editor is simply hidden then) or before Monaco has finished loading.
   let shownScriptId: string | null = null;
+  // Which rootGraph `models` was built against — main.ts's "Load" flow (the only place that
+  // reassigns store.state.rootGraph wholesale) already resets openScriptTabs/activeLowerTabId, but
+  // never touches THIS module's own per-script model cache. Loading a file whose script(s) reuse an
+  // id from before (e.g. re-loading a graph saved earlier this same session) would otherwise make
+  // getOrCreateModel below hand back the OLD model — seeded from the PREVIOUS script.source, quite
+  // possibly with unrelated in-progress (dirty) edits still sitting in it — instead of a fresh one
+  // matching what was actually just loaded. render() below clears the whole cache the instant it
+  // notices the graph itself has been swapped out, not just its contents mutated in place.
+  let modelsRootGraph: Graph | null = null;
 
   function scriptById(id: string): CodeScriptDef | undefined {
     return store.state.rootGraph.scripts.find((s) => s.id === id);
@@ -166,6 +176,14 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
   }
 
   function render(): void {
+    if (store.state.rootGraph !== modelsRootGraph) {
+      modelsRootGraph = store.state.rootGraph;
+      editor?.setModel(null); // detach before disposing — Monaco errors if a disposed model stays set
+      for (const model of models.values()) model.dispose();
+      models.clear();
+      shownScriptId = null;
+    }
+
     renderTabs();
 
     const activeScriptId = store.state.activeLowerTabId;
