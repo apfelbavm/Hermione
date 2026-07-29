@@ -1,6 +1,6 @@
 import { Colors } from "../engine/color";
 import type { MarqueeSelectionState } from "../state/store";
-import type { Camera } from "./camera";
+import { worldToScreen, type Camera } from "./camera";
 
 const MARQUEE_COLOR = "#5ad1ff";
 
@@ -11,8 +11,8 @@ export function drawMarqueeSelection(
   camera: Camera,
   marquee: MarqueeSelectionState,
 ): void {
-  const start = camera.worldToScreen(marquee.startWorld.x, marquee.startWorld.y);
-  const current = camera.worldToScreen(marquee.currentWorld.x, marquee.currentWorld.y);
+  const start = worldToScreen(camera, marquee.startWorld.x, marquee.startWorld.y);
+  const current = worldToScreen(camera, marquee.currentWorld.x, marquee.currentWorld.y);
   const x = Math.min(start.x, current.x);
   const y = Math.min(start.y, current.y);
   const width = Math.abs(current.x - start.x);

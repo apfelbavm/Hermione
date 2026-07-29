@@ -2,7 +2,7 @@ import { getNodeDef } from "../engine/registry";
 import { resolveNodeLabel, resolvePinDefs } from "../engine/graphMutations";
 import type { CodeScriptDef, FunctionDef, Graph, NodeInstance, PinDef, Variable } from "../engine/types";
 import { computeNodeLayout, type NodeLayout } from "./layout";
-import type { Camera } from "./camera";
+import { worldToScreen, type Camera } from "./camera";
 
 export interface NodeScreenGeometry {
   screenX: number;
@@ -25,7 +25,7 @@ export function computeNodeScreenGeometry(
   compact: boolean = false,
 ): NodeScreenGeometry {
   const layout = computeNodeLayout(label, pinDefs, { showAddButton, compact });
-  const screen = camera.worldToScreen(node.position.x, node.position.y);
+  const screen = worldToScreen(camera, node.position.x, node.position.y);
   const pinScreen: Record<string, { x: number; y: number }> = {};
   for (const p of layout.pins) {
     pinScreen[p.pin.id] = { x: screen.x + p.x * camera.zoom, y: screen.y + p.y * camera.zoom };
