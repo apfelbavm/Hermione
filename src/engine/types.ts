@@ -270,7 +270,7 @@ export interface CodeScriptDef {
   inputs: PinSignatureEntry[];
 }
 
-export interface Graph {
+export class Graph {
   id: string;
   name: string;
   nodes: NodeInstance[];
@@ -279,6 +279,17 @@ export interface Graph {
   commentBoxes: CommentBox[];
   functions: FunctionDef[];
   scripts: CodeScriptDef[];
+
+  constructor(id: string, name: string) {
+    this.id = id;
+    this.name = name;
+    this.nodes = [];
+    this.connections = [];
+    this.variables = [];
+    this.commentBoxes = [];
+    this.functions = [];
+    this.scripts = [];
+  }
 }
 
 export interface ExecutionContext {
@@ -309,5 +320,14 @@ export interface ExecutionContext {
 }
 
 export function createEmptyGraph(id: string, name: string): Graph {
-  return { id, name, nodes: [], connections: [], variables: [], commentBoxes: [], functions: [], scripts: [] };
+  return {
+    id,
+    name,
+    nodes: [],
+    connections: [],
+    variables: [],
+    commentBoxes: [],
+    functions: [],
+    scripts: [],
+  };
 }
