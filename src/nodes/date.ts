@@ -12,6 +12,7 @@ function toDate(value: unknown): Date {
 registerNode({
   type: "date.now",
   label: "Now",
+  description: "Returns the current date and time as a Date.",
   group: "Date",
   pins: [{ id: "result", label: "Result", type: "date", direction: "output" }],
   evaluate: () => ({ result: new Date() }),
@@ -23,6 +24,7 @@ registerNode({
 registerNode({
   type: "date.fromString",
   label: "To Date (String)",
+  description: "Parses a text string into a Date.",
   group: "Date",
   pins: [
     { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
@@ -37,6 +39,7 @@ registerNode({
 registerNode({
   type: "date.fromNumber",
   label: "To Date (Number)",
+  description: "Converts a number of milliseconds since epoch into a Date.",
   group: "Date",
   pins: [
     { id: "value", label: "Value", type: "number", direction: "input", defaultValue: 0 },
@@ -51,6 +54,7 @@ registerNode({
 registerNode({
   type: "date.subtract",
   label: "Subtract Dates (A - B) → ms",
+  description: "Returns the difference between two dates in milliseconds.",
   group: "Date",
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
@@ -68,6 +72,7 @@ registerNode({
 registerNode({
   type: "date.equal",
   label: "Equal (A == B)",
+  description: "True if two dates represent the same moment in time.",
   group: "Date.Comparison",
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
@@ -85,6 +90,7 @@ registerNode({
 registerNode({
   type: "date.unequal",
   label: "Unequal (A != B)",
+  description: "True if two dates do not represent the same moment in time.",
   group: "Date.Comparison",
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
@@ -102,6 +108,7 @@ registerNode({
 registerNode({
   type: "date.greaterThan",
   label: "Greater than (A > B)",
+  description: "True if date A is later than date B.",
   group: "Date.Comparison",
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
@@ -119,6 +126,7 @@ registerNode({
 registerNode({
   type: "date.greaterEqual",
   label: "Greater equal (A >= B)",
+  description: "True if date A is later than or the same as date B.",
   group: "Date.Comparison",
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
@@ -136,6 +144,7 @@ registerNode({
 registerNode({
   type: "date.lessThan",
   label: "Less than (A < B)",
+  description: "True if date A is earlier than date B.",
   group: "Date.Comparison",
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
@@ -153,6 +162,7 @@ registerNode({
 registerNode({
   type: "date.lessEqual",
   label: "Less equal (A <= B)",
+  description: "True if date A is earlier than or the same as date B.",
   group: "Date.Comparison",
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },

@@ -871,6 +871,49 @@ body.resizing {
   border-color: #4d84a8 !important;
 }
 
+.hover-tooltip {
+  position: fixed;
+  z-index: 30;
+  display: none;
+  max-width: 280px;
+  background: #f7f6f3;
+  border: 1px solid #d6d4cd;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 6px 10px;
+  color: #1c1c1a;
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+
+.details-description-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+.details-description-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 54px;
+  resize: vertical;
+  background: #1c1f24;
+  border: 1px solid #33383f;
+  border-radius: 4px;
+  color: #e8e8e8;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 5px 7px;
+}
+
+.details-description-input:focus {
+  outline: none;
+  border-color: #e8b339;
+}
+
 .node-search-menu {
   position: absolute;
   width: 220px;

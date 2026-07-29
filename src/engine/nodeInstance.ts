@@ -159,6 +159,19 @@ export class NodeInstance {
     return def.label;
   }
 
+  /** Sibling of resolveNodeLabel for the hover tooltip (see overlay/tooltip.ts/nodeTooltip.ts) — a
+   * function.call node shows its bound FunctionDef's own user-authored description (set in the
+   * Details panel) when one's been given, since that's far more useful than the generic "Call
+   * Function" text; every other node type (including Get/Set Variable and Code, which have no
+   * per-instance description of their own) just shows its NodeDef's static description. */
+  resolveNodeDescription(def: NodeDef, functions: FunctionDef[]): string {
+    if (this.type === "function.call" && this.functionId) {
+      const fn = functions.find((f) => f.id === this.functionId);
+      if (fn?.description) return fn.description;
+    }
+    return def.description;
+  }
+
   /** True if this node's canvas right-click menu should offer a Disable/Enable toggle at all — it
    * must have at least one execution pin (a pure data node has no "code" to skip) and must not be an
    * event trigger (an entry point always has to be reachable). Whether disabling is CURRENTLY

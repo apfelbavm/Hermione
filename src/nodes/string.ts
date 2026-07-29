@@ -5,6 +5,7 @@ import type { PinDef } from "../engine/types";
 registerNode({
   type: "string.fromNumber",
   label: "To String (Number)",
+  description: "Converts a number to its text representation.",
   group: "String",
   pins: [
     {
@@ -25,6 +26,7 @@ registerNode({
 registerNode({
   type: "string.fromBoolean",
   label: "To String (Boolean)",
+  description: "Converts a boolean to its text representation.",
   group: "String",
   pins: [
     {
@@ -47,6 +49,7 @@ registerNode({
 registerNode({
   type: "string.fromDate",
   label: "To String (Date)",
+  description: "Converts a date to an ISO 8601 text string.",
   group: "String",
   pins: [
     { id: "value", label: "Value", type: "date", direction: "input", defaultValue: "" },
@@ -63,6 +66,7 @@ registerNode({
 registerNode({
   type: "string.fromJson",
   label: "To String (JSON)",
+  description: "Converts a value to its JSON text representation.",
   group: "String",
   pins: [
     { id: "value", label: "Value", type: "object", direction: "input" },
@@ -77,6 +81,7 @@ registerNode({
 registerNode({
   type: "string.equalCaseSensitive",
   label: "Equal (A === B) case-sensitive",
+  description: "True if two strings are exactly equal, case-sensitive.",
   group: "String",
   pins: [
     {
@@ -106,6 +111,7 @@ registerNode({
 registerNode({
   type: "string.equalCaseInsensitive",
   label: "Equal (A == B) case-insensitive",
+  description: "True if two strings are equal, ignoring letter case.",
   group: "String",
   pins: [
     {
@@ -173,6 +179,7 @@ function appendEntryPinDefs(node: NodeInstance): PinDef[] {
 registerNode({
   type: "string.append",
   label: "Append String",
+  description: "Concatenates all of its string inputs into one result.",
   group: "String",
   pins: [
     {

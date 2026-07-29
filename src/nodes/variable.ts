@@ -23,6 +23,7 @@ function setVariableValue(ctx: ExecutionContext, variableId: string, value: unkn
 registerNode({
   type: "variable.get",
   label: "Get Variable",
+  description: "Reads the bound variable's current value.",
   group: "Variables",
   pins: [], // real pins are derived per-instance from the bound Variable via derivePins
   // Unlabeled — the node's own title already shows the variable's name (see resolveNodeLabel).
@@ -43,6 +44,7 @@ registerNode({
 registerNode({
   type: "variable.set",
   label: "Set Variable",
+  description: "Writes a new value to the bound variable.",
   group: "Variables",
   pins: [],
   // "value" is unlabeled too — the node's own title already shows the variable's name.

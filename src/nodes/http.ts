@@ -82,6 +82,7 @@ const httpRequestExecute: (
 registerNode({
   type: "http.request",
   label: "HTTP Request",
+  description: "Sends an HTTP request with a chosen method, headers, optional auth, and body, returning the response status, body, and headers.",
   group: "Actions",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

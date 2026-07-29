@@ -37,6 +37,7 @@ function reroutePinDef(
 registerNode({
   type: "core.reroute",
   label: "Reroute",
+  description: "Bends a wire's path on the canvas with no effect on behavior.",
   group: "Internal",
   compact: true,
   pins: [
@@ -54,6 +55,7 @@ registerNode({
 registerNode({
   type: "core.rerouteExec",
   label: "Reroute",
+  description: "Bends an exec wire's path on the canvas with no effect on behavior.",
   group: "Internal",
   compact: true,
   pins: [

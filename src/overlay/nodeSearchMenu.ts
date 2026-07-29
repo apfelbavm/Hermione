@@ -1,5 +1,6 @@
 import type { NodeDef } from "../engine/types";
 import { buildMenuTree, flattenVisible, type MenuNode, type VisibleRow } from "./nodeMenuTree";
+import { attachHoverTooltip } from "./tooltip";
 
 export interface NodeSearchMenuOptions {
   screenPos: { x: number; y: number };
@@ -88,6 +89,7 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
           e.preventDefault();
           pick(def);
         });
+        attachHoverTooltip(li, () => def.description);
         list.appendChild(li);
       });
       return;
@@ -116,6 +118,7 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
           e.preventDefault();
           pick(def);
         });
+        attachHoverTooltip(li, () => def.description);
       }
       list.appendChild(li);
     });

@@ -70,6 +70,7 @@ function namedInputsFor(script: CodeScriptDef, pinInputs: Record<string, unknown
 registerNode({
   type: "code.run",
   label: "Code",
+  description: "Runs a user-authored TypeScript script node.",
   group: GROUP,
   pins: [], // real pins are derived per-instance from the bound CodeScriptDef's inputs
   deriveScriptPins,

@@ -113,6 +113,7 @@ function makeArrayEntryPins(node: NodeInstance): PinDef[] {
 registerNode({
   type: "array.make",
   label: "Make Array",
+  description: "Builds a new array from the given elements, in order.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -150,6 +151,7 @@ registerNode({
 registerNode({
   type: "array.length",
   label: "Array Length",
+  description: "Returns how many elements are in the array.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -169,6 +171,7 @@ registerNode({
 registerNode({
   type: "array.get",
   label: "Array Get",
+  description: "Returns the element at an index, and whether it existed.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -208,6 +211,7 @@ registerNode({
 registerNode({
   type: "array.set",
   label: "Array Set",
+  description: "Replaces the element at an index, if the index is in bounds.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -244,6 +248,7 @@ registerNode({
 registerNode({
   type: "array.add",
   label: "Array Add",
+  description: "Appends a value to the end of the array.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -276,6 +281,7 @@ registerNode({
 registerNode({
   type: "array.append",
   label: "Array Append",
+  description: "Concatenates two arrays into one, keeping order and duplicates.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -302,6 +308,7 @@ registerNode({
 registerNode({
   type: "array.insert",
   label: "Array Insert",
+  description: "Inserts a value at an index, shifting later elements over.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -336,6 +343,7 @@ registerNode({
 registerNode({
   type: "array.removeAt",
   label: "Array Remove At",
+  description: "Removes the element at an index, if the index is in bounds.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -372,6 +380,7 @@ registerNode({
 registerNode({
   type: "array.removeItem",
   label: "Array Remove Item",
+  description: "Removes the first element that matches a given value.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -407,6 +416,7 @@ registerNode({
 registerNode({
   type: "array.clear",
   label: "Array Clear",
+  description: "Returns an empty array, discarding all elements.",
   group: GROUP,
   configurableElementType: {},
   pins: [arrayPin("number"), arrayOutPin("number")],
@@ -421,6 +431,7 @@ registerNode({
 registerNode({
   type: "array.contains",
   label: "Array Contains",
+  description: "True if the array contains this value anywhere.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -454,6 +465,7 @@ registerNode({
 registerNode({
   type: "array.findIndex",
   label: "Array Find Index",
+  description: "Returns the index of the first matching element, or -1.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -482,6 +494,7 @@ registerNode({
 registerNode({
   type: "array.isEmpty",
   label: "Array Is Empty",
+  description: "True if the array has no elements.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -501,6 +514,7 @@ registerNode({
 registerNode({
   type: "array.reverse",
   label: "Array Reverse",
+  description: "Returns a copy of the array with elements in reverse order.",
   group: GROUP,
   configurableElementType: {},
   pins: [arrayPin("number"), arrayOutPin("number")],
@@ -524,6 +538,7 @@ const MAX_ARRAY_FOR_EACH_ITERATIONS = 100_000;
 registerNode({
   type: "array.forEach",
   label: "Array For Each",
+  description: "Runs the loop body once for each array element, in order.",
   group: GROUP,
   configurableElementType: {},
   pins: [

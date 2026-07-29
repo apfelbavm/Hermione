@@ -5,7 +5,7 @@ import {
 } from "../engine/graphMutations";
 import { NodeInstance } from "../engine/nodeInstance";
 import { getNodeDef } from "../engine/registry";
-import type { CommentBox, PinDef } from "../engine/types";
+import type { CommentBox, FunctionDef, PinDef } from "../engine/types";
 import { DEFAULT_COMMENT_COLOR } from "../render/commentGeometry";
 import {
   getEditingGraph,
@@ -34,10 +34,12 @@ export interface DetailsPanelElements {
    * canvas itself — see commentOverlay.ts). */
   commentContent: HTMLElement;
   commentFieldsContainer: HTMLElement;
-  /** Function sub-view: just a visibility toggle — the actual Inputs/Outputs content lives in the
-   * pre-existing functionIoPanel instances, relocated into this wrapper in index.html. They
-   * already self-hide when their own accessor resolves to null, so nothing else to render here. */
+  /** Function sub-view: an editable description field (see renderFunctionDescription) above the
+   * Inputs/Outputs content, which lives in the pre-existing functionIoPanel instances, relocated
+   * into this wrapper in index.html — they already self-hide when their own accessor resolves to
+   * null, so there's nothing else to render for those here. */
   functionContent: HTMLElement;
+  functionFieldsContainer: HTMLElement;
   /** Script sub-view: same "just a visibility toggle" idea as functionContent — the actual Inputs
    * content lives in the pre-existing scriptIoPanel instance, relocated here in index.html. */
   scriptContent: HTMLElement;
@@ -169,14 +171,42 @@ export function createDetailsPanel(
     elements.commentFieldsContainer.appendChild(row);
   }
 
+  function renderFunctionDescription(fn: FunctionDef): void {
+    // Don't wipe the field while the user is actively typing in it.
+    if (elements.functionFieldsContainer.contains(document.activeElement))
+      return;
+
+    elements.functionFieldsContainer.innerHTML = "";
+    const row = document.createElement("div");
+    row.className = "details-description-row";
+
+    const label = document.createElement("span");
+    label.className = "variable-name";
+    label.textContent = "Description";
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "details-description-input";
+    textarea.placeholder = "Shown as a tooltip when hovering this function";
+    textarea.value = fn.description ?? "";
+    textarea.addEventListener("input", () => {
+      fn.description = textarea.value;
+      store.notify();
+    });
+
+    row.append(label, textarea);
+    elements.functionFieldsContainer.appendChild(row);
+  }
+
   function render(): void {
     const selection = store.state.sidebarSelection;
 
-    const validFunction =
-      selection?.kind === "function" &&
-      store.state.rootGraph.functions.some(
-        (f) => f.id === selection.functionId,
-      );
+    const fn =
+      selection?.kind === "function"
+        ? store.state.rootGraph.functions.find(
+            (f) => f.id === selection.functionId,
+          )
+        : undefined;
+    const validFunction = !!fn;
     const validScript =
       selection?.kind === "script" &&
       store.state.rootGraph.scripts.some((s) => s.id === selection.scriptId);
@@ -246,6 +276,7 @@ export function createDetailsPanel(
     if (selectedNode && nodeProperties)
       renderNodeProperties(selectedNode, nodeProperties);
     if (selectedComment) renderCommentColor(selectedComment);
+    if (fn) renderFunctionDescription(fn);
 
     if (!variable) return;
 

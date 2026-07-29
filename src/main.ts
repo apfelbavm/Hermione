@@ -43,6 +43,7 @@ import {
   type WireAnchor,
 } from "./interaction/pointerHandlers";
 import { createWidgetSync } from "./overlay/widgetSync";
+import { setupNodeHoverTooltip } from "./overlay/nodeTooltip";
 import { createCommentOverlay } from "./overlay/commentOverlay";
 import { setupResizablePanels } from "./overlay/resizablePanels";
 import { createVariablePanel } from "./overlay/variablePanel";
@@ -171,6 +172,7 @@ function resizeCanvas(): void {
 }
 
 const widgetSync = createWidgetSync(overlay, store);
+setupNodeHoverTooltip(canvas, store);
 const commentOverlay = createCommentOverlay(overlay, canvas, store);
 const variablePanel = createVariablePanel(
   {
@@ -338,6 +340,9 @@ const detailsPanel = createDetailsPanel(
     ) as HTMLDivElement,
     functionContent: document.getElementById(
       "function-details",
+    ) as HTMLDivElement,
+    functionFieldsContainer: document.getElementById(
+      "function-details-fields",
     ) as HTMLDivElement,
     scriptContent: document.getElementById("script-details") as HTMLDivElement,
   },

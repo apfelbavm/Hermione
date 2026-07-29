@@ -3,7 +3,7 @@ import type { NodeDef } from "../engine/types";
 import { allGroupPaths, buildMenuTree, flattenVisible } from "./nodeMenuTree";
 
 function fakeDef(type: string, label: string, group: string): NodeDef {
-  return { type, label, group, pins: [] };
+  return { type, label, description: "", group, pins: [] };
 }
 
 describe("buildMenuTree", () => {

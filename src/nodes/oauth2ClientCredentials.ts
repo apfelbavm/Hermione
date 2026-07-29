@@ -15,6 +15,7 @@ const SEND_AS_OPTIONS = ["body", "basicAuthHeader"];
 registerNode({
   type: "auth.oauth2ClientCredentials",
   label: "OAuth2 Client Credentials",
+  description: "Requests an access token from an OAuth2 token endpoint using the client credentials grant (client ID and secret, no user involved).",
   group: "Auth",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

@@ -12,6 +12,7 @@ import {
 registerNode({
   type: "debug.print",
   label: "Print",
+  description: "Logs a text message to the console for debugging.",
   group: "Debug",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -78,6 +79,7 @@ const formatForLog: (message: string, format: string) => string = new Function(
 registerNode({
   type: "debug.printFormatted",
   label: "Print (Formatted)",
+  description: "Logs a message pretty-printed according to a chosen format.",
   group: "Debug",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

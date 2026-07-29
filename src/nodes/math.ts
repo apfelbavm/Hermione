@@ -3,6 +3,7 @@ import { registerNode } from "../engine/registry";
 registerNode({
   type: "math.add",
   label: "Add (A + B)",
+  description: "Adds two numbers together.",
   group: "Math.Arithmetic",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -20,6 +21,7 @@ registerNode({
 registerNode({
   type: "math.subtract",
   label: "Subtract (A - B)",
+  description: "Subtracts B from A.",
   group: "Math.Arithmetic",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -37,6 +39,7 @@ registerNode({
 registerNode({
   type: "math.multiply",
   label: "Multiply (A * B)",
+  description: "Multiplies two numbers together.",
   group: "Math.Arithmetic",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -54,6 +57,7 @@ registerNode({
 registerNode({
   type: "math.divide",
   label: "Divide (A / B)",
+  description: "Divides A by B.",
   group: "Math.Arithmetic",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -71,6 +75,7 @@ registerNode({
 registerNode({
   type: "math.greaterThan",
   label: "Greater than (A > B)",
+  description: "True if A is greater than B.",
   group: "Math.Comparison",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -88,6 +93,7 @@ registerNode({
 registerNode({
   type: "math.greaterEqual",
   label: "Greater equal (A >= B)",
+  description: "True if A is greater than or equal to B.",
   group: "Math.Comparison",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -105,6 +111,7 @@ registerNode({
 registerNode({
   type: "math.lessThan",
   label: "Less than (A < B)",
+  description: "True if A is less than B.",
   group: "Math.Comparison",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -122,6 +129,7 @@ registerNode({
 registerNode({
   type: "math.lessEqual",
   label: "Less equal (A <= B)",
+  description: "True if A is less than or equal to B.",
   group: "Math.Comparison",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -139,6 +147,7 @@ registerNode({
 registerNode({
   type: "math.equal",
   label: "Equal (A == B)",
+  description: "True if A and B are numerically equal.",
   group: "Math.Comparison",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },
@@ -156,6 +165,7 @@ registerNode({
 registerNode({
   type: "math.unequal",
   label: "Unequal (A != B)",
+  description: "True if A and B are not numerically equal.",
   group: "Math.Comparison",
   pins: [
     { id: "a", label: "A", type: "number", direction: "input", defaultValue: 0 },

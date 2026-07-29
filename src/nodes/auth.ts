@@ -25,6 +25,7 @@ export function basicAuthHeaderValue(username: string, password: string): string
 registerNode({
   type: "auth.basic",
   label: "Basic Auth",
+  description: "Builds an HTTP Basic Auth header value from a username and password.",
   group: "Auth",
   pins: [
     { id: "username", label: "Username", type: "string", direction: "input", defaultValue: "" },

@@ -101,6 +101,7 @@ const oauth2SamlExchange: (
 registerNode({
   type: "auth.oauth2Saml",
   label: "OAuth2 SAML Bearer",
+  description: "Fetches a signed SAML assertion from an IdP endpoint, then exchanges it for an OAuth2 access token from a token endpoint.",
   group: "Auth",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

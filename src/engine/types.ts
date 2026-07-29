@@ -89,6 +89,11 @@ export interface EventTrigger {
 export interface NodeDef {
   type: string;
   label: string;
+  /** Shown as a hover tooltip (after resting ~0.5s) both over this node's box on the canvas and
+   * over its entry in the create-node menu — see overlay/tooltip.ts/nodeTooltip.ts. A one-sentence
+   * summary of what the node does, since `label` alone often isn't enough (e.g. distinguishing
+   * "Less equal" from "Less than" at a glance). */
+  description: string;
   /** Where this node appears in the node-creation menu, e.g. "Math" or "Math.Comparison" for a nested subgroup. */
   group: string;
   pins: PinDef[];
@@ -235,6 +240,11 @@ export interface PinSignatureEntry {
 export interface FunctionDef {
   id: string;
   name: string;
+  /** User-authored, edited in the Details panel (see detailsPanel.ts) — shown as the hover tooltip
+   * over this function's Call node(s) on the canvas and its row in the Functions sidebar list,
+   * taking over from the generic "Call Function" NodeDef.description when set (see
+   * NodeInstance.resolveNodeDescription). Absent/empty for a function that hasn't been given one. */
+  description?: string;
   inputs: PinSignatureEntry[];
   outputs: PinSignatureEntry[];
   body: Graph;

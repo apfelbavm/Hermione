@@ -8,6 +8,7 @@ function wait(ms: number): Promise<void> {
 registerNode({
   type: "action.sendEmailMock",
   label: "Send Email",
+  description: "Simulates sending an email without actually sending one — logs it instead.",
   group: "Actions",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

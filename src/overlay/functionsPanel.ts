@@ -5,6 +5,7 @@ import { setupCollapsibleSection } from "./collapsibleSection";
 import { FUNCTION_DRAG_MIME } from "./dragTypes";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
+import { attachHoverTooltip } from "./tooltip";
 import { nextAvailableName } from "./uniqueName";
 
 export interface FunctionsPanelElements {
@@ -120,7 +121,10 @@ export function createFunctionsPanel(elements: FunctionsPanelElements, store: St
               ]);
             });
             label.classList.add("function-name");
-            label.title = "Click to open this function's graph in a tab";
+            attachHoverTooltip(
+              label,
+              () => fn.description || "Click to open this function's graph in a tab",
+            );
             label.addEventListener("click", () => {
               openFunctionTab(store.state, fn.id);
               store.state.sidebarSelection = { kind: "function", functionId: fn.id };

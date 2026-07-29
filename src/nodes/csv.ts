@@ -23,6 +23,7 @@ import { csvToObjects, extractTabularRows, jsonValueToXml, objectsToCsv } from "
 registerNode({
   type: "csv.toJson",
   label: "CSV to JSON",
+  description: "Parses a CSV string into a JSON object, wrapping the rows under configurable root/row tags.",
   group: "CSV",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -50,6 +51,7 @@ registerNode({
 registerNode({
   type: "json.toCsv",
   label: "JSON to CSV",
+  description: "Converts a JSON object's tabular rows into a delimited CSV string.",
   group: "CSV",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -77,6 +79,7 @@ registerNode({
 registerNode({
   type: "csv.toXml",
   label: "CSV to XML",
+  description: "Parses a CSV string and converts it into an XML string with configurable root/row tags.",
   group: "CSV",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

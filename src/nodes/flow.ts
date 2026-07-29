@@ -12,6 +12,7 @@ function wait(ms: number): Promise<void> {
 registerNode({
   type: "flow.delay",
   label: "Delay",
+  description: "Pauses the exec chain for a given duration in milliseconds.",
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -39,6 +40,7 @@ registerNode({
 registerNode({
   type: "flow.branch",
   label: "Branch",
+  description: "Routes execution to True or False based on a condition.",
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -69,6 +71,7 @@ const MAX_FOR_LOOP_ITERATIONS = 100_000;
 registerNode({
   type: "flow.forLoop",
   label: "For Loop",
+  description: "Runs its Loop Body once for each index from Start to End.",
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -168,6 +171,7 @@ function sequenceThenPinDefs(node: NodeInstance): PinDef[] {
 registerNode({
   type: "flow.sequence",
   label: "Sequence",
+  description: "Runs each Then branch to completion, one after another.",
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -256,6 +260,7 @@ function parallelBranchPinDefs(node: NodeInstance): PinDef[] {
 registerNode({
   type: "flow.parallel",
   label: "Parallel",
+  description: "Runs all branches at once and continues once every branch finishes.",
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

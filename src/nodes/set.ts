@@ -107,6 +107,7 @@ function makeSetEntryPins(node: NodeInstance): PinDef[] {
 registerNode({
   type: "set.make",
   label: "Make Set",
+  description: "Builds a new set from the given elements, dropping duplicates.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -146,6 +147,7 @@ registerNode({
 registerNode({
   type: "set.length",
   label: "Set Length",
+  description: "Returns how many unique elements are in the set.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -165,6 +167,7 @@ registerNode({
 registerNode({
   type: "set.add",
   label: "Set Add",
+  description: "Adds a value to the set, unless it's already present.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -204,6 +207,7 @@ registerNode({
 registerNode({
   type: "set.remove",
   label: "Set Remove",
+  description: "Removes a value from the set if it is present.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -241,6 +245,7 @@ registerNode({
 registerNode({
   type: "set.clear",
   label: "Set Clear",
+  description: "Returns an empty set, discarding all elements.",
   group: GROUP,
   configurableElementType: {},
   pins: [setPin("number"), setOutPin("number")],
@@ -255,6 +260,7 @@ registerNode({
 registerNode({
   type: "set.contains",
   label: "Set Contains",
+  description: "True if the set already contains this value.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -288,6 +294,7 @@ registerNode({
 registerNode({
   type: "set.isEmpty",
   label: "Set Is Empty",
+  description: "True if the set has no elements.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -307,6 +314,7 @@ registerNode({
 registerNode({
   type: "set.toArray",
   label: "Set To Array",
+  description: "Converts the set's elements into an ordinary array.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -341,6 +349,7 @@ registerNode({
 registerNode({
   type: "set.union",
   label: "Set Union",
+  description: "Combines two sets, keeping every distinct element from both.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -369,6 +378,7 @@ registerNode({
 registerNode({
   type: "set.intersection",
   label: "Set Intersection",
+  description: "Returns only the elements present in both sets.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -401,6 +411,7 @@ registerNode({
 registerNode({
   type: "set.difference",
   label: "Set Difference",
+  description: "Returns elements in the first set that aren't in the second.",
   group: GROUP,
   configurableElementType: {},
   pins: [
@@ -437,6 +448,7 @@ const MAX_SET_FOR_EACH_ITERATIONS = 100_000;
 registerNode({
   type: "set.forEach",
   label: "Set For Each",
+  description: "Runs the loop body once for each element in the set.",
   group: GROUP,
   configurableElementType: {},
   pins: [

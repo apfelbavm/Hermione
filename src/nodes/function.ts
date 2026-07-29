@@ -8,6 +8,7 @@ import { registerNode } from "../engine/registry";
 registerNode({
   type: "function.entry",
   label: "Entry",
+  description: "Starts a function's body and outputs its call's input arguments.",
   group: "Functions",
   pins: [], // real pins are derived per-instance from the owning FunctionDef's inputs
   deriveFunctionPins: (fn) => [
@@ -28,6 +29,7 @@ registerNode({
 registerNode({
   type: "function.return",
   label: "Return",
+  description: "Ends a function's body, sending its output values back to the caller.",
   group: "Functions",
   pins: [], // real pins are derived per-instance from the owning FunctionDef's outputs
   deriveFunctionPins: (fn) => [
@@ -52,6 +54,7 @@ registerNode({
 registerNode({
   type: "function.call",
   label: "Call Function",
+  description: "Invokes a user-defined function with the given arguments.",
   group: "Functions",
   pins: [], // real pins are derived per-instance from the target FunctionDef's full signature
   deriveFunctionPins: (fn) => [

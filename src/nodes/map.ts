@@ -143,6 +143,7 @@ function makeMapEntryPins(node: NodeInstance): PinDef[] {
 registerNode({
   type: "map.make",
   label: "Make Map",
+  description: "Builds a new map from the given key-value pairs.",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [
@@ -200,6 +201,7 @@ registerNode({
 registerNode({
   type: "map.length",
   label: "Map Length",
+  description: "Returns how many key-value pairs are in the map.",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [
@@ -219,6 +221,7 @@ registerNode({
 registerNode({
   type: "map.set",
   label: "Map Add",
+  description: "Sets the value for a key, adding it or overwriting the existing one.",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [
@@ -254,6 +257,7 @@ registerNode({
 registerNode({
   type: "map.remove",
   label: "Map Remove",
+  description: "Removes the entry for a key, if one exists.",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [
@@ -292,6 +296,7 @@ registerNode({
 registerNode({
   type: "map.clear",
   label: "Map Clear",
+  description: "Returns an empty map, discarding all entries.",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), mapOutPin("number", "string")],
@@ -306,6 +311,7 @@ registerNode({
 registerNode({
   type: "map.containsKey",
   label: "Map Contains Key",
+  description: "True if the map has an entry stored under this key.",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [
@@ -340,6 +346,7 @@ registerNode({
 registerNode({
   type: "map.find",
   label: "Map Find",
+  description: "Returns the value stored under a key, and whether it was found.",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [
@@ -379,6 +386,7 @@ registerNode({
 registerNode({
   type: "map.keys",
   label: "Map Keys",
+  description: "Returns an array of every key currently in the map.",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [
@@ -416,6 +424,7 @@ registerNode({
 registerNode({
   type: "map.values",
   label: "Map Values",
+  description: "Returns an array of every value currently in the map.",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [
@@ -453,6 +462,7 @@ registerNode({
 registerNode({
   type: "map.isEmpty",
   label: "Map Is Empty",
+  description: "True if the map has no entries.",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [
@@ -476,6 +486,7 @@ const MAX_MAP_FOR_EACH_ITERATIONS = 100_000;
 registerNode({
   type: "map.forEach",
   label: "Map For Each",
+  description: "Runs the loop body once for each key-value pair in the map.",
   group: GROUP,
   configurableElementType: { includeKeyType: true },
   pins: [

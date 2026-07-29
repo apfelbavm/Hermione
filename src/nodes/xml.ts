@@ -13,6 +13,7 @@ import {
 registerNode({
   type: "xml.toJson",
   label: "XML to JSON",
+  description: "Parses an XML string into a JSON object, failing safely with success:false on invalid XML.",
   group: "XML",
   pins: [
     { id: "xml", label: "XML", type: "string", direction: "input", defaultValue: "", multiline: true },
@@ -42,6 +43,7 @@ registerNode({
 registerNode({
   type: "xml.fromJson",
   label: "JSON to XML",
+  description: "Builds an XML string from a JSON object.",
   group: "XML",
   pins: [
     { id: "json", label: "JSON", type: "object", direction: "input", defaultValue: null },
@@ -67,6 +69,7 @@ registerNode({
 registerNode({
   type: "xml.toCsv",
   label: "XML to CSV",
+  description: "Parses an XML string's tabular rows and converts them into a delimited CSV string.",
   group: "XML",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
