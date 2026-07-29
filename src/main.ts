@@ -34,7 +34,7 @@ import { openNodeSearchMenu } from "./overlay/nodeSearchMenu";
 import { FUNCTION_DRAG_MIME, SCRIPT_DRAG_MIME, VARIABLE_DRAG_MIME } from "./overlay/dragTypes";
 import { openRowContextMenu, type ContextMenuItem } from "./overlay/rowContextMenu";
 import { loadGraphFromFile, loadGraphFromLocalStorage } from "./persistence/load";
-import { downloadGraphAsFile, saveGraphToLocalStorage } from "./persistence/save";
+import { deleteSavedGraph, downloadGraphAsFile, saveGraphToLocalStorage } from "./persistence/save";
 import { downloadCompiledGraph } from "./compiler/codegen";
 import { isNodeLatent } from "./engine/latency";
 import { NodeInstance } from "./engine/nodeInstance";
@@ -53,7 +53,9 @@ const logSaveStatus = document.getElementById("log-save-status") as HTMLSpanElem
 const runButton = document.getElementById("run-button") as HTMLButtonElement;
 const saveButton = document.getElementById("save-button") as HTMLButtonElement;
 const loadButton = document.getElementById("load-button") as HTMLButtonElement;
+const downloadButton = document.getElementById("download-button") as HTMLButtonElement;
 const compileButton = document.getElementById("compile-button") as HTMLButtonElement;
+const deleteButton = document.getElementById("delete-button") as HTMLButtonElement;
 const snapToGridCheckbox = document.getElementById("snap-to-grid-checkbox") as HTMLInputElement;
 const frameAllButton = document.getElementById("frame-all-button") as HTMLButtonElement;
 const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
@@ -691,16 +693,21 @@ runButton.addEventListener("click", async () => {
   }
 });
 
-// --- Save / Load: JSON persisted to localStorage (auto-restored on next launch) and downloadable as a file ---
+// --- Save / Load: JSON persisted to localStorage (auto-restored on next launch); Download hands
+// that same JSON out as a file, as a separate, explicit action ---
 saveButton.addEventListener("click", async () => {
   // See the Run button's identical call for why — this Save button persists the whole GRAPH, not
   // any open script's own (separately buttoned) in-progress edits.
   await scriptEditor.flushDirtyScripts();
   saveGraphToLocalStorage(store.state.rootGraph);
-  downloadGraphAsFile(store.state.rootGraph);
 });
 
 loadButton.addEventListener("click", () => loadFileInput.click());
+
+downloadButton.addEventListener("click", async () => {
+  await scriptEditor.flushDirtyScripts();
+  downloadGraphAsFile(store.state.rootGraph);
+});
 
 loadFileInput.addEventListener("change", async () => {
   const file = loadFileInput.files?.[0];
@@ -736,6 +743,12 @@ compileButton.addEventListener("click", async () => {
   } catch (err) {
     appendLog(`Compile error: ${err instanceof Error ? err.message : String(err)}`);
   }
+});
+
+// --- Delete: discards the graph persisted via Save (localStorage) — the one auto-restored on next
+// launch — without touching whatever is currently open on the canvas.
+deleteButton.addEventListener("click", () => {
+  deleteSavedGraph();
 });
 
 // --- Frame All: zooms/pans so every node and comment box in the current graph fits on screen

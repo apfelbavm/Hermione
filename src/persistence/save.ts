@@ -9,6 +9,10 @@ export function saveGraphToLocalStorage(graph: Graph): void {
   localStorage.setItem(LOCAL_STORAGE_KEY, serializeGraph(graph));
 }
 
+export function deleteSavedGraph(): void {
+  localStorage.removeItem(LOCAL_STORAGE_KEY);
+}
+
 export function downloadGraphAsFile(
   graph: Graph,
   filename: string = `${graph.name || "graph"}.json`,
