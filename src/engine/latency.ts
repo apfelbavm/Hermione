@@ -1,5 +1,5 @@
 import { Graph } from "./graph";
-import { getVisibleVariables, resolvePinDefs } from "./graphMutations";
+import { resolvePinDefs } from "./graphMutations";
 import { NodeInstance } from "./nodeInstance";
 import { getNodeDef } from "./registry";
 import type { FunctionDef } from "./types";
@@ -64,7 +64,7 @@ function isChainLatent(
   startPinIds: string[],
   visitingFunctionIds: VisitingFunctionIds,
 ): boolean {
-  const variables = getVisibleVariables(rootGraph, graph);
+  const variables = rootGraph.getVisibleVariables(graph);
   const visitedNodeIds = new Set<string>();
   const queue: Array<{ nodeId: string; pinId: string }> = startPinIds.map(
     (pinId) => ({ nodeId: startNodeId, pinId }),

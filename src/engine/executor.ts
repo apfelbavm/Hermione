@@ -1,9 +1,5 @@
 import { Graph } from "./graph";
-import {
-  cloneDefaultValue,
-  getVisibleVariables,
-  resolvePinDefs,
-} from "./graphMutations";
+import { cloneDefaultValue, resolvePinDefs } from "./graphMutations";
 import { connectionsFrom, connectionTo } from "./graphQueries";
 import { NodeInstance } from "./nodeInstance";
 import { getNodeDef } from "./registry";
@@ -19,7 +15,7 @@ export function findNode(graph: Graph, nodeId: string): NodeInstance {
  * root (global) + ctx.graph's own (local) if a function-call frame has swapped ctx.graph
  * to that function's body. */
 function visibleVariables(ctx: ExecutionContext) {
-  return getVisibleVariables(ctx.rootGraph, ctx.graph);
+  return ctx.rootGraph.getVisibleVariables(ctx.graph);
 }
 
 export function createExecutionContext(

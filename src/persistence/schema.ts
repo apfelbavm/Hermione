@@ -12,30 +12,33 @@ export function toDocument(graph: Graph): SavedDocument {
   return { formatVersion: CURRENT_FORMAT_VERSION, graph };
 }
 
-/** v1 predates user-defined Functions — its saved graphs have no `functions` field at all. */
-function migrateV1ToV2(graph: Graph): Graph {
-  const newGraph = new Graph(graph.id, graph.name);
-  newGraph.functions = graph.functions ?? [];
-  return newGraph;
-}
+/** v1 (predates user-defined Functions) and v2 (predates the Code node/Scripts) saves are simply
+ * missing the `functions`/`scripts` fields — reviveGraph below already defaults every field
+ * unconditionally, so that defaulting IS the migration; no format ever renamed or restructured a
+ * field, which is the only thing that would require version-specific logic beyond it. */
+const SUPPORTED_FORMAT_VERSIONS = [1, 2, CURRENT_FORMAT_VERSION];
 
-/** v2 predates the Code node/Scripts — its saved graphs have no `scripts` field at all. */
-function migrateV2ToV3(graph: Graph): Graph {
-  const newGraph = new Graph(graph.id, graph.name);
-  newGraph.functions = graph.functions ?? [];
-  newGraph.scripts = graph.scripts ?? [];
-  return newGraph;
+/** `doc.graph` (and every function's `body`) is a plain object fresh out of JSON.parse, not a real
+ * `Graph` instance — it has none of Graph.prototype's methods (e.g. getVisibleVariables). Rebuilds
+ * a proper instance, recursively, so the loaded graph behaves identically to one built with `new
+ * Graph(...)`. */
+function reviveGraph(graph: Graph): Graph {
+  const revived = new Graph(graph.id, graph.name);
+  revived.nodes = graph.nodes ?? [];
+  revived.connections = graph.connections ?? [];
+  revived.variables = graph.variables ?? [];
+  revived.commentBoxes = graph.commentBoxes ?? [];
+  revived.scripts = graph.scripts ?? [];
+  revived.functions = (graph.functions ?? []).map((fn) => ({
+    ...fn,
+    body: reviveGraph(fn.body),
+  }));
+  return revived;
 }
 
 export function fromDocument(doc: SavedDocument): Graph {
-  if (doc.formatVersion === 1) {
-    return migrateV2ToV3(migrateV1ToV2(doc.graph));
-  }
-  if (doc.formatVersion === 2) {
-    return migrateV2ToV3(doc.graph);
-  }
-  if (doc.formatVersion !== CURRENT_FORMAT_VERSION) {
+  if (!SUPPORTED_FORMAT_VERSIONS.includes(doc.formatVersion)) {
     throw new Error(`Unsupported save format version ${doc.formatVersion}`);
   }
-  return doc.graph;
+  return reviveGraph(doc.graph);
 }

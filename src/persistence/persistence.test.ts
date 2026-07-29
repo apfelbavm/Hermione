@@ -69,6 +69,9 @@ describe("persistence round-trip", () => {
     const loaded = deserializeGraph(json);
 
     expect(loaded).toEqual(graph);
+    // toEqual ignores prototypes, so it wouldn't catch `loaded` coming back as a plain
+    // JSON object missing Graph.prototype methods (e.g. getVisibleVariables) — assert directly.
+    expect(loaded).toBeInstanceOf(Graph);
   });
 
   it("re-executes identically after a save/load round trip", async () => {

@@ -142,20 +142,6 @@ export function resolveNodeLabel(
   return def.label;
 }
 
-/** All variables visible from `currentGraph`: just the root's if editing the root itself, or
- * root (global) + currentGraph's own (local) if currentGraph is a function's body. Functions
- * themselves are never merged this way — they're always looked up straight from rootGraph.functions,
- * since a function's own body.functions field is unused (functions are never nested). */
-export function getVisibleVariables(
-  rootGraph: Graph,
-  currentGraph: Graph,
-): Variable[] {
-  if (currentGraph === rootGraph) return rootGraph.variables;
-  return [...rootGraph.variables, ...currentGraph.variables];
-}
-
-
-
 /** True if a node of this type is allowed to be placed into `graph` right now — trivially true for
  * any non-event node type. An event node (see NodeDef.eventTrigger — On Start/On Interval/On Run)
  * may only live in the root graph, never inside a function body, and at most one instance of each
@@ -702,7 +688,7 @@ export function createFunctionDef(name: string): FunctionDef {
  * function's body (Call nodes can appear anywhere, including inside other functions). */
 export function removeFunctionDef(rootGraph: Graph, functionId: string): void {
   for (const g of allGraphs(rootGraph)) {
-    const variables = getVisibleVariables(rootGraph, g);
+    const variables = rootGraph.getVisibleVariables(g);
     const dependentNodeIds = g.nodes
       .filter((n) => n.functionId === functionId && n.type === "function.call")
       .map((n) => n.id);
@@ -816,7 +802,7 @@ export function updateVariable(
 
   if (signatureChanged) {
     for (const g of allGraphs(rootGraph)) {
-      const visibleVariables = getVisibleVariables(rootGraph, g);
+      const visibleVariables = rootGraph.getVisibleVariables(g);
       for (const node of g.nodes) {
         if (node.variableId !== variableId) continue;
         if (node.type === "variable.get")
@@ -869,7 +855,7 @@ function updateFunctionEntry(
 
   if (signatureChanged) {
     for (const g of allGraphs(rootGraph)) {
-      const visibleVariables = getVisibleVariables(rootGraph, g);
+      const visibleVariables = rootGraph.getVisibleVariables(g);
       for (const node of g.nodes) {
         if (node.functionId !== fn.id) continue;
         disconnectAcrossGraphs(g, visibleVariables, node);
@@ -969,7 +955,7 @@ export function createCodeScriptDef(name: string): CodeScriptDef {
  * body (a Code node can appear anywhere, same as a Call node). */
 export function removeCodeScriptDef(rootGraph: Graph, scriptId: string): void {
   for (const g of allGraphs(rootGraph)) {
-    const variables = getVisibleVariables(rootGraph, g);
+    const variables = rootGraph.getVisibleVariables(g);
     const dependentNodeIds = g.nodes
       .filter((n) => n.scriptId === scriptId && n.type === "code.run")
       .map((n) => n.id);
@@ -1062,7 +1048,7 @@ export function updateScriptInput(
 
   if (signatureChanged) {
     for (const g of allGraphs(rootGraph)) {
-      const visibleVariables = getVisibleVariables(rootGraph, g);
+      const visibleVariables = rootGraph.getVisibleVariables(g);
       for (const node of g.nodes) {
         if (node.scriptId !== script.id || node.type !== "code.run") continue;
         disconnectPin(

@@ -31,4 +31,13 @@ export class Graph {
   addNode(node: NodeInstance): void {
     this.nodes.push(node);
   }
+
+  /** All variables visible from `currentGraph`: just the root's if editing the root itself, or
+   * root (global) + currentGraph's own (local) if currentGraph is a function's body. Functions
+   * themselves are never merged this way — they're always looked up straight from rootGraph.functions,
+   * since a function's own body.functions field is unused (functions are never nested). */
+  getVisibleVariables(currentGraph: Graph): Variable[] {
+    if (currentGraph === this) return this.variables;
+    return [...this.variables, ...currentGraph.variables];
+  }
 }

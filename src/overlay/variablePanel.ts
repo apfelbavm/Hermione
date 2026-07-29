@@ -3,7 +3,6 @@ import { Graph } from "../engine/graph";
 import {
   addVariable,
   DEFAULT_VALUE_BY_TYPE,
-  getVisibleVariables,
   moveVariable,
   nextId,
   removeVariable,
@@ -198,7 +197,7 @@ export function createVariablePanel(
         const graph = getGraph();
         removeVariable(
           graph,
-          getVisibleVariables(store.state.rootGraph, graph),
+          store.state.rootGraph.getVisibleVariables(graph),
           store.state.rootGraph.functions,
           variable.id,
         );

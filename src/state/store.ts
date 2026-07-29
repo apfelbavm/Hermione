@@ -1,5 +1,4 @@
 import { Graph } from "../engine/graph";
-import { getVisibleVariables } from "../engine/graphMutations";
 import type { PinDirection, PinType, Variable } from "../engine/types";
 import type { Camera } from "../render/camera";
 
@@ -98,7 +97,7 @@ export function closeFunctionTab(state: AppState, functionId: string): void {
 /** Variables visible from the currently open editing graph — root's own, or root + the active
  * function's local variables. */
 export function getVisibleVariablesForState(state: AppState): Variable[] {
-  return getVisibleVariables(state.rootGraph, getEditingGraph(state));
+  return state.rootGraph.getVisibleVariables(getEditingGraph(state));
 }
 
 /** Opens (or focuses, if already open) a script's tab in the lower panel and makes it the active
