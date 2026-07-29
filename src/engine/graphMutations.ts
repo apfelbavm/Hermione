@@ -40,25 +40,6 @@ export const DEFAULT_VALUE_BY_TYPE: Record<PinType, unknown> = {
 };
 
 
-
-
-/** True if this node's canvas right-click menu should offer a Disable/Enable toggle at all — it
- * must have at least one execution pin (a pure data node has no "code" to skip) and must not be an
- * event trigger (an entry point always has to be reachable). Whether disabling is CURRENTLY
- * allowed (vs. greyed out) is a separate question — see hasConnectedDataOutput. */
-export function canToggleDisabled(
-  node: NodeInstance,
-  variables: Variable[],
-  functions: FunctionDef[],
-  scripts: CodeScriptDef[] = [],
-): boolean {
-  const def = getNodeDef(node.type);
-  if (def.eventTrigger) return false;
-  return node
-    .resolvePinDefs(variables, functions, scripts)
-    .some((p) => p.type === "exec");
-}
-
 /** True if any of this node's DATA (non-exec) output pins feeds something else. A node can only be
  * disabled while this is false — disabling it anyway would silently starve whatever's downstream of
  * a real value, since a disabled node's execute()/evaluate() never runs. Re-enabling has no such

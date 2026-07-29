@@ -3,7 +3,6 @@ import { registerBuiltins } from "../nodes";
 import {
   addScriptInput,
   addVariable,
-  canToggleDisabled,
   connectPins,
   createCodeScriptDef,
   hasConnectedDataOutput,
@@ -239,7 +238,7 @@ describe("canToggleDisabled", () => {
       def.pins,
       "add",
     );
-    expect(canToggleDisabled(node, [], [])).toBe(false);
+    expect(node.canToggleDisabled([], [])).toBe(false);
   });
 
   it("is true for an ordinary exec-capable node", () => {
@@ -250,7 +249,7 @@ describe("canToggleDisabled", () => {
       def.pins,
       "print",
     );
-    expect(canToggleDisabled(node, [], [])).toBe(true);
+    expect(node.canToggleDisabled([], [])).toBe(true);
   });
 
   it("is false for an event trigger, even though it has an execution pin", () => {
@@ -261,7 +260,7 @@ describe("canToggleDisabled", () => {
       def.pins,
       "run",
     );
-    expect(canToggleDisabled(node, [], [])).toBe(false);
+    expect(node.canToggleDisabled([], [])).toBe(false);
   });
 });
 

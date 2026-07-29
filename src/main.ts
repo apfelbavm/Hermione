@@ -2,7 +2,6 @@ import "./style.css";
 import { registerBuiltins } from "./nodes";
 import { createExecutionContext, runExecFrom } from "./engine/executor";
 import {
-  canToggleDisabled,
   connectPins,
   hasConnectedDataOutput,
   insertRerouteOnConnection,
@@ -626,7 +625,7 @@ canvas.addEventListener("contextmenu", (e) => {
       },
     ];
 
-    if (canToggleDisabled(node, variables, functions, scripts)) {
+    if (node.canToggleDisabled(variables, functions, scripts)) {
       const isDisabled = !!node.disabled;
       // Re-enabling is always allowed; disabling is blocked while something depends on one of this
       // node's data outputs, since a disabled node's evaluate() never runs to produce it.

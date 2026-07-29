@@ -158,4 +158,20 @@ export class NodeInstance {
     }
     return def.label;
   }
+
+  /** True if this node's canvas right-click menu should offer a Disable/Enable toggle at all — it
+   * must have at least one execution pin (a pure data node has no "code" to skip) and must not be an
+   * event trigger (an entry point always has to be reachable). Whether disabling is CURRENTLY
+   * allowed (vs. greyed out) is a separate question — see hasConnectedDataOutput. */
+  canToggleDisabled(
+    variables: Variable[],
+    functions: FunctionDef[],
+    scripts: CodeScriptDef[] = [],
+  ): boolean {
+    const def = getNodeDef(this.type);
+    if (def.eventTrigger) return false;
+    return this.resolvePinDefs(variables, functions, scripts).some(
+      (p) => p.type === "exec",
+    );
+  }
 }
