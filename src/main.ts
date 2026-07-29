@@ -2,7 +2,6 @@ import "./style.css";
 import { registerBuiltins } from "./nodes";
 import { createExecutionContext, runExecFrom } from "./engine/executor";
 import {
-  canPlaceNodeType,
   canToggleDisabled,
   connectPins,
   createNodeInstance,
@@ -472,7 +471,7 @@ function filterCreatableHere(defs: NodeDef[]): NodeDef[] {
   return defs.filter(
     (def) =>
       topLevelGroup(def.group) !== "Internal" &&
-      canPlaceNodeType(def.type, graph, isFunctionBody),
+      graph.canPlaceNodeType(def.type, isFunctionBody),
   );
 }
 

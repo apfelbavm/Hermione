@@ -1,4 +1,5 @@
 import { NodeInstance } from "./nodeInstance";
+import { getNodeDef } from "./registry";
 import type {
   CodeScriptDef,
   CommentBox,
@@ -39,5 +40,17 @@ export class Graph {
   getVisibleVariables(currentGraph: Graph): Variable[] {
     if (currentGraph === this) return this.variables;
     return [...this.variables, ...currentGraph.variables];
+  }
+
+  /** True if a node of this type is allowed to be placed into `graph` right now — trivially true for
+   * any non-event node type. An event node (see NodeDef.eventTrigger — On Start/On Interval/On Run)
+   * may only live in the root graph, never inside a function body, and at most one instance of each
+   * event TYPE may exist per graph, mirroring how Unreal only allows one BeginPlay/EventTick per
+   * Blueprint. Used to filter both the node-creation menu and paste. */
+  canPlaceNodeType(type: string, isFunctionBody: boolean): boolean {
+    const def = getNodeDef(type);
+    if (!def.eventTrigger) return true;
+    if (isFunctionBody) return false;
+    return !this.nodes.some((n) => n.type === type);
   }
 }

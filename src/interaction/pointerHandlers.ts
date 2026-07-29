@@ -8,7 +8,6 @@ import {
 } from "../engine/clipboard";
 import {
   addCommentBox,
-  canPlaceNodeType,
   connectPins,
   disconnectPin,
   nextId,
@@ -910,7 +909,7 @@ export function setupPointerInteraction(
             const isFunctionBody = store.state.activeFunctionId !== null;
             const seenEventTypes = new Set<string>();
             const placeableNodes = payload.nodes.filter((n) => {
-              if (!canPlaceNodeType(n.type, pasteGraph, isFunctionBody))
+              if (!pasteGraph.canPlaceNodeType(n.type, isFunctionBody))
                 return false;
               if (getNodeDef(n.type).eventTrigger) {
                 if (seenEventTypes.has(n.type)) return false;

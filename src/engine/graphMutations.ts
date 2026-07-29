@@ -142,21 +142,7 @@ export function resolveNodeLabel(
   return def.label;
 }
 
-/** True if a node of this type is allowed to be placed into `graph` right now — trivially true for
- * any non-event node type. An event node (see NodeDef.eventTrigger — On Start/On Interval/On Run)
- * may only live in the root graph, never inside a function body, and at most one instance of each
- * event TYPE may exist per graph, mirroring how Unreal only allows one BeginPlay/EventTick per
- * Blueprint. Used to filter both the node-creation menu and paste. */
-export function canPlaceNodeType(
-  type: string,
-  graph: Graph,
-  isFunctionBody: boolean,
-): boolean {
-  const def = getNodeDef(type);
-  if (!def.eventTrigger) return true;
-  if (isFunctionBody) return false;
-  return !graph.nodes.some((n) => n.type === type);
-}
+
 
 /** True if this node's canvas right-click menu should offer a Disable/Enable toggle at all — it
  * must have at least one execution pin (a pure data node has no "code" to skip) and must not be an
