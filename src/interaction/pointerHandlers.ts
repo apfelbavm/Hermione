@@ -343,6 +343,33 @@ export function setupPointerInteraction(
     }
   }
 
+  /** Recomputes the marquee box's far corner and which nodes it currently touches from the CURRENT
+   * camera and the cursor's last known SCREEN position — shared by the mousemove handler and the
+   * auto-pan ticker, same reason as updateNodeDragPositions/updateWireDragPreview: panning the
+   * camera under a stationary cursor (dragging the selection box right up against a canvas edge)
+   * changes what world point/nodes that screen position resolves to, exactly as if the cursor
+   * itself had moved there. */
+  function updateMarqueeSelection(): void {
+    if (drag.kind !== "marquee" || !store.state.marqueeSelection) return;
+    const graph = getEditingGraph(store.state);
+    const { camera } = store.state;
+    const marquee = store.state.marqueeSelection;
+    marquee.currentWorld = camera.screenToWorld(
+      lastMouseScreenPos.x,
+      lastMouseScreenPos.y,
+    );
+    const variables = getVisibleVariablesForState(store.state);
+    const functions = store.state.rootGraph.functions;
+    const scripts = store.state.rootGraph.scripts;
+    store.state.selectedNodeIds = computeMarqueeSelectedNodeIds(
+      graph,
+      variables,
+      functions,
+      scripts,
+      marquee,
+    );
+  }
+
   function startAutoPanLoop(): void {
     if (autoPanFrame !== null) return;
     const tick = () => {
@@ -351,7 +378,8 @@ export function setupPointerInteraction(
       if (
         drag.kind !== "wire" &&
         drag.kind !== "wire-multi" &&
-        drag.kind !== "nodes"
+        drag.kind !== "nodes" &&
+        drag.kind !== "marquee"
       )
         return;
       const rect = canvas.getBoundingClientRect();
@@ -363,6 +391,7 @@ export function setupPointerInteraction(
       if (dx !== 0 || dy !== 0) {
         store.state.camera.pan(dx, dy);
         if (drag.kind === "nodes") updateNodeDragPositions();
+        else if (drag.kind === "marquee") updateMarqueeSelection();
         else updateWireDragPreview();
         store.notify();
       }
@@ -594,6 +623,7 @@ export function setupPointerInteraction(
       currentWorld: worldPos,
     };
     drag = { kind: "marquee" };
+    startAutoPanLoop();
     store.notify();
   });
 
@@ -683,16 +713,7 @@ export function setupPointerInteraction(
     }
 
     if (drag.kind === "marquee") {
-      const pos = screenPos(e);
-      const worldPos = camera.screenToWorld(pos.x, pos.y);
-      const marquee = store.state.marqueeSelection;
-      if (marquee) {
-        marquee.currentWorld = worldPos;
-        const variables = getVisibleVariablesForState(store.state);
-        const functions = store.state.rootGraph.functions;
-        const scripts = store.state.rootGraph.scripts;
-        store.state.selectedNodeIds = computeMarqueeSelectedNodeIds(graph, variables, functions, scripts, marquee);
-      }
+      updateMarqueeSelection();
       store.notify();
       return;
     }
