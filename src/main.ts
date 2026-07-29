@@ -4,7 +4,6 @@ import { createExecutionContext, runExecFrom } from "./engine/executor";
 import {
   canToggleDisabled,
   connectPins,
-  createNodeInstance,
   hasConnectedDataOutput,
   insertRerouteOnConnection,
   removeConnection,
@@ -79,6 +78,7 @@ import {
 } from "./persistence/save";
 import { downloadCompiledGraph } from "./compiler/codegen";
 import { isNodeLatent } from "./engine/latency";
+import { NodeInstance } from "./engine/nodeInstance";
 
 registerBuiltins();
 
@@ -484,7 +484,7 @@ function createNodeAndMaybeConnect(
   anchors: WireAnchor[] = [],
 ): void {
   const graph = getEditingGraph(store.state);
-  const node = createNodeInstance(
+  const node = NodeInstance.createNodeInstance(
     def.type,
     applySnapIfEnabled(worldPos),
     def.pins,
@@ -717,7 +717,7 @@ function spawnCallNodeAt(
 ): void {
   const def = getNodeDef("function.call");
   const pinDefs = def.deriveFunctionPins!(fn);
-  const node = createNodeInstance(
+  const node = NodeInstance.createNodeInstance(
     "function.call",
     applySnapIfEnabled(worldPos),
     pinDefs,
@@ -736,7 +736,7 @@ function spawnVariableNodeAt(
 ): void {
   const def = getNodeDef(type);
   const pinDefs = def.derivePins!(variable);
-  const node = createNodeInstance(
+  const node = NodeInstance.createNodeInstance(
     type,
     applySnapIfEnabled(worldPos),
     pinDefs,
@@ -753,7 +753,7 @@ function spawnCodeNodeAt(
 ): void {
   const def = getNodeDef("code.run");
   const pinDefs = def.deriveScriptPins!(script);
-  const node = createNodeInstance(
+  const node = NodeInstance.createNodeInstance(
     "code.run",
     applySnapIfEnabled(worldPos),
     pinDefs,
@@ -774,7 +774,7 @@ function spawnReturnNodeAt(
 ): void {
   const def = getNodeDef("function.return");
   const pinDefs = def.deriveFunctionPins!(fn);
-  const node = createNodeInstance(
+  const node = NodeInstance.createNodeInstance(
     "function.return",
     applySnapIfEnabled(worldPos),
     pinDefs,

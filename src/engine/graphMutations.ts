@@ -9,18 +9,11 @@ import type {
   NodeDef,
   Pin,
   PinContainer,
-  PinDef,
   PinSignatureEntry,
   PinType,
   Variable,
 } from "./types";
 
-/** Seed element/key type for a freshly-created configurableElementType node instance (see
- * NodeDef.configurableElementType) — arbitrary but consistent defaults, same spirit as
- * variablePanel.ts/functionIoPanel.ts always defaulting a brand-new Variable/PinSignatureEntry to
- * type "number". */
-const DEFAULT_ELEMENT_TYPE: PinType = "number";
-const DEFAULT_KEY_TYPE: PinType = "string";
 
 /** Defensive shallow clone for a value about to be copied from a PinDef/Variable's `defaultValue`
  * into a live Pin.value slot. A container's default is a plain array (see PinContainer's own doc
@@ -47,43 +40,6 @@ export const DEFAULT_VALUE_BY_TYPE: Record<PinType, unknown> = {
   object: null,
 };
 
-export function createNodeInstance(
-  type: string,
-  position: { x: number; y: number },
-  pinDefs: PinDef[],
-  id: string = nextId("node"),
-  variableId?: string,
-  functionId?: string,
-  scriptId?: string,
-): NodeInstance {
-  // detailProperties are seeded here (not passed in by the caller) since every caller already
-  // identifies the node purely by `type` — looking them up off the registered NodeDef keeps every
-  // call site from having to remember to merge them in separately.
-  const def = getNodeDef(type);
-  const detailProperties = def.detailProperties ?? [];
-  const pins: Record<string, Pin> = {};
-  for (const entry of [...pinDefs, ...detailProperties]) {
-    pins[entry.id] =
-      entry.direction === "input"
-        ? { value: cloneDefaultValue(entry.defaultValue) }
-        : {};
-  }
-  const node = new NodeInstance(
-    id,
-    type,
-    position,
-    pins,
-    variableId,
-    functionId,
-    scriptId,
-  );
-  if (def.configurableElementType) {
-    node.elementType = DEFAULT_ELEMENT_TYPE;
-    if (def.configurableElementType.includeKeyType)
-      node.mapKeyType = DEFAULT_KEY_TYPE;
-  }
-  return node;
-}
 
 /** The display label for a node instance — normally its NodeDef's static label, except: a node
  * bound to a Variable (Get/Set) shows "Get "/"Set " followed by that variable's name (so the graph
@@ -393,7 +349,7 @@ export function insertRerouteOnConnection(
 
   const isExec = fromPinDef.type === "exec";
   const rerouteType = isExec ? "core.rerouteExec" : "core.reroute";
-  const reroute = createNodeInstance(
+  const reroute = NodeInstance.createNodeInstance(
     rerouteType,
     position,
     getNodeDef(rerouteType).pins,
@@ -611,7 +567,7 @@ export function createFunctionDef(name: string): FunctionDef {
   const entryPins = entryDef.deriveFunctionPins
     ? entryDef.deriveFunctionPins(fn)
     : entryDef.pins;
-  const entryNode = createNodeInstance(
+  const entryNode = NodeInstance.createNodeInstance(
     "function.entry",
     { x: 40, y: 120 },
     entryPins,
@@ -625,7 +581,7 @@ export function createFunctionDef(name: string): FunctionDef {
   const returnPins = returnDef.deriveFunctionPins
     ? returnDef.deriveFunctionPins(fn)
     : returnDef.pins;
-  const returnNode = createNodeInstance(
+  const returnNode = NodeInstance.createNodeInstance(
     "function.return",
     { x: 360, y: 120 },
     returnPins,

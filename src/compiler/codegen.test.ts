@@ -5,10 +5,11 @@ import { pathToFileURL } from "node:url";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../nodes";
 import { createExecutionContext, runExecFrom } from "../engine/executor";
-import { connectPins, createNodeInstance } from "../engine/graphMutations";
+import { connectPins } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import { compileGraph } from "./codegen";
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 function addBuiltinNode(
   graph: Graph,
@@ -17,7 +18,7 @@ function addBuiltinNode(
   id?: string,
 ) {
   const def = getNodeDef(type);
-  const node = createNodeInstance(type, position, def.pins, id);
+  const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
   return node;
 }
@@ -218,7 +219,7 @@ describe("compileGraph", () => {
     const setDef = getNodeDef("variable.set");
     const getDef = getNodeDef("variable.get");
 
-    const set1 = createNodeInstance(
+    const set1 = NodeInstance.createNodeInstance(
       "variable.set",
       { x: 0, y: 0 },
       setDef.derivePins!(variable),
@@ -227,7 +228,7 @@ describe("compileGraph", () => {
     );
     set1.pins.value.value = "1";
     graph.nodes.push(set1);
-    const getNode = createNodeInstance(
+    const getNode = NodeInstance.createNodeInstance(
       "variable.get",
       { x: 0, y: 0 },
       getDef.derivePins!(variable),
@@ -241,7 +242,7 @@ describe("compileGraph", () => {
       { x: 0, y: 0 },
       "print1",
     );
-    const set2 = createNodeInstance(
+    const set2 = NodeInstance.createNodeInstance(
       "variable.set",
       { x: 0, y: 0 },
       setDef.derivePins!(variable),
@@ -331,7 +332,7 @@ describe("compileGraph", () => {
       "branch",
     );
     const getDef = getNodeDef("variable.get");
-    const getCond = createNodeInstance(
+    const getCond = NodeInstance.createNodeInstance(
       "variable.get",
       { x: 0, y: 0 },
       getDef.derivePins!(variable),

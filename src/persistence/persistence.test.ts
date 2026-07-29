@@ -1,13 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../nodes";
 import { createExecutionContext, runExecFrom } from "../engine/executor";
-import { connectPins, createNodeInstance } from "../engine/graphMutations";
+import { connectPins } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import { type Variable } from "../engine/types";
 import { deserializeGraph } from "./load";
 import { serializeGraph } from "./save";
 import { CURRENT_FORMAT_VERSION } from "./schema";
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 function addBuiltinNode(
   graph: Graph,
@@ -16,7 +17,7 @@ function addBuiltinNode(
   id?: string,
 ) {
   const def = getNodeDef(type);
-  const node = createNodeInstance(type, position, def.pins, id);
+  const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
   return node;
 }

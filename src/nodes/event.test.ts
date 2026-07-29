@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "./index";
-import { createNodeInstance } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
+import { NodeInstance } from "../engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -25,7 +25,7 @@ describe("On Interval's intervalMs is a Details-panel property, never a wireable
     expect(def.pins.some((p) => p.id === "intervalMs")).toBe(false);
     expect(def.pins.some((p) => p.id === "name")).toBe(false);
 
-    const node = createNodeInstance("event.interval", { x: 0, y: 0 }, def.pins);
+    const node = NodeInstance.createNodeInstance("event.interval", { x: 0, y: 0 }, def.pins);
     expect(node.resolvePinDefs([], []).some((p) => p.id === "intervalMs")).toBe(
       false,
     );
@@ -46,13 +46,13 @@ describe("On Interval's intervalMs is a Details-panel property, never a wireable
 
   it("still gets seeded onto the instance's pins record at creation, for storage/persistence", () => {
     const def = getNodeDef("event.interval");
-    const node = createNodeInstance("event.interval", { x: 0, y: 0 }, def.pins);
+    const node = NodeInstance.createNodeInstance("event.interval", { x: 0, y: 0 }, def.pins);
     expect(node.pins.intervalMs).toEqual({ value: 5000 });
   });
 
   it("describeInstance still reads the live value for the compiled manifest", () => {
     const def = getNodeDef("event.interval");
-    const node = createNodeInstance("event.interval", { x: 0, y: 0 }, def.pins);
+    const node = NodeInstance.createNodeInstance("event.interval", { x: 0, y: 0 }, def.pins);
     node.pins.intervalMs!.value = 9000;
     expect(def.eventTrigger!.describeInstance!(node)).toEqual({
       intervalMs: 9000,

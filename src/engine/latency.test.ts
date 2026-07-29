@@ -1,9 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../nodes";
-import { connectPins, createFunctionDef, createNodeInstance } from "./graphMutations";
+import { connectPins, createFunctionDef } from "./graphMutations";
 import { isFunctionLatent, isNodeLatent } from "./latency";
 import { getNodeDef } from "./registry";
 import { Graph } from "./graph";
+import { NodeInstance } from "./nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -11,7 +12,7 @@ beforeAll(() => {
 
 function addBuiltinNode(graph: Graph, type: string, id: string, position = { x: 0, y: 0 }) {
   const def = getNodeDef(type);
-  const node = createNodeInstance(type, position, def.pins, id);
+  const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
   return node;
 }
@@ -118,7 +119,7 @@ describe("isNodeLatent — Array/Set/Map For Each", () => {
   it("Array For Each is latent when its body contains a latent node", () => {
     const graph = new Graph("g", "root");
     const forEachDef = getNodeDef("array.forEach");
-    const forEach = createNodeInstance("array.forEach", { x: 0, y: 0 }, forEachDef.pins, "forEach");
+    const forEach = NodeInstance.createNodeInstance("array.forEach", { x: 0, y: 0 }, forEachDef.pins, "forEach");
     graph.nodes.push(forEach);
     addBuiltinNode(graph, "flow.delay", "delay");
     connectPins(graph, [], [], { fromNode: "forEach", fromPin: "loop-body", toNode: "delay", toPin: "exec-in" });
@@ -129,8 +130,8 @@ describe("isNodeLatent — Array/Set/Map For Each", () => {
     const graph = new Graph("g", "root");
     const setDef = getNodeDef("set.forEach");
     const mapDef = getNodeDef("map.forEach");
-    const setForEach = createNodeInstance("set.forEach", { x: 0, y: 0 }, setDef.pins, "setForEach");
-    const mapForEach = createNodeInstance("map.forEach", { x: 0, y: 0 }, mapDef.pins, "mapForEach");
+    const setForEach = NodeInstance.createNodeInstance("set.forEach", { x: 0, y: 0 }, setDef.pins, "setForEach");
+    const mapForEach = NodeInstance.createNodeInstance("map.forEach", { x: 0, y: 0 }, mapDef.pins, "mapForEach");
     graph.nodes.push(setForEach, mapForEach);
     expect(isNodeLatent(setForEach, graph, graph)).toBe(false);
     expect(isNodeLatent(mapForEach, graph, graph)).toBe(false);
@@ -146,7 +147,7 @@ describe("isFunctionLatent / Call Function propagation", () => {
     expect(isFunctionLatent(fn, rootGraph)).toBe(false);
 
     const callDef = getNodeDef("function.call");
-    const callNode = createNodeInstance("function.call", { x: 0, y: 0 }, callDef.deriveFunctionPins!(fn), "call", undefined, fn.id);
+    const callNode = NodeInstance.createNodeInstance("function.call", { x: 0, y: 0 }, callDef.deriveFunctionPins!(fn), "call", undefined, fn.id);
     rootGraph.nodes.push(callNode);
     expect(isNodeLatent(callNode, rootGraph, rootGraph)).toBe(false);
   });
@@ -159,7 +160,7 @@ describe("isFunctionLatent / Call Function propagation", () => {
     expect(isFunctionLatent(fn, rootGraph)).toBe(true);
 
     const callDef = getNodeDef("function.call");
-    const callNode = createNodeInstance("function.call", { x: 0, y: 0 }, callDef.deriveFunctionPins!(fn), "call", undefined, fn.id);
+    const callNode = NodeInstance.createNodeInstance("function.call", { x: 0, y: 0 }, callDef.deriveFunctionPins!(fn), "call", undefined, fn.id);
     rootGraph.nodes.push(callNode);
     expect(isNodeLatent(callNode, rootGraph, rootGraph)).toBe(true);
   });
@@ -172,7 +173,7 @@ describe("isFunctionLatent / Call Function propagation", () => {
 
     const loop = addBuiltinNode(rootGraph, "flow.forLoop", "loop");
     const callDef = getNodeDef("function.call");
-    const callNode = createNodeInstance("function.call", { x: 0, y: 0 }, callDef.deriveFunctionPins!(fn), "call", undefined, fn.id);
+    const callNode = NodeInstance.createNodeInstance("function.call", { x: 0, y: 0 }, callDef.deriveFunctionPins!(fn), "call", undefined, fn.id);
     rootGraph.nodes.push(callNode);
     connectPins(rootGraph, [], rootGraph.functions, { fromNode: "loop", fromPin: "loop-body", toNode: "call", toPin: "exec-in" });
 
@@ -184,7 +185,7 @@ describe("isFunctionLatent / Call Function propagation", () => {
     const fn = createFunctionDef("Recursive");
     rootGraph.functions.push(fn);
     const callDef = getNodeDef("function.call");
-    const selfCall = createNodeInstance("function.call", { x: 0, y: 0 }, callDef.deriveFunctionPins!(fn), "selfCall", undefined, fn.id);
+    const selfCall = NodeInstance.createNodeInstance("function.call", { x: 0, y: 0 }, callDef.deriveFunctionPins!(fn), "selfCall", undefined, fn.id);
     fn.body.nodes.push(selfCall);
 
     expect(isFunctionLatent(fn, rootGraph)).toBe(false);

@@ -1,13 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../nodes";
 import { createExecutionContext, runExecFrom } from "./executor";
-import { createNodeInstance, connectPins } from "./graphMutations";
+import {  connectPins } from "./graphMutations";
 import { getNodeDef } from "./registry";
 import { Graph } from "./graph";
+import { NodeInstance } from "./nodeInstance";
 
 function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);
-  const node = createNodeInstance(type, position, def.pins, id);
+  const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
   return node;
 }
@@ -86,12 +87,12 @@ describe("executor", () => {
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
 
     const setDef = getNodeDef("variable.set");
-    const setNode = createNodeInstance("variable.set", { x: 100, y: 0 }, setDef.derivePins!(variable), "set", variable.id);
+    const setNode = NodeInstance.createNodeInstance("variable.set", { x: 100, y: 0 }, setDef.derivePins!(variable), "set", variable.id);
     setNode.pins.value.value = "hello from variable";
     graph.nodes.push(setNode);
 
     const getDef = getNodeDef("variable.get");
-    const getNode = createNodeInstance("variable.get", { x: 200, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
+    const getNode = NodeInstance.createNodeInstance("variable.get", { x: 200, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
     graph.nodes.push(getNode);
 
     const print = addBuiltinNode(graph, "debug.print", { x: 300, y: 0 }, "print");
@@ -117,16 +118,16 @@ describe("executor", () => {
     const setDef = getNodeDef("variable.set");
     const getDef = getNodeDef("variable.get");
 
-    const set1 = createNodeInstance("variable.set", { x: 0, y: 0 }, setDef.derivePins!(variable), "set1", variable.id);
+    const set1 = NodeInstance.createNodeInstance("variable.set", { x: 0, y: 0 }, setDef.derivePins!(variable), "set1", variable.id);
     set1.pins.value.value = "1";
     graph.nodes.push(set1);
 
-    const getNode = createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
+    const getNode = NodeInstance.createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
     graph.nodes.push(getNode);
 
     const print1 = addBuiltinNode(graph, "debug.print", { x: 0, y: 0 }, "print1");
 
-    const set2 = createNodeInstance("variable.set", { x: 0, y: 0 }, setDef.derivePins!(variable), "set2", variable.id);
+    const set2 = NodeInstance.createNodeInstance("variable.set", { x: 0, y: 0 }, setDef.derivePins!(variable), "set2", variable.id);
     set2.pins.value.value = "2";
     graph.nodes.push(set2);
 

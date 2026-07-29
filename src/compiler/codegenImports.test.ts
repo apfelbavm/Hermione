@@ -3,14 +3,15 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../nodes";
-import { connectPins, createNodeInstance } from "../engine/graphMutations";
+import { connectPins } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import { compileGraph } from "./codegen";
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);
-  const node = createNodeInstance(type, position, def.pins, id);
+  const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
   return node;
 }

@@ -1,9 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "./index";
-import {
-  createNodeInstance,
-  removeInstancePin,
-} from "../engine/graphMutations";
+import { removeInstancePin } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import { Graph } from "../engine/graph";
 import { NodeInstance } from "../engine/nodeInstance";
@@ -14,7 +11,11 @@ beforeAll(() => {
 
 function appendNode(): NodeInstance {
   const def = getNodeDef("string.append");
-  return createNodeInstance("string.append", { x: 0, y: 0 }, def.pins);
+  return NodeInstance.createNodeInstance(
+    "string.append",
+    { x: 0, y: 0 },
+    def.pins,
+  );
 }
 
 describe("string.fromNumber / fromBoolean / fromJson", () => {

@@ -1,10 +1,11 @@
 import { getNodeDef } from "./engine/registry";
-import { connectPins, createNodeInstance } from "./engine/graphMutations";
+import { connectPins } from "./engine/graphMutations";
 import { Graph } from "./engine/graph";
+import { NodeInstance } from "./engine/nodeInstance";
 
 function addNode(graph: Graph, type: string, position: { x: number; y: number }, id: string) {
   const def = getNodeDef(type);
-  const node = createNodeInstance(type, position, def.pins, id);
+  const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
   return node;
 }

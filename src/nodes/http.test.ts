@@ -1,9 +1,9 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "./index";
 import { createExecutionContext, runExecFrom } from "../engine/executor";
-import { createNodeInstance } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -16,7 +16,7 @@ afterEach(() => {
 function buildGraph(pinValues: Record<string, unknown> = {}) {
   const graph: Graph = new Graph("g", "test");
   const def = getNodeDef("http.request");
-  const node = createNodeInstance("http.request", { x: 0, y: 0 }, def.pins, "req");
+  const node = NodeInstance.createNodeInstance("http.request", { x: 0, y: 0 }, def.pins, "req");
   for (const [id, value] of Object.entries(pinValues)) {
     node.pins[id].value = value;
   }

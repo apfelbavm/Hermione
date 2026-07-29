@@ -1,3 +1,4 @@
+import { cloneDefaultValue, nextId } from "./graphMutations";
 import { getNodeDef } from "./registry";
 import {
   CodeScriptDef,
@@ -55,6 +56,51 @@ export class NodeInstance {
     this.elementType = undefined;
     this.mapKeyType = undefined;
     this.container = undefined;
+  }
+
+  /** Seed element/key type for a freshly-created configurableElementType node instance (see
+   * NodeDef.configurableElementType) — arbitrary but consistent defaults, same spirit as
+   * variablePanel.ts/functionIoPanel.ts always defaulting a brand-new Variable/PinSignatureEntry to
+   * type "number". */
+  static DEFAULT_ELEMENT_TYPE: PinType = "number";
+  static DEFAULT_KEY_TYPE: PinType = "string";
+
+  static createNodeInstance(
+    type: string,
+    position: { x: number; y: number },
+    pinDefs: PinDef[],
+    id: string = nextId("node"),
+    variableId?: string,
+    functionId?: string,
+    scriptId?: string,
+  ): NodeInstance {
+    // detailProperties are seeded here (not passed in by the caller) since every caller already
+    // identifies the node purely by `type` — looking them up off the registered NodeDef keeps every
+    // call site from having to remember to merge them in separately.
+    const def = getNodeDef(type);
+    const detailProperties = def.detailProperties ?? [];
+    const pins: Record<string, Pin> = {};
+    for (const entry of [...pinDefs, ...detailProperties]) {
+      pins[entry.id] =
+        entry.direction === "input"
+          ? { value: cloneDefaultValue(entry.defaultValue) }
+          : {};
+    }
+    const node = new NodeInstance(
+      id,
+      type,
+      position,
+      pins,
+      variableId,
+      functionId,
+      scriptId,
+    );
+    if (def.configurableElementType) {
+      node.elementType = NodeInstance.DEFAULT_ELEMENT_TYPE;
+      if (def.configurableElementType.includeKeyType)
+        node.mapKeyType = NodeInstance.DEFAULT_KEY_TYPE;
+    }
+    return node;
   }
 
   /** Resolves the pin defs for a node instance, accounting for variable-derived (Get/Set) nodes,

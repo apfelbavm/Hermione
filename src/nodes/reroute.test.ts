@@ -1,9 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "./index";
 import { createExecutionContext, runExecFrom } from "../engine/executor";
-import { connectPins, createNodeInstance } from "../engine/graphMutations";
+import { connectPins } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 
 beforeAll(() => {
@@ -12,7 +13,7 @@ beforeAll(() => {
 
 function addBuiltinNode(graph: Graph, type: string, id: string, position = { x: 0, y: 0 }) {
   const def = getNodeDef(type);
-  const node = createNodeInstance(type, position, def.pins, id);
+  const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
   return node;
 }
@@ -26,7 +27,7 @@ describe("core.reroute (data)", () => {
 
   it("deriveInstancePins reflects the instance's own elementType/container/mapKeyType", () => {
     const def = getNodeDef("core.reroute");
-    const node = createNodeInstance("core.reroute", { x: 0, y: 0 }, def.pins, "r1");
+    const node = NodeInstance.createNodeInstance("core.reroute", { x: 0, y: 0 }, def.pins, "r1");
     node.elementType = "string";
     node.container = "array";
     const pins = def.deriveInstancePins!(node);

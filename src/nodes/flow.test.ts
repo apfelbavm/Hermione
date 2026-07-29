@@ -1,9 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "./index";
 import { createExecutionContext, runExecFrom } from "../engine/executor";
-import { connectPins, createNodeInstance, removeInstancePin } from "../engine/graphMutations";
+import { connectPins,  removeInstancePin } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 
 beforeAll(() => {
@@ -12,7 +13,7 @@ beforeAll(() => {
 
 function addBuiltinNode(graph: Graph, type: string, id: string, position = { x: 0, y: 0 }) {
   const def = getNodeDef(type);
-  const node = createNodeInstance(type, position, def.pins, id);
+  const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
   return node;
 }
@@ -101,7 +102,7 @@ describe("flow.forLoop", () => {
 describe("flow.sequence", () => {
   it("starts with exactly two removable 'Then' pins", () => {
     const def = getNodeDef("flow.sequence");
-    const node = createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
+    const node = NodeInstance.createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
     const pins = def.deriveInstancePins!(node);
     expect(pins.map((p) => p.id)).toEqual(["exec-in", "then-0", "then-1"]);
     expect(pins.find((p) => p.id === "then-0")?.removable).toBe(true);
@@ -110,7 +111,7 @@ describe("flow.sequence", () => {
 
   it("adds a third 'Then 2' pin via addInstancePinEntry", () => {
     const def = getNodeDef("flow.sequence");
-    const node = createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
+    const node = NodeInstance.createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
     def.addInstancePinEntry!(node);
     const pins = def.deriveInstancePins!(node);
     expect(pins.map((p) => p.id)).toEqual(["exec-in", "then-0", "then-1", "then-2"]);
@@ -120,7 +121,7 @@ describe("flow.sequence", () => {
   it("renumbers labels contiguously after removing a middle entry, keeping the underlying pin ids", () => {
     const graph = new Graph("g", "root");
     const def = getNodeDef("flow.sequence");
-    const node = createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
+    const node = NodeInstance.createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
     graph.nodes.push(node);
     def.addInstancePinEntry!(node); // now then-0, then-1, then-2
 
@@ -177,7 +178,7 @@ describe("flow.sequence", () => {
 describe("flow.parallel", () => {
   it("starts with exactly two removable 'Branch' pins plus a fixed 'Completed' pin", () => {
     const def = getNodeDef("flow.parallel");
-    const node = createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
+    const node = NodeInstance.createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
     const pins = def.deriveInstancePins!(node);
     expect(pins.map((p) => p.id)).toEqual(["exec-in", "branch-0", "branch-1", "completed"]);
     expect(pins.find((p) => p.id === "branch-0")?.removable).toBe(true);
@@ -187,7 +188,7 @@ describe("flow.parallel", () => {
 
   it("adds a third 'Branch 2' pin via addInstancePinEntry", () => {
     const def = getNodeDef("flow.parallel");
-    const node = createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
+    const node = NodeInstance.createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
     def.addInstancePinEntry!(node);
     const pins = def.deriveInstancePins!(node);
     expect(pins.map((p) => p.id)).toEqual(["exec-in", "branch-0", "branch-1", "branch-2", "completed"]);
@@ -197,7 +198,7 @@ describe("flow.parallel", () => {
   it("renumbers labels contiguously after removing a middle entry, keeping the underlying pin ids", () => {
     const graph = new Graph("g", "root");
     const def = getNodeDef("flow.parallel");
-    const node = createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
+    const node = NodeInstance.createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
     graph.nodes.push(node);
     def.addInstancePinEntry!(node); // now branch-0, branch-1, branch-2
 

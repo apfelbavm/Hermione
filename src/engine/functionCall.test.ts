@@ -7,17 +7,18 @@ import {
   addVariable,
   connectPins,
   createFunctionDef,
-  createNodeInstance,
+  
   nextId,
   removeNode,
 } from "./graphMutations";
 import { getNodeDef } from "./registry";
 import {  type Variable } from "./types";
 import { Graph } from "./graph";
+import { NodeInstance } from "./nodeInstance";
 
 function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);
-  const node = createNodeInstance(type, position, def.pins, id);
+  const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
   return node;
 }
@@ -31,7 +32,7 @@ function addFunctionBoundNode(
 ) {
   const def = getNodeDef(type);
   const pins = def.deriveFunctionPins!(fn);
-  const node = createNodeInstance(type, { x: 0, y: 0 }, pins, id, undefined, functionId);
+  const node = NodeInstance.createNodeInstance(type, { x: 0, y: 0 }, pins, id, undefined, functionId);
   graph.nodes.push(node);
   return node;
 }
@@ -177,7 +178,7 @@ describe("function calls", () => {
 
     const entryNode = fn.body.nodes.find((n) => n.type === "function.entry")!;
     const setDef = getNodeDef("variable.set");
-    const setNode = createNodeInstance(
+    const setNode = NodeInstance.createNodeInstance(
       "variable.set",
       { x: 0, y: 0 },
       setDef.derivePins!(localVar),
