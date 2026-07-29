@@ -19,7 +19,6 @@ import {
   removeScriptInput,
   removeVariable,
   resolveNodeLabel,
-  resolvePinDefs,
   updateScriptInput,
   updateVariable,
 } from "./graphMutations";
@@ -808,8 +807,7 @@ describe("addScriptInput / removeScriptInput", () => {
       defaultValue: "",
     });
     const codeNode = graph.nodes.find((n) => n.id === "code1")!;
-    const pins = resolvePinDefs(
-      codeNode,
+    const pins = codeNode.resolvePinDefs(
       graph.variables,
       graph.functions,
       graph.scripts,

@@ -11,7 +11,6 @@ import {
   removeInstancePin,
   removeNode,
   resolveNodeLabel,
-  resolvePinDefs,
 } from "./engine/graphMutations";
 import { connectionsTouchingPin } from "./engine/graphQueries";
 import {
@@ -962,7 +961,7 @@ frameAllButton.addEventListener("click", () => {
     ...graph.nodes.map((n) =>
       computeNodeWorldRect(
         n,
-        resolvePinDefs(n, variables, functions, scripts),
+        n.resolvePinDefs(variables, functions, scripts),
         variables,
         functions,
         scripts,

@@ -1,4 +1,5 @@
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 export const CURRENT_FORMAT_VERSION = 3;
 export const LOCAL_STORAGE_KEY = "hermione:last-graph";
@@ -18,13 +19,33 @@ export function toDocument(graph: Graph): SavedDocument {
  * field, which is the only thing that would require version-specific logic beyond it. */
 const SUPPORTED_FORMAT_VERSIONS = [1, 2, CURRENT_FORMAT_VERSION];
 
+/** Every node in `doc.graph` is likewise a plain object fresh out of JSON.parse, not a real
+ * `NodeInstance` — it has none of NodeInstance.prototype's methods (e.g. resolvePinDefs). Rebuilds
+ * a proper instance so the loaded node behaves identically to one built with `new NodeInstance(...)`. */
+function reviveNode(node: NodeInstance): NodeInstance {
+  const revived = new NodeInstance(
+    node.id,
+    node.type,
+    node.position,
+    node.pins,
+    node.variableId,
+    node.functionId,
+    node.scriptId,
+  );
+  revived.disabled = node.disabled;
+  revived.elementType = node.elementType;
+  revived.mapKeyType = node.mapKeyType;
+  revived.container = node.container;
+  return revived;
+}
+
 /** `doc.graph` (and every function's `body`) is a plain object fresh out of JSON.parse, not a real
  * `Graph` instance — it has none of Graph.prototype's methods (e.g. getVisibleVariables). Rebuilds
  * a proper instance, recursively, so the loaded graph behaves identically to one built with `new
  * Graph(...)`. */
 function reviveGraph(graph: Graph): Graph {
   const revived = new Graph(graph.id, graph.name);
-  revived.nodes = graph.nodes ?? [];
+  revived.nodes = (graph.nodes ?? []).map(reviveNode);
   revived.connections = graph.connections ?? [];
   revived.variables = graph.variables ?? [];
   revived.commentBoxes = graph.commentBoxes ?? [];

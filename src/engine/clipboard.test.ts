@@ -12,16 +12,6 @@ import { type Connection, type Variable } from "./types";
 import { Graph } from "./graph";
 import { NodeInstance } from "./nodeInstance";
 
-function node(
-  id: string,
-  type: string,
-  x: number,
-  y: number,
-  extra: Partial<NodeInstance> = {},
-): NodeInstance {
-  return { id, type, position: { x, y }, pins: {}, ...extra };
-}
-
 describe("parseClipboardPayload", () => {
   it("rejects non-JSON text", () => {
     expect(parseClipboardPayload("not json at all")).toBeNull();
@@ -59,7 +49,7 @@ describe("parseClipboardPayload", () => {
   });
 
   it("accepts a well-formed nodes payload round-tripped through serialize", () => {
-    const nodes = [node("n1", "math.add", 0, 0)];
+    const nodes = [new NodeInstance("n1", "math.add", { x: 0, y: 0 }, {})];
     const connections: Connection[] = [];
     const parsed = parseClipboardPayload(
       serializeNodesClipboardPayload(nodes, connections),
@@ -142,9 +132,9 @@ describe("cloneNodesForClipboard", () => {
   it("copies only selected nodes and connections strictly between them", () => {
     const graph = new Graph("g", "Root");
     graph.nodes.push(
-      node("a", "math.add", 0, 0),
-      node("b", "math.add", 100, 0),
-      node("c", "math.add", 200, 0),
+      new NodeInstance("a", "math.add", { x: 0, y: 0 }, {}),
+      new NodeInstance("b", "math.add", { x: 100, y: 0 }, {}),
+      new NodeInstance("c", "math.add", { x: 200, y: 0 }, {}),
     );
     graph.connections.push(
       { id: "c1", fromNode: "a", fromPin: "out", toNode: "b", toPin: "in" },
@@ -163,8 +153,8 @@ describe("cloneNodesForClipboard", () => {
   it("excludes structural function.entry/function.return nodes even if selected", () => {
     const graph = new Graph("g", "Root");
     graph.nodes.push(
-      node("entry", "function.entry", 0, 0),
-      node("mid", "math.add", 50, 0),
+      new NodeInstance("entry", "function.entry", { x: 0, y: 0 }, {}),
+      new NodeInstance("mid", "math.add", { x: 50, y: 0 }, {}),
     );
 
     const { nodes } = cloneNodesForClipboard(graph, new Set(["entry", "mid"]));
@@ -174,7 +164,7 @@ describe("cloneNodesForClipboard", () => {
   it("deep-clones so mutating the source graph doesn't affect the copy", () => {
     const graph = new Graph("g", "Root");
     graph.nodes.push(
-      node("a", "math.add", 0, 0, { pins: { in: { value: 1 } } }),
+      new NodeInstance("a", "math.add", { x: 0, y: 0 }, { in: { value: 1 } }),
     );
     const { nodes } = cloneNodesForClipboard(graph, new Set(["a"]));
     graph.nodes[0].pins.in.value = 999;
@@ -190,8 +180,13 @@ describe("pasteNodesIntoGraph", () => {
       version: 1,
       kind: "nodes",
       nodes: [
-        node("a", "math.add", 10, 10),
-        node("b", "math.add", 60, 10, { pins: { in: { connectionId: "c1" } } }),
+        new NodeInstance("a", "math.add", { x: 10, y: 10 }, {}),
+        new NodeInstance(
+          "b",
+          "math.add",
+          { x: 60, y: 10 },
+          { in: { connectionId: "c1" } },
+        ),
       ],
       connections: [
         { id: "c1", fromNode: "a", fromPin: "out", toNode: "b", toPin: "in" },
@@ -224,7 +219,7 @@ describe("pasteNodesIntoGraph", () => {
       source: "hermione-graph-editor",
       version: 1,
       kind: "nodes",
-      nodes: [node("a", "math.add", 0, 0)],
+      nodes: [new NodeInstance("a", "math.add", { x: 0, y: 0 }, {})],
       connections: [
         {
           id: "c1",

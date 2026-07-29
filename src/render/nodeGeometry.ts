@@ -1,5 +1,5 @@
 import { getNodeDef } from "../engine/registry";
-import { resolveNodeLabel, resolvePinDefs } from "../engine/graphMutations";
+import { resolveNodeLabel } from "../engine/graphMutations";
 import type {
   CodeScriptDef,
   FunctionDef,
@@ -103,7 +103,7 @@ export function computeAllNodeGeometries(
   const map = new Map<string, NodeScreenGeometry>();
   for (const node of graph.nodes) {
     const def = getNodeDef(node.type);
-    const pinDefs = resolvePinDefs(node, variables, functions, scripts);
+    const pinDefs = node.resolvePinDefs(variables, functions, scripts);
     map.set(
       node.id,
       computeNodeScreenGeometry(

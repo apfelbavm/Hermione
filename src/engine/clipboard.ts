@@ -168,10 +168,24 @@ export function serializeVariableClipboardPayload(variable: Variable): string {
   return JSON.stringify(payload);
 }
 
+/** Copies the fields NodeInstance's constructor doesn't take — plain field assignment is safe here
+ * since these are never anything but strings/undefined. */
+function cloneOptionalFields(target: NodeInstance, source: NodeInstance): void {
+  target.disabled = source.disabled;
+  target.elementType = source.elementType;
+  target.mapKeyType = source.mapKeyType;
+  target.container = source.container;
+}
+
 /** Deep-clones the given selection for copying: the nodes themselves (minus Entry/Return, which are
  * structural and can never be duplicated — see UNDELETABLE_NODE_TYPES) plus only the connections
  * that run strictly between two selected nodes. A wire to a node outside the selection is dropped,
- * same as Ctrl+C in Unreal's Blueprint editor would. */
+ * same as Ctrl+C in Unreal's Blueprint editor would.
+ *
+ * Nodes are rebuilt via `new NodeInstance(...)` rather than `structuredClone`d directly —
+ * structuredClone (like object spread) only copies own enumerable properties, dropping the
+ * NodeInstance prototype and its resolvePinDefs method, which then blows up wherever the pasted
+ * node is later used. */
 export function cloneNodesForClipboard(
   graph: Graph,
   nodeIds: Set<string>,
@@ -180,7 +194,19 @@ export function cloneNodesForClipboard(
     (n) => nodeIds.has(n.id) && !UNDELETABLE_NODE_TYPES.has(n.type),
   );
   const copyableIds = new Set(selectedNodes.map((n) => n.id));
-  const nodes = selectedNodes.map((n) => structuredClone(n));
+  const nodes = selectedNodes.map((n) => {
+    const clone = new NodeInstance(
+      n.id,
+      n.type,
+      { ...n.position },
+      structuredClone(n.pins),
+      n.variableId,
+      n.functionId,
+      n.scriptId,
+    );
+    cloneOptionalFields(clone, n);
+    return clone;
+  });
   const connections = graph.connections
     .filter((c) => copyableIds.has(c.fromNode) && copyableIds.has(c.toNode))
     .map((c) => structuredClone(c));
@@ -210,15 +236,21 @@ export function pasteNodesIntoGraph(
     for (const [pinId, pin] of Object.entries(original.pins)) {
       pins[pinId] = { value: pin.value };
     }
-    return {
-      ...original,
+    const newNode = new NodeInstance(
       id,
-      position: {
+      original.type,
+      {
         x: original.position.x + offset.x,
         y: original.position.y + offset.y,
       },
       pins,
-    };
+      original.variableId,
+      original.functionId,
+      original.scriptId,
+    );
+    cloneOptionalFields(newNode, original);
+
+    return newNode;
   });
 
   const pastedConnections: Connection[] = payload.connections

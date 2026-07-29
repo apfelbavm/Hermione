@@ -1,5 +1,4 @@
 import { connectionsFrom, connectionTo } from "../engine/graphQueries";
-import { resolvePinDefs } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import { indent } from "../engine/compileUtils";
 import { Graph } from "../engine/graph";
@@ -65,8 +64,7 @@ function compileResolveDataPin(
     );
   }
 
-  const upstreamPinDefs = resolvePinDefs(
-    upstreamNode,
+  const upstreamPinDefs = upstreamNode.resolvePinDefs(
     graph.variables,
     graph.functions,
     graph.scripts,
@@ -148,7 +146,8 @@ function compileFrom(
   if (node.disabled) {
     const execOutPins =
       getNodeDef(node.type).disabledNextExec ??
-      resolvePinDefs(node, graph.variables, graph.functions, graph.scripts)
+      node
+        .resolvePinDefs(graph.variables, graph.functions, graph.scripts)
         .filter((p) => p.direction === "output" && p.type === "exec")
         .map((p) => p.id);
 
@@ -177,8 +176,7 @@ function compileFrom(
     );
   }
 
-  const pinDefs = resolvePinDefs(
-    node,
+  const pinDefs = node.resolvePinDefs(
     graph.variables,
     graph.functions,
     graph.scripts,

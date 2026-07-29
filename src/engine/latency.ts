@@ -1,5 +1,4 @@
 import { Graph } from "./graph";
-import { resolvePinDefs } from "./graphMutations";
 import { NodeInstance } from "./nodeInstance";
 import { getNodeDef } from "./registry";
 import type { FunctionDef } from "./types";
@@ -82,12 +81,9 @@ function isChainLatent(
       if (isNodeLatent(nextNode, graph, rootGraph, visitingFunctionIds))
         return true;
 
-      const execOutPins = resolvePinDefs(
-        nextNode,
-        variables,
-        rootGraph.functions,
-        rootGraph.scripts,
-      ).filter((p) => p.direction === "output" && p.type === "exec");
+      const execOutPins = nextNode
+        .resolvePinDefs(variables, rootGraph.functions, rootGraph.scripts)
+        .filter((p) => p.direction === "output" && p.type === "exec");
       for (const p of execOutPins) {
         queue.push({ nodeId: nextNode.id, pinId: p.id });
       }

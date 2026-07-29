@@ -3,7 +3,6 @@ import { registerBuiltins } from "./index";
 import {
   createNodeInstance,
   removeInstancePin,
-  resolvePinDefs,
 } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 import { Graph } from "../engine/graph";
@@ -83,7 +82,7 @@ describe("string.append", () => {
     const graph = new Graph("g", "root");
     graph.nodes.push(node);
 
-    const pinDefs = resolvePinDefs(node, [], []);
+    const pinDefs = node.resolvePinDefs([], []);
     const entryIds = pinDefs
       .filter((p) => p.direction === "input")
       .map((p) => p.id);
@@ -100,7 +99,7 @@ describe("string.append", () => {
 
   it("both default entries are removable (count exceeds the one-entry minimum)", () => {
     const node = appendNode();
-    const pinDefs = resolvePinDefs(node, [], []);
+    const pinDefs = node.resolvePinDefs([], []);
     const entries = pinDefs.filter((p) => p.direction === "input");
     expect(entries.every((p) => p.removable)).toBe(true);
   });
@@ -110,7 +109,7 @@ describe("string.append", () => {
     const def = getNodeDef("string.append");
     def.addInstancePinEntry!(node);
 
-    const pinDefs = resolvePinDefs(node, [], []);
+    const pinDefs = node.resolvePinDefs([], []);
     const entries = pinDefs.filter((p) => p.direction === "input");
     expect(entries.map((p) => p.id)).toEqual(["entry-0", "entry-1", "entry-2"]);
     expect(entries.map((p) => p.label)).toEqual([
@@ -138,7 +137,7 @@ describe("string.append", () => {
     expect(node.pins["entry-0"]).toBeUndefined();
     expect(graph.connections).toHaveLength(0);
 
-    const pinDefs = resolvePinDefs(node, [], []);
+    const pinDefs = node.resolvePinDefs([], []);
     const entries = pinDefs.filter((p) => p.direction === "input");
     expect(entries.map((p) => p.id)).toEqual(["entry-1"]);
     expect(entries[0].label).toBe("String 1"); // relabeled to position 1 even though its id is entry-1

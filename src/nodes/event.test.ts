@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "./index";
-import { createNodeInstance, resolvePinDefs } from "../engine/graphMutations";
+import { createNodeInstance } from "../engine/graphMutations";
 import { getNodeDef } from "../engine/registry";
 
 beforeAll(() => {
@@ -26,13 +26,21 @@ describe("On Interval's intervalMs is a Details-panel property, never a wireable
     expect(def.pins.some((p) => p.id === "name")).toBe(false);
 
     const node = createNodeInstance("event.interval", { x: 0, y: 0 }, def.pins);
-    expect(resolvePinDefs(node, [], []).some((p) => p.id === "intervalMs")).toBe(false);
+    expect(node.resolvePinDefs([], []).some((p) => p.id === "intervalMs")).toBe(
+      false,
+    );
   });
 
   it("is declared as a detailProperty with the expected default", () => {
     const def = getNodeDef("event.interval");
     expect(def.detailProperties).toEqual([
-      { id: "intervalMs", label: "Interval (ms)", type: "number", direction: "input", defaultValue: 5000 },
+      {
+        id: "intervalMs",
+        label: "Interval (ms)",
+        type: "number",
+        direction: "input",
+        defaultValue: 5000,
+      },
     ]);
   });
 
@@ -46,7 +54,9 @@ describe("On Interval's intervalMs is a Details-panel property, never a wireable
     const def = getNodeDef("event.interval");
     const node = createNodeInstance("event.interval", { x: 0, y: 0 }, def.pins);
     node.pins.intervalMs!.value = 9000;
-    expect(def.eventTrigger!.describeInstance!(node)).toEqual({ intervalMs: 9000 });
+    expect(def.eventTrigger!.describeInstance!(node)).toEqual({
+      intervalMs: 9000,
+    });
   });
 });
 
@@ -58,7 +68,11 @@ describe("event.run", () => {
 
   it("executes straight through to exec-out", async () => {
     const def = getNodeDef("event.run");
-    const result = await def.execute!({ node: {} as never, inputs: {}, ctx: {} as never });
+    const result = await def.execute!({
+      node: {} as never,
+      inputs: {},
+      ctx: {} as never,
+    });
     expect(result).toEqual({ nextExec: "exec-out" });
   });
 });

@@ -1,4 +1,13 @@
-import { Pin, PinContainer, PinType } from "./types";
+import { getNodeDef } from "./registry";
+import {
+  CodeScriptDef,
+  FunctionDef,
+  Pin,
+  PinContainer,
+  PinDef,
+  PinType,
+  Variable,
+} from "./types";
 
 export class NodeInstance {
   id: string;
@@ -46,5 +55,29 @@ export class NodeInstance {
     this.elementType = undefined;
     this.mapKeyType = undefined;
     this.container = undefined;
+  }
+
+  /** Resolves the pin defs for a node instance, accounting for variable-derived (Get/Set) nodes,
+   * function-derived (Entry/Return/Call) nodes, and script-derived (Code) nodes. */
+  resolvePinDefs(
+    variables: Variable[],
+    functions: FunctionDef[],
+    scripts: CodeScriptDef[] = [],
+  ): PinDef[] {
+    const def = getNodeDef(this.type);
+    if (def.derivePins && this.variableId) {
+      const variable = variables.find((v) => v.id === this.variableId);
+      if (variable) return def.derivePins(variable);
+    }
+    if (def.deriveFunctionPins && this.functionId) {
+      const fn = functions.find((f) => f.id === this.functionId);
+      if (fn) return def.deriveFunctionPins(fn);
+    }
+    if (def.deriveScriptPins && this.scriptId) {
+      const script = scripts.find((s) => s.id === this.scriptId);
+      if (script) return def.deriveScriptPins(script);
+    }
+    if (def.deriveInstancePins) return def.deriveInstancePins(this);
+    return def.pins;
   }
 }

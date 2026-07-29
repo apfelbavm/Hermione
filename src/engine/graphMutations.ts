@@ -68,7 +68,7 @@ export function createNodeInstance(
         ? { value: cloneDefaultValue(entry.defaultValue) }
         : {};
   }
-  const node: NodeInstance = {
+  const node = new NodeInstance(
     id,
     type,
     position,
@@ -76,38 +76,13 @@ export function createNodeInstance(
     variableId,
     functionId,
     scriptId,
-  };
+  );
   if (def.configurableElementType) {
     node.elementType = DEFAULT_ELEMENT_TYPE;
     if (def.configurableElementType.includeKeyType)
       node.mapKeyType = DEFAULT_KEY_TYPE;
   }
   return node;
-}
-
-/** Resolves the pin defs for a node instance, accounting for variable-derived (Get/Set) nodes,
- * function-derived (Entry/Return/Call) nodes, and script-derived (Code) nodes. */
-export function resolvePinDefs(
-  node: NodeInstance,
-  variables: Variable[],
-  functions: FunctionDef[],
-  scripts: CodeScriptDef[] = [],
-): PinDef[] {
-  const def = getNodeDef(node.type);
-  if (def.derivePins && node.variableId) {
-    const variable = variables.find((v) => v.id === node.variableId);
-    if (variable) return def.derivePins(variable);
-  }
-  if (def.deriveFunctionPins && node.functionId) {
-    const fn = functions.find((f) => f.id === node.functionId);
-    if (fn) return def.deriveFunctionPins(fn);
-  }
-  if (def.deriveScriptPins && node.scriptId) {
-    const script = scripts.find((s) => s.id === node.scriptId);
-    if (script) return def.deriveScriptPins(script);
-  }
-  if (def.deriveInstancePins) return def.deriveInstancePins(node);
-  return def.pins;
 }
 
 /** The display label for a node instance — normally its NodeDef's static label, except: a node
@@ -142,8 +117,6 @@ export function resolveNodeLabel(
   return def.label;
 }
 
-
-
 /** True if this node's canvas right-click menu should offer a Disable/Enable toggle at all — it
  * must have at least one execution pin (a pure data node has no "code" to skip) and must not be an
  * event trigger (an entry point always has to be reachable). Whether disabling is CURRENTLY
@@ -156,9 +129,9 @@ export function canToggleDisabled(
 ): boolean {
   const def = getNodeDef(node.type);
   if (def.eventTrigger) return false;
-  return resolvePinDefs(node, variables, functions, scripts).some(
-    (p) => p.type === "exec",
-  );
+  return node
+    .resolvePinDefs(variables, functions, scripts)
+    .some((p) => p.type === "exec");
 }
 
 /** True if any of this node's DATA (non-exec) output pins feeds something else. A node can only be
@@ -183,7 +156,8 @@ export function hasConnectedDataOutput(
   if (!node) return false;
   if (getNodeDef(node.type).disabledNextExec) return false;
   const dataOutputIds = new Set(
-    resolvePinDefs(node, variables, functions, scripts)
+    node
+      .resolvePinDefs(variables, functions, scripts)
       .filter((p) => p.direction === "output" && p.type !== "exec")
       .map((p) => p.id),
   );
@@ -286,15 +260,12 @@ export function connectPins(
   const toNode = graph.nodes.find((n) => n.id === req.toNode);
   if (!fromNode || !toNode) throw new Error("connectPins: node not found");
 
-  const fromPinDef = resolvePinDefs(
-    fromNode,
-    variables,
-    functions,
-    scripts,
-  ).find((p) => p.id === req.fromPin);
-  const toPinDef = resolvePinDefs(toNode, variables, functions, scripts).find(
-    (p) => p.id === req.toPin,
-  );
+  const fromPinDef = fromNode
+    .resolvePinDefs(variables, functions, scripts)
+    .find((p) => p.id === req.fromPin);
+  const toPinDef = toNode
+    .resolvePinDefs(variables, functions, scripts)
+    .find((p) => p.id === req.toPin);
   if (!fromPinDef || !toPinDef) throw new Error("connectPins: pin not found");
   if (fromPinDef.direction !== "output" || toPinDef.direction !== "input") {
     throw new Error("connectPins: must connect an output pin to an input pin");
@@ -386,9 +357,9 @@ export function removeConnection(
     toPin.connectionId = remaining?.id;
     if (!remaining) {
       const pinDef = toNode
-        ? resolvePinDefs(toNode, variables, functions, scripts).find(
-            (p) => p.id === conn.toPin,
-          )
+        ? toNode
+            .resolvePinDefs(variables, functions, scripts)
+            .find((p) => p.id === conn.toPin)
         : undefined;
       toPin.value = cloneDefaultValue(pinDef?.defaultValue);
     }
@@ -415,12 +386,9 @@ export function insertRerouteOnConnection(
   if (!conn) return;
   const fromNode = graph.nodes.find((n) => n.id === conn.fromNode);
   if (!fromNode) return;
-  const fromPinDef = resolvePinDefs(
-    fromNode,
-    variables,
-    functions,
-    scripts,
-  ).find((p) => p.id === conn.fromPin);
+  const fromPinDef = fromNode
+    .resolvePinDefs(variables, functions, scripts)
+    .find((p) => p.id === conn.fromPin);
   if (!fromPinDef) return;
 
   const isExec = fromPinDef.type === "exec";
@@ -614,7 +582,7 @@ export function changeNodeElementType(
   if (patch.mapKeyType !== undefined) node.mapKeyType = patch.mapKeyType;
 
   const pins: Record<string, Pin> = {};
-  for (const def of resolvePinDefs(node, variables, functions)) {
+  for (const def of node.resolvePinDefs(variables, functions)) {
     pins[def.id] =
       def.direction === "input"
         ? { value: cloneDefaultValue(def.defaultValue) }

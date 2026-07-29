@@ -14,7 +14,6 @@ import {
   removeCommentBox,
   removeConnection,
   removeNode,
-  resolvePinDefs,
 } from "../engine/graphMutations";
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { getNodeDef, isPinTypeCompatible } from "../engine/registry";
@@ -166,7 +165,7 @@ function recomputeContainment(
         innerBounds,
         computeNodeWorldRect(
           n,
-          resolvePinDefs(n, variables, functions, scripts),
+          n.resolvePinDefs(variables, functions, scripts),
           variables,
           functions,
           scripts,
@@ -417,12 +416,9 @@ export function setupPointerInteraction(
           const otherNodeId = otherIsFromEnd ? conn.fromNode : conn.toNode;
           const otherPinId = otherIsFromEnd ? conn.fromPin : conn.toPin;
           const otherNode = graph.nodes.find((n) => n.id === otherNodeId)!;
-          const otherPinDef = resolvePinDefs(
-            otherNode,
-            variables,
-            functions,
-            scripts,
-          ).find((p) => p.id === otherPinId)!;
+          const otherPinDef = otherNode
+            .resolvePinDefs(variables, functions, scripts)
+            .find((p) => p.id === otherPinId)!;
           return { nodeId: otherNodeId, pinId: otherPinId, pin: otherPinDef };
         });
         for (const conn of touching) {
@@ -459,12 +455,9 @@ export function setupPointerInteraction(
         );
         if (existing) {
           const fromNode = graph.nodes.find((n) => n.id === existing.fromNode)!;
-          const fromPinDef = resolvePinDefs(
-            fromNode,
-            variables,
-            functions,
-            scripts,
-          ).find((p) => p.id === existing.fromPin)!;
+          const fromPinDef = fromNode
+            .resolvePinDefs(variables, functions, scripts)
+            .find((p) => p.id === existing.fromPin)!;
           disconnectPin(
             graph,
             variables,
@@ -795,7 +788,7 @@ export function setupPointerInteraction(
             box,
             computeNodeWorldRect(
               n,
-              resolvePinDefs(n, variables, functions, scripts),
+              n.resolvePinDefs(variables, functions, scripts),
               variables,
               functions,
               scripts,
@@ -967,7 +960,7 @@ export function setupPointerInteraction(
           .map((n) =>
             computeNodeWorldRect(
               n,
-              resolvePinDefs(n, variables, functions, scripts),
+              n.resolvePinDefs(variables, functions, scripts),
               variables,
               functions,
               scripts,

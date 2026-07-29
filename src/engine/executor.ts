@@ -1,5 +1,5 @@
 import { Graph } from "./graph";
-import { cloneDefaultValue, resolvePinDefs } from "./graphMutations";
+import { cloneDefaultValue } from "./graphMutations";
 import { connectionsFrom, connectionTo } from "./graphQueries";
 import { NodeInstance } from "./nodeInstance";
 import { getNodeDef } from "./registry";
@@ -89,8 +89,7 @@ export async function resolveDataPin(
 
   // Pins actually in effect for this instance — not the static def.pins, which is empty
   // for variable-derived node types (Get/Set Variable) whose pins depend on the bound Variable.
-  const upstreamPinDefs = resolvePinDefs(
-    upstreamNode,
+  const upstreamPinDefs = upstreamNode.resolvePinDefs(
     visibleVariables(ctx),
     ctx.rootGraph.functions,
     ctx.rootGraph.scripts,
@@ -159,12 +158,12 @@ export async function runExecFrom(
       const disabledNextExec = getNodeDef(node.type).disabledNextExec;
       nextExecPins =
         disabledNextExec ??
-        resolvePinDefs(
-          node,
-          visibleVariables(ctx),
-          ctx.rootGraph.functions,
-          ctx.rootGraph.scripts,
-        )
+        node
+          .resolvePinDefs(
+            visibleVariables(ctx),
+            ctx.rootGraph.functions,
+            ctx.rootGraph.scripts,
+          )
           .filter((p) => p.direction === "output" && p.type === "exec")
           .map((p) => p.id);
     } else {
@@ -183,8 +182,7 @@ export async function runExecFrom(
       // the cache only clears *between* steps.
       ctx.tickCache.clear();
 
-      const pinDefs = resolvePinDefs(
-        node,
+      const pinDefs = node.resolvePinDefs(
         visibleVariables(ctx),
         ctx.rootGraph.functions,
         ctx.rootGraph.scripts,
