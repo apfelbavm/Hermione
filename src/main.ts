@@ -58,6 +58,7 @@ const canvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
 const container = document.getElementById("canvas-container") as HTMLDivElement;
 const overlay = document.getElementById("overlay") as HTMLDivElement;
 const logPanel = document.getElementById("log-panel") as HTMLDivElement;
+const logClearButton = document.getElementById("log-clear-button") as HTMLButtonElement;
 const runButton = document.getElementById("run-button") as HTMLButtonElement;
 const saveButton = document.getElementById("save-button") as HTMLButtonElement;
 const loadButton = document.getElementById("load-button") as HTMLButtonElement;
@@ -531,6 +532,10 @@ function appendLog(message: string): void {
   logPanel.appendChild(line);
   logPanel.scrollTop = logPanel.scrollHeight;
 }
+
+logClearButton.addEventListener("click", () => {
+  logPanel.innerHTML = "";
+});
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

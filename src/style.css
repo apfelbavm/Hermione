@@ -643,11 +643,22 @@ body.resizing {
   pointer-events: auto;
 }
 
-#log-panel {
+#log-container {
+  position: relative;
   flex: 0 0 140px;
+  display: flex;
+  border-top: 1px solid #33383f;
+  /* A flex item's default overflow:visible gives it an automatic MINIMUM size equal to its
+     content's natural height, which overrides flex-shrink:0 and lets it grow past its flex-basis
+     whenever the log fills up — overflow:hidden makes that automatic minimum 0, so flex-basis
+     actually governs the height regardless of how much log content #log-panel holds. */
+  overflow: hidden;
+}
+
+#log-panel {
+  flex: 1;
   overflow-y: auto;
   background: #16181c;
-  border-top: 1px solid #33383f;
   padding: 6px 10px;
   font-family: "Cascadia Code", "Consolas", monospace;
   font-size: 12px;
@@ -656,6 +667,32 @@ body.resizing {
 
 #log-panel .log-line {
   white-space: pre-wrap;
+}
+
+/* Same "reads as interactive without a permanent visual seam" language as .canvas-hud-button,
+   pinned to the log panel's own top-right corner rather than the canvas's. */
+.log-clear-button {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #3d4148;
+  border-radius: 4px;
+  background: rgba(43, 47, 54, 0.75);
+  color: #9aa0a8;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.log-clear-button:hover {
+  background: #2b2f36;
+  color: #e8e8e8;
+  border-color: #3b6b8a;
 }
 
 .pin-widget {

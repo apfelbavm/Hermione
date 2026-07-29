@@ -61,7 +61,7 @@ export function setupResizablePanels(): void {
 
   wireResizeHandle({
     handle: document.getElementById("log-resizer")!,
-    target: document.getElementById("log-panel")!,
+    target: document.getElementById("log-container")!,
     storageKey: "hermione:log-height",
     min: 60,
     max: () => window.innerHeight * 0.7,
