@@ -17,6 +17,7 @@ import "./map";
 import "./reroute";
 import "./xml";
 import "./csv";
+import "./code";
 
 let registered = false;
 

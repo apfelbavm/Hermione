@@ -86,7 +86,7 @@ export async function resolveDataPin(
 
   // Pins actually in effect for this instance — not the static def.pins, which is empty
   // for variable-derived node types (Get/Set Variable) whose pins depend on the bound Variable.
-  const upstreamPinDefs = resolvePinDefs(upstreamNode, visibleVariables(ctx), ctx.rootGraph.functions);
+  const upstreamPinDefs = resolvePinDefs(upstreamNode, visibleVariables(ctx), ctx.rootGraph.functions, ctx.rootGraph.scripts);
 
   const upstreamInputs: Record<string, unknown> = {};
   for (const pinDef of upstreamPinDefs) {
@@ -145,7 +145,7 @@ export async function runExecFrom(
       const disabledNextExec = getNodeDef(node.type).disabledNextExec;
       nextExecPins =
         disabledNextExec ??
-        resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions)
+        resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions, ctx.rootGraph.scripts)
           .filter((p) => p.direction === "output" && p.type === "exec")
           .map((p) => p.id);
     } else {
@@ -162,7 +162,7 @@ export async function runExecFrom(
       // the cache only clears *between* steps.
       ctx.tickCache.clear();
 
-      const pinDefs = resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions);
+      const pinDefs = resolvePinDefs(node, visibleVariables(ctx), ctx.rootGraph.functions, ctx.rootGraph.scripts);
       const inputs: Record<string, unknown> = {};
       for (const pinDef of pinDefs) {
         if (pinDef.direction === "input" && pinDef.type !== "exec") {

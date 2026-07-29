@@ -2,7 +2,7 @@ import { Colors } from "../engine/color";
 import { resolveNodeLabel } from "../engine/graphMutations";
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { getNodeDef, topLevelGroup } from "../engine/registry";
-import type { FunctionDef, Graph, NodeDef, NodeInstance, PinDef, Variable } from "../engine/types";
+import type { CodeScriptDef, FunctionDef, Graph, NodeDef, NodeInstance, PinDef, Variable } from "../engine/types";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
 import { NODE_HEADER_HEIGHT, PIN_RADIUS } from "./layout";
@@ -27,6 +27,7 @@ export function drawNodes(
   executingNodeId: string | null,
   variables: Variable[],
   functions: FunctionDef[],
+  scripts: CodeScriptDef[] = [],
   latentNodeIds: ReadonlySet<string> = new Set(),
 ): void {
   // Text scales with zoom too — a camera zooming over world-space content, same as everything else.
@@ -90,7 +91,7 @@ export function drawNodes(
       ctx.fillStyle = Colors.TEXT_PRIMARY;
       ctx.textAlign = "left";
       ctx.fillText(
-        resolveNodeLabel(node, def, variables, functions),
+        resolveNodeLabel(node, def, variables, functions, scripts),
         geo.screenX + 10 * camera.zoom,
         geo.screenY + headerHeight / 2,
       );

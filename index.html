@@ -52,6 +52,15 @@
               <div id="variables-list" class="panel-list"></div>
             </div>
           </div>
+          <div id="scripts-section" class="panel-section">
+            <div id="scripts-header" class="panel-header">
+              <span class="panel-header-title">Scripts</span>
+              <button id="add-script-button" class="panel-header-add">+</button>
+            </div>
+            <div class="panel-body">
+              <div id="scripts-list" class="panel-list"></div>
+            </div>
+          </div>
           <div id="local-variables-section" class="panel-section">
             <div id="local-variables-header" class="panel-header">
               <span class="panel-header-title">Local Variables</span>
@@ -96,13 +105,30 @@
                 </div>
               </div>
             </div>
+            <div id="script-details" class="details-content">
+              <div id="script-inputs-section" class="panel-section">
+                <div id="script-inputs-header" class="panel-header">
+                  <span class="panel-header-title">Inputs</span>
+                  <button id="add-script-input-button" class="panel-header-add">+</button>
+                </div>
+                <div class="panel-body">
+                  <div id="script-inputs-list" class="panel-list"></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       <div id="log-resizer" class="resizer resizer-horizontal"></div>
       <div id="log-container">
-        <button id="log-clear-button" class="log-clear-button" title="Clear log">🗑</button>
+        <div id="log-tab-strip">
+          <div id="log-tabs-dynamic"></div>
+          <span id="log-save-status" class="log-save-status" style="display: none"></span>
+          <button id="log-save-button" class="log-clear-button" title="Save script" style="display: none">💾</button>
+          <button id="log-clear-button" class="log-clear-button" title="Clear log">🗑</button>
+        </div>
         <div id="log-panel"></div>
+        <div id="monaco-container" style="display: none"></div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

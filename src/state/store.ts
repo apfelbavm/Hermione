@@ -30,7 +30,8 @@ export interface MarqueeSelectionState {
  * name does both, but they can diverge (e.g. switching tabs via the graph-tab strip). */
 export type SidebarSelection =
   | { kind: "variable"; variableId: string }
-  | { kind: "function"; functionId: string };
+  | { kind: "function"; functionId: string }
+  | { kind: "script"; scriptId: string };
 
 export interface AppState {
   /** Always the true whole program — what Run/Compile/Save/Load and the Functions/global
@@ -42,6 +43,13 @@ export interface AppState {
    * always first, and isn't tracked here since it can't be closed or reordered). Session-only
    * UI state — not persisted, reset to [] on load like selection/camera. */
   openFunctionTabs: string[];
+  /** Ordered ids of scripts currently open as tabs in the LOWER panel (alongside the always-present,
+   * unclosable "Log" tab there) — same shape as openFunctionTabs, just for the log-container's own
+   * tab strip instead of the canvas one. Session-only, not persisted. */
+  openScriptTabs: string[];
+  /** Which lower-panel tab is active: null means the "Log" tab, otherwise a script id from
+   * openScriptTabs (see scriptEditor.ts). */
+  activeLowerTabId: string | null;
   camera: Camera;
   /** Toolbar toggle: when on, nodes snap to the grid as they're moved or newly dropped/placed onto
    * the canvas. Never retroactively applied to nodes already sitting at an off-grid position. */
@@ -85,6 +93,26 @@ export function closeFunctionTab(state: AppState, functionId: string): void {
  * function's local variables. */
 export function getVisibleVariablesForState(state: AppState): Variable[] {
   return getVisibleVariables(state.rootGraph, getEditingGraph(state));
+}
+
+/** Opens (or focuses, if already open) a script's tab in the lower panel and makes it the active
+ * lower-panel tab — mirrors openFunctionTab/the canvas tab strip, just for scripts/the log panel. */
+export function openScriptTab(state: AppState, scriptId: string): void {
+  if (!state.openScriptTabs.includes(scriptId)) {
+    state.openScriptTabs.push(scriptId);
+  }
+  state.activeLowerTabId = scriptId;
+}
+
+/** Closes a script's tab. If it was the active tab, falls back to whichever tab took its place,
+ * else the previous tab, else the "Log" tab (null) — mirrors closeFunctionTab. */
+export function closeScriptTab(state: AppState, scriptId: string): void {
+  const index = state.openScriptTabs.indexOf(scriptId);
+  if (index === -1) return;
+  state.openScriptTabs.splice(index, 1);
+  if (state.activeLowerTabId === scriptId) {
+    state.activeLowerTabId = state.openScriptTabs[index] ?? state.openScriptTabs[index - 1] ?? null;
+  }
 }
 
 type Listener = () => void;

@@ -46,7 +46,7 @@ function compileResolveDataPin(
     );
   }
 
-  const upstreamPinDefs = resolvePinDefs(upstreamNode, graph.variables, graph.functions);
+  const upstreamPinDefs = resolvePinDefs(upstreamNode, graph.variables, graph.functions, graph.scripts);
   const upstreamInputs: Record<string, string> = {};
   for (const pinDef of upstreamPinDefs) {
     if (pinDef.direction === "input" && pinDef.type !== "exec") {
@@ -106,7 +106,7 @@ function compileFrom(
   if (node.disabled) {
     const execOutPins =
       getNodeDef(node.type).disabledNextExec ??
-      resolvePinDefs(node, graph.variables, graph.functions)
+      resolvePinDefs(node, graph.variables, graph.functions, graph.scripts)
         .filter((p) => p.direction === "output" && p.type === "exec")
         .map((p) => p.id);
 
@@ -124,7 +124,7 @@ function compileFrom(
     throw new Error(`Node type "${node.type}" has no compileExecute — cannot compile this graph yet`);
   }
 
-  const pinDefs = resolvePinDefs(node, graph.variables, graph.functions);
+  const pinDefs = resolvePinDefs(node, graph.variables, graph.functions, graph.scripts);
   const inputs: Record<string, string> = {};
   for (const pinDef of pinDefs) {
     if (pinDef.direction === "input" && pinDef.type !== "exec") {

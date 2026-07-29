@@ -25,6 +25,9 @@ export interface DetailsPanelElements {
    * pre-existing functionIoPanel instances, relocated into this wrapper in index.html. They
    * already self-hide when their own accessor resolves to null, so nothing else to render here. */
   functionContent: HTMLElement;
+  /** Script sub-view: same "just a visibility toggle" idea as functionContent — the actual Inputs
+   * content lives in the pre-existing scriptIoPanel instance, relocated here in index.html. */
+  scriptContent: HTMLElement;
 }
 
 /** The Unreal-style "Details" section pinned to the bottom of the sidebar: shows whichever
@@ -122,6 +125,8 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
 
     const validFunction =
       selection?.kind === "function" && store.state.rootGraph.functions.some((f) => f.id === selection.functionId);
+    const validScript =
+      selection?.kind === "script" && store.state.rootGraph.scripts.some((s) => s.id === selection.scriptId);
     const variable =
       selection?.kind === "variable"
         ? allGraphs(store.state.rootGraph)
@@ -134,7 +139,7 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
     // through correctly the instant the user selects a node.
     let selectedNode: NodeInstance | undefined;
     let nodeProperties: PinDef[] | undefined;
-    if (!variable && !validFunction && store.state.selectedNodeIds.size === 1) {
+    if (!variable && !validFunction && !validScript && store.state.selectedNodeIds.size === 1) {
       const graph = getEditingGraph(store.state);
       const [onlyId] = store.state.selectedNodeIds;
       const node = graph.nodes.find((n) => n.id === onlyId);
@@ -150,13 +155,14 @@ export function createDetailsPanel(elements: DetailsPanelElements, store: Store)
     // else claims the panel. selectedNodeIds/selectedCommentId are already mutually exclusive (see
     // pointerHandlers.ts), so this mainly guards against a stale sidebarSelection.
     let selectedComment: CommentBox | undefined;
-    if (!variable && !validFunction && !selectedNode && store.state.selectedCommentId) {
+    if (!variable && !validFunction && !validScript && !selectedNode && store.state.selectedCommentId) {
       selectedComment = getEditingGraph(store.state).commentBoxes.find((b) => b.id === store.state.selectedCommentId);
     }
 
-    elements.section.style.display = variable || validFunction || selectedNode || selectedComment ? "" : "none";
+    elements.section.style.display = variable || validFunction || validScript || selectedNode || selectedComment ? "" : "none";
     elements.variableContent.style.display = variable ? "" : "none";
     elements.functionContent.style.display = validFunction ? "" : "none";
+    elements.scriptContent.style.display = validScript ? "" : "none";
     elements.nodeContent.style.display = selectedNode ? "" : "none";
     elements.commentContent.style.display = selectedComment ? "" : "none";
 

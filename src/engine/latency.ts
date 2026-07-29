@@ -67,7 +67,7 @@ function isChainLatent(
       if (!nextNode) continue;
       if (isNodeLatent(nextNode, graph, rootGraph, visitingFunctionIds)) return true;
 
-      const execOutPins = resolvePinDefs(nextNode, variables, rootGraph.functions).filter(
+      const execOutPins = resolvePinDefs(nextNode, variables, rootGraph.functions, rootGraph.scripts).filter(
         (p) => p.direction === "output" && p.type === "exec",
       );
       for (const p of execOutPins) {

@@ -1,6 +1,6 @@
 import { Colors } from "../engine/color";
 import { resolvePinDefs } from "../engine/graphMutations";
-import type { FunctionDef, Graph, Variable } from "../engine/types";
+import type { CodeScriptDef, FunctionDef, Graph, Variable } from "../engine/types";
 import { bezierControlPoints } from "./bezier";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
@@ -14,6 +14,7 @@ export function drawWires(
   firedConnectionIds: ReadonlySet<string>,
   variables: Variable[],
   functions: FunctionDef[],
+  scripts: CodeScriptDef[] = [],
 ): void {
   for (const conn of graph.connections) {
     const fromGeo = geometries.get(conn.fromNode);
@@ -25,7 +26,7 @@ export function drawWires(
     if (!from || !to) continue;
 
     const fromNode = graph.nodes.find((n) => n.id === conn.fromNode)!;
-    const pinDefs = resolvePinDefs(fromNode, variables, functions);
+    const pinDefs = resolvePinDefs(fromNode, variables, functions, scripts);
     const pinDef = pinDefs.find((p) => p.id === conn.fromPin);
     const color = pinDef ? Colors.PIN_COLORS[pinDef.type] : "#888";
 

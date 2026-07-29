@@ -96,6 +96,8 @@ export interface NodeDef {
   derivePins?: (variable: Variable) => PinDef[];
   /** Sibling of derivePins for the Entry/Return/Call function nodes, dispatched off NodeInstance.functionId. */
   deriveFunctionPins?: (fn: FunctionDef) => PinDef[];
+  /** Sibling of derivePins/deriveFunctionPins for the Code node, dispatched off NodeInstance.scriptId. */
+  deriveScriptPins?: (script: CodeScriptDef) => PinDef[];
   /** Sibling of derivePins/deriveFunctionPins for a node whose pin list depends on data stored
    * directly on its own NodeInstance — e.g. Append String's expandable list of string inputs —
    * rather than a bound Variable/FunctionDef. */
@@ -180,6 +182,8 @@ export interface NodeInstance {
   variableId?: string;
   /** Binds this node to a FunctionDef — used by function.entry/return/call, sibling to variableId. */
   functionId?: string;
+  /** Binds this node to a CodeScriptDef — used by code.run, sibling to variableId/functionId. */
+  scriptId?: string;
   /** Toggled via the canvas right-click menu (see graphMutations.ts's canToggleDisabled/
    * hasConnectedDataOutput) — a disabled node's execute()/compileExecute() is never invoked, by
    * the interpreter or the compiler, and the exec chain simply doesn't continue past it. */
@@ -248,6 +252,24 @@ export interface FunctionDef {
   body: Graph;
 }
 
+/** A user-authored, named, reusable script — bound to one or more Code (code.run) nodes via
+ * NodeInstance.scriptId, the same way a FunctionDef is bound to Entry/Return/Call nodes via
+ * functionId. Unlike a function, a script has no body GRAPH of its own (no nested nodes/wires) —
+ * its "body" is `source`, plain text edited in a Monaco tab, and its only signature is `inputs`
+ * (no outputs: a script reports results via the logger it's called with, not a return pin — see
+ * code.ts). `source` is what the user edits/sees; `compiledJs` is the last successful transpile of
+ * it (see engine/transpile.ts), computed once at Save time rather than on every run/compile, and is
+ * what execute()/compileExecute() actually embed and call — so a script with unsaved edits (or one
+ * that's never been saved) keeps running/compiling against its last-known-good `compiledJs` instead
+ * of silently doing nothing or re-transpiling on every single execution. */
+export interface CodeScriptDef {
+  id: string;
+  name: string;
+  source: string;
+  compiledJs: string;
+  inputs: PinSignatureEntry[];
+}
+
 export interface Graph {
   id: string;
   name: string;
@@ -256,6 +278,7 @@ export interface Graph {
   variables: Variable[];
   commentBoxes: CommentBox[];
   functions: FunctionDef[];
+  scripts: CodeScriptDef[];
 }
 
 export interface ExecutionContext {
@@ -286,5 +309,5 @@ export interface ExecutionContext {
 }
 
 export function createEmptyGraph(id: string, name: string): Graph {
-  return { id, name, nodes: [], connections: [], variables: [], commentBoxes: [], functions: [] };
+  return { id, name, nodes: [], connections: [], variables: [], commentBoxes: [], functions: [], scripts: [] };
 }

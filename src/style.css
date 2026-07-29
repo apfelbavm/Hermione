@@ -644,15 +644,81 @@ body.resizing {
 }
 
 #log-container {
-  position: relative;
   flex: 0 0 140px;
   display: flex;
+  flex-direction: column;
   border-top: 1px solid #33383f;
   /* A flex item's default overflow:visible gives it an automatic MINIMUM size equal to its
      content's natural height, which overrides flex-shrink:0 and lets it grow past its flex-basis
      whenever the log fills up — overflow:hidden makes that automatic minimum 0, so flex-basis
      actually governs the height regardless of how much log content #log-panel holds. */
   overflow: hidden;
+}
+
+/* Same tab-strip language as #graph-tabs/.graph-tab. The "Log" tab plus one tab per open script
+   (see scriptEditor.ts) render into #log-tabs-dynamic; the Save/Clear buttons stay OUTSIDE it as
+   permanent siblings (main.ts holds a direct reference to #log-clear-button), so rebuilding the
+   tabs each render never touches — or invalidates a reference to — either button. */
+#log-tab-strip {
+  display: flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  background: #1c1f24;
+  border-bottom: 1px solid #33383f;
+}
+
+#log-tabs-dynamic {
+  display: flex;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.log-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #b8bec7;
+  border-right: 1px solid #33383f;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.log-tab-active {
+  background: #16181c;
+  color: #e8e8e8;
+  box-shadow: inset 0 -2px 0 #3b8a5c;
+}
+
+.log-tab-close {
+  background: none;
+  border: none;
+  color: #9aa0a8;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 2px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.log-tab-close:hover {
+  background: #454a52;
+  color: #e8e8e8;
+}
+
+.log-save-status {
+  margin: auto 4px;
+  font-size: 11px;
+  color: #7fb88a;
+  white-space: nowrap;
+}
+
+.log-save-status-error {
+  color: #e08a8a;
 }
 
 #log-panel {
@@ -669,14 +735,22 @@ body.resizing {
   white-space: pre-wrap;
 }
 
-/* Same "reads as interactive without a permanent visual seam" language as .canvas-hud-button,
-   pinned to the log panel's own top-right corner rather than the canvas's. */
+#monaco-container {
+  flex: 1;
+  min-height: 0;
+  background: #1e1e1e;
+  color: #9aa0a8;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+/* Same "reads as interactive without a permanent visual seam" language as .canvas-hud-button, now
+   sitting inline at the tab strip's right edge instead of floating over the log content. */
 .log-clear-button {
-  position: absolute;
-  top: 6px;
-  right: 10px;
   width: 22px;
   height: 22px;
+  margin: auto 8px auto 4px;
   border: 1px solid #3d4148;
   border-radius: 4px;
   background: rgba(43, 47, 54, 0.75);

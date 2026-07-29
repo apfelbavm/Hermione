@@ -1,23 +1,31 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../nodes";
 import {
+  addScriptInput,
   addVariable,
   canPlaceNodeType,
   canToggleDisabled,
   connectPins,
+  createCodeScriptDef,
   createNodeInstance,
   hasConnectedDataOutput,
   insertRerouteOnConnection,
   moveFunction,
   moveFunctionEntry,
+  moveScript,
+  moveScriptInput,
   moveVariable,
+  removeCodeScriptDef,
   removeNode,
+  removeScriptInput,
   removeVariable,
   resolveNodeLabel,
+  resolvePinDefs,
+  updateScriptInput,
   updateVariable,
 } from "./graphMutations";
 import { getNodeDef } from "./registry";
-import { createEmptyGraph, type FunctionDef, type Variable } from "./types";
+import { createEmptyGraph, type CodeScriptDef, type FunctionDef, type Variable } from "./types";
 
 beforeAll(() => {
   registerBuiltins();
@@ -446,5 +454,190 @@ describe("moveFunctionEntry", () => {
     moveFunctionEntry(fn, "output", "a", "out1", "before");
     expect(fn.inputs.map((e) => e.id)).toEqual(["a", "b"]);
     expect(fn.outputs.map((e) => e.id)).toEqual(["out1"]);
+  });
+});
+
+describe("createCodeScriptDef", () => {
+  it("creates an empty, unsaved script with no inputs yet", () => {
+    const script = createCodeScriptDef("MyScript");
+    expect(script.name).toBe("MyScript");
+    expect(script.source).toBe("");
+    expect(script.compiledJs).toBe("");
+    expect(script.inputs).toEqual([]);
+    expect(script.id).toBeTruthy();
+  });
+});
+
+describe("removeCodeScriptDef", () => {
+  it("removes the bound code.run node AND restores whatever it fed into, rather than leaving a dangling wired-looking pin", () => {
+    const graph = createEmptyGraph("g", "root");
+    const script = createCodeScriptDef("Greet");
+    graph.scripts.push(script);
+
+    const addDef = getNodeDef("math.add");
+    const addNode = createNodeInstance("math.add", { x: 200, y: 0 }, addDef.pins, "add");
+    graph.nodes.push(addNode);
+
+    const codeDef = getNodeDef("code.run");
+    const codeNode = createNodeInstance(
+      "code.run",
+      { x: 0, y: 0 },
+      codeDef.deriveScriptPins!(script),
+      "code1",
+      undefined,
+      undefined,
+      script.id,
+    );
+    graph.nodes.push(codeNode);
+
+    // code.run has no output pins (see nodes/code.ts), so wire its exec-out into the Add node's
+    // exec pin isn't representative — instead prove the general "removeNode cleans up connections"
+    // path via an exec wire from a fresh On Run node into the Code node.
+    const startDef = getNodeDef("event.run");
+    const startNode = createNodeInstance("event.run", { x: -200, y: 0 }, startDef.pins, "start");
+    graph.nodes.push(startNode);
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "start", fromPin: "exec-out", toNode: "code1", toPin: "exec-in" }, graph.scripts);
+
+    removeCodeScriptDef(graph, script.id);
+
+    expect(graph.scripts).toHaveLength(0);
+    expect(graph.nodes.find((n) => n.id === "code1")).toBeUndefined();
+    expect(graph.connections).toHaveLength(0);
+  });
+
+  it("only removes code.run nodes bound to THIS script, leaving other scripts' nodes untouched", () => {
+    const graph = createEmptyGraph("g", "root");
+    const keep = createCodeScriptDef("Keep");
+    const drop = createCodeScriptDef("Drop");
+    graph.scripts.push(keep, drop);
+
+    const codeDef = getNodeDef("code.run");
+    graph.nodes.push(
+      createNodeInstance("code.run", { x: 0, y: 0 }, codeDef.deriveScriptPins!(keep), "keepNode", undefined, undefined, keep.id),
+      createNodeInstance("code.run", { x: 0, y: 100 }, codeDef.deriveScriptPins!(drop), "dropNode", undefined, undefined, drop.id),
+    );
+
+    removeCodeScriptDef(graph, drop.id);
+
+    expect(graph.scripts.map((s) => s.id)).toEqual([keep.id]);
+    expect(graph.nodes.map((n) => n.id)).toEqual(["keepNode"]);
+  });
+});
+
+describe("addScriptInput / removeScriptInput", () => {
+  function buildGraphWithBoundCodeNode(script: CodeScriptDef) {
+    const graph = createEmptyGraph("g", "root");
+    graph.scripts.push(script);
+    const codeDef = getNodeDef("code.run");
+    const codeNode = createNodeInstance(
+      "code.run",
+      { x: 0, y: 0 },
+      codeDef.deriveScriptPins!(script),
+      "code1",
+      undefined,
+      undefined,
+      script.id,
+    );
+    graph.nodes.push(codeNode);
+    return graph;
+  }
+
+  it("adding an input makes it appear as a new pin on every code.run node bound to the script", () => {
+    const script = createCodeScriptDef("Greet");
+    const graph = buildGraphWithBoundCodeNode(script);
+
+    addScriptInput(script, { id: "name", name: "name", type: "string", defaultValue: "" });
+    const codeNode = graph.nodes.find((n) => n.id === "code1")!;
+    const pins = resolvePinDefs(codeNode, graph.variables, graph.functions, graph.scripts);
+    expect(pins.some((p) => p.id === "name" && p.direction === "input")).toBe(true);
+  });
+
+  it("removing an input prunes the now-dangling pin/connection off every bound code.run node", () => {
+    const script = createCodeScriptDef("Greet");
+    script.inputs.push({ id: "name", name: "name", type: "string", defaultValue: "" });
+    const graph = buildGraphWithBoundCodeNode(script);
+
+    const varDef = getNodeDef("variable.get");
+    const variable: Variable = { id: "v1", name: "PlayerName", type: "string", defaultValue: "Alice" };
+    addVariable(graph, variable);
+    const getNode = createNodeInstance("variable.get", { x: -200, y: 0 }, varDef.derivePins!(variable), "get", variable.id);
+    graph.nodes.push(getNode);
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "get", fromPin: "value", toNode: "code1", toPin: "name" }, graph.scripts);
+
+    expect(graph.connections).toHaveLength(1);
+
+    removeScriptInput(graph, script, "name");
+
+    expect(script.inputs).toHaveLength(0);
+    expect(graph.connections).toHaveLength(0);
+    const codeNode = graph.nodes.find((n) => n.id === "code1")!;
+    expect(codeNode.pins.name).toBeUndefined();
+  });
+});
+
+describe("updateScriptInput", () => {
+  it("renaming an input does NOT disconnect its wire", () => {
+    const script = createCodeScriptDef("Greet");
+    script.inputs.push({ id: "name", name: "name", type: "string", defaultValue: "" });
+    const graph = createEmptyGraph("g", "root");
+    graph.scripts.push(script);
+
+    const codeDef = getNodeDef("code.run");
+    const codeNode = createNodeInstance("code.run", { x: 0, y: 0 }, codeDef.deriveScriptPins!(script), "code1", undefined, undefined, script.id);
+    graph.nodes.push(codeNode);
+    const variable: Variable = { id: "v1", name: "PlayerName", type: "string", defaultValue: "Alice" };
+    addVariable(graph, variable);
+    const getDef = getNodeDef("variable.get");
+    graph.nodes.push(createNodeInstance("variable.get", { x: -200, y: 0 }, getDef.derivePins!(variable), "get", variable.id));
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "get", fromPin: "value", toNode: "code1", toPin: "name" }, graph.scripts);
+
+    updateScriptInput(graph, script, "name", { name: "playerName" });
+
+    expect(script.inputs[0].name).toBe("playerName");
+    expect(graph.connections).toHaveLength(1);
+  });
+
+  it("retyping an input DOES disconnect its wire (the old wire may no longer be type-compatible)", () => {
+    const script = createCodeScriptDef("Greet");
+    script.inputs.push({ id: "name", name: "name", type: "string", defaultValue: "" });
+    const graph = createEmptyGraph("g", "root");
+    graph.scripts.push(script);
+
+    const codeDef = getNodeDef("code.run");
+    const codeNode = createNodeInstance("code.run", { x: 0, y: 0 }, codeDef.deriveScriptPins!(script), "code1", undefined, undefined, script.id);
+    graph.nodes.push(codeNode);
+    const variable: Variable = { id: "v1", name: "PlayerName", type: "string", defaultValue: "Alice" };
+    addVariable(graph, variable);
+    const getDef = getNodeDef("variable.get");
+    graph.nodes.push(createNodeInstance("variable.get", { x: -200, y: 0 }, getDef.derivePins!(variable), "get", variable.id));
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "get", fromPin: "value", toNode: "code1", toPin: "name" }, graph.scripts);
+
+    updateScriptInput(graph, script, "name", { type: "number" });
+
+    expect(script.inputs[0].type).toBe("number");
+    expect(graph.connections).toHaveLength(0);
+  });
+});
+
+describe("moveScript", () => {
+  it("reorders scripts on the graph", () => {
+    const graph = createEmptyGraph("g", "root");
+    graph.scripts.push(createCodeScriptDef("a"), createCodeScriptDef("b"), createCodeScriptDef("c"));
+    const [a, b, c] = graph.scripts;
+    moveScript(graph, c.id, a.id, "before");
+    expect(graph.scripts.map((s) => s.id)).toEqual([c.id, a.id, b.id]);
+  });
+});
+
+describe("moveScriptInput", () => {
+  it("reorders a script's inputs list", () => {
+    const script = createCodeScriptDef("Fn");
+    script.inputs.push(
+      { id: "a", name: "a", type: "number", defaultValue: 0 },
+      { id: "b", name: "b", type: "number", defaultValue: 0 },
+      { id: "c", name: "c", type: "number", defaultValue: 0 },
+    );
+    moveScriptInput(script, "c", "a", "before");
+    expect(script.inputs.map((e) => e.id)).toEqual(["c", "a", "b"]);
   });
 });

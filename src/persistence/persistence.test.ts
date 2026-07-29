@@ -79,10 +79,26 @@ describe("persistence round-trip", () => {
     v1Doc.formatVersion = 1;
     // @ts-expect-error simulating a v1 save file that predates the `functions` field entirely
     delete v1Doc.graph.functions;
+    // @ts-expect-error a v1 save file predates `scripts` too, migrated in the same chain
+    delete v1Doc.graph.scripts;
 
     const loaded = deserializeGraph(JSON.stringify(v1Doc));
 
     expect(loaded.functions).toEqual([]);
+    expect(loaded.scripts).toEqual([]);
+  });
+
+  it("migrates a v2 document (predating the Code node/Scripts) by defaulting an empty scripts array", () => {
+    const graph = createEmptyGraph("g5", "Legacy v2");
+    addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+    const v2Doc = JSON.parse(serializeGraph(graph)) as { formatVersion: number; graph: Graph };
+    v2Doc.formatVersion = 2;
+    // @ts-expect-error simulating a v2 save file that predates the `scripts` field entirely
+    delete v2Doc.graph.scripts;
+
+    const loaded = deserializeGraph(JSON.stringify(v2Doc));
+
+    expect(loaded.scripts).toEqual([]);
   });
 
   it("saves at the current format version", () => {

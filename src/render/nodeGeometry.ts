@@ -1,6 +1,6 @@
 import { getNodeDef } from "../engine/registry";
 import { resolveNodeLabel, resolvePinDefs } from "../engine/graphMutations";
-import type { FunctionDef, Graph, NodeInstance, PinDef, Variable } from "../engine/types";
+import type { CodeScriptDef, FunctionDef, Graph, NodeInstance, PinDef, Variable } from "../engine/types";
 import { computeNodeLayout, type NodeLayout } from "./layout";
 import { worldToScreen, type Camera } from "./camera";
 
@@ -50,14 +50,20 @@ export function computeNodeScreenGeometry(
 }
 
 /** A node's bounding box in world units (independent of camera) — used for comment-box containment tests. */
-export function computeNodeWorldRect(node: NodeInstance, pinDefs: PinDef[], variables: Variable[], functions: FunctionDef[]): {
+export function computeNodeWorldRect(
+  node: NodeInstance,
+  pinDefs: PinDef[],
+  variables: Variable[],
+  functions: FunctionDef[],
+  scripts: CodeScriptDef[] = [],
+): {
   x: number;
   y: number;
   width: number;
   height: number;
 } {
   const def = getNodeDef(node.type);
-  const layout = computeNodeLayout(resolveNodeLabel(node, def, variables, functions), pinDefs, {
+  const layout = computeNodeLayout(resolveNodeLabel(node, def, variables, functions, scripts), pinDefs, {
     showAddButton: !!def.addInstancePinEntry,
     compact: !!def.compact,
   });
@@ -65,23 +71,25 @@ export function computeNodeWorldRect(node: NodeInstance, pinDefs: PinDef[], vari
 }
 
 /** Computes screen geometry for every node once per frame, reused by drawing, hit-testing, and the DOM overlay.
- * `variables` must be the full VISIBLE set (see getVisibleVariables) and `functions` the root's function
- * list — `graph` may be a function's body, whose own `.variables`/`.functions` aren't the complete picture. */
+ * `variables` must be the full VISIBLE set (see getVisibleVariables) and `functions`/`scripts` the root's
+ * function/script lists — `graph` may be a function's body, whose own `.variables`/`.functions`/`.scripts`
+ * aren't the complete picture. */
 export function computeAllNodeGeometries(
   graph: Graph,
   camera: Camera,
   variables: Variable[],
   functions: FunctionDef[],
+  scripts: CodeScriptDef[] = [],
 ): Map<string, NodeScreenGeometry> {
   const map = new Map<string, NodeScreenGeometry>();
   for (const node of graph.nodes) {
     const def = getNodeDef(node.type);
-    const pinDefs = resolvePinDefs(node, variables, functions);
+    const pinDefs = resolvePinDefs(node, variables, functions, scripts);
     map.set(
       node.id,
       computeNodeScreenGeometry(
         node,
-        resolveNodeLabel(node, def, variables, functions),
+        resolveNodeLabel(node, def, variables, functions, scripts),
         pinDefs,
         camera,
         !!def.addInstancePinEntry,
