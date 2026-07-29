@@ -43,29 +43,29 @@ export function drawNodes(
     // so it's clear at a glance both that it's disabled and what it would otherwise still connect to.
     ctx.globalAlpha = node.disabled ? 0.45 : 1;
 
+    // The plain resting-state border is gone entirely (shadow + top-left highlight carry the
+    // node's edge on their own now) — but selection/execution feedback is functional, not just
+    // decorative chrome, so THAT still draws a ring, only for the two states that need one.
     const isExecuting = executingNodeId === node.id;
-    const borderWidth = isExecuting ? 2.5 : selectedNodeIds.has(node.id) ? 2 : 1;
-    const borderColor = isExecuting
-      ? "#5ad1ff"
-      : selectedNodeIds.has(node.id)
-        ? Colors.NODE_BORDER_SELECTED
-        : Colors.NODE_BORDER;
+    const isSelected = selectedNodeIds.has(node.id);
+    const showStateBorder = isExecuting || isSelected;
+    const borderWidth = isExecuting ? 2.5 : 2;
+    const borderColor = isExecuting ? "#5ad1ff" : Colors.NODE_BORDER_SELECTED;
 
     if (def.compact) {
       // A reroute "knot" (see NodeDef.compact) — just a small body + border, no header bar or
       // label; its pins (drawn below, same as any other node) carry all the visual meaning.
-      ctx.beginPath();
-      ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 4 * camera.zoom);
-      ctx.fillStyle = Colors.NODE_BODY_BG;
-      ctx.fill();
-      ctx.lineWidth = borderWidth;
-      ctx.strokeStyle = borderColor;
-      ctx.stroke();
+      drawNodeShadow(ctx, geo.screenX, geo.screenY, geo.width, geo.height, 4 * camera.zoom, camera.zoom);
+      drawTopHighlight(ctx, geo.screenX, geo.screenY, geo.width, geo.height, 4 * camera.zoom, camera.zoom);
+      if (showStateBorder) {
+        ctx.lineWidth = borderWidth;
+        ctx.strokeStyle = borderColor;
+        ctx.beginPath();
+        ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 4 * camera.zoom);
+        ctx.stroke();
+      }
     } else {
-      ctx.beginPath();
-      ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom);
-      ctx.fillStyle = Colors.NODE_BODY_BG;
-      ctx.fill();
+      drawNodeShadow(ctx, geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom, camera.zoom);
 
       const headerHeight = NODE_HEADER_HEIGHT * camera.zoom;
       ctx.beginPath();
@@ -77,12 +77,22 @@ export function drawNodes(
       ]);
       ctx.fillStyle = resolveNodeHeaderColor(node, def, variables);
       ctx.fill();
+      // A left-to-right black falloff over the header's own color — same path, no beginPath()
+      // needed (fill() doesn't clear it) — reads as a subtle depth/sheen rather than a flat block.
+      const headerShade = ctx.createLinearGradient(geo.screenX, 0, geo.screenX + geo.width, 0);
+      headerShade.addColorStop(0, "rgba(0, 0, 0, 0.75)");
+      headerShade.addColorStop(1, "rgba(0, 0, 0, 0)");
+      ctx.fillStyle = headerShade;
+      ctx.fill();
 
-      ctx.lineWidth = borderWidth;
-      ctx.strokeStyle = borderColor;
-      ctx.beginPath();
-      ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom);
-      ctx.stroke();
+      drawTopHighlight(ctx, geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom, camera.zoom);
+      if (showStateBorder) {
+        ctx.lineWidth = borderWidth;
+        ctx.strokeStyle = borderColor;
+        ctx.beginPath();
+        ctx.roundRect(geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom);
+        ctx.stroke();
+      }
 
       if (latentNodeIds.has(node.id)) {
         drawLatentIcon(ctx, geo.screenX + geo.width, geo.screenY, 8 * camera.zoom);
@@ -128,6 +138,60 @@ export function drawNodes(
   }
   ctx.textAlign = "left";
   ctx.globalAlpha = 1;
+}
+
+/** Fills a node's own body silhouette (the same rounded-rect shape every caller then draws a
+ * header/border/pins over) once with a drop shadow applied, via canvas's native shadow
+ * properties — wrapped in save/restore so the shadow only ever applies to this one fill and
+ * doesn't bleed into anything drawn after it (header, gradient, border, pins, text), which would
+ * otherwise each cast their own small shadow too. Subtle by design: a slight lift off the canvas,
+ * not a heavy floating-card effect. Light comes from the top-left at 45°, so the shadow it casts
+ * falls toward the bottom-right — equal X/Y offsets, since a 45° direction is exactly where those
+ * two agree. (drawTopHighlight below simplifies this to a top-only cue, so the two no longer
+ * share an identical light angle — a deliberate simplicity-over-precision tradeoff.) */
+function drawNodeShadow(
+  ctx: CanvasRenderingContext2D,
+  screenX: number,
+  screenY: number,
+  width: number,
+  height: number,
+  cornerRadius: number,
+  zoom: number,
+): void {
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+  ctx.shadowBlur = 10 * zoom;
+  ctx.shadowOffsetX = 3 * zoom;
+  ctx.shadowOffsetY = 3 * zoom;
+  ctx.beginPath();
+  ctx.roundRect(screenX, screenY, width, height, cornerRadius);
+  ctx.fillStyle = Colors.NODE_BODY_BG;
+  ctx.fill();
+  ctx.restore();
+}
+
+/** A soft light-from-above cue: a plain top-to-bottom gradient, white fading to transparent
+ * within just a few pixels of the top edge, filled over the node's own rounded-rect shape.
+ * Simpler than an actual inset-shadow simulation (no clip/shadow-offset trick needed) — a
+ * gradient fill already only paints within the current path, so this reads as a thin top-lit
+ * sheen at a fraction of the cost and code of clipping + casting a shadow. */
+function drawTopHighlight(
+  ctx: CanvasRenderingContext2D,
+  screenX: number,
+  screenY: number,
+  width: number,
+  height: number,
+  cornerRadius: number,
+  zoom: number,
+): void {
+  ctx.beginPath();
+  ctx.roundRect(screenX, screenY, width, height, cornerRadius);
+  const fadeDistance = 4 * zoom;
+  const highlight = ctx.createLinearGradient(0, screenY, 0, screenY + fadeDistance);
+  highlight.addColorStop(0, "rgba(255, 255, 255, 0.3)");
+  highlight.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = highlight;
+  ctx.fill();
 }
 
 /** Draws a small clock icon straddling (cx, cy) — used centered on a node's top-right CORNER so
