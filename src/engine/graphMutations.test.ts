@@ -23,6 +23,7 @@ import {
   updateVariable,
 } from "./graphMutations";
 import { getNodeDef } from "./registry";
+import { transpileScript } from "./transpile";
 import { type CodeScriptDef, type ExecutionContext, type FunctionDef, type Variable } from "./types";
 import { Graph } from "./graph";
 import { NodeInstance } from "./nodeInstance";
@@ -732,7 +733,16 @@ describe("createTemplatedCodeScriptDef", () => {
     expect(script.outputs[0].type).toBe("string");
 
     expect(script.source).not.toBe("");
-    expect(script.compiledJs).toBe(script.source);
+    expect(script.source).toContain(": string"); // genuinely type-annotated TS, not plain JS
+    expect(script.compiledJs).not.toBe(script.source);
+    expect(script.compiledJs).not.toContain(": string"); // type annotations stripped
+  });
+
+  it("compiledJs is exactly what the real TypeScript transpiler produces from source", async () => {
+    const script = createTemplatedCodeScriptDef("MyScript");
+    const { success, outputJs } = await transpileScript(script.source);
+    expect(success).toBe(true);
+    expect(script.compiledJs).toBe(outputJs);
   });
 
   it("the template actually runs end-to-end: logs the input and sets the output, both under their Custom-prefixed names", async () => {

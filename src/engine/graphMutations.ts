@@ -686,12 +686,42 @@ export function createCodeScriptDef(name: string): CodeScriptDef {
 
 const TEMPLATE_INPUT_NAME = "MyInputPin";
 const TEMPLATE_OUTPUT_NAME = "MyOutputPin";
+const TEMPLATE_INPUT_KEY = `${CUSTOM_PIN_PREFIX}${TEMPLATE_INPUT_NAME}`;
+const TEMPLATE_OUTPUT_KEY = `${CUSTOM_PIN_PREFIX}${TEMPLATE_OUTPUT_NAME}`;
 
+/** Real, type-annotated TypeScript — not the plain-JS shortcut an earlier version of this template
+ * used — so a freshly created script demonstrates a genuinely type-safe `run()` straight away:
+ * `inputs`'s shape (and `log`'s) is spelled out, so mistyping a Custom-prefixed pin name, or its
+ * type, is a red squiggle in the editor rather than a silent `undefined` at run time. */
 function templateScriptSource(): string {
   return [
+    "function run(",
+    "  log: (message: string) => void,",
+    `  inputs: { ${TEMPLATE_INPUT_KEY}: string },`,
+    `): { ${TEMPLATE_OUTPUT_KEY}: string } {`,
+    `  log(inputs.${TEMPLATE_INPUT_KEY});`,
+    `  return { ${TEMPLATE_OUTPUT_KEY}: "I am Alive" };`,
+    "}",
+    "",
+  ].join("\n");
+}
+
+/** The exact plain-JS equivalent of templateScriptSource() above, with every type annotation
+ * removed and nothing else changed — i.e. exactly what engine/transpile.ts's transpileScript would
+ * produce from it. Hand-kept in lockstep (verified by createTemplatedCodeScriptDef's own test)
+ * rather than actually awaiting the real transpiler at creation time, since that's async and
+ * lazily loads the whole `typescript` package on first use — overkill for seeding one fixed,
+ * already-known-correct snippet. A real edit-then-Save through scriptEditor.ts re-transpiles this
+ * for real, the same as any other script; nothing here bypasses that for anything the user
+ * actually changes. */
+function templateCompiledJs(): string {
+  // 4-space indent to match ts.transpileModule's own printer exactly (verified by
+  // createTemplatedCodeScriptDef's own test) — unlike templateScriptSource's 2-space TS, which is
+  // just this file's own authored style and irrelevant to what the compiled JS looks like.
+  return [
     "function run(log, inputs) {",
-    `  log(inputs.${CUSTOM_PIN_PREFIX}${TEMPLATE_INPUT_NAME});`,
-    `  return { ${CUSTOM_PIN_PREFIX}${TEMPLATE_OUTPUT_NAME}: "I am Alive" };`,
+    `    log(inputs.${TEMPLATE_INPUT_KEY});`,
+    `    return { ${TEMPLATE_OUTPUT_KEY}: "I am Alive" };`,
     "}",
     "",
   ].join("\n");
@@ -699,14 +729,11 @@ function templateScriptSource(): string {
 
 /** Creates a new script pre-seeded with a runnable example, rather than createCodeScriptDef's bare
  * empty shell — one string input (`MyInputPin`, defaulting to "Hello World!") and one string
- * output (`MyOutputPin`), plus a `source`/`compiledJs` template that logs the input via the `log`
- * it's given and sets the output, so a freshly created script already does something end-to-end
- * instead of starting as a silent no-op. Only used by the Scripts panel's own "+" button (see
- * scriptsPanel.ts) — every other caller that wants a genuinely blank starting point (including
- * every existing test) still uses createCodeScriptDef directly. The template is plain JavaScript,
- * not TypeScript, so `compiledJs` can just be the exact same text: transpiling plain JS through the
- * real (async, lazily-loaded — see engine/transpile.ts) transpiler is documented as a byte-for-byte
- * no-op, so there's nothing to gain from awaiting it just to seed this fixed, already-valid text. */
+ * output (`MyOutputPin`), plus a type-safe `source`/`compiledJs` template that logs the input via
+ * the `log` it's given and sets the output, so a freshly created script already does something
+ * end-to-end instead of starting as a silent no-op. Only used by the Scripts panel's own "+" button
+ * (see scriptsPanel.ts) — every other caller that wants a genuinely blank starting point (including
+ * every existing test) still uses createCodeScriptDef directly. */
 export function createTemplatedCodeScriptDef(name: string): CodeScriptDef {
   const script = createCodeScriptDef(name);
   script.inputs.push({
@@ -722,7 +749,7 @@ export function createTemplatedCodeScriptDef(name: string): CodeScriptDef {
     defaultValue: "",
   });
   script.source = templateScriptSource();
-  script.compiledJs = script.source;
+  script.compiledJs = templateCompiledJs();
   return script;
 }
 
