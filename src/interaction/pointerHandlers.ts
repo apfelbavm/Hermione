@@ -620,6 +620,21 @@ export function setupPointerInteraction(
     }
 
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+      // A real text selection anchored INSIDE the log panel means the user dragged across log
+      // lines to copy that text — let the browser's native copy handle it instead of hijacking
+      // Ctrl+C into a no-op graph-clipboard write. Deliberately scoped to the log panel specifically
+      // rather than "any selection exists anywhere on the page": dragging a marquee box over the
+      // canvas to multi-select nodes can itself leave the browser with an incidental, invisible
+      // text selection elsewhere (nothing here sets user-select: none on the whole page — see
+      // style.css's ".resizing" comment, which blocks exactly this during a panel-resize drag) —
+      // treating THAT as "copy the selection" would silently break ordinary graph-node copying.
+      const selection = window.getSelection();
+      const logPanel = document.getElementById("log-panel");
+      const copyingLogText =
+        !!selection && !selection.isCollapsed && selection.toString().length > 0 &&
+        !!logPanel && !!selection.anchorNode && logPanel.contains(selection.anchorNode);
+      if (copyingLogText) return;
+
       e.preventDefault();
       const { selectedNodeIds, sidebarSelection } = store.state;
       if (selectedNodeIds.size > 0) {
