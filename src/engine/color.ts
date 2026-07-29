@@ -105,6 +105,8 @@ export namespace Colors {
     Math: PIN_COLORS.number,
     // Same color as a "date" pin/wire, tying the whole node category to that type visually.
     Date: PIN_COLORS.date,
+    // Same color as a "boolean" pin/wire, tying the whole node category to that type visually.
+    Boolean: PIN_COLORS.boolean,
     Debug: "#6b6b3b",
     Variables: "#7a4f9b",
     // Neither has a separate color of its own anymore — both read as the same category as Flow
