@@ -154,9 +154,7 @@ export function getVisibleVariables(
   return [...rootGraph.variables, ...currentGraph.variables];
 }
 
-export function addNode(graph: Graph, node: NodeInstance): void {
-  graph.nodes.push(node);
-}
+
 
 /** True if a node of this type is allowed to be placed into `graph` right now — trivially true for
  * any non-event node type. An event node (see NodeDef.eventTrigger — On Start/On Interval/On Run)

@@ -14,12 +14,17 @@ export function toDocument(graph: Graph): SavedDocument {
 
 /** v1 predates user-defined Functions — its saved graphs have no `functions` field at all. */
 function migrateV1ToV2(graph: Graph): Graph {
-  return { ...graph, functions: graph.functions ?? [] };
+  const newGraph = new Graph(graph.id, graph.name);
+  newGraph.functions = graph.functions ?? [];
+  return newGraph;
 }
 
 /** v2 predates the Code node/Scripts — its saved graphs have no `scripts` field at all. */
 function migrateV2ToV3(graph: Graph): Graph {
-  return { ...graph, scripts: graph.scripts ?? [] };
+  const newGraph = new Graph(graph.id, graph.name);
+  newGraph.functions = graph.functions ?? [];
+  newGraph.scripts = graph.scripts ?? [];
+  return newGraph;
 }
 
 export function fromDocument(doc: SavedDocument): Graph {

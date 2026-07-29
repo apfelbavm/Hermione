@@ -27,4 +27,8 @@ export class Graph {
     this.functions = [];
     this.scripts = [];
   }
+
+  addNode(node: NodeInstance): void {
+    this.nodes.push(node);
+  }
 }
