@@ -37,10 +37,7 @@ export function drawWires(
   }
 }
 
-export function drawWireDragPreview(
-  ctx: CanvasRenderingContext2D,
-  wireDrag: WireDragState,
-): void {
+export function drawWireDragPreview(ctx: CanvasRenderingContext2D, wireDrag: WireDragState): void {
   ctx.strokeStyle = Colors.PIN_COLORS[wireDrag.pinType];
   ctx.lineWidth = 2;
   ctx.setLineDash([5, 4]);
@@ -51,33 +48,15 @@ export function drawWireDragPreview(
     // anchor itself is the entry side and the mouse (toScreen) stands in for the eventual output —
     // so the argument order swaps to match.
     if (wireDrag.anchorDirection === "output") {
-      drawBezierWire(
-        ctx,
-        from.x,
-        from.y,
-        wireDrag.toScreen.x,
-        wireDrag.toScreen.y,
-      );
+      drawBezierWire(ctx, from.x, from.y, wireDrag.toScreen.x, wireDrag.toScreen.y);
     } else {
-      drawBezierWire(
-        ctx,
-        wireDrag.toScreen.x,
-        wireDrag.toScreen.y,
-        from.x,
-        from.y,
-      );
+      drawBezierWire(ctx, wireDrag.toScreen.x, wireDrag.toScreen.y, from.x, from.y);
     }
   }
   ctx.setLineDash([]);
 }
 
-function drawBezierWire(
-  ctx: CanvasRenderingContext2D,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-): void {
+function drawBezierWire(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number): void {
   const g = bezierControlPoints(x1, y1, x2, y2);
   ctx.beginPath();
   ctx.moveTo(g.x1, g.y1);
