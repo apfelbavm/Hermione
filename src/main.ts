@@ -77,18 +77,31 @@ const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 if (!ctx) throw new Error("Canvas 2D context unavailable");
 
 // Tracked independently of pointerHandlers.ts's own internal copy (not exposed from there) so the
-// bottom-right coordinate readout (see render() below) has a value from the very first frame —
+// bottom-right coordinate readout (see renderCanvas() below) has a value from the very first frame —
 // render() itself runs synchronously once during startup (via resizeCanvas(), below), well before
 // setupPointerInteraction() is even called later in this file.
 let lastMouseScreenPos = { x: 0, y: 0 };
+// Coalesces into at most one canvas-only redraw per animation frame, same idea as store's own
+// notify() — but deliberately NOT store.notify() itself: that reruns the full render(), including
+// every sidebar panel's list.innerHTML = "" rebuild (variablePanel/functionsPanel/scriptsPanel/etc),
+// on every single call. Since this fires on EVERY mousemove anywhere on the page (not just over the
+// canvas), routing it through store.notify() was rebuilding those panels' row DOM up to 60x/sec —
+// destroying the very row element a sidebar drag or click was in the middle of grabbing, which is
+// exactly why dragging/selecting sidebar rows got progressively "stuck" the longer a session ran (a
+// bigger graph makes each rebuild slower, widening the window where it collides with the gesture).
+let canvasRedrawScheduled = false;
+function scheduleCanvasRedraw(): void {
+  if (canvasRedrawScheduled) return;
+  canvasRedrawScheduled = true;
+  requestAnimationFrame(() => {
+    canvasRedrawScheduled = false;
+    renderCanvas();
+  });
+}
 window.addEventListener("mousemove", (e) => {
   const rect = canvas.getBoundingClientRect();
   lastMouseScreenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  // render() only ever runs in response to store.notify() (see store.subscribe(render) below) —
-  // a plain hover with nothing being dragged never calls it on its own, so without this the
-  // coordinate readout would sit frozen until some UNRELATED interaction happened to redraw.
-  // store.notify() itself is already throttled to once per animation frame, so this stays cheap.
-  store.notify();
+  scheduleCanvasRedraw();
 });
 
 const store = createStore({
@@ -253,7 +266,10 @@ const detailsPanel = createDetailsPanel(
   store,
 );
 
-function render(): void {
+/** The cheap, purely-visual half of a frame: canvas drawing + the DOM overlays that sit directly on
+ * top of it (widgetSync, comment titles). Safe to run on every mousemove regardless of the graph's
+ * size — unlike render() below, it never touches a sidebar panel's DOM. */
+function renderCanvas(): void {
   const {
     camera,
     selectedNodeIds,
@@ -283,6 +299,10 @@ function render(): void {
   drawMouseCoordinates(ctx, camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y), width, height);
   widgetSync.sync(geometries);
   commentOverlay.sync();
+}
+
+function render(): void {
+  renderCanvas();
   variablePanel.render();
   functionsPanel.render();
   inputsPanel.render();

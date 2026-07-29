@@ -255,11 +255,32 @@ export function setupPointerInteraction(
     autoPanFrame = requestAnimationFrame(tick);
   }
 
+  // Firefox (unlike Chromium) treats a plain <canvas> as natively draggable by default: a
+  // click-drag starting on it kicks off the browser's own OS-level drag-ghost gesture (the whole
+  // canvas visibly drags away as a translucent image) INSTEAD OF delivering the ordinary mousedown/
+  // mousemove/mouseup sequence the marquee-select and node-drag logic below rely on. Once that
+  // native drag steals the gesture, the mouseup that would reset `drag` back to "none" never fires,
+  // so `drag.kind` gets stuck (e.g. at "marquee") and every later plain mousemove — even with no
+  // button held — keeps resizing the stale selection box, exactly as if it were still being dragged.
+  // Canvas content should never be natively draggable here, so unconditionally cancel it.
+  canvas.draggable = false;
+  canvas.addEventListener("dragstart", (e) => e.preventDefault());
+
   canvas.addEventListener("mousedown", (e) => {
     // Any click inside the graph view — regardless of what it hits — stands down whatever
     // Variables/Functions sidebar row was selected, so the Details panel only ever reflects
     // whichever was clicked last (see detailsPanel.ts).
     store.state.sidebarSelection = null;
+
+    // Clicking on <canvas> (no text content of its own) does NOT clear a pre-existing browser text
+    // selection elsewhere on the page — e.g. from an earlier drag across log lines to copy them —
+    // the way clicking on ordinary text does. Left alone, that stale selection stays non-collapsed
+    // indefinitely, so the Ctrl+C handler's "is the user copying log text?" check (below, keyed off
+    // window.getSelection() being anchored in the log panel) kept firing for an old selection long
+    // after the user had moved on to selecting nodes here instead — permanently shadowing graph-node
+    // copying until something else happened to clear it. Starting a fresh canvas interaction is a
+    // clear signal focus has moved to the graph, so clear it here.
+    window.getSelection()?.removeAllRanges();
 
     if (e.button === 2) {
       // Right-drag pans the camera; a right-click with no drag still opens the context menu

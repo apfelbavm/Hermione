@@ -15,7 +15,7 @@ import * as Papa from "papaparse";
 // CDATA, encodings, real well-formedness checking via XMLValidator) than anything worth
 // hand-maintaining here. The tradeoff, surfaced via NodeDef.compileImports: a compiled graph using
 // these nodes needs `fast-xml-parser`/`fast-xml-builder` installed alongside it — no longer a fully
-// dependency-free .mjs, the same call already made for the SAML node's xmldsigjs dependency.
+// dependency-free .mjs.
 //
 // XMLBuilder comes from the separate `fast-xml-builder` package, not from fast-xml-parser itself:
 // fast-xml-parser's own typings mark its bundled XMLBuilder @deprecated in favor of the standalone

@@ -24,13 +24,19 @@ function buildGraph(pinValues: Record<string, unknown>) {
   return { graph, node };
 }
 
+// oauth4webapi enforces HTTPS by default (real OAuth2 should always use it) — these tests stub
+// `fetch` directly rather than spinning up a real HTTPS server, so the https:// URLs below never
+// actually hit the network.
+
 describe("auth.oauth2ClientCredentials", () => {
-  it("requests a token from tokenServiceUrl directly when provider is generic, sending client_id/secret in the body", async () => {
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
-      status: 200,
-      ok: true,
-      text: async () => JSON.stringify({ access_token: "tok-1", expires_in: 3600 }),
-    }));
+  it("requests a token from tokenServiceUrl, sending client_id/secret in the body by default", async () => {
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) =>
+        new Response(JSON.stringify({ access_token: "tok-1", token_type: "bearer", expires_in: 3600 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph({
@@ -45,63 +51,40 @@ describe("auth.oauth2ClientCredentials", () => {
     expect(ctx.execOutputs.get("oauth:accessToken")).toBe("tok-1");
     expect(ctx.execOutputs.get("oauth:auth")).toEqual({ header: "Authorization", value: "Bearer tok-1" });
     expect(ctx.execOutputs.get("oauth:expiresIn")).toBe(3600);
+    expect(ctx.execOutputs.get("oauth:status")).toBe(200);
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://idp.example.com/oauth/token");
+    expect(String(url)).toBe("https://idp.example.com/oauth/token");
     const body = new URLSearchParams(init!.body as string);
     expect(body.get("grant_type")).toBe("client_credentials");
     expect(body.get("client_id")).toBe("client-1");
     expect(body.get("client_secret")).toBe("secret-1");
+    expect(init!.headers).not.toHaveProperty("authorization");
   });
 
-  it("derives the Entra ID token endpoint from tenantId instead of using tokenServiceUrl", async () => {
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
-      status: 200,
-      ok: true,
-      text: async () => JSON.stringify({ access_token: "tok", expires_in: 60 }),
-    }));
+  it("includes scope in the request body when given", async () => {
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ access_token: "tok", token_type: "bearer", expires_in: 60 }), { status: 200 }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph({
-      provider: "microsoftEntraId",
-      tenantId: "my-tenant-id",
-      tokenServiceUrl: "https://should-be-ignored.example.com/token",
+      tokenServiceUrl: "https://idp.example.com/oauth/token",
       clientId: "client-1",
       clientSecret: "secret-1",
-      scope: "https://graph.microsoft.com/.default",
+      scope: "read write",
     });
     await runExecFrom("oauth", "exec-in", createExecutionContext(graph, { log: () => {} }));
 
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://login.microsoftonline.com/my-tenant-id/oauth2/v2.0/token");
+    const [, init] = fetchMock.mock.calls[0];
     const body = new URLSearchParams(init!.body as string);
-    expect(body.get("scope")).toBe("https://graph.microsoft.com/.default");
-  });
-
-  it("falls back to tokenServiceUrl for microsoftEntraId when tenantId is left blank", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({ status: 200, ok: true, text: async () => JSON.stringify({ access_token: "t", expires_in: 60 }) })),
-    );
-
-    const { graph } = buildGraph({
-      provider: "microsoftEntraId",
-      tokenServiceUrl: "https://fallback.example.com/token",
-      clientId: "c",
-      clientSecret: "s",
-    });
-    const ctx = createExecutionContext(graph, { log: () => {} });
-    await runExecFrom("oauth", "exec-in", ctx);
-
-    expect(ctx.execOutputs.get("oauth:success")).toBe(true);
+    expect(body.get("scope")).toBe("read write");
   });
 
   it("sends client credentials as a Basic Auth header instead when Send As is basicAuthHeader", async () => {
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
-      status: 200,
-      ok: true,
-      text: async () => JSON.stringify({ access_token: "tok", expires_in: 60 }),
-    }));
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ access_token: "tok", token_type: "bearer", expires_in: 60 }), { status: 200 }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph({
@@ -113,17 +96,27 @@ describe("auth.oauth2ClientCredentials", () => {
     await runExecFrom("oauth", "exec-in", createExecutionContext(graph, { log: () => {} }));
 
     const [, init] = fetchMock.mock.calls[0];
-    expect(init!.headers).toEqual({
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${btoa("client-1:secret-1")}`,
-    });
+    const headers = new Headers(init!.headers);
+    // oauth4webapi percent-encodes client_id/client_secret before Basic-encoding them (RFC 6749
+    // Appendix B), unlike a naive `btoa(id + ":" + secret)` — notably more correct, since it means a
+    // colon inside either value can't be confused with the id:secret separator.
+    expect(headers.get("authorization")).toBe(`Basic ${btoa("client%2D1:secret%2D1")}`);
     const body = new URLSearchParams(init!.body as string);
     expect(body.get("client_id")).toBe(null);
     expect(body.get("client_secret")).toBe(null);
   });
 
-  it("reports a non-2xx token endpoint response as an error instead of throwing, with the raw response body as the error and the real status", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ status: 401, ok: false, text: async () => '{"error":"invalid_client"}' })));
+  it("reports a non-2xx token endpoint response as an error instead of throwing, with the real status", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async (_url: string, _init?: RequestInit) =>
+          new Response(JSON.stringify({ error: "invalid_client", error_description: "bad secret" }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ),
+    );
 
     const { graph } = buildGraph({
       tokenServiceUrl: "https://idp.example.com/oauth/token",
@@ -136,53 +129,7 @@ describe("auth.oauth2ClientCredentials", () => {
     expect(ctx.execOutputs.get("oauth:success")).toBe(false);
     expect(ctx.execOutputs.get("oauth:auth")).toBe(null);
     expect(ctx.execOutputs.get("oauth:status")).toBe(401);
-    expect(ctx.execOutputs.get("oauth:error")).toBe('{"error":"invalid_client"}');
-  });
-
-  it("falls back to statusText when the response body is empty", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ status: 404, ok: false, statusText: "Not Found", text: async () => "" })));
-
-    const { graph } = buildGraph({
-      tokenServiceUrl: "https://idp.example.com/oauth/token",
-      clientId: "c",
-      clientSecret: "s",
-    });
-    const ctx = createExecutionContext(graph, { log: () => {} });
-    await runExecFrom("oauth", "exec-in", ctx);
-
-    expect(ctx.execOutputs.get("oauth:status")).toBe(404);
-    expect(ctx.execOutputs.get("oauth:error")).toBe("Not Found");
-  });
-
-  it("is an empty error string when BOTH the body and statusText are empty (HTTP/2 has no reason phrase) — the status pin is still the real code", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ status: 404, ok: false, statusText: "", text: async () => "" })));
-
-    const { graph } = buildGraph({
-      tokenServiceUrl: "https://idp.example.com/oauth/token",
-      clientId: "c",
-      clientSecret: "s",
-    });
-    const ctx = createExecutionContext(graph, { log: () => {} });
-    await runExecFrom("oauth", "exec-in", ctx);
-
-    expect(ctx.execOutputs.get("oauth:status")).toBe(404);
-    expect(ctx.execOutputs.get("oauth:error")).toBe("");
-  });
-
-  it("reports a response with no access_token as an error instead of throwing", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ status: 200, ok: true, text: async () => "{}" })));
-
-    const { graph } = buildGraph({
-      tokenServiceUrl: "https://idp.example.com/oauth/token",
-      clientId: "c",
-      clientSecret: "s",
-    });
-    const ctx = createExecutionContext(graph, { log: () => {} });
-    await runExecFrom("oauth", "exec-in", ctx);
-
-    expect(ctx.execOutputs.get("oauth:success")).toBe(false);
-    expect(ctx.execOutputs.get("oauth:status")).toBe(200);
-    expect(String(ctx.execOutputs.get("oauth:error"))).toContain("access_token");
+    expect(ctx.execOutputs.get("oauth:error")).toBe("bad secret");
   });
 
   it("reports status 0 on a network failure (no response received at all)", async () => {
@@ -204,23 +151,5 @@ describe("auth.oauth2ClientCredentials", () => {
     expect(ctx.execOutputs.get("oauth:success")).toBe(false);
     expect(ctx.execOutputs.get("oauth:status")).toBe(0);
     expect(ctx.execOutputs.get("oauth:error")).toBe("network down");
-  });
-
-  it("returns the real status alongside a successful token exchange", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({ status: 200, ok: true, text: async () => JSON.stringify({ access_token: "tok", expires_in: 60 }) })),
-    );
-
-    const { graph } = buildGraph({
-      tokenServiceUrl: "https://idp.example.com/oauth/token",
-      clientId: "c",
-      clientSecret: "s",
-    });
-    const ctx = createExecutionContext(graph, { log: () => {} });
-    await runExecFrom("oauth", "exec-in", ctx);
-
-    expect(ctx.execOutputs.get("oauth:success")).toBe(true);
-    expect(ctx.execOutputs.get("oauth:status")).toBe(200);
   });
 });
