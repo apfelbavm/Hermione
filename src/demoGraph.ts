@@ -19,7 +19,6 @@ export function buildDemoGraph(): Graph {
   const compare = addNode(graph, "math.equal", { x: 560, y: 40 }, "compare");
   const branch = addNode(graph, "flow.branch", { x: 320, y: 260 }, "branch");
   const delay = addNode(graph, "flow.delay", { x: 600, y: 200 }, "delay");
-  const sendEmail = addNode(graph, "action.sendEmailMock", { x: 820, y: 200 }, "sendEmail");
   const printInvited = addNode(graph, "debug.print", { x: 1080, y: 200 }, "printInvited");
   const printFalse = addNode(graph, "debug.print", { x: 600, y: 420 }, "printFalse");
 
@@ -27,9 +26,6 @@ export function buildDemoGraph(): Graph {
   add.pins.b.value = 3;
   compare.pins.b.value = 4;
   delay.pins.duration.value = 500;
-  sendEmail.pins.to.value = "candidate@example.com";
-  sendEmail.pins.subject.value = "Interview Invitation";
-  sendEmail.pins.body.value = "We would like to invite you for an interview.";
   printInvited.pins.message.value = "Invitation sent — interview scheduled";
   printFalse.pins.message.value = "Score too low — sending rejection";
 
@@ -37,8 +33,7 @@ export function buildDemoGraph(): Graph {
   connectPins(graph, graph.variables, graph.functions, { fromNode: compare.id, fromPin: "result", toNode: branch.id, toPin: "condition" });
   connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: branch.id, toPin: "exec-in" });
   connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "true", toNode: delay.id, toPin: "exec-in" });
-  connectPins(graph, graph.variables, graph.functions, { fromNode: delay.id, fromPin: "exec-out", toNode: sendEmail.id, toPin: "exec-in" });
-  connectPins(graph, graph.variables, graph.functions, { fromNode: sendEmail.id, fromPin: "exec-out", toNode: printInvited.id, toPin: "exec-in" });
+  connectPins(graph, graph.variables, graph.functions, { fromNode: delay.id, fromPin: "exec-out", toNode: printInvited.id, toPin: "exec-in" });
   connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "false", toNode: printFalse.id, toPin: "exec-in" });
 
   return graph;

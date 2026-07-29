@@ -14,7 +14,7 @@ import { NodeInstance } from "../engine/nodeInstance";
 // from Unreal's by-reference Array library for why. Only For Each needs exec pins (an actual
 // control-flow operation, not a value transformation).
 
-const GROUP = "Collections.Array";
+const GROUP = "Container.Array";
 
 function elementTypeOf(node: NodeInstance): PinType {
   return node.elementType ?? "number";

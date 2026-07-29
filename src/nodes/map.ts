@@ -12,7 +12,7 @@ import { NodeInstance } from "../engine/nodeInstance";
 // AND a key type (NodeInstance.mapKeyType) configured per instance — see
 // NodeDef.configurableElementType's includeKeyType flag.
 
-const GROUP = "Collections.Map";
+const GROUP = "Container.Map";
 
 interface MapEntry {
   key: unknown;

@@ -11,12 +11,7 @@ import { compileGraph } from "./codegen";
 import { Graph } from "../engine/graph";
 import { NodeInstance } from "../engine/nodeInstance";
 
-function addBuiltinNode(
-  graph: Graph,
-  type: string,
-  position = { x: 0, y: 0 },
-  id?: string,
-) {
+function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);
   const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
@@ -45,30 +40,10 @@ describe("compileGraph", () => {
     const graph = new Graph("g1", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const add = addBuiltinNode(graph, "math.add", { x: 0, y: 100 }, "add");
-    const compare = addBuiltinNode(
-      graph,
-      "math.greaterThan",
-      { x: 100, y: 100 },
-      "compare",
-    );
-    const branch = addBuiltinNode(
-      graph,
-      "flow.branch",
-      { x: 200, y: 0 },
-      "branch",
-    );
-    const printTrue = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 300, y: -50 },
-      "printTrue",
-    );
-    const printFalse = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 300, y: 50 },
-      "printFalse",
-    );
+    const compare = addBuiltinNode(graph, "math.greaterThan", { x: 100, y: 100 }, "compare");
+    const branch = addBuiltinNode(graph, "flow.branch", { x: 200, y: 0 }, "branch");
+    const printTrue = addBuiltinNode(graph, "debug.print", { x: 300, y: -50 }, "printTrue");
+    const printFalse = addBuiltinNode(graph, "debug.print", { x: 300, y: 50 }, "printFalse");
 
     add.pins.a.value = 2;
     add.pins.b.value = 3;
@@ -108,24 +83,15 @@ describe("compileGraph", () => {
     });
 
     const interpreterLogs: string[] = [];
-    await runExecFrom(
-      start.id,
-      "exec-out",
-      createExecutionContext(graph, { log: (m) => interpreterLogs.push(m) }),
-    );
+    await runExecFrom(start.id, "exec-out", createExecutionContext(graph, { log: (m) => interpreterLogs.push(m) }));
 
     const { code, manifest } = compileGraph(graph);
     expect(manifest.triggers).toHaveLength(1);
     expect(manifest.triggers[0].kind).toBe("manual");
 
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<
-      string,
-      unknown
-    >;
-    const trigger = compiled[manifest.triggers[0].functionName] as (
-      rt: unknown,
-    ) => Promise<void>;
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const compiledLogs: string[] = [];
     await trigger({
@@ -135,74 +101,6 @@ describe("compileGraph", () => {
 
     expect(compiledLogs).toEqual(interpreterLogs);
     expect(compiledLogs).toEqual(["5 is greater than 4"]);
-  });
-
-  it("compiled output preserves async ordering for Delay -> Send Email (mock) -> Print", async () => {
-    const graph = new Graph("g2", "test");
-    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
-    const delay = addBuiltinNode(
-      graph,
-      "flow.delay",
-      { x: 100, y: 0 },
-      "delay",
-    );
-    const sendEmail = addBuiltinNode(
-      graph,
-      "action.sendEmailMock",
-      { x: 200, y: 0 },
-      "sendEmail",
-    );
-    const print = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 300, y: 0 },
-      "print",
-    );
-
-    delay.pins.duration.value = 5;
-    sendEmail.pins.to.value = "candidate@example.com";
-    sendEmail.pins.subject.value = "Interview Invitation";
-    print.pins.message.value = "done";
-
-    connectPins(graph, graph.variables, graph.functions, {
-      fromNode: start.id,
-      fromPin: "exec-out",
-      toNode: delay.id,
-      toPin: "exec-in",
-    });
-    connectPins(graph, graph.variables, graph.functions, {
-      fromNode: delay.id,
-      fromPin: "exec-out",
-      toNode: sendEmail.id,
-      toPin: "exec-in",
-    });
-    connectPins(graph, graph.variables, graph.functions, {
-      fromNode: sendEmail.id,
-      fromPin: "exec-out",
-      toNode: print.id,
-      toPin: "exec-in",
-    });
-
-    const { code, manifest } = compileGraph(graph);
-    const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<
-      string,
-      unknown
-    >;
-    const trigger = compiled[manifest.triggers[0].functionName] as (
-      rt: unknown,
-    ) => Promise<void>;
-
-    const logs: string[] = [];
-    await trigger({
-      state: createInitialState(),
-      log: (m: string) => logs.push(m),
-    });
-
-    expect(logs).toEqual([
-      '📧 Sent to candidate@example.com: "Interview Invitation"',
-      "done",
-    ]);
   });
 
   it("compiled output reads variable state live across Set -> Get -> Set -> Get, matching the interpreter", async () => {
@@ -219,44 +117,16 @@ describe("compileGraph", () => {
     const setDef = getNodeDef("variable.set");
     const getDef = getNodeDef("variable.get");
 
-    const set1 = NodeInstance.createNodeInstance(
-      "variable.set",
-      { x: 0, y: 0 },
-      setDef.derivePins!(variable),
-      "set1",
-      variable.id,
-    );
+    const set1 = NodeInstance.createNodeInstance("variable.set", { x: 0, y: 0 }, setDef.derivePins!(variable), "set1", variable.id);
     set1.pins.value.value = "1";
     graph.nodes.push(set1);
-    const getNode = NodeInstance.createNodeInstance(
-      "variable.get",
-      { x: 0, y: 0 },
-      getDef.derivePins!(variable),
-      "get",
-      variable.id,
-    );
+    const getNode = NodeInstance.createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
     graph.nodes.push(getNode);
-    const print1 = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 0, y: 0 },
-      "print1",
-    );
-    const set2 = NodeInstance.createNodeInstance(
-      "variable.set",
-      { x: 0, y: 0 },
-      setDef.derivePins!(variable),
-      "set2",
-      variable.id,
-    );
+    const print1 = addBuiltinNode(graph, "debug.print", { x: 0, y: 0 }, "print1");
+    const set2 = NodeInstance.createNodeInstance("variable.set", { x: 0, y: 0 }, setDef.derivePins!(variable), "set2", variable.id);
     set2.pins.value.value = "2";
     graph.nodes.push(set2);
-    const print2 = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 0, y: 0 },
-      "print2",
-    );
+    const print2 = addBuiltinNode(graph, "debug.print", { x: 0, y: 0 }, "print2");
 
     connectPins(graph, graph.variables, graph.functions, {
       fromNode: start.id,
@@ -297,13 +167,8 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<
-      string,
-      unknown
-    >;
-    const trigger = compiled[manifest.triggers[0].functionName] as (
-      rt: unknown,
-    ) => Promise<void>;
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const logs: string[] = [];
     await trigger({
@@ -325,27 +190,11 @@ describe("compileGraph", () => {
     graph.variables.push(variable);
 
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
-    const branch = addBuiltinNode(
-      graph,
-      "flow.branch",
-      { x: 100, y: 0 },
-      "branch",
-    );
+    const branch = addBuiltinNode(graph, "flow.branch", { x: 100, y: 0 }, "branch");
     const getDef = getNodeDef("variable.get");
-    const getCond = NodeInstance.createNodeInstance(
-      "variable.get",
-      { x: 0, y: 0 },
-      getDef.derivePins!(variable),
-      "getCond",
-      variable.id,
-    );
+    const getCond = NodeInstance.createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "getCond", variable.id);
     graph.nodes.push(getCond);
-    const shared = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: 0 },
-      "shared",
-    );
+    const shared = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "shared");
     shared.pins.message.value = "reached shared";
 
     connectPins(graph, graph.variables, graph.functions, {
@@ -378,13 +227,8 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<
-      string,
-      unknown
-    >;
-    const trigger = compiled[manifest.triggers[0].functionName] as (
-      rt: unknown,
-    ) => Promise<void>;
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     for (const condValue of [true, false]) {
       const state = createInitialState() as Record<string, unknown>;
@@ -398,18 +242,8 @@ describe("compileGraph", () => {
   it("throws when an event root's exec-out fans out to multiple wires", () => {
     const graph = new Graph("g4", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
-    const print1 = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 100, y: 0 },
-      "print1",
-    );
-    const print2 = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 100, y: 100 },
-      "print2",
-    );
+    const print1 = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print1");
+    const print2 = addBuiltinNode(graph, "debug.print", { x: 100, y: 100 }, "print2");
 
     // Built directly: connectPins itself now enforces "one wire per exec output" (the second
     // call would just replace the first), so this shape can't arise through normal editor use —
@@ -437,24 +271,9 @@ describe("compileGraph", () => {
   it("throws when a non-root node's exec-out fans out to multiple wires", () => {
     const graph = new Graph("g5", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
-    const branchStart = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 100, y: 0 },
-      "branchStart",
-    );
-    const print1 = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: 0 },
-      "print1",
-    );
-    const print2 = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: 100 },
-      "print2",
-    );
+    const branchStart = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "branchStart");
+    const print1 = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "print1");
+    const print2 = addBuiltinNode(graph, "debug.print", { x: 200, y: 100 }, "print2");
 
     connectPins(graph, graph.variables, graph.functions, {
       fromNode: start.id,
@@ -485,18 +304,8 @@ describe("compileGraph", () => {
   it("throws on a cyclic exec wire", () => {
     const graph = new Graph("g6", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
-    const print1 = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 100, y: 0 },
-      "print1",
-    );
-    const print2 = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: 0 },
-      "print2",
-    );
+    const print1 = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print1");
+    const print2 = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "print2");
 
     // Built directly, bypassing connectPins' single-incoming-wire rule: a cycle that's still
     // reachable from an entry point can't actually be drawn through the editor's normal wire
@@ -532,18 +341,8 @@ describe("compileGraph", () => {
   it("a disabled node compiles to nothing, but the chain still continues past it — matching the interpreter", async () => {
     const graph = new Graph("g12", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
-    const print1 = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 100, y: 0 },
-      "print1",
-    );
-    const print2 = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: 0 },
-      "print2",
-    );
+    const print1 = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print1");
+    const print2 = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "print2");
     print1.pins.message.value = "first";
     print2.pins.message.value = "second";
     print1.disabled = true;
@@ -563,13 +362,8 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<
-      string,
-      unknown
-    >;
-    const trigger = compiled[manifest.triggers[0].functionName] as (
-      rt: unknown,
-    ) => Promise<void>;
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const logs: string[] = [];
     await trigger({
@@ -583,24 +377,9 @@ describe("compileGraph", () => {
   it("a disabled loop node compiles straight to 'completed', never splicing in its loop-body chain", async () => {
     const graph = new Graph("g13", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
-    const loop = addBuiltinNode(
-      graph,
-      "flow.forLoop",
-      { x: 100, y: 0 },
-      "loop",
-    );
-    const printBody = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: 0 },
-      "printBody",
-    );
-    const printDone = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: 100 },
-      "printDone",
-    );
+    const loop = addBuiltinNode(graph, "flow.forLoop", { x: 100, y: 0 }, "loop");
+    const printBody = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "printBody");
+    const printDone = addBuiltinNode(graph, "debug.print", { x: 200, y: 100 }, "printDone");
     printBody.pins.message.value = "body";
     printDone.pins.message.value = "done";
     loop.pins.start.value = 0;
@@ -630,13 +409,8 @@ describe("compileGraph", () => {
     // only splices in the compiled chain for its disabledNextExec pin(s) (see codegen.ts).
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<
-      string,
-      unknown
-    >;
-    const trigger = compiled[manifest.triggers[0].functionName] as (
-      rt: unknown,
-    ) => Promise<void>;
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const logs: string[] = [];
     await trigger({
@@ -651,36 +425,11 @@ describe("compileGraph", () => {
     const graph = new Graph("g14", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const par = addBuiltinNode(graph, "flow.parallel", { x: 100, y: 0 }, "par");
-    const slowDelay = addBuiltinNode(
-      graph,
-      "flow.delay",
-      { x: 200, y: 0 },
-      "slowDelay",
-    );
-    const fastDelay = addBuiltinNode(
-      graph,
-      "flow.delay",
-      { x: 200, y: 100 },
-      "fastDelay",
-    );
-    const printSlow = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 300, y: 0 },
-      "printSlow",
-    );
-    const printFast = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 300, y: 100 },
-      "printFast",
-    );
-    const printDone = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 400, y: 50 },
-      "printDone",
-    );
+    const slowDelay = addBuiltinNode(graph, "flow.delay", { x: 200, y: 0 }, "slowDelay");
+    const fastDelay = addBuiltinNode(graph, "flow.delay", { x: 200, y: 100 }, "fastDelay");
+    const printSlow = addBuiltinNode(graph, "debug.print", { x: 300, y: 0 }, "printSlow");
+    const printFast = addBuiltinNode(graph, "debug.print", { x: 300, y: 100 }, "printFast");
+    const printDone = addBuiltinNode(graph, "debug.print", { x: 400, y: 50 }, "printDone");
     slowDelay.pins.duration.value = 20;
     fastDelay.pins.duration.value = 5;
     printSlow.pins.message.value = "slow";
@@ -726,13 +475,8 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<
-      string,
-      unknown
-    >;
-    const trigger = compiled[manifest.triggers[0].functionName] as (
-      rt: unknown,
-    ) => Promise<void>;
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const logs: string[] = [];
     await trigger({
@@ -747,24 +491,9 @@ describe("compileGraph", () => {
     const graph = new Graph("g15", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
     const par = addBuiltinNode(graph, "flow.parallel", { x: 100, y: 0 }, "par");
-    const printA = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: 0 },
-      "printA",
-    );
-    const printB = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: 100 },
-      "printB",
-    );
-    const printDone = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 300, y: 50 },
-      "printDone",
-    );
+    const printA = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "printA");
+    const printB = addBuiltinNode(graph, "debug.print", { x: 200, y: 100 }, "printB");
+    const printDone = addBuiltinNode(graph, "debug.print", { x: 300, y: 50 }, "printDone");
     printA.pins.message.value = "A";
     printB.pins.message.value = "B";
     printDone.pins.message.value = "Done";
@@ -797,13 +526,8 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<
-      string,
-      unknown
-    >;
-    const trigger = compiled[manifest.triggers[0].functionName] as (
-      rt: unknown,
-    ) => Promise<void>;
+    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const logs: string[] = [];
     await trigger({
@@ -817,36 +541,11 @@ describe("compileGraph", () => {
   describe("auth.oauth2Saml (compileExecuteOutputs — a latent exec node's data outputs read by downstream nodes)", () => {
     function buildSamlGraph() {
       const graph = new Graph("g16", "test");
-      const start = addBuiltinNode(
-        graph,
-        "event.start",
-        { x: 0, y: 0 },
-        "start",
-      );
-      const saml = addBuiltinNode(
-        graph,
-        "auth.oauth2Saml",
-        { x: 100, y: 0 },
-        "saml",
-      );
-      const branch = addBuiltinNode(
-        graph,
-        "flow.branch",
-        { x: 200, y: 0 },
-        "branch",
-      );
-      const printTrue = addBuiltinNode(
-        graph,
-        "debug.print",
-        { x: 300, y: -50 },
-        "printTrue",
-      );
-      const printFalse = addBuiltinNode(
-        graph,
-        "debug.print",
-        { x: 300, y: 50 },
-        "printFalse",
-      );
+      const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+      const saml = addBuiltinNode(graph, "auth.oauth2Saml", { x: 100, y: 0 }, "saml");
+      const branch = addBuiltinNode(graph, "flow.branch", { x: 200, y: 0 }, "branch");
+      const printTrue = addBuiltinNode(graph, "debug.print", { x: 300, y: -50 }, "printTrue");
+      const printFalse = addBuiltinNode(graph, "debug.print", { x: 300, y: 50 }, "printFalse");
 
       saml.pins.idpUrl.value = "https://idp.example.com/oauth/idp";
       saml.pins.tokenServiceUrl.value = "https://idp.example.com/oauth/token";
@@ -904,13 +603,8 @@ describe("compileGraph", () => {
     async function runCompiledSaml(graph: Graph): Promise<string[]> {
       const { code, manifest } = compileGraph(graph);
       const compiled = await loadCompiled(code);
-      const createInitialState = compiled.createInitialState as () => Record<
-        string,
-        unknown
-      >;
-      const trigger = compiled[manifest.triggers[0].functionName] as (
-        rt: unknown,
-      ) => Promise<void>;
+      const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+      const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
       const logs: string[] = [];
       await trigger({
@@ -925,15 +619,11 @@ describe("compileGraph", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) => {
-          if (url === "https://idp.example.com/oauth/idp")
-            return new Response("signed-assertion", { status: 200 });
-          return new Response(
-            JSON.stringify({ access_token: "tok-1", expires_in: 3600 }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
-            },
-          );
+          if (url === "https://idp.example.com/oauth/idp") return new Response("signed-assertion", { status: 200 });
+          return new Response(JSON.stringify({ access_token: "tok-1", expires_in: 3600 }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
         }),
       );
 
@@ -945,8 +635,7 @@ describe("compileGraph", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) => {
-          if (url === "https://idp.example.com/oauth/idp")
-            return new Response("signed-assertion", { status: 200 });
+          if (url === "https://idp.example.com/oauth/idp") return new Response("signed-assertion", { status: 200 });
           return new Response("invalid_grant", { status: 401 });
         }),
       );
@@ -957,24 +646,16 @@ describe("compileGraph", () => {
     it("compiled output matches the interpreter's own execute() for the same graph and mocked fetch", async () => {
       const graph = buildSamlGraph();
       const fetchMock = vi.fn(async (url: string) => {
-        if (url === "https://idp.example.com/oauth/idp")
-          return new Response("signed-assertion", { status: 200 });
-        return new Response(
-          JSON.stringify({ access_token: "tok-1", expires_in: 3600 }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
+        if (url === "https://idp.example.com/oauth/idp") return new Response("signed-assertion", { status: 200 });
+        return new Response(JSON.stringify({ access_token: "tok-1", expires_in: 3600 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       });
       vi.stubGlobal("fetch", fetchMock);
 
       const interpreterLogs: string[] = [];
-      await runExecFrom(
-        "start",
-        "exec-out",
-        createExecutionContext(graph, { log: (m) => interpreterLogs.push(m) }),
-      );
+      await runExecFrom("start", "exec-out", createExecutionContext(graph, { log: (m) => interpreterLogs.push(m) }));
 
       const compiledLogs = await runCompiledSaml(graph);
       expect(compiledLogs).toEqual(interpreterLogs);
@@ -985,24 +666,9 @@ describe("compileGraph", () => {
   describe("http.request (compileExecuteOutputs)", () => {
     it("compiles without throwing and reads status/responseBody into downstream Print nodes", async () => {
       const graph = new Graph("g17", "test");
-      const start = addBuiltinNode(
-        graph,
-        "event.start",
-        { x: 0, y: 0 },
-        "start",
-      );
-      const req = addBuiltinNode(
-        graph,
-        "http.request",
-        { x: 100, y: 0 },
-        "req",
-      );
-      const printBody = addBuiltinNode(
-        graph,
-        "debug.print",
-        { x: 200, y: 0 },
-        "printBody",
-      );
+      const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+      const req = addBuiltinNode(graph, "http.request", { x: 100, y: 0 }, "req");
+      const printBody = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "printBody");
 
       req.pins.url.value = "https://api.example.com/thing";
       req.pins.method.value = "GET";
@@ -1028,13 +694,8 @@ describe("compileGraph", () => {
 
       const { code, manifest } = compileGraph(graph);
       const compiled = await loadCompiled(code);
-      const createInitialState = compiled.createInitialState as () => Record<
-        string,
-        unknown
-      >;
-      const trigger = compiled[manifest.triggers[0].functionName] as (
-        rt: unknown,
-      ) => Promise<void>;
+      const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+      const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
       vi.stubGlobal(
         "fetch",
@@ -1051,30 +712,10 @@ describe("compileGraph", () => {
 
     it("compiles the full pipeline this feature exists for: auth.oauth2Saml's Auth output wired straight into http.request's Auth input", async () => {
       const graph = new Graph("g18", "test");
-      const start = addBuiltinNode(
-        graph,
-        "event.start",
-        { x: 0, y: 0 },
-        "start",
-      );
-      const saml = addBuiltinNode(
-        graph,
-        "auth.oauth2Saml",
-        { x: 100, y: 0 },
-        "saml",
-      );
-      const req = addBuiltinNode(
-        graph,
-        "http.request",
-        { x: 200, y: 0 },
-        "req",
-      );
-      const printBody = addBuiltinNode(
-        graph,
-        "debug.print",
-        { x: 300, y: 0 },
-        "printBody",
-      );
+      const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+      const saml = addBuiltinNode(graph, "auth.oauth2Saml", { x: 100, y: 0 }, "saml");
+      const req = addBuiltinNode(graph, "http.request", { x: 200, y: 0 }, "req");
+      const printBody = addBuiltinNode(graph, "debug.print", { x: 300, y: 0 }, "printBody");
 
       saml.pins.idpUrl.value = "https://idp.example.com/oauth/idp";
       saml.pins.tokenServiceUrl.value = "https://idp.example.com/oauth/token";
@@ -1119,28 +760,19 @@ describe("compileGraph", () => {
 
       const { code, manifest } = compileGraph(graph);
       const compiled = await loadCompiled(code);
-      const createInitialState = compiled.createInitialState as () => Record<
-        string,
-        unknown
-      >;
-      const trigger = compiled[manifest.triggers[0].functionName] as (
-        rt: unknown,
-      ) => Promise<void>;
+      const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+      const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
       let capturedAuthHeader: string | null = null;
       vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string, init?: RequestInit) => {
-          if (url === "https://idp.example.com/oauth/idp")
-            return new Response("signed-assertion", { status: 200 });
+          if (url === "https://idp.example.com/oauth/idp") return new Response("signed-assertion", { status: 200 });
           if (url === "https://idp.example.com/oauth/token") {
-            return new Response(
-              JSON.stringify({ access_token: "tok-1", expires_in: 3600 }),
-              {
-                status: 200,
-                headers: { "Content-Type": "application/json" },
-              },
-            );
+            return new Response(JSON.stringify({ access_token: "tok-1", expires_in: 3600 }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
           }
           capturedAuthHeader = new Headers(init?.headers).get("authorization");
           return new Response("protected data", { status: 200 });

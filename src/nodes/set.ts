@@ -10,7 +10,7 @@ import { NodeInstance } from "../engine/nodeInstance";
 // those don't survive JSON.stringify/parse and would break save/load) — uniqueness is enforced by
 // every node here rather than by the storage type itself.
 
-const GROUP = "Collections.Set";
+const GROUP = "Container.Set";
 
 function elementTypeOf(node: NodeInstance): PinType {
   return node.elementType ?? "number";

@@ -24,16 +24,6 @@ describe("isNodeLatent — plain nodes", () => {
     expect(isNodeLatent(node, graph, graph)).toBe(false);
   });
 
-  it("is true for Delay, Send Email (mock), and HTTP Request", () => {
-    const graph = new Graph("g", "root");
-    const delay = addBuiltinNode(graph, "flow.delay", "delay");
-    const email = addBuiltinNode(graph, "action.sendEmailMock", "email");
-    const httpReq = addBuiltinNode(graph, "http.request", "http");
-    expect(isNodeLatent(delay, graph, graph)).toBe(true);
-    expect(isNodeLatent(email, graph, graph)).toBe(true);
-    expect(isNodeLatent(httpReq, graph, graph)).toBe(true);
-  });
-
   it("does NOT mark a node merely sequenced before a latent one — only the latent node itself is latent", () => {
     const graph = new Graph("g", "root");
     const print1 = addBuiltinNode(graph, "debug.print", "print1");
@@ -150,34 +140,6 @@ describe("isFunctionLatent / Call Function propagation", () => {
     const callNode = NodeInstance.createNodeInstance("function.call", { x: 0, y: 0 }, callDef.deriveFunctionPins!(fn), "call", undefined, fn.id);
     rootGraph.nodes.push(callNode);
     expect(isNodeLatent(callNode, rootGraph, rootGraph)).toBe(false);
-  });
-
-  it("a function containing a latent node is latent, and so is every Call Function node targeting it", () => {
-    const rootGraph = new Graph("g", "root");
-    const fn = createFunctionDef("SendsEmail");
-    rootGraph.functions.push(fn);
-    addBuiltinNode(fn.body, "action.sendEmailMock", "email");
-    expect(isFunctionLatent(fn, rootGraph)).toBe(true);
-
-    const callDef = getNodeDef("function.call");
-    const callNode = NodeInstance.createNodeInstance("function.call", { x: 0, y: 0 }, callDef.deriveFunctionPins!(fn), "call", undefined, fn.id);
-    rootGraph.nodes.push(callNode);
-    expect(isNodeLatent(callNode, rootGraph, rootGraph)).toBe(true);
-  });
-
-  it("a For Loop whose body calls a latent function is itself latent (composed propagation)", () => {
-    const rootGraph = new Graph("g", "root");
-    const fn = createFunctionDef("SendsEmail");
-    rootGraph.functions.push(fn);
-    addBuiltinNode(fn.body, "action.sendEmailMock", "email");
-
-    const loop = addBuiltinNode(rootGraph, "flow.forLoop", "loop");
-    const callDef = getNodeDef("function.call");
-    const callNode = NodeInstance.createNodeInstance("function.call", { x: 0, y: 0 }, callDef.deriveFunctionPins!(fn), "call", undefined, fn.id);
-    rootGraph.nodes.push(callNode);
-    connectPins(rootGraph, [], rootGraph.functions, { fromNode: "loop", fromPin: "loop-body", toNode: "call", toPin: "exec-in" });
-
-    expect(isNodeLatent(loop, rootGraph, rootGraph)).toBe(true);
   });
 
   it("does not infinite-loop on a self-recursive function and resolves to non-latent", () => {

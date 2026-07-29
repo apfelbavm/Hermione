@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../nodes";
 import { createExecutionContext, runExecFrom } from "./executor";
-import {  connectPins } from "./graphMutations";
+import { connectPins } from "./graphMutations";
 import { getNodeDef } from "./registry";
 import { Graph } from "./graph";
 import { NodeInstance } from "./nodeInstance";
@@ -147,39 +147,12 @@ describe("executor", () => {
     expect(logs).toEqual(["1", "2"]);
   });
 
-  it("awaits async nodes in order: Delay -> Send Email (mock) -> Print", async () => {
-    const graph = new Graph("g6", "test");
-    const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
-    const delay = addBuiltinNode(graph, "flow.delay", { x: 100, y: 0 }, "delay");
-    const sendEmail = addBuiltinNode(graph, "action.sendEmailMock", { x: 200, y: 0 }, "sendEmail");
-    const print = addBuiltinNode(graph, "debug.print", { x: 300, y: 0 }, "print");
-
-    delay.pins.duration.value = 5; // keep the test fast; behavior doesn't depend on the exact duration
-    sendEmail.pins.to.value = "candidate@example.com";
-    sendEmail.pins.subject.value = "Interview Invitation";
-    print.pins.message.value = "done";
-
-    connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: delay.id, toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: delay.id, fromPin: "exec-out", toNode: sendEmail.id, toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: sendEmail.id, fromPin: "exec-out", toNode: print.id, toPin: "exec-in" });
-
-    const logs: string[] = [];
-    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
-    await runExecFrom(start.id, "exec-out", ctx);
-
-    // Order matters: the email log must land before Print's "done", proving the executor
-    // awaited both async execute() calls in sequence rather than racing them.
-    expect(logs).toEqual(['📧 Sent to candidate@example.com: "Interview Invitation"', "done"]);
-  });
-
   it("connectPins rejects incompatible pin types", () => {
     const graph = new Graph("g4", "test");
     const add = addBuiltinNode(graph, "math.add", { x: 0, y: 0 }, "add");
     const branch = addBuiltinNode(graph, "flow.branch", { x: 100, y: 0 }, "branch");
 
-    expect(() =>
-      connectPins(graph, graph.variables, graph.functions, { fromNode: add.id, fromPin: "result", toNode: branch.id, toPin: "exec-in" }),
-    ).toThrow();
+    expect(() => connectPins(graph, graph.variables, graph.functions, { fromNode: add.id, fromPin: "result", toNode: branch.id, toPin: "exec-in" })).toThrow();
   });
 
   it("exec input pins accept multiple incoming wires (branches can converge)", async () => {

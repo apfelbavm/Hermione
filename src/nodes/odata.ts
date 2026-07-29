@@ -143,7 +143,7 @@ registerNode({
   label: "OData V2 Request",
   description:
     "Fetches every page of an OData v2 GET request — client-driven $top/$skip (1000 rows per page by default) or server-driven cursor/snapshot next-link paging — and returns the combined rows.",
-  group: "Actions",
+  group: "Request",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     {

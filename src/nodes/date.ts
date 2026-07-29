@@ -53,7 +53,7 @@ registerNode({
 
 registerNode({
   type: "date.subtract",
-  label: "Subtract Dates (A - B) → ms",
+  label: "Subtract ( - )",
   description: "Returns the difference between two dates in milliseconds.",
   group: "Date",
   pins: [
@@ -71,7 +71,7 @@ registerNode({
 
 registerNode({
   type: "date.equal",
-  label: "Equal (A == B)",
+  label: "Equal ( == )",
   description: "True if two dates represent the same moment in time.",
   group: "Date.Comparison",
   pins: [
@@ -89,7 +89,7 @@ registerNode({
 
 registerNode({
   type: "date.unequal",
-  label: "Unequal (A != B)",
+  label: "Unequal ( != )",
   description: "True if two dates do not represent the same moment in time.",
   group: "Date.Comparison",
   pins: [
@@ -107,7 +107,7 @@ registerNode({
 
 registerNode({
   type: "date.greaterThan",
-  label: "Greater than (A > B)",
+  label: "Greater than ( > )",
   description: "True if date A is later than date B.",
   group: "Date.Comparison",
   pins: [
@@ -125,7 +125,7 @@ registerNode({
 
 registerNode({
   type: "date.greaterEqual",
-  label: "Greater equal (A >= B)",
+  label: "Greater equal ( >= )",
   description: "True if date A is later than or the same as date B.",
   group: "Date.Comparison",
   pins: [
@@ -143,7 +143,7 @@ registerNode({
 
 registerNode({
   type: "date.lessThan",
-  label: "Less than (A < B)",
+  label: "Less than ( < )",
   description: "True if date A is earlier than date B.",
   group: "Date.Comparison",
   pins: [
@@ -161,7 +161,7 @@ registerNode({
 
 registerNode({
   type: "date.lessEqual",
-  label: "Less equal (A <= B)",
+  label: "Less equal ( <= )",
   description: "True if date A is earlier than or the same as date B.",
   group: "Date.Comparison",
   pins: [

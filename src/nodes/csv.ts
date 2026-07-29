@@ -24,7 +24,7 @@ registerNode({
   type: "csv.toJson",
   label: "CSV to JSON",
   description: "Parses a CSV string into a JSON object, wrapping the rows under configurable root/row tags.",
-  group: "CSV",
+  group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "csv", label: "CSV", type: "string", direction: "input", defaultValue: "", multiline: true },
@@ -52,7 +52,7 @@ registerNode({
   type: "json.toCsv",
   label: "JSON to CSV",
   description: "Converts a JSON object's tabular rows into a delimited CSV string.",
-  group: "CSV",
+  group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "json", label: "JSON", type: "object", direction: "input", defaultValue: null },
@@ -80,7 +80,7 @@ registerNode({
   type: "csv.toXml",
   label: "CSV to XML",
   description: "Parses a CSV string and converts it into an XML string with configurable root/row tags.",
-  group: "CSV",
+  group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "csv", label: "CSV", type: "string", direction: "input", defaultValue: "", multiline: true },
