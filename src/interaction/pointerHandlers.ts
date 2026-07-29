@@ -97,6 +97,14 @@ function findConnectionToInput(graph: Graph, nodeId: string, pinId: string) {
   );
 }
 
+/** Every node id in `graph` — used by both the global Ctrl+A shortcut below and the node right-click
+ * menu's own "Select All" item (see main.ts's contextmenu handler), so both mean exactly the same
+ * thing. Callers still assign the result to store.state.selectedNodeIds and clear
+ * selectedCommentId/notify themselves — this only computes WHAT gets selected. */
+export function selectAllNodes(graph: Graph): Set<string> {
+  return new Set(graph.nodes.map((n) => n.id));
+}
+
 /** Connects every anchor to `target` (all sharing the same direction/type, guaranteed by however
  * they were gathered) if `target` is a valid, compatible, non-self partner — returns whether it
  * connected anything. Used by both a plain single-anchor wire release and a Ctrl+drag "wire-multi"
@@ -845,6 +853,14 @@ export function setupPointerInteraction(
       }
       if (selectedCommentId) removeCommentBox(graph, selectedCommentId);
       store.state.selectedNodeIds = new Set();
+      store.state.selectedCommentId = null;
+      store.notify();
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+      e.preventDefault();
+      store.state.selectedNodeIds = selectAllNodes(graph);
       store.state.selectedCommentId = null;
       store.notify();
       return;

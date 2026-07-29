@@ -16,7 +16,7 @@ import { drawNodes } from "./render/drawNodes";
 import { drawWires, drawWireDragPreview } from "./render/drawWires";
 import { drawMarqueeSelection } from "./render/drawMarquee";
 import { createStore, getEditingGraph, getVisibleVariablesForState } from "./state/store";
-import { setupPointerInteraction, type WireAnchor } from "./interaction/pointerHandlers";
+import { selectAllNodes, setupPointerInteraction, type WireAnchor } from "./interaction/pointerHandlers";
 import { createWidgetSync } from "./overlay/widgetSync";
 import { setupNodeHoverTooltip } from "./overlay/nodeTooltip";
 import { createCommentOverlay } from "./overlay/commentOverlay";
@@ -449,6 +449,16 @@ canvas.addEventListener("contextmenu", (e) => {
   const nodeHit = hitTestNode(graph, geometries, screenPos.x, screenPos.y);
   if (nodeHit) {
     const node = graph.nodes.find((n) => n.id === nodeHit.nodeId)!;
+
+    // Right-clicking a node also selects it — same "replace the selection, unless it's already part
+    // of one" rule the left-click mousedown handler uses (see pointerHandlers.ts), so right-clicking
+    // within an existing multi-selection keeps the whole group intact (Delete/Disable then apply to
+    // all of them) instead of collapsing it down to just the one node under the cursor.
+    if (!store.state.selectedNodeIds.has(node.id)) {
+      store.state.selectedNodeIds = new Set([node.id]);
+      store.state.selectedCommentId = null;
+    }
+
     const items: ContextMenuItem[] = [
       {
         label: "Delete (Del)",
@@ -474,7 +484,17 @@ canvas.addEventListener("contextmenu", (e) => {
       });
     }
 
+    items.push({
+      label: "Select All (Ctrl+A)",
+      onClick: () => {
+        store.state.selectedNodeIds = selectAllNodes(graph);
+        store.state.selectedCommentId = null;
+        store.notify();
+      },
+    });
+
     openRowContextMenu({ x: e.clientX, y: e.clientY }, items);
+    store.notify();
     return;
   }
 
