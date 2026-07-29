@@ -64,6 +64,29 @@ registerNode({
   ],
 });
 
+registerNode({
+  type: "flow.isValid",
+  label: "Is Valid",
+  description: "Routes execution to Is Valid or Is Not Valid based on whether the object is null/undefined.",
+  group: "Flow Control",
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    { id: "object", label: "Object", type: "object", direction: "input", defaultValue: null },
+    { id: "valid", label: "Is Valid", type: "exec", direction: "output" },
+    { id: "invalid", label: "Is Not Valid", type: "exec", direction: "output" },
+  ],
+  execute: ({ inputs }) => ({
+    nextExec: inputs.object === undefined || inputs.object === null ? "invalid" : "valid",
+  }),
+  compileExecute: ({ inputs, compileFrom }) => [
+    `if (${inputs.object} !== undefined && ${inputs.object} !== null) {`,
+    ...indent(compileFrom("valid")),
+    `} else {`,
+    ...indent(compileFrom("invalid")),
+    `}`,
+  ],
+});
+
 // A runaway Start/End (typo'd or wired to the wrong value) shouldn't be able to hang the whole
 // tab — same philosophy as executor.ts's MAX_EXEC_STEPS/MAX_CALL_DEPTH, just for loop iterations.
 const MAX_FOR_LOOP_ITERATIONS = 100_000;

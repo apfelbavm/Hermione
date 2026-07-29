@@ -6,6 +6,11 @@ export const NODE_MIN_WIDTH = 170;
 export const NODE_PADDING_X = 12;
 export const PIN_RADIUS = 5;
 export const PIN_MARGIN = 14;
+/** How far an input pin's dot sits inset from the node's left edge — purely cosmetic breathing room
+ * (an output pin's dot stays flush against the right edge, unchanged). PIN_MARGIN (used for a row's
+ * left-margin width budget) already assumed this exact gap plus PIN_LABEL_GAP (4 + 10 = 14), so
+ * insetting the dot to this position needs no other width-math adjustment. */
+export const PIN_INSET_X = 8;
 export const ADD_BUTTON_SIZE = 16;
 /** Width/height of a "compact" node's whole box (see NodeDef.compact) — just big enough to hold
  * its one input and one output pin dot side by side, no header/label rows. */
@@ -117,10 +122,14 @@ export function computeNodeLayout(
 
   const pins: PinLayout[] = [];
   inputs.forEach((pin, i) => {
-    pins.push({ pin, x: 0, y: NODE_HEADER_HEIGHT + i * PIN_ROW_HEIGHT + PIN_ROW_HEIGHT / 2 });
+    pins.push({
+      pin,
+      x: PIN_INSET_X,
+      y: NODE_HEADER_HEIGHT + i * PIN_ROW_HEIGHT + PIN_ROW_HEIGHT / 2,
+    });
   });
   outputs.forEach((pin, i) => {
-    pins.push({ pin, x: width, y: NODE_HEADER_HEIGHT + i * PIN_ROW_HEIGHT + PIN_ROW_HEIGHT / 2 });
+    pins.push({ pin, x: width - PIN_INSET_X, y: NODE_HEADER_HEIGHT + i * PIN_ROW_HEIGHT + PIN_ROW_HEIGHT / 2 });
   });
 
   const addButton: NodeAddButtonLayout | undefined = showAddButton

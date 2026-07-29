@@ -99,6 +99,68 @@ describe("flow.forLoop", () => {
   });
 });
 
+describe("flow.isValid", () => {
+  function buildIsValidGraph(objectValue: unknown) {
+    const graph = new Graph("g", "test");
+    const isValid = addBuiltinNode(graph, "flow.isValid", "check");
+    isValid.pins.object.value = objectValue;
+    const printValid = addBuiltinNode(graph, "debug.print", "printValid");
+    printValid.pins.message.value = "valid";
+    const printInvalid = addBuiltinNode(graph, "debug.print", "printInvalid");
+    printInvalid.pins.message.value = "invalid";
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "check", fromPin: "valid", toNode: "printValid", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "check", fromPin: "invalid", toNode: "printInvalid", toPin: "exec-in" });
+    return { graph, isValid };
+  }
+
+  it("routes to Is Valid for a non-null/undefined object", async () => {
+    const { graph } = buildIsValidGraph({ a: 1 });
+    const logs: string[] = [];
+    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
+
+    await runExecFrom("check", "exec-in", ctx);
+
+    expect(logs).toEqual(["valid"]);
+  });
+
+  it("routes to Is Not Valid for null", async () => {
+    const { graph } = buildIsValidGraph(null);
+    const logs: string[] = [];
+    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
+
+    await runExecFrom("check", "exec-in", ctx);
+
+    expect(logs).toEqual(["invalid"]);
+  });
+
+  it("routes to Is Not Valid for undefined (e.g. an unconnected pin)", async () => {
+    const { graph } = buildIsValidGraph(undefined);
+    const logs: string[] = [];
+    const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
+
+    await runExecFrom("check", "exec-in", ctx);
+
+    expect(logs).toEqual(["invalid"]);
+  });
+
+  it("compileExecute guards on strict !== undefined && !== null", () => {
+    const def = getNodeDef("flow.isValid");
+    const statements = def.compileExecute!({
+      node: {} as NodeInstance,
+      inputs: { object: "obj" },
+      graph: {} as never,
+      compileFrom: (pin) => [`/* ${pin} */`],
+    });
+    expect(statements).toEqual([
+      "if (obj !== undefined && obj !== null) {",
+      "  /* valid */",
+      "} else {",
+      "  /* invalid */",
+      "}",
+    ]);
+  });
+});
+
 describe("flow.sequence", () => {
   it("starts with exactly two removable 'Then' pins", () => {
     const def = getNodeDef("flow.sequence");
