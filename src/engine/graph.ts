@@ -6,6 +6,8 @@ import type {
   CommentBox,
   Connection,
   FunctionDef,
+  Pin,
+  PinType,
   Variable,
 } from "./types";
 
@@ -83,5 +85,41 @@ export class Graph {
         toPin.value = cloneDefaultValue(pinDef?.defaultValue);
       }
     }
+  }
+
+  /** Changes a configurableElementType node instance's element/key type (see
+   * NodeDef.configurableElementType) — e.g. an Array Length node switching from operating on
+   * Array<Number> to Array<String>. Every pin on such a node shares the one parameterized type, so
+   * (unlike a Variable, which only disconnects its single Get/Set value pin on a type change) this
+   * disconnects EVERY connection touching the node, applies the patch, then rebuilds every pin fresh
+   * from the now-current (post-patch) pin defs — deriveInstancePins reads the still-intact `node.pins`
+   * keys for arity (e.g. how many Make Array entries existed) before they're replaced, so entry COUNT
+   * survives a type change even though each entry's stored value resets to the new type's default. */
+  changeNodeElementType(
+    variables: Variable[],
+    functions: FunctionDef[],
+    nodeId: string,
+    patch: { elementType?: PinType; mapKeyType?: PinType },
+  ): void {
+    const node = this.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    for (const conn of this.connections.filter(
+      (c) => c.fromNode === nodeId || c.toNode === nodeId,
+    )) {
+      this.removeConnection(variables, functions, conn.id);
+    }
+
+    if (patch.elementType !== undefined) node.elementType = patch.elementType;
+    if (patch.mapKeyType !== undefined) node.mapKeyType = patch.mapKeyType;
+
+    const pins: Record<string, Pin> = {};
+    for (const def of node.resolvePinDefs(variables, functions)) {
+      pins[def.id] =
+        def.direction === "input"
+          ? { value: cloneDefaultValue(def.defaultValue) }
+          : {};
+    }
+    node.pins = pins;
   }
 }

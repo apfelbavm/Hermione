@@ -1,6 +1,5 @@
 import {
   allGraphs,
-  changeNodeElementType,
   setPinLiteralValue,
   updateVariable,
 } from "../engine/graphMutations";
@@ -79,8 +78,7 @@ export function createDetailsPanel(
       const elementSelect = createTypeSelect(
         node.elementType ?? "number",
         (elementType) => {
-          changeNodeElementType(
-            getEditingGraph(store.state),
+          getEditingGraph(store.state).changeNodeElementType(
             getVisibleVariablesForState(store.state),
             store.state.rootGraph.functions,
             node.id,
@@ -103,8 +101,7 @@ export function createDetailsPanel(
         const keySelect = createTypeSelect(
           node.mapKeyType ?? "string",
           (mapKeyType) => {
-            changeNodeElementType(
-              getEditingGraph(store.state),
+            getEditingGraph(store.state).changeNodeElementType(
               getVisibleVariablesForState(store.state),
               store.state.rootGraph.functions,
               node.id,
