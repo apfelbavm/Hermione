@@ -33,7 +33,7 @@ describe("odata.v2Request", () => {
     const def = getNodeDef("odata.v2Request");
     const pin = def.pins.find((p) => p.id === "paginationType")!;
     expect(pin.type).toBe("string");
-    expect(pin.options).toEqual(["Client", "Server (cursor-based)", "Server (snapshot-based)"]);
+    expect(pin.options).toEqual(["Client", "Server"]);
   });
 
   it("exposes Rows as an Array<Object> output pin", () => {
@@ -69,33 +69,30 @@ describe("odata.v2Request", () => {
     expect(ctx.execOutputs.get("req:error")).toBe("");
   });
 
-  it.each(["Server (cursor-based)", "Server (snapshot-based)"])(
-    "%s paging: follows d.__next verbatim until it's absent",
-    async (paginationType) => {
-      const fetchMock = vi.fn(async (url: string) => {
-        if (url === "https://example.com/odata/v2/EmpJob?$top=50") {
-          return jsonResponse({ d: { results: [{ id: 1 }], __next: "https://example.com/next?skiptoken=abc" } });
-        }
-        if (url === "https://example.com/next?skiptoken=abc") {
-          return jsonResponse({ d: { results: [{ id: 2 }] } }); // no __next — last page
-        }
-        throw new Error(`unexpected url ${url}`);
-      });
-      vi.stubGlobal("fetch", fetchMock);
+  it("Server paging: follows d.__next verbatim until it's absent", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "https://example.com/odata/v2/EmpJob?$top=50") {
+        return jsonResponse({ d: { results: [{ id: 1 }], __next: "https://example.com/next?skiptoken=abc" } });
+      }
+      if (url === "https://example.com/next?skiptoken=abc") {
+        return jsonResponse({ d: { results: [{ id: 2 }] } }); // no __next — last page
+      }
+      throw new Error(`unexpected url ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
-      const { graph } = buildGraph({
-        url: "https://example.com/odata/v2/EmpJob",
-        pageSize: 50,
-        paginationType,
-      });
-      const ctx = createExecutionContext(graph, { log: () => {} });
-      await runExecFrom("req", "exec-in", ctx);
+    const { graph } = buildGraph({
+      url: "https://example.com/odata/v2/EmpJob",
+      pageSize: 50,
+      paginationType: "Server",
+    });
+    const ctx = createExecutionContext(graph, { log: () => {} });
+    await runExecFrom("req", "exec-in", ctx);
 
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(ctx.execOutputs.get("req:rows")).toEqual([{ id: 1 }, { id: 2 }]);
-      expect(ctx.execOutputs.get("req:pageCount")).toBe(2);
-    },
-  );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(ctx.execOutputs.get("req:rows")).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(ctx.execOutputs.get("req:pageCount")).toBe(2);
+  });
 
   it("stops at Max Pages even if the server keeps returning full pages / a next link", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ d: { results: [{ id: 1 }, { id: 2 }] } }));

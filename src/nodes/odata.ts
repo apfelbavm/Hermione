@@ -10,9 +10,9 @@ const PAGINATION_TYPES = ["Client", "Server"];
 // (see PAGINATION_TYPES above):
 //  - Client: we drive the loop ourselves, appending "$top"/"$skip" to the given URL and stopping
 //    once a page comes back with fewer than Page Size rows.
-//  - Server (cursor-based) / Server (snapshot-based): the server drives it — each OData v2 JSON
-//    response carries its own "d.__next" (or "__next") URL for the next page; we just keep
-//    following it verbatim (it already encodes its own $skiptoken/paging state) until it's absent.
+//  - Server: the server drives it — each OData v2 JSON response carries its own "d.__next" (or
+//    "__next") URL for the next page; we just keep following it verbatim (it already encodes its
+//    own $skiptoken/paging state) until it's absent.
 // Written ONCE as a plain-JS source string (see http.ts's HTTP_REQUEST_EXECUTE_SOURCE for the same
 // reasoning) — derived via `new Function` for the interpreter's own use and embedded verbatim as
 // this node's compileHelpers entry for the compiled path. Deliberately self-contained (its own
@@ -30,7 +30,7 @@ async function odataV2RequestExecute(baseUrl, rawPageSize, paginationType, rawMa
   const top = Math.max(1, Math.round(Number(rawPageSize)) || 1000);
   const userCap = Math.max(1, Math.round(Number(rawMaxPages)) || 50);
   const cap = Math.min(userCap, HARD_MAX_PAGES);
-  const serverDriven = paginationType !== ${PAGINATION_TYPES[0]};
+  const serverDriven = paginationType !== ${JSON.stringify(PAGINATION_TYPES[0])};
   const timeoutMs = Math.round(Number(rawTimeoutMs) || 0);
 
   const rawHeaders = String(headersJson ?? "").trim();
