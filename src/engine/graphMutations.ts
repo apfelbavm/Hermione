@@ -666,17 +666,8 @@ export function updateFunctionOutput(
 // smaller echo of the Functions one above (createFunctionDef/removeFunctionDef/updateFunctionInput
 // etc.) rather than a parallel Entry/Return/Call trio — outputs are reported by the script's own
 // `run()` returning a { [outputName]: value } object (see code.ts), the exact inverse of how
-// inputs already arrive as a name-keyed object.
-
-/** Every script input/output's user-facing NAME (freely editable in the Inputs/Outputs panel, see
- * scriptIoPanel.ts) is exposed to `run()` under this same name prefixed with "Custom" — e.g. an
- * input named "PlayerName" is read as `inputs.CustomPlayerName`, and an output named "Result" is
- * set by returning `{ CustomResult: ... }`. Lives here (engine layer), not in nodes/code.ts (which
- * actually enforces it in namedInputsFor/pinOutputsFor and their compiled equivalents), since
- * createTemplatedCodeScriptDef below — an engine-layer function — also needs to generate source
- * text that follows this exact same convention; nodes may import from the engine but not vice
- * versa, so the shared constant has to live on this side of that boundary. */
-export const CUSTOM_PIN_PREFIX = "Custom";
+// inputs already arrive as a name-keyed object, both keyed by the input/output's own plain
+// user-facing name (e.g. an input named "PlayerName" is read as `inputs.PlayerName`) — no prefix.
 
 /** Creates a new script with an empty signature and no source yet. Scripts live only on the root
  * graph (rootGraph.scripts), same as functions — never nested inside a function body. */
@@ -686,21 +677,25 @@ export function createCodeScriptDef(name: string): CodeScriptDef {
 
 const TEMPLATE_INPUT_NAME = "MyInputPin";
 const TEMPLATE_OUTPUT_NAME = "MyOutputPin";
-const TEMPLATE_INPUT_KEY = `${CUSTOM_PIN_PREFIX}${TEMPLATE_INPUT_NAME}`;
-const TEMPLATE_OUTPUT_KEY = `${CUSTOM_PIN_PREFIX}${TEMPLATE_OUTPUT_NAME}`;
 
 /** Real, type-annotated TypeScript — not the plain-JS shortcut an earlier version of this template
  * used — so a freshly created script demonstrates a genuinely type-safe `run()` straight away:
- * `inputs`'s shape (and `log`'s) is spelled out, so mistyping a Custom-prefixed pin name, or its
- * type, is a red squiggle in the editor rather than a silent `undefined` at run time. */
+ * `inputs`'s shape (and `log`'s) is spelled out, so mistyping a pin name, or its type, is a red
+ * squiggle in the editor rather than a silent `undefined` at run time. Declared `async` (returning
+ * a Promise) even though this particular body never actually awaits anything, so the template
+ * itself demonstrates the one thing code.ts's execute()/compileExecute() always assume regardless
+ * of what the user writes: `run()`'s result is always awaited, whether or not `run` is itself
+ * declared `async` — an ordinary, non-async function returning a plain value works exactly the same
+ * way through that same `await`, since awaiting a non-Promise value just resolves to it immediately
+ * (see code.ts's own test coverage for that guarantee). */
 function templateScriptSource(): string {
   return [
-    "function run(",
+    "async function run(",
     "  log: (message: string) => void,",
-    `  inputs: { ${TEMPLATE_INPUT_KEY}: string },`,
-    `): { ${TEMPLATE_OUTPUT_KEY}: string } {`,
-    `  log(inputs.${TEMPLATE_INPUT_KEY});`,
-    `  return { ${TEMPLATE_OUTPUT_KEY}: "I am Alive" };`,
+    `  inputs: { ${TEMPLATE_INPUT_NAME}: string },`,
+    `): Promise<{ ${TEMPLATE_OUTPUT_NAME}: string }> {`,
+    `  log(inputs.${TEMPLATE_INPUT_NAME});`,
+    `  return { ${TEMPLATE_OUTPUT_NAME}: "I am Alive" };`,
     "}",
     "",
   ].join("\n");
@@ -719,9 +714,9 @@ function templateCompiledJs(): string {
   // createTemplatedCodeScriptDef's own test) — unlike templateScriptSource's 2-space TS, which is
   // just this file's own authored style and irrelevant to what the compiled JS looks like.
   return [
-    "function run(log, inputs) {",
-    `    log(inputs.${TEMPLATE_INPUT_KEY});`,
-    `    return { ${TEMPLATE_OUTPUT_KEY}: "I am Alive" };`,
+    "async function run(log, inputs) {",
+    `    log(inputs.${TEMPLATE_INPUT_NAME});`,
+    `    return { ${TEMPLATE_OUTPUT_NAME}: "I am Alive" };`,
     "}",
     "",
   ].join("\n");

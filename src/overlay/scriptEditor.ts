@@ -3,6 +3,22 @@ import type { CodeScriptDef } from "../engine/types";
 import type { Graph } from "../engine/graph";
 import { closeScriptTab, type Store } from "../state/store";
 
+export interface ScriptEditor {
+  render: () => void;
+  /** Commits every open tab's IN-PROGRESS (unsaved) Monaco buffer into its CodeScriptDef — exactly
+   * what clicking this panel's own Save button does, just for every dirty tab at once instead of
+   * only whichever one is currently shown. Awaited by main.ts's toolbar Save/Compile/Run handlers
+   * before they read graph.scripts, so none of them silently act on a script's STALE last-saved
+   * text just because the user edited it without separately remembering to click this editor's own
+   * small Save button first — easy to miss when there are two differently-scoped "Save" buttons on
+   * screen (this one saves just the current script; the toolbar's saves the whole graph). Without
+   * this, Save/Compile/Run all read straight from CodeScriptDef.compiledJs, which only ever updates
+   * via this panel's own Save button — so an edit made and never explicitly (re-)saved here would
+   * silently keep compiling/running/persisting whatever was last actually saved, no matter how much
+   * more editing happened on top of it. */
+  flushDirtyScripts: () => Promise<void>;
+}
+
 export interface ScriptEditorElements {
   /** Where the Log tab + one tab per open script get rendered — a dedicated sub-container of
    * #log-tab-strip, NOT the whole strip: the Save/Clear buttons live in index.html as permanent,
@@ -56,7 +72,7 @@ function loadMonaco(): Promise<typeof import("monaco-editor")> {
  * exactly so an in-progress edit is never silently clobbered by the model existing already covers
  * "don't wipe out what the user is actively typing," the same concern detailsPanel.ts's own
  * `contains(document.activeElement)` guards handle for its plain-HTML fields. */
-export function createScriptEditor(elements: ScriptEditorElements, store: Store): { render: () => void } {
+export function createScriptEditor(elements: ScriptEditorElements, store: Store): ScriptEditor {
   type Monaco = typeof import("monaco-editor");
   let monaco: Monaco | null = null;
   let editor: import("monaco-editor").editor.IStandaloneCodeEditor | null = null;
@@ -106,6 +122,25 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
     elements.saveStatus.classList.toggle("log-save-status-error", isError);
   }
 
+  /** Transpiles `source` and commits it into `script` — the one place that actually writes
+   * CodeScriptDef.source/compiledJs, shared by the Save button below and flushDirtyScripts so
+   * there's exactly one implementation of "what saving a script means" to keep in sync. */
+  async function commitScriptSource(
+    script: CodeScriptDef,
+    source: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const { success, outputJs, errors } = await transpileScript(source);
+    script.source = source;
+    if (success) {
+      script.compiledJs = outputJs;
+      return { success: true };
+    }
+    // Deliberately keep the PREVIOUS compiledJs on a failed transpile (see CodeScriptDef's own
+    // comment) — a script with a syntax error mid-edit keeps running/compiling against its last
+    // good version instead of silently going dead.
+    return { success: false, error: errors[0] };
+  }
+
   elements.saveButton.addEventListener("click", async () => {
     if (!shownScriptId || !editor) return;
     const script = scriptById(shownScriptId);
@@ -113,23 +148,31 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
 
     const source = editor.getValue();
     showSaveStatus("Saving…", false);
-    const { success, outputJs, errors } = await transpileScript(source);
+    const result = await commitScriptSource(script, source);
     // Re-check: the user may have switched tabs (or the script may have been deleted) while the
     // (lazy-loaded-on-first-use) transpiler was still loading.
     if (shownScriptId !== script.id || !scriptById(script.id)) return;
 
-    script.source = source;
-    if (success) {
-      script.compiledJs = outputJs;
-      showSaveStatus("Saved", false);
-    } else {
-      // Deliberately keep the PREVIOUS compiledJs on a failed transpile (see CodeScriptDef's own
-      // comment) — a script with a syntax error mid-edit keeps running/compiling against its last
-      // good version instead of silently going dead.
-      showSaveStatus(`Not saved — ${errors[0]}`, true);
-    }
+    showSaveStatus(result.success ? "Saved" : `Not saved — ${result.error}`, !result.success);
     store.notify();
   });
+
+  async function flushDirtyScripts(): Promise<void> {
+    const dirty = [...models.entries()]
+      .map(([id, model]) => ({ script: scriptById(id), model }))
+      .filter(
+        (entry): entry is { script: CodeScriptDef; model: import("monaco-editor").editor.ITextModel } =>
+          !!entry.script && entry.model.getValue() !== entry.script.source,
+      );
+    if (dirty.length === 0) return;
+
+    await Promise.all(dirty.map(({ script, model }) => commitScriptSource(script, model.getValue())));
+
+    if (shownScriptId && dirty.some((d) => d.script.id === shownScriptId)) {
+      showSaveStatus("Saved", false);
+    }
+    store.notify();
+  }
 
   function renderTabs(): void {
     elements.tabsContainer.innerHTML = "";
@@ -228,5 +271,5 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
     }
   }
 
-  return { render };
+  return { render, flushDirtyScripts };
 }

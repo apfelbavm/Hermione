@@ -628,6 +628,11 @@ runButton.addEventListener("click", async () => {
   logPanel.innerHTML = "";
   store.state.firedConnectionIds = new Set();
 
+  // Commit any script tab's in-progress (unsaved) Monaco edits first — otherwise a Code node would
+  // run whatever was last explicitly saved via the script editor's OWN Save button, silently
+  // ignoring anything typed since, which reads as "my changes aren't taking effect."
+  await scriptEditor.flushDirtyScripts();
+
   // On Start/On Interval describe how a *compiled* graph gets triggered outside the editor —
   // the Run button only ever fires On Run nodes.
   const eventRoots = store.state.rootGraph.nodes.filter((n) => n.type === "event.run");
@@ -664,7 +669,10 @@ runButton.addEventListener("click", async () => {
 });
 
 // --- Save / Load: JSON persisted to localStorage (auto-restored on next launch) and downloadable as a file ---
-saveButton.addEventListener("click", () => {
+saveButton.addEventListener("click", async () => {
+  // See the Run button's identical call for why — this Save button persists the whole GRAPH, not
+  // any open script's own (separately buttoned) in-progress edits.
+  await scriptEditor.flushDirtyScripts();
   saveGraphToLocalStorage(store.state.rootGraph);
   downloadGraphAsFile(store.state.rootGraph);
 });
@@ -696,7 +704,10 @@ loadFileInput.addEventListener("change", async () => {
 });
 
 // --- Compile: generates a self-contained .mjs from the graph (see src/compiler/codegen.ts) and downloads it ---
-compileButton.addEventListener("click", () => {
+compileButton.addEventListener("click", async () => {
+  // See the Run button's identical call for why — otherwise the compiled output would embed
+  // whatever a Code node's script was last explicitly saved as, not its current editor contents.
+  await scriptEditor.flushDirtyScripts();
   try {
     downloadCompiledGraph(store.state.rootGraph);
   } catch (err) {

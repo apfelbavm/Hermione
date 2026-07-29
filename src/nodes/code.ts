@@ -1,6 +1,5 @@
 import { registerNode } from "../engine/registry";
 import { compileResultVar } from "../engine/compileUtils";
-import { CUSTOM_PIN_PREFIX } from "../engine/graphMutations";
 import type { CodeScriptDef } from "../engine/types";
 
 // The Code node runs a user-authored script (see CodeScriptDef in types.ts, edited via Monaco in
@@ -13,13 +12,20 @@ import type { CodeScriptDef } from "../engine/types";
 // Outputs are the exact inverse of inputs: `run()` is called with a name-keyed `inputs` object
 // (namedInputsFor) and may itself RETURN a name-keyed object, which pinOutputsFor below turns back
 // into pin-id-keyed node outputs — the same name<->id translation, just in the opposite direction.
-// Every name on both sides is prefixed with CUSTOM_PIN_PREFIX (see graphMutations.ts) — a pin named
-// "PlayerName" is read as `inputs.CustomPlayerName` and set by returning `{ CustomPlayerName: ... }`
-// for an output of the same name. A script that doesn't return anything (or returns something
-// that isn't a plain object) simply gets every declared output's own default value, same as an
-// upstream node that never ran. This is in ADDITION to (not instead of) reporting progress via the
-// `log` it's given, which still works exactly as before for scripts that don't need to hand
-// anything back.
+// Each name is exactly the input/output's own user-facing name (e.g. an input named "PlayerName" is
+// read as `inputs.PlayerName`, and an output of that name is set by returning
+// `{ PlayerName: ... }`) — no prefix on either side. A script that doesn't return anything (or
+// returns something that isn't a plain object) simply gets every declared output's own default
+// value, same as an upstream node that never ran. This is in ADDITION to (not instead of) reporting
+// progress via the `log` it's given, which still works exactly as before for scripts that don't
+// need to hand anything back.
+//
+// `run()`'s result is always awaited (both here and in compileExecute below) regardless of whether
+// the script itself declares `run` as `async` — an ordinary, non-async `run` that just returns a
+// plain value works identically, since awaiting a non-Promise value simply resolves to it (see this
+// file's own test coverage for that guarantee). The default template (see
+// graphMutations.ts's createTemplatedCodeScriptDef) declares `run` async to model the common case,
+// but nothing here requires it.
 //
 // TypeScript is supported by transpiling to plain JS at Save time (see scriptEditor.ts calling
 // engine/transpile.ts), not at run/compile time — CodeScriptDef.compiledJs is what this node
@@ -77,29 +83,26 @@ function getRunFunction(compiledJs: string): RunFunction {
 }
 
 /** Builds the `inputs` object a script's `run()` actually sees: keyed by each input's human-chosen
- * NAME (what the user wrote in the Scripts panel) prefixed with CUSTOM_PIN_PREFIX — e.g. an input
- * named "PlayerName" is read inside the script as `inputs.CustomPlayerName` — not its internal pin
- * id (an opaque `nextId(...)` string) — `pinInputs` here is already keyed by pin id (the shape
- * resolveDataPin/execute produce). */
+ * NAME (what the user wrote in the Scripts panel), not its internal pin id (an opaque `nextId(...)`
+ * string) — `pinInputs` here is already keyed by pin id (the shape resolveDataPin/execute produce). */
 function namedInputsFor(script: CodeScriptDef, pinInputs: Record<string, unknown>): Record<string, unknown> {
   const named: Record<string, unknown> = {};
   for (const input of script.inputs) {
-    named[`${CUSTOM_PIN_PREFIX}${input.name}`] = pinInputs[input.id];
+    named[input.name] = pinInputs[input.id];
   }
   return named;
 }
 
 /** Inverse of namedInputsFor: turns whatever `run()` returned back into pin-id-keyed node outputs —
- * an output named "Result" is SET by the script returning `{ CustomResult: ... }`. A script that
- * returns nothing (or something that isn't a plain object — e.g. it forgot to, or only ever logs)
- * is treated exactly like an output whose (prefixed) name wasn't present: that output just gets its
- * own declared default value, same as any other node output nobody actually filled in. */
+ * an output named "Result" is SET by the script returning `{ Result: ... }`. A script that returns
+ * nothing (or something that isn't a plain object — e.g. it forgot to, or only ever logs) is
+ * treated exactly like an output whose name wasn't present: that output just gets its own declared
+ * default value, same as any other node output nobody actually filled in. */
 function pinOutputsFor(script: CodeScriptDef, returned: unknown): Record<string, unknown> {
   const named = returned && typeof returned === "object" ? (returned as Record<string, unknown>) : {};
   const outputs: Record<string, unknown> = {};
   for (const output of script.outputs) {
-    const key = `${CUSTOM_PIN_PREFIX}${output.name}`;
-    outputs[output.id] = key in named ? named[key] : output.defaultValue;
+    outputs[output.id] = output.name in named ? named[output.name] : output.defaultValue;
   }
   return outputs;
 }
@@ -137,7 +140,7 @@ registerNode({
       throw new Error(`Code node "${node.id}"'s script "${script.name}" has never been saved — cannot compile this graph yet`);
     }
 
-    const inputsObjExpr = `{ ${script.inputs.map((input) => `${JSON.stringify(`${CUSTOM_PIN_PREFIX}${input.name}`)}: ${inputs[input.id]}`).join(", ")} }`;
+    const inputsObjExpr = `{ ${script.inputs.map((input) => `${JSON.stringify(input.name)}: ${inputs[input.id]}`).join(", ")} }`;
     const resultVar = compileResultVar(node.id);
 
     return [
@@ -165,7 +168,7 @@ registerNode({
     const v = compileResultVar(node.id);
     const outputs: Record<string, string> = {};
     for (const output of script.outputs) {
-      const nameExpr = JSON.stringify(`${CUSTOM_PIN_PREFIX}${output.name}`);
+      const nameExpr = JSON.stringify(output.name);
       outputs[output.id] = `(${nameExpr} in ${v} ? ${v}[${nameExpr}] : ${JSON.stringify(output.defaultValue)})`;
     }
     return outputs;

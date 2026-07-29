@@ -745,7 +745,7 @@ describe("createTemplatedCodeScriptDef", () => {
     expect(script.compiledJs).toBe(outputJs);
   });
 
-  it("the template actually runs end-to-end: logs the input and sets the output, both under their Custom-prefixed names", async () => {
+  it("the template actually runs end-to-end: logs the input and sets the output, both under their own plain pin names", async () => {
     const script = createTemplatedCodeScriptDef("MyScript");
     const def = getNodeDef("code.run");
     const node = NodeInstance.createNodeInstance(
