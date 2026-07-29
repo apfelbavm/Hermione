@@ -60,7 +60,9 @@ html, body {
 
 #save-button,
 #load-button,
-#compile-button {
+#download-button,
+#compile-button,
+#delete-button {
   background: #33383f;
   color: #e8e8e8;
   border: none;
@@ -72,7 +74,9 @@ html, body {
 
 #save-button:hover,
 #load-button:hover,
-#compile-button:hover {
+#download-button:hover,
+#compile-button:hover,
+#delete-button:hover {
   background: #454a52;
 }
 

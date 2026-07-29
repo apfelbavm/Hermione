@@ -746,9 +746,12 @@ compileButton.addEventListener("click", async () => {
 });
 
 // --- Delete: discards the graph persisted via Save (localStorage) — the one auto-restored on next
-// launch — without touching whatever is currently open on the canvas.
+// launch — then reloads the page so the whole view reflects it immediately (the same fresh-launch
+// state loadGraphFromLocalStorage()'s fallback to buildDemoGraph() produces), instead of leaving
+// whatever was already open on the canvas showing stale.
 deleteButton.addEventListener("click", () => {
   deleteSavedGraph();
+  location.reload();
 });
 
 // --- Frame All: zooms/pans so every node and comment box in the current graph fits on screen
