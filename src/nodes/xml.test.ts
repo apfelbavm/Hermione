@@ -1,4 +1,5 @@
-import { XMLBuilder, XMLParser, XMLValidator } from "fast-xml-parser";
+import { XMLParser, XMLValidator } from "fast-xml-parser";
+import XMLBuilder from "fast-xml-builder";
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "./index";
 import { getNodeDef } from "../engine/registry";

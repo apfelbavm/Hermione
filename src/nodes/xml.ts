@@ -1,5 +1,6 @@
 import { registerNode } from "../engine/registry";
 import {
+  XML_BUILDER_IMPORT_LINE,
   XML_BUILD_OPTIONS_LITERAL,
   XML_IMPORT_LINE,
   XML_PARSE_OPTIONS_LITERAL,
@@ -60,7 +61,7 @@ registerNode({
       `catch { return { xml: "", success: false }; } })()`;
     return { xml: `${attempt}.xml`, success: `${attempt}.success` };
   },
-  compileImports: [XML_IMPORT_LINE],
+  compileImports: [XML_BUILDER_IMPORT_LINE],
 });
 
 registerNode({

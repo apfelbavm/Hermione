@@ -1,7 +1,13 @@
-import { XMLBuilder, XMLParser, XMLValidator } from "fast-xml-parser";
+import { XMLParser, XMLValidator } from "fast-xml-parser";
+import XMLBuilder from "fast-xml-builder";
 import * as Papa from "papaparse";
 import { registerNode } from "../engine/registry";
-import { XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, XML_PRETTY_BUILD_OPTIONS_LITERAL } from "./dataFormatHelpers";
+import {
+  XML_BUILDER_IMPORT_LINE,
+  XML_IMPORT_LINE,
+  XML_PARSE_OPTIONS_LITERAL,
+  XML_PRETTY_BUILD_OPTIONS_LITERAL,
+} from "./dataFormatHelpers";
 
 registerNode({
   type: "debug.print",
@@ -87,6 +93,6 @@ registerNode({
     `rt.log(formatForLog(String(${inputs.message}), String(${inputs.format})));`,
     ...compileFrom("exec-out"),
   ],
-  compileImports: [XML_IMPORT_LINE, 'import * as Papa from "papaparse";'],
+  compileImports: [XML_IMPORT_LINE, XML_BUILDER_IMPORT_LINE, 'import * as Papa from "papaparse";'],
   compileHelpers: { formatForLog: FORMAT_FOR_LOG_SOURCE },
 });

@@ -1,4 +1,5 @@
-import { XMLBuilder, XMLParser, XMLValidator } from "fast-xml-parser";
+import { XMLParser, XMLValidator } from "fast-xml-parser";
+import XMLBuilder from "fast-xml-builder";
 import * as Papa from "papaparse";
 
 // Shared building blocks for the XML/JSON/CSV conversion nodes (xml.ts, csv.ts). Kept in their own
@@ -8,13 +9,22 @@ import * as Papa from "papaparse";
 // compileImports strings eagerly, not inside a closure) fragile to whichever file happened to load
 // first.
 
-// XML <-> JSON, backed by fast-xml-parser rather than a hand-rolled parser: it's plain JS (no
-// DOMParser/browser-only API), so it runs identically in the browser interpreter and in a compiled
-// graph's plain-Node output, and it's dramatically more spec-compliant (entities, CDATA, encodings,
-// real well-formedness checking via XMLValidator) than anything worth hand-maintaining here. The
-// tradeoff, surfaced via NodeDef.compileImports: a compiled graph using these nodes needs
-// `fast-xml-parser` installed alongside it — no longer a fully dependency-free .mjs, the same call
-// already made for the SAML node's xmldsigjs dependency.
+// XML <-> JSON, backed by fast-xml-parser/fast-xml-builder rather than a hand-rolled parser: it's
+// plain JS (no DOMParser/browser-only API), so it runs identically in the browser interpreter and
+// in a compiled graph's plain-Node output, and it's dramatically more spec-compliant (entities,
+// CDATA, encodings, real well-formedness checking via XMLValidator) than anything worth
+// hand-maintaining here. The tradeoff, surfaced via NodeDef.compileImports: a compiled graph using
+// these nodes needs `fast-xml-parser`/`fast-xml-builder` installed alongside it — no longer a fully
+// dependency-free .mjs, the same call already made for the SAML node's xmldsigjs dependency.
+//
+// XMLBuilder comes from the separate `fast-xml-builder` package, not from fast-xml-parser itself:
+// fast-xml-parser's own typings mark its bundled XMLBuilder @deprecated in favor of the standalone
+// package (it split out years ago and has since gained more features and speed — see fast-xml-
+// parser's README "Before using this library" section). Confirmed byte-for-byte identical output
+// between the two builders for every option this file actually sets (ignoreAttributes,
+// attributeNamePrefix, textNodeName, format, indentBy) before switching. XMLValidator carries the
+// same @deprecated marker (pointing at a sibling `fast-xml-validator` package) but is left as-is
+// here — out of scope for this change, which only migrates the builder.
 //
 // Conversion convention (documented, not a spec): attributes become "@name" keys, text alongside
 // child elements (if any) becomes "#text", repeated sibling elements with the same tag name become
@@ -48,7 +58,8 @@ export const XML_PRETTY_BUILD_OPTIONS = { ...XML_BUILD_OPTIONS, format: true, in
 export const XML_PARSE_OPTIONS_LITERAL = JSON.stringify(XML_PARSE_OPTIONS);
 export const XML_BUILD_OPTIONS_LITERAL = JSON.stringify(XML_BUILD_OPTIONS);
 export const XML_PRETTY_BUILD_OPTIONS_LITERAL = JSON.stringify(XML_PRETTY_BUILD_OPTIONS);
-export const XML_IMPORT_LINE = 'import { XMLBuilder, XMLParser, XMLValidator } from "fast-xml-parser";';
+export const XML_IMPORT_LINE = 'import { XMLParser, XMLValidator } from "fast-xml-parser";';
+export const XML_BUILDER_IMPORT_LINE = 'import XMLBuilder from "fast-xml-builder";';
 
 export function xmlToJsonValue(xml: string): unknown {
   const validation = XMLValidator.validate(xml);
