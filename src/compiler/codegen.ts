@@ -40,6 +40,24 @@ function compileResolveDataPin(
 
   const upstreamNode = findNode(graph, conn.fromNode);
   const upstreamDef = getNodeDef(upstreamNode.type);
+
+  // A latent/exec node's data outputs (e.g. an HTTP-calling node's success/error/status) come from
+  // compileExecuteOutputs instead of compileEvaluate — see that field's own doc comment for why the
+  // two aren't interchangeable. Checked before requiring compileEvaluate, not merely as a fallback,
+  // since a node exposing this only ever exposes THIS, never both.
+  if (upstreamDef.compileExecuteOutputs) {
+    collectHelpers(upstreamDef.compileHelpers, helpers);
+    collectImports(upstreamDef.compileImports, imports);
+    const outputs = upstreamDef.compileExecuteOutputs({ node: upstreamNode });
+    const expr = outputs[conn.fromPin];
+    if (expr === undefined) {
+      throw new Error(
+        `Node type "${upstreamNode.type}" compileExecuteOutputs did not return an expression for output pin "${conn.fromPin}"`,
+      );
+    }
+    return expr;
+  }
+
   if (!upstreamDef.compileEvaluate) {
     throw new Error(
       `Node type "${upstreamNode.type}" has no compileEvaluate — cannot compile this graph yet`,

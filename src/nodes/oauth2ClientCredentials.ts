@@ -94,6 +94,7 @@ registerNode({
       };
     }
   },
-  // Compiler support (compileExecute) is intentionally out of scope for now, same call as
-  // http.request — this node has data outputs beyond a single result, which no exec node compiles yet.
+  // Compiler support (compileExecute) is intentionally out of scope for now — this node has data
+  // outputs beyond a single result, which needs the compiler's compileExecuteOutputs hook (see
+  // auth.oauth2Saml/http.request for the pattern, once something actually needs this compiled).
 });

@@ -1,4 +1,5 @@
 import { registerNode } from "../engine/registry";
+import { compileResultVar } from "../engine/compileUtils";
 
 // SAML 2.0 Bearer Assertion exchange (RFC 7522 grant type) — but the assertion itself is NOT built
 // or signed locally. This matches systems (e.g. SAP SuccessFactors-style integrations) where
@@ -7,6 +8,95 @@ import { registerNode } from "../engine/registry";
 // Only the second leg — exchanging that assertion for an access token — is a standard OAuth2 token
 // request (grant_type=urn:ietf:params:oauth:grant-type:saml2-bearer). No local XML signing, no
 // crypto library: both legs are plain form-urlencoded POSTs, same as http.request would send by hand.
+//
+// Written ONCE as a plain-JS source string, derived via `new Function` for the interpreter's own use
+// and embedded verbatim as this node's compileHelpers entry for the compiled path — same reasoning
+// as debug.ts's formatForLog — so there's exactly one implementation, not two hand-kept copies that
+// could drift. Needs no compileImports: fetch/URLSearchParams/JSON are globals in both the browser
+// and plain Node, not something a compiled file needs to `npm install` alongside it.
+//
+// This is also the node's actual reason for having compileExecute/compileExecuteOutputs at all where
+// its sibling auth.oauth2ClientCredentials and http.request still don't: an in-editor Run executes
+// fetch() from the browser page itself, so a target server that doesn't send CORS headers back (true
+// of most server-to-server OAuth endpoints, including SuccessFactors' — they're built for Postman/
+// backend callers, not page JS) blocks the response outright with a NetworkError, independent of
+// anything this file does. Compiling the graph and running the output under plain Node sidesteps
+// that entirely, since CORS is purely a browser-enforced restriction.
+const OAUTH2_SAML_EXCHANGE_SOURCE = `
+async function oauth2SamlExchange(idpUrl, tokenServiceUrl, clientId, userId, companyId, privateKey) {
+  const formHeaders = { "Content-Type": "application/x-www-form-urlencoded", Accept: "*/*" };
+  const fail = (status, error) => ({ success: false, auth: null, accessToken: "", expiresIn: 0, status, error });
+
+  try {
+    const assertionRes = await fetch(idpUrl, {
+      method: "POST",
+      headers: formHeaders,
+      body: new URLSearchParams({
+        client_id: clientId,
+        user_id: userId,
+        token_url: tokenServiceUrl,
+        private_key: privateKey,
+      }).toString(),
+    });
+    const assertion = (await assertionRes.text()).trim();
+    if (!assertionRes.ok || !assertion) {
+      return fail(assertionRes.status, assertion || "Assertion endpoint returned " + assertionRes.status);
+    }
+
+    const tokenRes = await fetch(tokenServiceUrl, {
+      method: "POST",
+      headers: formHeaders,
+      body: new URLSearchParams({
+        client_id: clientId,
+        user_id: userId,
+        company_id: companyId,
+        grant_type: "urn:ietf:params:oauth:grant-type:saml2-bearer",
+        assertion: assertion,
+      }).toString(),
+    });
+    const responseText = await tokenRes.text();
+    if (!tokenRes.ok) {
+      return fail(tokenRes.status, responseText || "Token endpoint returned " + tokenRes.status);
+    }
+
+    const parsed = JSON.parse(responseText);
+    const accessToken = String(parsed.access_token ?? "");
+    if (!accessToken) {
+      return fail(tokenRes.status, "Token endpoint response had no access_token");
+    }
+
+    return {
+      success: true,
+      auth: { header: "Authorization", value: "Bearer " + accessToken },
+      accessToken: accessToken,
+      expiresIn: Number(parsed.expires_in ?? 0),
+      status: tokenRes.status,
+      error: "",
+    };
+  } catch (err) {
+    return fail(0, err instanceof Error ? err.message : String(err));
+  }
+}
+`;
+
+interface Oauth2SamlResult {
+  success: boolean;
+  auth: { header: string; value: string } | null;
+  accessToken: string;
+  expiresIn: number;
+  status: number;
+  error: string;
+  [key: string]: unknown;
+}
+
+const oauth2SamlExchange: (
+  idpUrl: string,
+  tokenServiceUrl: string,
+  clientId: string,
+  userId: string,
+  companyId: string,
+  privateKey: string,
+) => Promise<Oauth2SamlResult> = new Function(`${OAUTH2_SAML_EXCHANGE_SOURCE}\nreturn oauth2SamlExchange;`)();
 
 registerNode({
   type: "auth.oauth2Saml",
@@ -34,72 +124,30 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const idpUrl = String(inputs.idpUrl ?? "");
-    const tokenServiceUrl = String(inputs.tokenServiceUrl ?? "");
-    const clientId = String(inputs.clientId ?? "");
-    const userId = String(inputs.userId ?? "");
-    const companyId = String(inputs.companyId ?? "");
-    const privateKey = String(inputs.privateKey ?? "");
-    const formHeaders = { "Content-Type": "application/x-www-form-urlencoded", Accept: "*/*" };
-    const fail = (status: number, error: string) => ({
-      nextExec: "exec-out" as const,
-      outputs: { success: false, auth: null, accessToken: "", expiresIn: 0, status, error },
-    });
-
-    try {
-      const assertionRes = await fetch(idpUrl, {
-        method: "POST",
-        headers: formHeaders,
-        body: new URLSearchParams({
-          client_id: clientId,
-          user_id: userId,
-          token_url: tokenServiceUrl,
-          private_key: privateKey,
-        }).toString(),
-      });
-      const assertion = (await assertionRes.text()).trim();
-      if (!assertionRes.ok || !assertion) {
-        return fail(assertionRes.status, assertion || `Assertion endpoint returned ${assertionRes.status}`);
-      }
-
-      const tokenRes = await fetch(tokenServiceUrl, {
-        method: "POST",
-        headers: formHeaders,
-        body: new URLSearchParams({
-          client_id: clientId,
-          user_id: userId,
-          company_id: companyId,
-          grant_type: "urn:ietf:params:oauth:grant-type:saml2-bearer",
-          assertion,
-        }).toString(),
-      });
-      const responseText = await tokenRes.text();
-      if (!tokenRes.ok) {
-        return fail(tokenRes.status, responseText || `Token endpoint returned ${tokenRes.status}`);
-      }
-
-      const parsed = JSON.parse(responseText) as { access_token?: unknown; expires_in?: unknown };
-      const accessToken = String(parsed.access_token ?? "");
-      if (!accessToken) {
-        return fail(tokenRes.status, "Token endpoint response had no access_token");
-      }
-
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: true,
-          auth: { header: "Authorization", value: `Bearer ${accessToken}` },
-          accessToken,
-          expiresIn: Number(parsed.expires_in ?? 0),
-          status: tokenRes.status,
-          error: "",
-        },
-      };
-    } catch (err) {
-      return fail(0, err instanceof Error ? err.message : String(err));
-    }
+    const result = await oauth2SamlExchange(
+      String(inputs.idpUrl ?? ""),
+      String(inputs.tokenServiceUrl ?? ""),
+      String(inputs.clientId ?? ""),
+      String(inputs.userId ?? ""),
+      String(inputs.companyId ?? ""),
+      String(inputs.privateKey ?? ""),
+    );
+    return { nextExec: "exec-out", outputs: result };
   },
-  // Compiler support (compileExecute) is intentionally out of scope for now, same call as
-  // http.request and auth.oauth2ClientCredentials — this node has data outputs beyond a single
-  // result, which no exec node compiles yet.
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await oauth2SamlExchange(${inputs.idpUrl}, ${inputs.tokenServiceUrl}, ${inputs.clientId}, ${inputs.userId}, ${inputs.companyId}, ${inputs.privateKey});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return {
+      success: `${v}.success`,
+      auth: `${v}.auth`,
+      accessToken: `${v}.accessToken`,
+      expiresIn: `${v}.expiresIn`,
+      status: `${v}.status`,
+      error: `${v}.error`,
+    };
+  },
+  compileHelpers: { oauth2SamlExchange: OAUTH2_SAML_EXCHANGE_SOURCE },
 });

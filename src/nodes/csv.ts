@@ -6,9 +6,10 @@ import { csvToObjects, extractTabularRows, jsonValueToXml, objectsToCsv } from "
 // slow enough to visibly freeze the tab, and PapaParse parses a plain string fully synchronously
 // (see dataFormatHelpers.ts's own comment) — so unlike the hand-rolled parser this replaced, being
 // "latent" here is purely a UI signal (the clock icon), not something that actually yields mid-call.
-// Compiler support (compileExecute) is intentionally out of scope for now, same call already made
-// for http.request/the OAuth2 nodes — these nodes have data outputs beyond a single result, which
-// no exec node compiles yet.
+// Compiler support (compileExecute) is intentionally out of scope for now, same call still made for
+// auth.oauth2ClientCredentials — these nodes have data outputs beyond a single result, which needs
+// the compiler's compileExecuteOutputs hook (see auth.oauth2Saml/http.request for the pattern once
+// something actually needs these compiled).
 //
 // csv.toJson's "json" pin is a single object, not an Array<Object>: the rows are wrapped under a
 // caller-chosen root/row tag pair, e.g. { rows: { row: [...] } } — the same convention csv.toXml

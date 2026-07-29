@@ -117,6 +117,16 @@ export interface NodeDef {
   compileEvaluate?: (args: CompileEvalArgs) => Record<string, string>;
   /** Compile-time counterpart of `execute`: returns JS statement strings. */
   compileExecute?: (args: CompileExecArgs) => string[];
+  /** For a latent/exec node whose `execute()` returns MORE than one data output (e.g. an HTTP-calling
+   * node's success/error/status/etc): maps each data output pin id to a JS expression a downstream
+   * node's compileEvaluate can embed. Unlike compileEvaluate (safe to call anywhere, any number of
+   * times, since it's pure), these expressions are only valid to reference from statements compiled
+   * to run AFTER this node's own compileExecute in the same exec chain — by convention, each is a
+   * reference into a local variable that compileExecute itself declared (see compileResultVar),
+   * never a fresh computation, since re-running the actual side-effecting call per reference would
+   * be wrong. compileFrom's downstream walk already guarantees the ordering: compileExecute's
+   * returned statements always precede whatever `compileFrom(execOutPin)` appends after them. */
+  compileExecuteOutputs?: (args: { node: NodeInstance }) => Record<string, string>;
   /** Named helper-function source snippets this node's generated code depends on (e.g. `delay`), deduped by name across the whole compiled file. */
   compileHelpers?: Record<string, string>;
   /** Literal ESM import statements this node's generated code depends on (e.g. `import { XMLParser } from

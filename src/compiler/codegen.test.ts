@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../nodes";
 import { createExecutionContext, runExecFrom } from "../engine/executor";
 import { connectPins, createNodeInstance } from "../engine/graphMutations";
@@ -19,6 +19,10 @@ function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, i
 
 beforeAll(() => {
   registerBuiltins();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 /** Writes compiled source to a temp file and dynamically imports it — cache-busted so repeat compiles in one test run don't hit a stale module. */
@@ -337,5 +341,174 @@ describe("compileGraph", () => {
     await trigger({ state: createInitialState(), log: (m: string) => logs.push(m) });
 
     expect(logs).toEqual(["Done"]);
+  });
+
+  describe("auth.oauth2Saml (compileExecuteOutputs — a latent exec node's data outputs read by downstream nodes)", () => {
+    function buildSamlGraph() {
+      const graph = createEmptyGraph("g16", "test");
+      const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+      const saml = addBuiltinNode(graph, "auth.oauth2Saml", { x: 100, y: 0 }, "saml");
+      const branch = addBuiltinNode(graph, "flow.branch", { x: 200, y: 0 }, "branch");
+      const printTrue = addBuiltinNode(graph, "debug.print", { x: 300, y: -50 }, "printTrue");
+      const printFalse = addBuiltinNode(graph, "debug.print", { x: 300, y: 50 }, "printFalse");
+
+      saml.pins.idpUrl.value = "https://idp.example.com/oauth/idp";
+      saml.pins.tokenServiceUrl.value = "https://idp.example.com/oauth/token";
+      saml.pins.clientId.value = "client-1";
+      saml.pins.userId.value = "user-1";
+      saml.pins.companyId.value = "company-1";
+      saml.pins.privateKey.value = "pk";
+
+      connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: saml.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: saml.id, fromPin: "exec-out", toNode: branch.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: saml.id, fromPin: "success", toNode: branch.id, toPin: "condition" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "true", toNode: printTrue.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: branch.id, fromPin: "false", toNode: printFalse.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: saml.id, fromPin: "accessToken", toNode: printTrue.id, toPin: "message" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: saml.id, fromPin: "error", toNode: printFalse.id, toPin: "message" });
+
+      return graph;
+    }
+
+    async function runCompiledSaml(graph: Graph): Promise<string[]> {
+      const { code, manifest } = compileGraph(graph);
+      const compiled = await loadCompiled(code);
+      const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+      const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
+
+      const logs: string[] = [];
+      await trigger({ state: createInitialState(), log: (m: string) => logs.push(m) });
+      return logs;
+    }
+
+    it("compiles without throwing and reads accessToken (a data output beyond a single result) into the Branch's true path", async () => {
+      const graph = buildSamlGraph();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          if (url === "https://idp.example.com/oauth/idp") return new Response("signed-assertion", { status: 200 });
+          return new Response(JSON.stringify({ access_token: "tok-1", expires_in: 3600 }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }),
+      );
+
+      expect(await runCompiledSaml(graph)).toEqual(["tok-1"]);
+    });
+
+    it("reads the error output into the Branch's false path when the token exchange fails", async () => {
+      const graph = buildSamlGraph();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          if (url === "https://idp.example.com/oauth/idp") return new Response("signed-assertion", { status: 200 });
+          return new Response("invalid_grant", { status: 401 });
+        }),
+      );
+
+      expect(await runCompiledSaml(graph)).toEqual(["invalid_grant"]);
+    });
+
+    it("compiled output matches the interpreter's own execute() for the same graph and mocked fetch", async () => {
+      const graph = buildSamlGraph();
+      const fetchMock = vi.fn(async (url: string) => {
+        if (url === "https://idp.example.com/oauth/idp") return new Response("signed-assertion", { status: 200 });
+        return new Response(JSON.stringify({ access_token: "tok-1", expires_in: 3600 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const interpreterLogs: string[] = [];
+      await runExecFrom(
+        "start",
+        "exec-out",
+        createExecutionContext(graph, { log: (m) => interpreterLogs.push(m) }),
+      );
+
+      const compiledLogs = await runCompiledSaml(graph);
+      expect(compiledLogs).toEqual(interpreterLogs);
+      expect(compiledLogs).toEqual(["tok-1"]);
+    });
+  });
+
+  describe("http.request (compileExecuteOutputs)", () => {
+    it("compiles without throwing and reads status/responseBody into downstream Print nodes", async () => {
+      const graph = createEmptyGraph("g17", "test");
+      const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+      const req = addBuiltinNode(graph, "http.request", { x: 100, y: 0 }, "req");
+      const printBody = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "printBody");
+
+      req.pins.url.value = "https://api.example.com/thing";
+      req.pins.method.value = "GET";
+
+      connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: req.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: req.id, fromPin: "exec-out", toNode: printBody.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: req.id, fromPin: "responseBody", toNode: printBody.id, toPin: "message" });
+
+      const { code, manifest } = compileGraph(graph);
+      const compiled = await loadCompiled(code);
+      const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+      const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
+
+      vi.stubGlobal("fetch", vi.fn(async () => new Response("hello from the API", { status: 200 })));
+
+      const logs: string[] = [];
+      await trigger({ state: createInitialState(), log: (m: string) => logs.push(m) });
+      expect(logs).toEqual(["hello from the API"]);
+    });
+
+    it("compiles the full pipeline this feature exists for: auth.oauth2Saml's Auth output wired straight into http.request's Auth input", async () => {
+      const graph = createEmptyGraph("g18", "test");
+      const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
+      const saml = addBuiltinNode(graph, "auth.oauth2Saml", { x: 100, y: 0 }, "saml");
+      const req = addBuiltinNode(graph, "http.request", { x: 200, y: 0 }, "req");
+      const printBody = addBuiltinNode(graph, "debug.print", { x: 300, y: 0 }, "printBody");
+
+      saml.pins.idpUrl.value = "https://idp.example.com/oauth/idp";
+      saml.pins.tokenServiceUrl.value = "https://idp.example.com/oauth/token";
+      saml.pins.clientId.value = "client-1";
+      saml.pins.userId.value = "user-1";
+      saml.pins.companyId.value = "company-1";
+      saml.pins.privateKey.value = "pk";
+      req.pins.url.value = "https://api.example.com/protected";
+      req.pins.method.value = "GET";
+
+      connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: saml.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: saml.id, fromPin: "exec-out", toNode: req.id, toPin: "exec-in" });
+      // The one thing the user should ever have to do: wire Auth straight across, untouched.
+      connectPins(graph, graph.variables, graph.functions, { fromNode: saml.id, fromPin: "auth", toNode: req.id, toPin: "auth" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: req.id, fromPin: "exec-out", toNode: printBody.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: req.id, fromPin: "responseBody", toNode: printBody.id, toPin: "message" });
+
+      const { code, manifest } = compileGraph(graph);
+      const compiled = await loadCompiled(code);
+      const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+      const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
+
+      let capturedAuthHeader: string | null = null;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string, init?: RequestInit) => {
+          if (url === "https://idp.example.com/oauth/idp") return new Response("signed-assertion", { status: 200 });
+          if (url === "https://idp.example.com/oauth/token") {
+            return new Response(JSON.stringify({ access_token: "tok-1", expires_in: 3600 }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          capturedAuthHeader = new Headers(init?.headers).get("authorization");
+          return new Response("protected data", { status: 200 });
+        }),
+      );
+
+      const logs: string[] = [];
+      await trigger({ state: createInitialState(), log: (m: string) => logs.push(m) });
+
+      expect(capturedAuthHeader).toBe("Bearer tok-1");
+      expect(logs).toEqual(["protected data"]);
+    });
   });
 });

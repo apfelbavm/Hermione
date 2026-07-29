@@ -80,8 +80,9 @@ registerNode({
   // PapaParse's objectsToCsv (see dataFormatHelpers.ts), slow enough for a large file to visibly
   // freeze the tab if run synchronously — being "latent" here is purely a UI signal (the clock
   // icon), since PapaParse itself doesn't yield mid-call. Compiler support (compileExecute) is
-  // intentionally out of scope for now, same call already made for http.request/the OAuth2 nodes —
-  // this node has data outputs beyond a single result, which no exec node compiles yet.
+  // intentionally out of scope for now, same call still made for auth.oauth2ClientCredentials — this
+  // node has data outputs beyond a single result, which needs the compiler's compileExecuteOutputs
+  // hook (see auth.oauth2Saml/http.request for the pattern once something actually needs this compiled).
   latent: true,
   execute: async ({ inputs }) => {
     try {
