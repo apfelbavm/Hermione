@@ -97,22 +97,33 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
 
     treeRows.forEach((row, i) => {
       const li = document.createElement("li");
+      li.className = "node-search-tree-row";
       li.style.paddingLeft = `${8 + row.depth * 14}px`;
       if (i === highlighted) li.classList.add("highlighted");
       if (i === pinned.length - 1 && pinned.length < treeRows.length) {
         li.classList.add("node-search-pinned-divider");
       }
 
+      // A fixed-width icon slot shared by every row — a group's ▾/▸ arrow sits here, and a leaf row
+      // (no icon of its own) gets an empty same-width slot instead, so its label lines up with a
+      // group's NAME text (which starts right after that arrow) rather than with the arrow itself.
+      const icon = document.createElement("span");
+      icon.className = "node-search-row-icon";
+
+      const labelEl = document.createElement("span");
+      labelEl.className = "node-search-row-label";
+
       if (row.node.kind === "group") {
-        li.className = "node-search-group";
-        li.textContent = `${expanded.has(row.node.path) ? "▾" : "▸"} ${row.node.name}`;
+        li.classList.add("node-search-group");
+        icon.textContent = expanded.has(row.node.path) ? "▾" : "▸";
+        labelEl.textContent = row.node.name;
         li.addEventListener("mousedown", (e) => {
           e.preventDefault();
           toggleGroup(row.node as MenuNode & { kind: "group" });
         });
       } else {
         const def = row.node.def;
-        li.textContent = def.label;
+        labelEl.textContent = def.label;
         li.title = def.group;
         li.addEventListener("mousedown", (e) => {
           e.preventDefault();
@@ -120,6 +131,8 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
         });
         attachHoverTooltip(li, () => def.description);
       }
+
+      li.append(icon, labelEl);
       list.appendChild(li);
     });
   }

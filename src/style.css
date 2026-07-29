@@ -916,7 +916,7 @@ body.resizing {
 
 .node-search-menu {
   position: absolute;
-  width: 220px;
+  width: 350px;
   max-height: 480px;
   background: #24272d;
   border: 1px solid #454a52;
@@ -950,14 +950,17 @@ body.resizing {
 }
 
 .node-search-list li {
-  padding: 6px 8px;
+  padding: 2px 4px;
   border-radius: 4px;
   font-size: 13px;
   cursor: pointer;
   color: #e8e8e8;
 }
 
-.node-search-list li:hover,
+.node-search-list li:hover {
+  background: #84a1b475;
+}
+
 .node-search-list li.highlighted {
   background: #3b6b8a;
 }
@@ -968,6 +971,27 @@ body.resizing {
 }
 .node-search-empty:hover {
   background: none !important;
+}
+
+.node-search-tree-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+/** Fixed-width slot shared by every tree row (see nodeSearchMenu.ts) — a group's ▾/▸ arrow renders
+ * here; a leaf row leaves it empty so its label still starts at this exact same x position, lining
+ * up with a group's NAME text rather than with the arrow glyph itself. */
+.node-search-row-icon {
+  flex: 0 0 auto;
+  width: 12px;
+  text-align: center;
+}
+
+.node-search-row-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .node-search-group {
