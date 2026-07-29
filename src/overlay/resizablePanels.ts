@@ -1,10 +1,12 @@
-/** Wires a thin drag handle to resize an adjacent flex sibling (the sidebar's width, the log
- * panel's height) by adjusting its flex-basis — persisted to localStorage so a resize survives a
- * reload, restored (clamped to the CURRENT viewport, in case the window shrank since) on setup.
- * The handle always sits on the side of `target` that's closer to the OTHER flex content, so
- * dragging it toward that content always grows `target` and away from it always shrinks it —
- * true for both the sidebar (handle on its left, growing means dragging left) and the log panel
- * (handle on its top, growing means dragging up), which is why one formula covers both. */
+/** Wires a thin drag handle to resize an adjacent flex sibling (a sidebar's width, the log panel's
+ * height) by adjusting its flex-basis — persisted to localStorage so a resize survives a reload,
+ * restored (clamped to the CURRENT viewport, in case the window shrank since) on setup.
+ * `growSign` says which pointer direction grows `target`: -1 (the default) when the handle sits on
+ * the side of `target` closer to the OTHER flex content — so dragging TOWARD that content grows
+ * `target` — true for the right sidebar (handle on its left, growing means dragging left) and the
+ * log panel (handle on its top, growing means dragging up); +1 when target sits on the SAME side
+ * the pointer coordinate increases toward, e.g. the left sidebar (handle on its right, growing
+ * means dragging right, away from it). */
 function wireResizeHandle(opts: {
   handle: HTMLElement;
   target: HTMLElement;
@@ -13,8 +15,9 @@ function wireResizeHandle(opts: {
   max: () => number;
   getPointerPos: (e: PointerEvent) => number;
   getSize: (rect: DOMRect) => number;
+  growSign?: 1 | -1;
 }): void {
-  const { handle, target, storageKey, min, max, getPointerPos, getSize } = opts;
+  const { handle, target, storageKey, min, max, getPointerPos, getSize, growSign = -1 } = opts;
 
   const stored = Number(localStorage.getItem(storageKey));
   if (stored > 0) target.style.flexBasis = `${clamp(stored, min, max())}px`;
@@ -28,7 +31,7 @@ function wireResizeHandle(opts: {
 
     function onMove(moveEvent: PointerEvent): void {
       const delta = getPointerPos(moveEvent) - startPos;
-      target.style.flexBasis = `${clamp(startSize - delta, min, max())}px`;
+      target.style.flexBasis = `${clamp(startSize + growSign * delta, min, max())}px`;
     }
     function onUp(upEvent: PointerEvent): void {
       handle.releasePointerCapture(upEvent.pointerId);
@@ -46,15 +49,27 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-/** Sidebar (width) and log panel (height) both get a drag-to-resize handle — see index.html for
- * the #sidebar-resizer/#log-resizer elements this binds to. */
+/** Both sidebars (width) and the log panel (height) each get a drag-to-resize handle — see
+ * index.html for the #left-sidebar-resizer/#right-sidebar-resizer/#log-resizer elements this
+ * binds to. */
 export function setupResizablePanels(): void {
   wireResizeHandle({
-    handle: document.getElementById("sidebar-resizer")!,
-    target: document.getElementById("sidebar")!,
-    storageKey: "hermione:sidebar-width",
+    handle: document.getElementById("left-sidebar-resizer")!,
+    target: document.getElementById("left-sidebar")!,
+    storageKey: "hermione:left-sidebar-width",
     min: 200,
-    max: () => window.innerWidth * 0.7,
+    max: () => window.innerWidth * 0.35,
+    getPointerPos: (e) => e.clientX,
+    getSize: (r) => r.width,
+    growSign: 1,
+  });
+
+  wireResizeHandle({
+    handle: document.getElementById("right-sidebar-resizer")!,
+    target: document.getElementById("right-sidebar")!,
+    storageKey: "hermione:right-sidebar-width",
+    min: 200,
+    max: () => window.innerWidth * 0.35,
     getPointerPos: (e) => e.clientX,
     getSize: (r) => r.width,
   });

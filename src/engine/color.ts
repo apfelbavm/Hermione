@@ -115,7 +115,7 @@ export namespace Colors {
     // Flow Control itself, so a neutral grey (matching the generic fallback) rather than its own hue.
     Functions: FLOW_CONTROL_BG,
   };
-  export const NODE_BODY_BG = "#2b2f36";
+  export const NODE_BODY_BG = "#121314";
   export const NODE_BORDER = "#3d4148";
   export const NODE_BORDER_SELECTED = "#e8b339";
   export const WIRE_COLOR_EXEC = PIN_COLORS.exec;

@@ -194,17 +194,26 @@ html, body {
   border-color: #3b6b8a;
 }
 
-#sidebar {
+.side-panel {
   flex: 0 0 240px;
   display: flex;
   flex-direction: column;
   background: #24272d;
-  border-left: 1px solid #33383f;
   overflow-y: auto;
   font-size: 13px;
 }
 
-/* Drag handles for the sidebar's width and the log panel's height — see resizablePanels.ts.
+/* Each sidebar's border sits on the edge facing the canvas — #left-sidebar is left-of-canvas so
+   its own right edge borders it; #right-sidebar is right-of-canvas so its own left edge does. */
+#left-sidebar {
+  border-right: 1px solid #33383f;
+}
+
+#right-sidebar {
+  border-left: 1px solid #33383f;
+}
+
+/* Drag handles for both sidebars' widths and the log panel's height — see resizablePanels.ts.
    Transparent by default, colored on hover/drag so they read as interactive without adding a
    permanent visual seam the rest of the time. */
 .resizer {
@@ -241,15 +250,12 @@ body.resizing {
   border-bottom: 1px solid #33383f;
 }
 
-/* Unreal-style Details section: pinned to the bottom of the sidebar (margin-top: auto pushes it
- * down when the lists above leave room), separated by a bold top divider, occupying roughly the
- * bottom third of the panel when there's enough vertical space. Hidden entirely (via JS) when
- * nothing is selected. */
+/* Unreal-style Details section: the sole content of its own standalone #right-sidebar, so it just
+ * fills the whole thing (no more margin-top: auto/min-height — those existed only to push it below
+ * the Functions/Variables/Scripts lists a single shared sidebar used to also hold). Hidden entirely
+ * (via JS) when nothing is selected. */
 #details-section {
-  flex: 0 0 auto;
-  margin-top: auto;
-  min-height: 33%;
-  border-top: 2px solid #454a52;
+  flex: 1;
   display: flex;
   flex-direction: column;
 }

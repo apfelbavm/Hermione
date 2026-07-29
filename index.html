@@ -18,22 +18,7 @@
         <input id="load-file-input" type="file" accept="application/json" style="display: none" />
       </div>
       <div id="main-area">
-        <div id="canvas-column">
-          <div id="graph-tabs"></div>
-          <div id="canvas-container">
-            <canvas id="graph-canvas"></canvas>
-            <div id="overlay"></div>
-            <div id="canvas-hud-toolbar">
-              <label id="snap-to-grid-toggle" class="toolbar-toggle">
-                <input type="checkbox" id="snap-to-grid-checkbox" />
-                Snap to Grid
-              </label>
-              <button id="frame-all-button" class="canvas-hud-button" title="Fit graph to view">⛶</button>
-            </div>
-          </div>
-        </div>
-        <div id="sidebar-resizer" class="resizer resizer-vertical"></div>
-        <div id="sidebar">
+        <div id="left-sidebar" class="side-panel">
           <div id="functions-section" class="panel-section">
             <div id="functions-header" class="panel-header">
               <span class="panel-header-title">Functions</span>
@@ -70,7 +55,24 @@
               <div id="local-variables-list" class="panel-list"></div>
             </div>
           </div>
-
+        </div>
+        <div id="left-sidebar-resizer" class="resizer resizer-vertical"></div>
+        <div id="canvas-column">
+          <div id="graph-tabs"></div>
+          <div id="canvas-container">
+            <canvas id="graph-canvas"></canvas>
+            <div id="overlay"></div>
+            <div id="canvas-hud-toolbar">
+              <label id="snap-to-grid-toggle" class="toolbar-toggle">
+                <input type="checkbox" id="snap-to-grid-checkbox" />
+                Snap to Grid
+              </label>
+              <button id="frame-all-button" class="canvas-hud-button" title="Fit graph to view">⛶</button>
+            </div>
+          </div>
+        </div>
+        <div id="right-sidebar-resizer" class="resizer resizer-vertical"></div>
+        <div id="right-sidebar" class="side-panel">
           <div id="details-section">
             <div class="details-header">Details</div>
             <div id="variable-details" class="details-content">
