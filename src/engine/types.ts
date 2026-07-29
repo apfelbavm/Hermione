@@ -136,6 +136,10 @@ export interface NodeDef {
    * returned statements always precede whatever `compileFrom(execOutPin)` appends after them. */
   compileExecuteOutputs?: (args: {
     node: NodeInstance;
+    /** Needed only by a node whose output SHAPE is derived from bound data rather than fixed (e.g.
+     * code.run's outputs come from its bound CodeScriptDef, looked up via node.scriptId) — every
+     * fixed-shape node (http.request, etc.) can safely ignore this. */
+    graph: Graph;
   }) => Record<string, string>;
   /** Named helper-function source snippets this node's generated code depends on (e.g. `delay`), deduped by name across the whole compiled file. */
   compileHelpers?: Record<string, string>;
@@ -253,19 +257,22 @@ export interface FunctionDef {
 /** A user-authored, named, reusable script — bound to one or more Code (code.run) nodes via
  * NodeInstance.scriptId, the same way a FunctionDef is bound to Entry/Return/Call nodes via
  * functionId. Unlike a function, a script has no body GRAPH of its own (no nested nodes/wires) —
- * its "body" is `source`, plain text edited in a Monaco tab, and its only signature is `inputs`
- * (no outputs: a script reports results via the logger it's called with, not a return pin — see
- * code.ts). `source` is what the user edits/sees; `compiledJs` is the last successful transpile of
- * it (see engine/transpile.ts), computed once at Save time rather than on every run/compile, and is
- * what execute()/compileExecute() actually embed and call — so a script with unsaved edits (or one
- * that's never been saved) keeps running/compiling against its last-known-good `compiledJs` instead
- * of silently doing nothing or re-transpiling on every single execution. */
+ * its "body" is `source`, plain text edited in a Monaco tab. `inputs` become code.run's own input
+ * pins, passed to `run()` as a name-keyed object; `outputs` become code.run's own OUTPUT pins,
+ * populated from whatever object `run()` returns, keyed the same way — the exact inverse direction
+ * (see code.ts's namedInputsFor/pinOutputsFor). `source` is what the user edits/sees; `compiledJs`
+ * is the last successful transpile of it (see engine/transpile.ts), computed once at Save time
+ * rather than on every run/compile, and is what execute()/compileExecute() actually embed and call
+ * — so a script with unsaved edits (or one that's never been saved) keeps running/compiling against
+ * its last-known-good `compiledJs` instead of silently doing nothing or re-transpiling on every
+ * single execution. */
 export interface CodeScriptDef {
   id: string;
   name: string;
   source: string;
   compiledJs: string;
   inputs: PinSignatureEntry[];
+  outputs: PinSignatureEntry[];
 }
 
 export interface ExecutionContext {

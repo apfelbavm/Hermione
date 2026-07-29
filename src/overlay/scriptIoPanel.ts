@@ -1,10 +1,14 @@
 import {
   addScriptInput,
+  addScriptOutput,
   DEFAULT_VALUE_BY_TYPE,
   moveScriptInput,
+  moveScriptOutput,
   nextId,
   removeScriptInput,
+  removeScriptOutput,
   updateScriptInput,
+  updateScriptOutput,
 } from "../engine/graphMutations";
 import type { CodeScriptDef, PinSignatureEntry, PinType } from "../engine/types";
 import type { Store } from "../state/store";
@@ -23,14 +27,15 @@ export interface ScriptIoPanelElements {
   addButton: HTMLButtonElement;
 }
 
-/** A script's Inputs section — a list of typed signature entries (name/type/default value), the
- * same shape as a function's Inputs (see functionIoPanel.ts, which this closely mirrors) but with
- * no Outputs counterpart: a script reports results via the logger it's called with, not a return
- * pin (see nodes/code.ts). Every code.run node bound to this script shares this one signature —
- * same relationship a FunctionDef's inputs have to every Entry/Call node bound to it. */
+/** Shared factory for a script's Inputs and Outputs sections — both are a list of typed signature
+ * entries (name/type/default value) on the currently-selected script, closely mirroring
+ * functionIoPanel.ts's own Inputs/Outputs factory. Inputs are passed into `run()` as a name-keyed
+ * object; Outputs are populated from whatever object `run()` returns, keyed the same way — see
+ * code.ts's namedInputsFor/pinOutputsFor for the exact (inverse) mapping each direction uses. */
 export function createScriptIoPanel(
   elements: ScriptIoPanelElements,
   store: Store,
+  kind: "input" | "output",
   getSelectedScript: () => CodeScriptDef | null,
 ): { render: () => void } {
   setupCollapsibleSection(elements.header, elements.section);
@@ -43,11 +48,17 @@ export function createScriptIoPanel(
     dropIndicatorRow = null;
   }
 
+  function entriesOf(script: CodeScriptDef): PinSignatureEntry[] {
+    return kind === "input" ? script.inputs : script.outputs;
+  }
+
   function commitRename(script: CodeScriptDef, entry: PinSignatureEntry, rawNewName: string): void {
     const trimmed = rawNewName.trim();
-    const isDuplicate = trimmed.length === 0 || script.inputs.some((e) => e.id !== entry.id && e.name === trimmed);
+    const isDuplicate =
+      trimmed.length === 0 || entriesOf(script).some((e) => e.id !== entry.id && e.name === trimmed);
     if (!isDuplicate) {
-      updateScriptInput(store.state.rootGraph, script, entry.id, { name: trimmed });
+      const update = kind === "input" ? updateScriptInput : updateScriptOutput;
+      update(store.state.rootGraph, script, entry.id, { name: trimmed });
     }
     editingId = null;
     store.notify();
@@ -60,8 +71,12 @@ export function createScriptIoPanel(
     if (isRenamingWithinList(elements.list)) return;
 
     elements.list.innerHTML = "";
+    const entries = entriesOf(script);
+    const update = kind === "input" ? updateScriptInput : updateScriptOutput;
+    const removeEntry = kind === "input" ? removeScriptInput : removeScriptOutput;
+    const moveEntry = kind === "input" ? moveScriptInput : moveScriptOutput;
 
-    for (const entry of script.inputs) {
+    for (const entry of entries) {
       const isEditing = editingId === entry.id;
       const row = document.createElement("div");
       row.className = "variable-row";
@@ -92,7 +107,7 @@ export function createScriptIoPanel(
         if (!draggedId) return;
         const rect = row.getBoundingClientRect();
         const position = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
-        moveScriptInput(script, draggedId, entry.id, position);
+        moveEntry(script, draggedId, entry.id, position);
         store.notify();
       });
 
@@ -124,26 +139,26 @@ export function createScriptIoPanel(
             });
 
       const type = createTypeSelect(entry.type, (type) => {
-        updateScriptInput(store.state.rootGraph, script, entry.id, { type });
+        update(store.state.rootGraph, script, entry.id, { type });
         store.notify();
       });
 
       const container = createContainerSelect(entry.container ?? "single", (container) => {
-        updateScriptInput(store.state.rootGraph, script, entry.id, { container });
+        update(store.state.rootGraph, script, entry.id, { container });
         store.notify();
       });
 
       const delBtn = document.createElement("button");
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", () => {
-        removeScriptInput(store.state.rootGraph, script, entry.id);
+        removeEntry(store.state.rootGraph, script, entry.id);
         store.notify();
       });
 
       row.append(nameEl, type, container);
       if (entry.container === "map") {
         const keyType = createTypeSelect(entry.keyType ?? "string", (keyType) => {
-          updateScriptInput(store.state.rootGraph, script, entry.id, { keyType });
+          update(store.state.rootGraph, script, entry.id, { keyType });
           store.notify();
         });
         row.append(keyType);
@@ -151,13 +166,19 @@ export function createScriptIoPanel(
       row.append(delBtn);
       elements.list.appendChild(row);
 
+      // A container's default-value editor is a whole vertical list, not a single inline input —
+      // gets its own row underneath the name/type/container line instead of squeezing in beside it.
+      // For an OUTPUT entry this default value is only ever the fallback used when the script's own
+      // `run()` doesn't return a value under this name (see code.ts's pinOutputsFor) — there's no
+      // separate "always show this" concept the way an unconnected INPUT pin's default is what a
+      // literal widget would show.
       const valueRow = document.createElement("div");
       valueRow.className = "variable-row";
       const value = createTypedValueInput(
         entry.type,
         entry.defaultValue,
         (defaultValue) => {
-          updateScriptInput(store.state.rootGraph, script, entry.id, { defaultValue });
+          update(store.state.rootGraph, script, entry.id, { defaultValue });
           store.notify();
         },
         entry.container ?? "single",
@@ -175,10 +196,11 @@ export function createScriptIoPanel(
     elements.section.classList.remove("collapsed");
     const script = getSelectedScript();
     if (!script) return;
-    const name = nextAvailableName(script.inputs.map((entry) => entry.name), "NewInput");
+    const name = nextAvailableName(entriesOf(script).map((entry) => entry.name), kind === "input" ? "NewInput" : "NewOutput");
     const type: PinType = "number";
     const entry: PinSignatureEntry = { id: nextId("io"), name, type, defaultValue: DEFAULT_VALUE_BY_TYPE[type] };
-    addScriptInput(script, entry);
+    if (kind === "input") addScriptInput(script, entry);
+    else addScriptOutput(script, entry);
     editingId = entry.id;
     store.notify();
   });

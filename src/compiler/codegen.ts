@@ -48,7 +48,7 @@ function compileResolveDataPin(
   if (upstreamDef.compileExecuteOutputs) {
     collectHelpers(upstreamDef.compileHelpers, helpers);
     collectImports(upstreamDef.compileImports, imports);
-    const outputs = upstreamDef.compileExecuteOutputs({ node: upstreamNode });
+    const outputs = upstreamDef.compileExecuteOutputs({ node: upstreamNode, graph });
     const expr = outputs[conn.fromPin];
     if (expr === undefined) {
       throw new Error(

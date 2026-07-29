@@ -171,6 +171,22 @@ describe("persistence round-trip", () => {
     expect(loaded.scripts).toEqual([]);
   });
 
+  it("migrates a script saved before Outputs existed by defaulting an empty outputs array", () => {
+    const graph = new Graph("g6", "Legacy script outputs");
+    const script = { id: "s1", name: "Old Script", source: "", compiledJs: "", inputs: [], outputs: [] };
+    graph.scripts.push(script);
+    const doc = JSON.parse(serializeGraph(graph)) as {
+      formatVersion: number;
+      graph: Graph;
+    };
+    // @ts-expect-error simulating a save from before CodeScriptDef gained an `outputs` field
+    delete doc.graph.scripts[0].outputs;
+
+    const loaded = deserializeGraph(JSON.stringify(doc));
+
+    expect(loaded.scripts[0].outputs).toEqual([]);
+  });
+
   it("saves at the current format version", () => {
     const graph = new Graph("g4", "test");
     const doc = JSON.parse(serializeGraph(graph)) as { formatVersion: number };

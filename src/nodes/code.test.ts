@@ -19,6 +19,7 @@ const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (
 async function makeScript(
   source: string,
   inputs: CodeScriptDef["inputs"] = [],
+  outputs: CodeScriptDef["outputs"] = [],
 ): Promise<CodeScriptDef> {
   const { success, outputJs, errors } = await transpileScript(source);
   if (!success)
@@ -31,6 +32,7 @@ async function makeScript(
     source,
     compiledJs: outputJs,
     inputs,
+    outputs,
   };
 }
 
@@ -71,11 +73,37 @@ async function runCompiled(
   return logs;
 }
 
+/** Sibling of runCompiled that ALSO evaluates compileExecuteOutputs' expressions against the same
+ * scope compileExecute's statements ran in — exactly how a real downstream node's own compiled
+ * compileEvaluate expression gets embedded (see codegen.ts) — by appending a `return { ... }`
+ * built from those expressions before invoking the generated function. */
+async function runCompiledWithOutputs(
+  node: Partial<NodeInstance>,
+  inputs: Record<string, string>,
+  scripts: CodeScriptDef[],
+) {
+  const def = getNodeDef("code.run");
+  const graph = { scripts } as any;
+  const statements = def.compileExecute!({
+    node: node as NodeInstance,
+    inputs,
+    graph,
+    compileFrom: () => [],
+  });
+  const outputExprs = def.compileExecuteOutputs!({ node: node as NodeInstance, graph });
+  const returnExpr = `{ ${Object.entries(outputExprs)
+    .map(([id, expr]) => `${JSON.stringify(id)}: ${expr}`)
+    .join(", ")} }`;
+  const fn = new AsyncFunction("rt", [...statements, `return ${returnExpr};`].join("\n"));
+  const outputs = await fn({ log: () => {} });
+  return outputs as Record<string, unknown>;
+}
+
 describe("code.run", () => {
   it("calls run(log, inputs) with real TypeScript, typed inputs keyed by name (not pin id)", async () => {
     const script = await makeScript(
-      `function run(log: (msg: string) => void, inputs: { name: string; age: number }) {
-        log("Hello " + inputs.name + ", age " + inputs.age);
+      `function run(log: (msg: string) => void, inputs: { Customname: string; Customage: number }) {
+        log("Hello " + inputs.Customname + ", age " + inputs.Customage);
       }`,
       [
         { id: "pin-name", name: "name", type: "string", defaultValue: "" },
@@ -92,7 +120,7 @@ describe("code.run", () => {
 
   it("supports plain JavaScript (no type annotations) identically", async () => {
     const script = await makeScript(
-      `function run(log, inputs) { log("plain js: " + inputs.x); }`,
+      `function run(log, inputs) { log("plain js: " + inputs.Customx); }`,
       [{ id: "pin-x", name: "x", type: "number", defaultValue: 0 }],
     );
     const { logs } = await executeNode(
@@ -107,7 +135,7 @@ describe("code.run", () => {
     const script = await makeScript(
       `async function run(log, inputs) {
       await new Promise((resolve) => setTimeout(resolve, 1));
-      log("done: " + inputs.n);
+      log("done: " + inputs.Customn);
     }`,
       [{ id: "pin-n", name: "n", type: "number", defaultValue: 0 }],
     );
@@ -141,6 +169,7 @@ describe("code.run", () => {
       source: "function run(){}",
       compiledJs: "",
       inputs: [],
+      outputs: [],
     };
     const { result: unsavedResult } = await executeNode(
       { scriptId: "s2" },
@@ -148,6 +177,54 @@ describe("code.run", () => {
       [unsaved],
     );
     expect(unsavedResult.nextExec).toBe("exec-out");
+  });
+
+  describe("outputs", () => {
+    it("maps run()'s returned name-keyed object onto the matching output pins", async () => {
+      const script = await makeScript(
+        `function run(log, inputs) { return { Customdoubled: inputs.Customn * 2, Customlabel: "ok" }; }`,
+        [{ id: "pin-n", name: "n", type: "number", defaultValue: 0 }],
+        [
+          { id: "pin-doubled", name: "doubled", type: "number", defaultValue: -1 },
+          { id: "pin-label", name: "label", type: "string", defaultValue: "" },
+        ],
+      );
+      const { result } = await executeNode(
+        { scriptId: script.id },
+        { "pin-n": 5 },
+        [script],
+      );
+      expect(result.outputs).toEqual({ "pin-doubled": 10, "pin-label": "ok" });
+    });
+
+    it("falls back to each output's own default value when run() omits that key, returns nothing, or throws", async () => {
+      const outputsSig: CodeScriptDef["outputs"] = [
+        { id: "pin-a", name: "a", type: "number", defaultValue: 42 },
+        { id: "pin-b", name: "b", type: "string", defaultValue: "fallback" },
+      ];
+
+      const partial = await makeScript(`function run() { return { Customa: 7 }; }`, [], outputsSig);
+      const { result: partialResult } = await executeNode({ scriptId: partial.id }, {}, [partial]);
+      expect(partialResult.outputs).toEqual({ "pin-a": 7, "pin-b": "fallback" });
+
+      const noReturn = await makeScript(`function run() { /* nothing */ }`, [], outputsSig);
+      const { result: noReturnResult } = await executeNode({ scriptId: noReturn.id }, {}, [noReturn]);
+      expect(noReturnResult.outputs).toEqual({ "pin-a": 42, "pin-b": "fallback" });
+
+      const throws = await makeScript(`function run() { throw new Error("boom"); }`, [], outputsSig);
+      const { result: throwsResult } = await executeNode({ scriptId: throws.id }, {}, [throws]);
+      expect(throwsResult.outputs).toEqual({ "pin-a": 42, "pin-b": "fallback" });
+    });
+
+    it("compiled output maps run()'s return value the same way, including the default-value fallback", async () => {
+      const outputsSig: CodeScriptDef["outputs"] = [
+        { id: "pin-a", name: "a", type: "number", defaultValue: 42 },
+        { id: "pin-b", name: "b", type: "string", defaultValue: "fallback" },
+      ];
+      const script = await makeScript(`function run() { return { Customa: 9 }; }`, [], outputsSig);
+      const outputs = await runCompiledWithOutputs({ id: "node-1", scriptId: script.id }, {}, [script]);
+      expect(outputs).toEqual({ "pin-a": 9, "pin-b": "fallback" });
+    });
   });
 
   it("gives each call a FRESH top-level scope — the parse is cached, but not script state", async () => {
@@ -165,7 +242,7 @@ describe("code.run", () => {
   describe("compileExecute", () => {
     it("compiles to statements that run to the same result as execute()", async () => {
       const script = await makeScript(
-        `function run(log: (m: string) => void, inputs: { greeting: string }) { log(inputs.greeting + "!"); }`,
+        `function run(log: (m: string) => void, inputs: { Customgreeting: string }) { log(inputs.Customgreeting + "!"); }`,
         [
           {
             id: "pin-greeting",
@@ -176,7 +253,7 @@ describe("code.run", () => {
         ],
       );
       const logs = await runCompiled(
-        { scriptId: script.id },
+        { id: "node-1", scriptId: script.id },
         { "pin-greeting": JSON.stringify("Hi") },
         [script],
       );
@@ -187,7 +264,7 @@ describe("code.run", () => {
       const script = await makeScript(
         `function run(log) { throw new Error("compiled boom"); }`,
       );
-      const logs = await runCompiled({ scriptId: script.id }, {}, [script]);
+      const logs = await runCompiled({ id: "node-1", scriptId: script.id }, {}, [script]);
       expect(logs).toEqual(["Error: compiled boom"]);
     });
 
@@ -211,6 +288,7 @@ describe("code.run", () => {
         source: "function run(){}",
         compiledJs: "",
         inputs: [],
+        outputs: [],
       };
       expect(() =>
         def.compileExecute!({

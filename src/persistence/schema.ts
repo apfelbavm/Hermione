@@ -49,7 +49,11 @@ function reviveGraph(graph: Graph): Graph {
   revived.connections = graph.connections ?? [];
   revived.variables = graph.variables ?? [];
   revived.commentBoxes = graph.commentBoxes ?? [];
-  revived.scripts = graph.scripts ?? [];
+  // A save from before scripts could have outputs is simply missing that field on each script
+  // (same defaulting-IS-the-migration story as this function's own doc comment) — CodeScriptDef
+  // requires it, so a stale save would otherwise load with `outputs: undefined` and throw the
+  // instant anything (e.g. code.ts's deriveScriptPins) iterates it.
+  revived.scripts = (graph.scripts ?? []).map((s) => ({ ...s, outputs: s.outputs ?? [] }));
   revived.functions = (graph.functions ?? []).map((fn) => ({
     ...fn,
     body: reviveGraph(fn.body),

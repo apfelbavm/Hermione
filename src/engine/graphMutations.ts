@@ -661,15 +661,69 @@ export function updateFunctionOutput(
 
 // --- Scripts -----------------------------------------------------------------------------------
 // A CodeScriptDef (see types.ts) is deliberately much thinner than a FunctionDef: no body graph, no
-// Entry/Return nodes, no outputs — just a name, an inputs signature, and source/compiledJs text.
-// Only one node type (code.run) ever binds to one via NodeInstance.scriptId, so this section is a
+// Entry/Return nodes — just a name, an inputs/outputs signature, and source/compiledJs text. Only
+// one node type (code.run) ever binds to one via NodeInstance.scriptId, so this section is a
 // smaller echo of the Functions one above (createFunctionDef/removeFunctionDef/updateFunctionInput
-// etc.) rather than a parallel Entry/Return/Call trio.
+// etc.) rather than a parallel Entry/Return/Call trio — outputs are reported by the script's own
+// `run()` returning a { [outputName]: value } object (see code.ts), the exact inverse of how
+// inputs already arrive as a name-keyed object.
+
+/** Every script input/output's user-facing NAME (freely editable in the Inputs/Outputs panel, see
+ * scriptIoPanel.ts) is exposed to `run()` under this same name prefixed with "Custom" — e.g. an
+ * input named "PlayerName" is read as `inputs.CustomPlayerName`, and an output named "Result" is
+ * set by returning `{ CustomResult: ... }`. Lives here (engine layer), not in nodes/code.ts (which
+ * actually enforces it in namedInputsFor/pinOutputsFor and their compiled equivalents), since
+ * createTemplatedCodeScriptDef below — an engine-layer function — also needs to generate source
+ * text that follows this exact same convention; nodes may import from the engine but not vice
+ * versa, so the shared constant has to live on this side of that boundary. */
+export const CUSTOM_PIN_PREFIX = "Custom";
 
 /** Creates a new script with an empty signature and no source yet. Scripts live only on the root
  * graph (rootGraph.scripts), same as functions — never nested inside a function body. */
 export function createCodeScriptDef(name: string): CodeScriptDef {
-  return { id: nextId("script"), name, source: "", compiledJs: "", inputs: [] };
+  return { id: nextId("script"), name, source: "", compiledJs: "", inputs: [], outputs: [] };
+}
+
+const TEMPLATE_INPUT_NAME = "MyInputPin";
+const TEMPLATE_OUTPUT_NAME = "MyOutputPin";
+
+function templateScriptSource(): string {
+  return [
+    "function run(log, inputs) {",
+    `  log(inputs.${CUSTOM_PIN_PREFIX}${TEMPLATE_INPUT_NAME});`,
+    `  return { ${CUSTOM_PIN_PREFIX}${TEMPLATE_OUTPUT_NAME}: "I am Alive" };`,
+    "}",
+    "",
+  ].join("\n");
+}
+
+/** Creates a new script pre-seeded with a runnable example, rather than createCodeScriptDef's bare
+ * empty shell — one string input (`MyInputPin`, defaulting to "Hello World!") and one string
+ * output (`MyOutputPin`), plus a `source`/`compiledJs` template that logs the input via the `log`
+ * it's given and sets the output, so a freshly created script already does something end-to-end
+ * instead of starting as a silent no-op. Only used by the Scripts panel's own "+" button (see
+ * scriptsPanel.ts) — every other caller that wants a genuinely blank starting point (including
+ * every existing test) still uses createCodeScriptDef directly. The template is plain JavaScript,
+ * not TypeScript, so `compiledJs` can just be the exact same text: transpiling plain JS through the
+ * real (async, lazily-loaded — see engine/transpile.ts) transpiler is documented as a byte-for-byte
+ * no-op, so there's nothing to gain from awaiting it just to seed this fixed, already-valid text. */
+export function createTemplatedCodeScriptDef(name: string): CodeScriptDef {
+  const script = createCodeScriptDef(name);
+  script.inputs.push({
+    id: nextId("io"),
+    name: TEMPLATE_INPUT_NAME,
+    type: "string",
+    defaultValue: "Hello World!",
+  });
+  script.outputs.push({
+    id: nextId("io"),
+    name: TEMPLATE_OUTPUT_NAME,
+    type: "string",
+    defaultValue: "",
+  });
+  script.source = templateScriptSource();
+  script.compiledJs = script.source;
+  return script;
 }
 
 /** Removes a script and any code.run nodes bound to it, across the root graph and every function
@@ -705,11 +759,27 @@ export function moveScriptInput(
   moveInArray(script.inputs, entryId, targetEntryId, position);
 }
 
+export function moveScriptOutput(
+  script: CodeScriptDef,
+  entryId: string,
+  targetEntryId: string,
+  position: "before" | "after",
+): void {
+  moveInArray(script.outputs, entryId, targetEntryId, position);
+}
+
 export function addScriptInput(
   script: CodeScriptDef,
   entry: PinSignatureEntry,
 ): void {
   script.inputs.push(entry);
+}
+
+export function addScriptOutput(
+  script: CodeScriptDef,
+  entry: PinSignatureEntry,
+): void {
+  script.outputs.push(entry);
 }
 
 /** Removes any now-dangling pins/connections referencing a since-removed script input, across
@@ -744,15 +814,28 @@ export function removeScriptInput(
   pruneDanglingScriptPinReferences(rootGraph, script.id, entryId);
 }
 
-/** Renames/retypes/revalues a script input, live everywhere it's bound (every code.run node's
- * matching input pin, across every graph) — mirrors updateFunctionInput. */
-export function updateScriptInput(
+export function removeScriptOutput(
   rootGraph: Graph,
   script: CodeScriptDef,
   entryId: string,
-  patch: TypedEntryPatch,
 ): void {
-  const entry = script.inputs.find((e) => e.id === entryId);
+  script.outputs = script.outputs.filter((e) => e.id !== entryId);
+  pruneDanglingScriptPinReferences(rootGraph, script.id, entryId);
+}
+
+/** Shared implementation for updateScriptInput/updateScriptOutput below — mirrors
+ * updateFunctionEntry's shape, but scripts have only ONE binding node type (code.run, not an
+ * Entry/Return/Call trio), so there's just one disconnect call to make per kind instead of a
+ * callback fired per bound node type. */
+function updateScriptEntry(
+  rootGraph: Graph,
+  script: CodeScriptDef,
+  entries: PinSignatureEntry[],
+  entryId: string,
+  patch: TypedEntryPatch,
+  disconnect: (g: Graph, visibleVariables: Variable[], node: NodeInstance) => void,
+): void {
+  const entry = entries.find((e) => e.id === entryId);
   if (!entry) return;
 
   const signatureChanged =
@@ -772,15 +855,36 @@ export function updateScriptInput(
       const visibleVariables = rootGraph.getVisibleVariables(g);
       for (const node of g.nodes) {
         if (node.scriptId !== script.id || node.type !== "code.run") continue;
-        disconnectPin(
-          g,
-          visibleVariables,
-          rootGraph.functions,
-          node.id,
-          entryId,
-          rootGraph.scripts,
-        );
+        disconnect(g, visibleVariables, node);
       }
     }
   }
+}
+
+/** Renames/retypes/revalues a script input, live everywhere it's bound (every code.run node's
+ * matching input pin, across every graph) — mirrors updateFunctionInput. */
+export function updateScriptInput(
+  rootGraph: Graph,
+  script: CodeScriptDef,
+  entryId: string,
+  patch: TypedEntryPatch,
+): void {
+  updateScriptEntry(rootGraph, script, script.inputs, entryId, patch, (g, visibleVariables, node) =>
+    disconnectPin(g, visibleVariables, rootGraph.functions, node.id, entryId, rootGraph.scripts),
+  );
+}
+
+/** Renames/retypes/revalues a script output, live everywhere it's bound (every code.run node's
+ * matching OUTPUT pin, across every graph) — mirrors updateFunctionOutput. Disconnects any wire
+ * LEAVING the pin (disconnectOutput), not one feeding into it, since an output pin is what
+ * downstream nodes read from. */
+export function updateScriptOutput(
+  rootGraph: Graph,
+  script: CodeScriptDef,
+  entryId: string,
+  patch: TypedEntryPatch,
+): void {
+  updateScriptEntry(rootGraph, script, script.outputs, entryId, patch, (g, visibleVariables, node) =>
+    disconnectOutput(g, visibleVariables, rootGraph.functions, node.id, entryId, rootGraph.scripts),
+  );
 }

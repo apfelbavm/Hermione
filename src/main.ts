@@ -277,6 +277,21 @@ const scriptInputsPanel = createScriptIoPanel(
     ) as HTMLButtonElement,
   },
   store,
+  "input",
+  getSelectedScriptForDetails,
+);
+
+const scriptOutputsPanel = createScriptIoPanel(
+  {
+    section: document.getElementById("script-outputs-section") as HTMLDivElement,
+    header: document.getElementById("script-outputs-header") as HTMLDivElement,
+    list: document.getElementById("script-outputs-list") as HTMLDivElement,
+    addButton: document.getElementById(
+      "add-script-output-button",
+    ) as HTMLButtonElement,
+  },
+  store,
+  "output",
   getSelectedScriptForDetails,
 );
 
@@ -425,6 +440,7 @@ function render(): void {
   outputsPanel.render();
   scriptsPanel.render();
   scriptInputsPanel.render();
+  scriptOutputsPanel.render();
   scriptEditor.render();
   graphTabs.render();
   detailsPanel.render();

@@ -1,4 +1,4 @@
-import { createCodeScriptDef, moveScript, removeCodeScriptDef } from "../engine/graphMutations";
+import { createTemplatedCodeScriptDef, moveScript, removeCodeScriptDef } from "../engine/graphMutations";
 import type { CodeScriptDef } from "../engine/types";
 import { closeScriptTab, openScriptTab, type Store } from "../state/store";
 import { setupCollapsibleSection } from "./collapsibleSection";
@@ -143,7 +143,7 @@ export function createScriptsPanel(elements: ScriptsPanelElements, store: Store)
     e.stopPropagation();
     elements.section.classList.remove("collapsed");
     const name = nextAvailableName(store.state.rootGraph.scripts.map((s) => s.name), "NewScript");
-    const script = createCodeScriptDef(name);
+    const script = createTemplatedCodeScriptDef(name);
     store.state.rootGraph.scripts.push(script);
     editingId = script.id;
     store.notify();

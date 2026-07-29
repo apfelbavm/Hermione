@@ -2,23 +2,28 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../nodes";
 import {
   addScriptInput,
+  addScriptOutput,
   addVariable,
   connectPins,
   createCodeScriptDef,
+  createTemplatedCodeScriptDef,
   insertRerouteOnConnection,
   moveFunction,
   moveFunctionEntry,
   moveScript,
   moveScriptInput,
+  moveScriptOutput,
   moveVariable,
   removeCodeScriptDef,
   removeScriptInput,
+  removeScriptOutput,
   removeVariable,
   updateScriptInput,
+  updateScriptOutput,
   updateVariable,
 } from "./graphMutations";
 import { getNodeDef } from "./registry";
-import { type CodeScriptDef, type FunctionDef, type Variable } from "./types";
+import { type CodeScriptDef, type ExecutionContext, type FunctionDef, type Variable } from "./types";
 import { Graph } from "./graph";
 import { NodeInstance } from "./nodeInstance";
 
@@ -713,6 +718,55 @@ describe("createCodeScriptDef", () => {
   });
 });
 
+describe("createTemplatedCodeScriptDef", () => {
+  it("seeds one string input (MyInputPin, default \"Hello World!\") and one string output (MyOutputPin)", () => {
+    const script = createTemplatedCodeScriptDef("MyScript");
+
+    expect(script.inputs).toHaveLength(1);
+    expect(script.inputs[0].name).toBe("MyInputPin");
+    expect(script.inputs[0].type).toBe("string");
+    expect(script.inputs[0].defaultValue).toBe("Hello World!");
+
+    expect(script.outputs).toHaveLength(1);
+    expect(script.outputs[0].name).toBe("MyOutputPin");
+    expect(script.outputs[0].type).toBe("string");
+
+    expect(script.source).not.toBe("");
+    expect(script.compiledJs).toBe(script.source);
+  });
+
+  it("the template actually runs end-to-end: logs the input and sets the output, both under their Custom-prefixed names", async () => {
+    const script = createTemplatedCodeScriptDef("MyScript");
+    const def = getNodeDef("code.run");
+    const node = NodeInstance.createNodeInstance(
+      "code.run",
+      { x: 0, y: 0 },
+      def.deriveScriptPins!(script),
+      "code1",
+      undefined,
+      undefined,
+      script.id,
+    );
+
+    const logs: string[] = [];
+    const ctx = {
+      log: (m: string) => logs.push(m),
+      rootGraph: { scripts: [script] },
+    } as unknown as ExecutionContext;
+    const inputPinId = script.inputs[0].id;
+    const outputPinId = script.outputs[0].id;
+
+    const result = await def.execute!({
+      node,
+      inputs: { [inputPinId]: "Hello World!" },
+      ctx,
+    });
+
+    expect(logs).toEqual(["Hello World!"]);
+    expect(result.outputs).toEqual({ [outputPinId]: "I am Alive" });
+  });
+});
+
 describe("removeCodeScriptDef", () => {
   it("removes the bound code.run node AND restores whatever it fed into, rather than leaving a dangling wired-looking pin", () => {
     const graph = new Graph("g", "root");
@@ -1022,5 +1076,152 @@ describe("moveScriptInput", () => {
     );
     moveScriptInput(script, "c", "a", "before");
     expect(script.inputs.map((e) => e.id)).toEqual(["c", "a", "b"]);
+  });
+});
+
+describe("addScriptOutput / removeScriptOutput", () => {
+  function buildGraphWithBoundCodeNode(script: CodeScriptDef) {
+    const graph = new Graph("g", "root");
+    graph.scripts.push(script);
+    const codeDef = getNodeDef("code.run");
+    const codeNode = NodeInstance.createNodeInstance(
+      "code.run",
+      { x: 0, y: 0 },
+      codeDef.deriveScriptPins!(script),
+      "code1",
+      undefined,
+      undefined,
+      script.id,
+    );
+    graph.nodes.push(codeNode);
+    return graph;
+  }
+
+  it("adding an output makes it appear as a new OUTPUT pin on every code.run node bound to the script", () => {
+    const script = createCodeScriptDef("Greet");
+    const graph = buildGraphWithBoundCodeNode(script);
+
+    addScriptOutput(script, {
+      id: "greeting",
+      name: "greeting",
+      type: "string",
+      defaultValue: "",
+    });
+    const codeNode = graph.nodes.find((n) => n.id === "code1")!;
+    const pins = codeNode.resolvePinDefs(
+      graph.variables,
+      graph.functions,
+      graph.scripts,
+    );
+    expect(
+      pins.some((p) => p.id === "greeting" && p.direction === "output"),
+    ).toBe(true);
+  });
+
+  it("removing an output prunes the now-dangling pin/connection off every bound code.run node", () => {
+    const script = createCodeScriptDef("Greet");
+    script.outputs.push({
+      id: "greeting",
+      name: "greeting",
+      type: "string",
+      defaultValue: "",
+    });
+    const graph = buildGraphWithBoundCodeNode(script);
+
+    const printNode = NodeInstance.createNodeInstance(
+      "debug.print",
+      { x: 200, y: 0 },
+      getNodeDef("debug.print").pins,
+      "print",
+    );
+    graph.nodes.push(printNode);
+    connectPins(
+      graph,
+      graph.variables,
+      graph.functions,
+      { fromNode: "code1", fromPin: "greeting", toNode: "print", toPin: "message" },
+      graph.scripts,
+    );
+
+    expect(graph.connections).toHaveLength(1);
+
+    removeScriptOutput(graph, script, "greeting");
+
+    expect(script.outputs).toHaveLength(0);
+    expect(graph.connections).toHaveLength(0);
+    const codeNode = graph.nodes.find((n) => n.id === "code1")!;
+    expect(codeNode.pins.greeting).toBeUndefined();
+  });
+});
+
+describe("updateScriptOutput", () => {
+  function buildWiredGraph() {
+    const script = createCodeScriptDef("Greet");
+    script.outputs.push({
+      id: "greeting",
+      name: "greeting",
+      type: "string",
+      defaultValue: "",
+    });
+    const graph = new Graph("g", "root");
+    graph.scripts.push(script);
+
+    const codeDef = getNodeDef("code.run");
+    const codeNode = NodeInstance.createNodeInstance(
+      "code.run",
+      { x: 0, y: 0 },
+      codeDef.deriveScriptPins!(script),
+      "code1",
+      undefined,
+      undefined,
+      script.id,
+    );
+    graph.nodes.push(codeNode);
+    const printNode = NodeInstance.createNodeInstance(
+      "debug.print",
+      { x: 200, y: 0 },
+      getNodeDef("debug.print").pins,
+      "print",
+    );
+    graph.nodes.push(printNode);
+    connectPins(
+      graph,
+      graph.variables,
+      graph.functions,
+      { fromNode: "code1", fromPin: "greeting", toNode: "print", toPin: "message" },
+      graph.scripts,
+    );
+    return { graph, script };
+  }
+
+  it("renaming an output does NOT disconnect its wire", () => {
+    const { graph, script } = buildWiredGraph();
+
+    updateScriptOutput(graph, script, "greeting", { name: "welcomeText" });
+
+    expect(script.outputs[0].name).toBe("welcomeText");
+    expect(graph.connections).toHaveLength(1);
+  });
+
+  it("retyping an output DOES disconnect its wire — the wire LEAVES the output pin, so disconnectOutput (not disconnectPin) is what fires", () => {
+    const { graph, script } = buildWiredGraph();
+
+    updateScriptOutput(graph, script, "greeting", { type: "number" });
+
+    expect(script.outputs[0].type).toBe("number");
+    expect(graph.connections).toHaveLength(0);
+  });
+});
+
+describe("moveScriptOutput", () => {
+  it("reorders a script's outputs list", () => {
+    const script = createCodeScriptDef("Fn");
+    script.outputs.push(
+      { id: "a", name: "a", type: "number", defaultValue: 0 },
+      { id: "b", name: "b", type: "number", defaultValue: 0 },
+      { id: "c", name: "c", type: "number", defaultValue: 0 },
+    );
+    moveScriptOutput(script, "c", "a", "before");
+    expect(script.outputs.map((e) => e.id)).toEqual(["c", "a", "b"]);
   });
 });
