@@ -20,7 +20,6 @@ import {
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { getNodeDef, isPinTypeCompatible } from "../engine/registry";
 import type { CodeScriptDef, CommentBox, FunctionDef, Graph, PinDef, Variable } from "../engine/types";
-import { panCamera, screenToWorld, zoomCameraAt } from "../render/camera";
 import {
   COMMENT_HEADER_HEIGHT,
   COMMENT_MIN_SIZE,
@@ -223,7 +222,7 @@ export function setupPointerInteraction(
     const graph = getEditingGraph(store.state);
     const { camera } = store.state;
     const { startWorld, initialPositions } = drag;
-    const worldPos = screenToWorld(camera, lastMouseScreenPos.x, lastMouseScreenPos.y);
+    const worldPos = camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y);
     const dx = worldPos.x - startWorld.x;
     const dy = worldPos.y - startWorld.y;
     for (const [nodeId, initial] of initialPositions) {
@@ -246,7 +245,7 @@ export function setupPointerInteraction(
       const rect = canvas.getBoundingClientRect();
       const { dx, dy } = computeAutoPanDelta(lastMouseScreenPos, rect.width, rect.height);
       if (dx !== 0 || dy !== 0) {
-        panCamera(store.state.camera, dx, dy);
+        store.state.camera.pan(dx, dy);
         if (drag.kind === "nodes") updateNodeDragPositions();
         else updateWireDragPreview();
         store.notify();
@@ -356,7 +355,7 @@ export function setupPointerInteraction(
     const nodeHit = hitTestNode(graph, geometries, pos.x, pos.y);
     if (nodeHit) {
       const node = graph.nodes.find((n) => n.id === nodeHit.nodeId)!;
-      const worldPos = screenToWorld(camera, pos.x, pos.y);
+      const worldPos = camera.screenToWorld(pos.x, pos.y);
 
       if (e.ctrlKey || e.metaKey) {
         // Ctrl/Cmd-click toggles this node's membership in the current multi-selection.
@@ -404,7 +403,7 @@ export function setupPointerInteraction(
     if (headerHit) {
       const box = graph.commentBoxes.find((b) => b.id === headerHit.commentId)!;
       recomputeContainment(graph, variables, functions, scripts, box);
-      const worldPos = screenToWorld(camera, pos.x, pos.y);
+      const worldPos = camera.screenToWorld(pos.x, pos.y);
       store.state.selectedCommentId = box.id;
       store.state.selectedNodeIds = new Set();
       drag = {
@@ -420,7 +419,7 @@ export function setupPointerInteraction(
     // Empty space: clear selection and start a rubber-band marquee-select box.
     store.state.selectedNodeIds = new Set();
     store.state.selectedCommentId = null;
-    const worldPos = screenToWorld(camera, pos.x, pos.y);
+    const worldPos = camera.screenToWorld(pos.x, pos.y);
     store.state.marqueeSelection = { startWorld: worldPos, currentWorld: worldPos };
     drag = { kind: "marquee" };
     store.notify();
@@ -483,7 +482,7 @@ export function setupPointerInteraction(
     const { camera } = store.state;
 
     if (drag.kind === "pan") {
-      panCamera(camera, e.clientX - drag.lastX, e.clientY - drag.lastY);
+      camera.pan(e.clientX - drag.lastX, e.clientY - drag.lastY);
       drag.lastX = e.clientX;
       drag.lastY = e.clientY;
       rightDragMoved = true;
@@ -499,7 +498,7 @@ export function setupPointerInteraction(
 
     if (drag.kind === "marquee") {
       const pos = screenPos(e);
-      const worldPos = screenToWorld(camera, pos.x, pos.y);
+      const worldPos = camera.screenToWorld(pos.x, pos.y);
       if (store.state.marqueeSelection) store.state.marqueeSelection.currentWorld = worldPos;
       store.notify();
       return;
@@ -516,7 +515,7 @@ export function setupPointerInteraction(
       const box = graph.commentBoxes.find((b) => b.id === commentId);
       if (box) {
         const pos = screenPos(e);
-        const worldPos = screenToWorld(camera, pos.x, pos.y);
+        const worldPos = camera.screenToWorld(pos.x, pos.y);
         const raw = { x: worldPos.x - grabOffsetX, y: worldPos.y - grabOffsetY };
         const snapped = store.state.snapToGrid ? snapPositionToGrid(raw) : raw;
         const dx = snapped.x - box.position.x;
@@ -540,7 +539,7 @@ export function setupPointerInteraction(
       const box = graph.commentBoxes.find((b) => b.id === commentId);
       if (box) {
         const pos = screenPos(e);
-        const worldPos = screenToWorld(camera, pos.x, pos.y);
+        const worldPos = camera.screenToWorld(pos.x, pos.y);
         box.size.width = Math.max(COMMENT_MIN_SIZE, worldPos.x - box.position.x);
         box.size.height = Math.max(COMMENT_MIN_SIZE, worldPos.y - box.position.y);
       }
@@ -628,7 +627,7 @@ export function setupPointerInteraction(
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      zoomCameraAt(store.state.camera, e.clientX - rect.left, e.clientY - rect.top, factor);
+      store.state.camera.zoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
       store.notify();
     },
     { passive: false },
@@ -709,7 +708,7 @@ export function setupPointerInteraction(
             });
             const placeablePayload = { ...payload, nodes: placeableNodes };
 
-            const rawTarget = screenToWorld(store.state.camera, lastMouseScreenPos.x, lastMouseScreenPos.y);
+            const rawTarget = store.state.camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y);
             const targetTopLeft = store.state.snapToGrid ? snapPositionToGrid(rawTarget) : rawTarget;
             const newIds = pasteNodesIntoGraph(pasteGraph, placeablePayload, targetTopLeft);
             if (newIds.length > 0) {
@@ -761,7 +760,7 @@ export function setupPointerInteraction(
         store.notify();
       } else {
         // Nothing selected: drop a default-sized empty box at the cursor.
-        const worldPos = screenToWorld(camera, lastMouseScreenPos.x, lastMouseScreenPos.y);
+        const worldPos = camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y);
         const box: CommentBox = {
           id: nextId("comment"),
           text: "Comment",

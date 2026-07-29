@@ -1,6 +1,5 @@
 import { Colors } from "../engine/color";
 import type { Camera } from "./camera";
-import { screenToWorld } from "./camera";
 
 export const GRID_SIZE = 20;
 const MINOR_SPACING = GRID_SIZE;
@@ -24,7 +23,7 @@ export function drawGrid(ctx: CanvasRenderingContext2D, camera: Camera, width: n
   if (spacing >= 4) {
     // too dense to draw usefully when zoomed way out — the origin axes below still draw regardless,
     // since they're a landmark rather than a measuring aid.
-    const topLeft = screenToWorld(camera, 0, 0);
+    const topLeft = camera.screenToWorld(0, 0);
     const startX = Math.floor(topLeft.x / MINOR_SPACING) * MINOR_SPACING;
     const startY = Math.floor(topLeft.y / MINOR_SPACING) * MINOR_SPACING;
 

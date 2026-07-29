@@ -1,5 +1,5 @@
 import type { CommentBox } from "../engine/types";
-import { worldToScreen, type Camera } from "./camera";
+import type { Camera } from "./camera";
 
 // Tall enough for a wrapped title to show ~2 lines (see commentOverlay.ts) before clipping —
 // deliberately not dynamic: every render/hit-test/containment call site treats this as one fixed
@@ -20,7 +20,7 @@ export interface CommentScreenRect {
 }
 
 export function computeCommentScreenRect(box: CommentBox, camera: Camera): CommentScreenRect {
-  const topLeft = worldToScreen(camera, box.position.x, box.position.y);
+  const topLeft = camera.worldToScreen(box.position.x, box.position.y);
   return {
     screenX: topLeft.x,
     screenY: topLeft.y,

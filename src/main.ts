@@ -25,7 +25,7 @@ import {
 } from "./engine/registry";
 import type { CodeScriptDef, FunctionDef, NodeDef, Variable } from "./engine/types";
 import { buildDemoGraph } from "./demoGraph";
-import { createCamera, frameRect, screenToWorld } from "./render/camera";
+import { Camera } from "./render/camera";
 import { computeAllNodeGeometries, computeNodeWorldRect } from "./render/nodeGeometry";
 import { hitTestNode, hitTestPin, hitTestWire } from "./render/hitTest";
 import { drawComments } from "./render/drawComments";
@@ -97,7 +97,7 @@ const store = createStore({
   openFunctionTabs: [],
   openScriptTabs: [],
   activeLowerTabId: null,
-  camera: createCamera(),
+  camera: new Camera(),
   snapToGrid: true,
   selectedNodeIds: new Set(),
   selectedCommentId: null,
@@ -280,7 +280,7 @@ function render(): void {
   );
   drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, variables, functions, scripts, latentNodeIds);
   if (marqueeSelection) drawMarqueeSelection(ctx, camera, marqueeSelection);
-  drawMouseCoordinates(ctx, screenToWorld(camera, lastMouseScreenPos.x, lastMouseScreenPos.y), width, height);
+  drawMouseCoordinates(ctx, camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y), width, height);
   widgetSync.sync(geometries);
   commentOverlay.sync();
   variablePanel.render();
@@ -379,7 +379,7 @@ const pointerInteraction = setupPointerInteraction(canvas, store, {
   onWireDroppedInEmptySpace: (anchors, screenPos) => {
     const shared = anchors[0].pin;
     const candidates = filterCreatableHere(findCompatibleNodeDefs(shared, shared.direction));
-    const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
+    const worldPos = store.state.camera.screenToWorld(screenPos.x, screenPos.y);
     openNodeSearchMenu(overlay, {
       screenPos,
       candidates,
@@ -478,7 +478,7 @@ canvas.addEventListener("contextmenu", (e) => {
   // into it — Unreal's "Add Reroute Node," purely for bending the wire's path on the canvas.
   const wireHit = hitTestWire(graph, geometries, store.state.camera, screenPos.x, screenPos.y);
   if (wireHit) {
-    const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
+    const worldPos = store.state.camera.screenToWorld(screenPos.x, screenPos.y);
     openRowContextMenu({ x: e.clientX, y: e.clientY }, [
       {
         label: "Add Reroute Node",
@@ -491,7 +491,7 @@ canvas.addEventListener("contextmenu", (e) => {
     return;
   }
 
-  const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
+  const worldPos = store.state.camera.screenToWorld(screenPos.x, screenPos.y);
   const activeFn = getActiveFunction();
   // Return is the one exception to the "Functions group isn't generically creatable" rule below —
   // inside a function body it's pinned to the top of the menu instead, bound to whichever function
@@ -568,7 +568,7 @@ canvas.addEventListener("drop", (e) => {
 
   const rect = canvas.getBoundingClientRect();
   const screenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  const worldPos = screenToWorld(store.state.camera, screenPos.x, screenPos.y);
+  const worldPos = store.state.camera.screenToWorld(screenPos.x, screenPos.y);
 
   if (functionId) {
     const fn = store.state.rootGraph.functions.find((f) => f.id === functionId);
@@ -697,7 +697,7 @@ compileButton.addEventListener("click", () => {
 });
 
 // --- Frame All: zooms/pans so every node and comment box in the current graph fits on screen
-// (see camera.ts's frameRect) — a no-op when there's nothing to frame.
+// (see camera.ts's Camera.frameRect) — a no-op when there's nothing to frame.
 frameAllButton.addEventListener("click", () => {
   const graph = getEditingGraph(store.state);
   const variables = getVisibleVariablesForState(store.state);
@@ -715,8 +715,7 @@ frameAllButton.addEventListener("click", () => {
   const maxX = Math.max(...rects.map((r) => r.x + r.width));
   const maxY = Math.max(...rects.map((r) => r.y + r.height));
 
-  frameRect(
-    store.state.camera,
+  store.state.camera.frameRect(
     { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
     canvas.clientWidth,
     canvas.clientHeight,
