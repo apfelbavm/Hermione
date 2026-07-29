@@ -5,7 +5,6 @@ import {
   connectPins,
   hasConnectedDataOutput,
   insertRerouteOnConnection,
-  removeConnection,
   removeInstancePin,
   removeNode,
 } from "./engine/graphMutations";
@@ -598,7 +597,7 @@ canvas.addEventListener("contextmenu", (e) => {
             ? `Break Connection → ${otherLabel}`
             : "Break Connection",
         onClick: () => {
-          removeConnection(graph, variables, functions, conn.id, scripts);
+          graph.removeConnection(variables, functions, conn.id, scripts);
           store.notify();
         },
       });

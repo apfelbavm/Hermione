@@ -13,7 +13,6 @@ import type {
   Variable,
 } from "./types";
 
-
 /** Defensive shallow clone for a value about to be copied from a PinDef/Variable's `defaultValue`
  * into a live Pin.value slot. A container's default is a plain array (see PinContainer's own doc
  * comment), and that ONE array object is shared by reference across every instance/read of the
@@ -38,7 +37,6 @@ export const DEFAULT_VALUE_BY_TYPE: Record<PinType, unknown> = {
   string: "",
   object: null,
 };
-
 
 /** True if any of this node's DATA (non-exec) output pins feeds something else. A node can only be
  * disabled while this is false — disabling it anyway would silently starve whatever's downstream of
@@ -100,7 +98,7 @@ export function removeNode(
   for (const conn of graph.connections.filter(
     (c) => c.fromNode === nodeId || c.toNode === nodeId,
   )) {
-    removeConnection(graph, variables, functions, conn.id, scripts);
+    graph.removeConnection(variables, functions, conn.id, scripts);
   }
 
   graph.nodes = graph.nodes.filter((n) => n.id !== nodeId);
@@ -222,7 +220,7 @@ export function disconnectPin(
     (c) => c.toNode === nodeId && c.toPin === pinId,
   );
   if (!existing) return;
-  removeConnection(graph, variables, functions, existing.id, scripts);
+  graph.removeConnection(variables, functions, existing.id, scripts);
 }
 
 /** Removes the connection leaving the given output pin, if any — enforces "one wire per exec output." */
@@ -238,38 +236,7 @@ export function disconnectOutput(
     (c) => c.fromNode === nodeId && c.fromPin === pinId,
   );
   if (!existing) return;
-  removeConnection(graph, variables, functions, existing.id, scripts);
-}
-
-export function removeConnection(
-  graph: Graph,
-  variables: Variable[],
-  functions: FunctionDef[],
-  connectionId: string,
-  scripts: CodeScriptDef[] = [],
-): void {
-  const conn = graph.connections.find((c) => c.id === connectionId);
-  if (!conn) return;
-  graph.connections = graph.connections.filter((c) => c.id !== connectionId);
-
-  const toNode = graph.nodes.find((n) => n.id === conn.toNode);
-  const toPin = toNode?.pins[conn.toPin];
-  if (toPin) {
-    // An exec input pin may still have OTHER incoming wires after this one is removed —
-    // only clear connectionId/restore the literal default once none remain.
-    const remaining = graph.connections.find(
-      (c) => c.toNode === conn.toNode && c.toPin === conn.toPin,
-    );
-    toPin.connectionId = remaining?.id;
-    if (!remaining) {
-      const pinDef = toNode
-        ? toNode
-            .resolvePinDefs(variables, functions, scripts)
-            .find((p) => p.id === conn.toPin)
-        : undefined;
-      toPin.value = cloneDefaultValue(pinDef?.defaultValue);
-    }
-  }
+  graph.removeConnection(variables, functions, existing.id, scripts);
 }
 
 /** Splices a "Reroute" node (see reroute.ts) into an existing connection — Unreal's "Add Reroute
@@ -324,7 +291,7 @@ export function insertRerouteOnConnection(
   // may legally converge several incoming wires — connectPins would happily add the reroute's exec
   // path ALONGSIDE the original one instead of replacing it (see connectPins' own comment on why
   // it only auto-prunes the FROM side for exec, the TO side for data).
-  removeConnection(graph, variables, functions, connectionId, scripts);
+  graph.removeConnection(variables, functions, connectionId, scripts);
   connectPins(
     graph,
     variables,
@@ -481,7 +448,7 @@ export function changeNodeElementType(
   for (const conn of graph.connections.filter(
     (c) => c.fromNode === nodeId || c.toNode === nodeId,
   )) {
-    removeConnection(graph, variables, functions, conn.id);
+    graph.removeConnection(variables, functions, conn.id);
   }
 
   if (patch.elementType !== undefined) node.elementType = patch.elementType;

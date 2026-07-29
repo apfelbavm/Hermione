@@ -1,3 +1,4 @@
+import { cloneDefaultValue } from "./graphMutations";
 import { NodeInstance } from "./nodeInstance";
 import { getNodeDef } from "./registry";
 import type {
@@ -52,5 +53,35 @@ export class Graph {
     if (!def.eventTrigger) return true;
     if (isFunctionBody) return false;
     return !this.nodes.some((n) => n.type === type);
+  }
+
+  removeConnection(
+    variables: Variable[],
+    functions: FunctionDef[],
+    connectionId: string,
+    scripts: CodeScriptDef[] = [],
+  ): void {
+    const conn = this.connections.find((c) => c.id === connectionId);
+    if (!conn) return;
+    this.connections = this.connections.filter((c) => c.id !== connectionId);
+
+    const toNode = this.nodes.find((n) => n.id === conn.toNode);
+    const toPin = toNode?.pins[conn.toPin];
+    if (toPin) {
+      // An exec input pin may still have OTHER incoming wires after this one is removed —
+      // only clear connectionId/restore the literal default once none remain.
+      const remaining = this.connections.find(
+        (c) => c.toNode === conn.toNode && c.toPin === conn.toPin,
+      );
+      toPin.connectionId = remaining?.id;
+      if (!remaining) {
+        const pinDef = toNode
+          ? toNode
+              .resolvePinDefs(variables, functions, scripts)
+              .find((p) => p.id === conn.toPin)
+          : undefined;
+        toPin.value = cloneDefaultValue(pinDef?.defaultValue);
+      }
+    }
   }
 }

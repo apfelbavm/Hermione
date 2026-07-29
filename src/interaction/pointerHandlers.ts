@@ -12,7 +12,6 @@ import {
   disconnectPin,
   nextId,
   removeCommentBox,
-  removeConnection,
   removeNode,
 } from "../engine/graphMutations";
 import { connectionsTouchingPin } from "../engine/graphQueries";
@@ -422,7 +421,7 @@ export function setupPointerInteraction(
           return { nodeId: otherNodeId, pinId: otherPinId, pin: otherPinDef };
         });
         for (const conn of touching) {
-          removeConnection(graph, variables, functions, conn.id, scripts);
+          graph.removeConnection(variables, functions, conn.id, scripts);
         }
 
         drag = { kind: "wire-multi", anchors };
