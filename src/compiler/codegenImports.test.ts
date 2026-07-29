@@ -44,11 +44,13 @@ describe("compileGraph — compileImports", () => {
     const print = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print");
     const xml1 = addBuiltinNode(graph, "xml.toJson", { x: 0, y: 100 }, "xml1");
     const xml2 = addBuiltinNode(graph, "xml.toJson", { x: 0, y: 200 }, "xml2");
+    const fromJson = addBuiltinNode(graph, "xml.fromJson", { x: 200, y: 100 }, "fromJson");
     xml1.pins.xml.value = "<a>1</a>";
     xml2.pins.xml.value = "<b>2</b>";
 
     connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: print.id, toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: xml1.id, fromPin: "json", toNode: print.id, toPin: "message" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: xml1.id, fromPin: "json", toNode: fromJson.id, toPin: "json" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: fromJson.id, fromPin: "xml", toNode: print.id, toPin: "message" });
 
     const { code } = compileGraph(graph);
     const importLines = code.split("\n").filter((line) => line.includes('from "fast-xml-parser"'));
@@ -58,12 +60,14 @@ describe("compileGraph — compileImports", () => {
   it("compiled output actually runs under plain Node with fast-xml-parser resolved from node_modules", async () => {
     const graph = createEmptyGraph("g2", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
-    const print = addBuiltinNode(graph, "debug.print", { x: 100, y: 0 }, "print");
+    const print = addBuiltinNode(graph, "debug.print", { x: 200, y: 0 }, "print");
     const xmlNode = addBuiltinNode(graph, "xml.toJson", { x: 0, y: 100 }, "xmlNode");
+    const fromJson = addBuiltinNode(graph, "xml.fromJson", { x: 100, y: 100 }, "fromJson");
     xmlNode.pins.xml.value = '<user id="1">Alice</user>';
 
     connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: print.id, toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: xmlNode.id, fromPin: "json", toNode: print.id, toPin: "message" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: xmlNode.id, fromPin: "json", toNode: fromJson.id, toPin: "json" });
+    connectPins(graph, graph.variables, graph.functions, { fromNode: fromJson.id, fromPin: "xml", toNode: print.id, toPin: "message" });
 
     const { code, manifest } = compileGraph(graph);
     expect(code).toContain('from "fast-xml-parser"');
@@ -76,6 +80,6 @@ describe("compileGraph — compileImports", () => {
     await trigger({ state: createInitialState(), log: (m: string) => logs.push(m) });
 
     expect(logs).toHaveLength(1);
-    expect(JSON.parse(logs[0])).toEqual({ user: { "@id": "1", "#text": "Alice" } });
+    expect(logs[0]).toBe('<user id="1">Alice</user>');
   });
 });

@@ -1,6 +1,7 @@
 import { Colors } from "../engine/color";
 import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
 import type { PinContainer, PinType } from "../engine/types";
+import { guardAgainstMultilinePaste, openMultilineTextEditor } from "./multilineTextEditor";
 
 const PIN_TYPE_OPTIONS: readonly PinType[] = ["number", "boolean", "string", "object"];
 const PIN_CONTAINER_OPTIONS: readonly PinContainer[] = ["single", "array", "set", "map"];
@@ -82,7 +83,42 @@ function createScalarInput(type: PinType, value: unknown, onChange: (value: unkn
     });
   }
 
-  return input;
+  if (type !== "string") return input;
+
+  // A plain <input> silently collapses real newlines to spaces the instant ANYTHING assigns a
+  // multi-line string to its .value — not just on user typing/paste, but even programmatically (a
+  // fresh render seeding it from the stored value hits the exact same browser behavior). So the
+  // expand button below tracks the real current value in this closure variable instead of ever
+  // reading it back off `input.value`, which is lossy for multi-line content the moment it's set.
+  let liveValue = value == null ? "" : String(value);
+
+  // Pasting multi-line content here (e.g. a whole CSV file's text, to feed a conversion node via a
+  // variable) would otherwise lose every line break with no visible error. The "⤢" button opens the
+  // same floating textarea editor the canvas's own per-node pin widgets use (see
+  // widgetSync.ts/multilineTextEditor.ts) as the reliable path for that content; the plain input
+  // stays editable for short values.
+  const commitFullValue = (newValue: string) => {
+    liveValue = newValue;
+    input.value = newValue;
+    onChange(newValue);
+  };
+
+  guardAgainstMultilinePaste(input, commitFullValue);
+
+  const wrapper = document.createElement("span");
+  wrapper.className = "typed-value-input-wrapper";
+  const expandButton = document.createElement("button");
+  expandButton.type = "button";
+  expandButton.className = "pin-widget-expand typed-value-expand";
+  expandButton.textContent = "⤢";
+  expandButton.title = "Edit full text";
+  expandButton.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const rect = expandButton.getBoundingClientRect();
+    openMultilineTextEditor({ x: rect.left, y: rect.bottom + 4 }, liveValue, commitFullValue);
+  });
+  wrapper.append(input, expandButton);
+  return wrapper;
 }
 
 /** Builds the expandable list editor for an Array/Set/Map default value — one row per entry (a

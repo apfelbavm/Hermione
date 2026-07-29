@@ -1,10 +1,8 @@
 import { registerNode } from "../engine/registry";
 import {
-  CSV_HELPER_SOURCE,
   XML_BUILD_OPTIONS_LITERAL,
   XML_IMPORT_LINE,
   XML_PARSE_OPTIONS_LITERAL,
-  XML_ROWS_HELPER_SOURCE,
   extractXmlRows,
   jsonValueToXml,
   objectsToCsv,
@@ -16,15 +14,15 @@ registerNode({
   label: "XML to JSON",
   group: "XML",
   pins: [
-    { id: "xml", label: "XML", type: "string", direction: "input", defaultValue: "" },
-    { id: "json", label: "JSON", type: "string", direction: "output" },
+    { id: "xml", label: "XML", type: "string", direction: "input", defaultValue: "", multiline: true },
+    { id: "json", label: "JSON", type: "object", direction: "output" },
     { id: "success", label: "Success", type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => {
     try {
-      return { json: JSON.stringify(xmlToJsonValue(String(inputs.xml ?? ""))), success: true };
+      return { json: xmlToJsonValue(String(inputs.xml ?? "")), success: true };
     } catch {
-      return { json: "", success: false };
+      return { json: null, success: false };
     }
   },
   compileEvaluate: ({ inputs }) => {
@@ -33,8 +31,8 @@ registerNode({
     // has no way to compute a shared intermediate once and hand it to two output-pin expressions.
     const attempt =
       `(() => { try { const __v = XMLValidator.validate(${inputs.xml}); if (__v !== true) throw new Error(__v.err.msg); ` +
-      `return { json: JSON.stringify(new XMLParser(${XML_PARSE_OPTIONS_LITERAL}).parse(${inputs.xml})), success: true }; } ` +
-      `catch { return { json: "", success: false }; } })()`;
+      `return { json: new XMLParser(${XML_PARSE_OPTIONS_LITERAL}).parse(${inputs.xml}), success: true }; } ` +
+      `catch { return { json: null, success: false }; } })()`;
     return { json: `${attempt}.json`, success: `${attempt}.success` };
   },
   compileImports: [XML_IMPORT_LINE],
@@ -45,20 +43,20 @@ registerNode({
   label: "JSON to XML",
   group: "XML",
   pins: [
-    { id: "json", label: "JSON", type: "string", direction: "input", defaultValue: "" },
+    { id: "json", label: "JSON", type: "object", direction: "input", defaultValue: null },
     { id: "xml", label: "XML", type: "string", direction: "output" },
     { id: "success", label: "Success", type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => {
     try {
-      return { xml: jsonValueToXml(JSON.parse(String(inputs.json ?? ""))), success: true };
+      return { xml: jsonValueToXml(inputs.json), success: true };
     } catch {
       return { xml: "", success: false };
     }
   },
   compileEvaluate: ({ inputs }) => {
     const attempt =
-      `(() => { try { return { xml: new XMLBuilder(${XML_BUILD_OPTIONS_LITERAL}).build(JSON.parse(String(${inputs.json}))), success: true }; } ` +
+      `(() => { try { return { xml: new XMLBuilder(${XML_BUILD_OPTIONS_LITERAL}).build(${inputs.json}), success: true }; } ` +
       `catch { return { xml: "", success: false }; } })()`;
     return { xml: `${attempt}.xml`, success: `${attempt}.success` };
   },
@@ -70,25 +68,27 @@ registerNode({
   label: "XML to CSV",
   group: "XML",
   pins: [
-    { id: "xml", label: "XML", type: "string", direction: "input", defaultValue: "" },
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    { id: "xml", label: "XML", type: "string", direction: "input", defaultValue: "", multiline: true },
+    { id: "delimiter", label: "Delimiter", type: "string", direction: "input", defaultValue: "," },
+    { id: "exec-out", label: "", type: "exec", direction: "output" },
     { id: "csv", label: "CSV", type: "string", direction: "output" },
     { id: "success", label: "Success", type: "boolean", direction: "output" },
   ],
-  evaluate: ({ inputs }) => {
+  // Latent (exec, not pure): converting to CSV means writing out potentially thousands of rows via
+  // PapaParse's objectsToCsv (see dataFormatHelpers.ts), slow enough for a large file to visibly
+  // freeze the tab if run synchronously — being "latent" here is purely a UI signal (the clock
+  // icon), since PapaParse itself doesn't yield mid-call. Compiler support (compileExecute) is
+  // intentionally out of scope for now, same call already made for http.request/the OAuth2 nodes —
+  // this node has data outputs beyond a single result, which no exec node compiles yet.
+  latent: true,
+  execute: async ({ inputs }) => {
     try {
       const rows = extractXmlRows(xmlToJsonValue(String(inputs.xml ?? "")));
-      return { csv: objectsToCsv(rows), success: true };
+      const csv = await objectsToCsv(rows, String(inputs.delimiter ?? ","));
+      return { nextExec: "exec-out", outputs: { csv, success: true } };
     } catch {
-      return { csv: "", success: false };
+      return { nextExec: "exec-out", outputs: { csv: "", success: false } };
     }
   },
-  compileEvaluate: ({ inputs }) => {
-    const attempt =
-      `(() => { try { const __v = XMLValidator.validate(${inputs.xml}); if (__v !== true) throw new Error(__v.err.msg); ` +
-      `return { csv: objectsToCsv(extractXmlRows(new XMLParser(${XML_PARSE_OPTIONS_LITERAL}).parse(${inputs.xml}))), success: true }; } ` +
-      `catch { return { csv: "", success: false }; } })()`;
-    return { csv: `${attempt}.csv`, success: `${attempt}.success` };
-  },
-  compileImports: [XML_IMPORT_LINE],
-  compileHelpers: { csvHelpers: CSV_HELPER_SOURCE, xmlCsvBridge: XML_ROWS_HELPER_SOURCE },
 });

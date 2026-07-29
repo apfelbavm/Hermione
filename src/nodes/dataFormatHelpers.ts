@@ -1,4 +1,5 @@
 import { XMLBuilder, XMLParser, XMLValidator } from "fast-xml-parser";
+import * as Papa from "papaparse";
 
 // Shared building blocks for the XML/JSON/CSV conversion nodes (xml.ts, csv.ts). Kept in their own
 // leaf module, with no dependency on either node file, specifically so xml.ts and csv.ts can each
@@ -39,10 +40,15 @@ export const XML_BUILD_OPTIONS = {
   format: false,
 } as const;
 
+/** Same shape as XML_BUILD_OPTIONS but indented — used only for human-facing pretty-printing (see
+ * debug.ts's Print (Formatted) node), never for xml.fromJson's actual conversion output, since a
+ * conversion node's output is meant to be re-parsed by another tool, not read by a person. */
+export const XML_PRETTY_BUILD_OPTIONS = { ...XML_BUILD_OPTIONS, format: true, indentBy: "  " } as const;
+
 export const XML_PARSE_OPTIONS_LITERAL = JSON.stringify(XML_PARSE_OPTIONS);
 export const XML_BUILD_OPTIONS_LITERAL = JSON.stringify(XML_BUILD_OPTIONS);
+export const XML_PRETTY_BUILD_OPTIONS_LITERAL = JSON.stringify(XML_PRETTY_BUILD_OPTIONS);
 export const XML_IMPORT_LINE = 'import { XMLBuilder, XMLParser, XMLValidator } from "fast-xml-parser";';
-export const XML_BUILD_IMPORT_LINE = 'import { XMLBuilder } from "fast-xml-parser";';
 
 export function xmlToJsonValue(xml: string): unknown {
   const validation = XMLValidator.validate(xml);
@@ -54,92 +60,52 @@ export function jsonValueToXml(value: unknown): string {
   return new XMLBuilder(XML_BUILD_OPTIONS).build(value);
 }
 
-// CSV <-> JSON — hand-rolled (RFC 4180-ish: comma-separated, double-quote-escaped fields that may
-// embed commas/quotes/newlines, first row is the header row) rather than pulling in a library,
-// since unlike XML this format is small and unambiguous enough to maintain directly. Written ONCE
-// as a plain-JS source string rather than twice — a real TS implementation for the interpreter plus
-// a matching string for the compiler — so the interpreter and compiled output can't drift apart
-// (same reasoning as the original hand-rolled XML parser this replaced, and flow.ts's
-// DELAY_HELPER_SOURCE for its own tiny helper). `new Function` derives the actual callables from
-// this SAME string once at module load for the interpreter's own use.
-export const CSV_HELPER_SOURCE = `
-function csvToRows(csv) {
-  const rows = [];
-  let row = [];
-  let field = "";
-  let inQuotes = false;
-  let i = 0;
-  const len = csv.length;
-
-  const pushField = () => { row.push(field); field = ""; };
-  const pushRow = () => { pushField(); rows.push(row); row = []; };
-
-  while (i < len) {
-    const ch = csv[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (csv[i + 1] === '"') { field += '"'; i += 2; continue; }
-        inQuotes = false; i++; continue;
-      }
-      field += ch; i++; continue;
-    }
-    if (ch === '"') { inQuotes = true; i++; continue; }
-    if (ch === ",") { pushField(); i++; continue; }
-    if (ch === "\\r") { i++; continue; }
-    if (ch === "\\n") { pushRow(); i++; continue; }
-    field += ch; i++;
-  }
-  if (field.length > 0 || row.length > 0) pushRow();
-  // A trailing newline produces one bogus fully-empty row — drop it rather than surfacing it as data.
-  if (rows.length > 0 && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === "") {
-    rows.pop();
-  }
-  return rows;
-}
-
-function csvToObjects(csv) {
-  const rows = csvToRows(csv);
-  if (rows.length === 0) return [];
-  const headers = rows[0];
-  return rows.slice(1).map((row) => {
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ""; });
-    return obj;
+// CSV <-> JSON, backed by PapaParse rather than a hand-rolled parser — the de-facto standard CSV
+// library, with far more battle-tested edge-case handling (quoting, embedded newlines, encodings,
+// line-ending conventions) than anything worth hand-maintaining here, the same call already made
+// for fast-xml-parser above.
+//
+// Note on responsiveness: PapaParse parses a plain in-memory string fully synchronously (measured
+// directly — no yielding between rows even with its own `step` callback) unless `worker: true` is
+// used, which relies on the browser's Worker API and wouldn't be available if these nodes are ever
+// run outside the browser (e.g. embedded server-side later). So unlike the hand-rolled parser this
+// replaced, this doesn't yield mid-parse for a large file — csv.toJson/json.toCsv/xml.toCsv/
+// csv.toXml stay latent/exec nodes (matching http.request/the OAuth2 nodes) because a large file's
+// parse/write time is itself still slow enough to warrant the clock icon, not because these
+// functions internally yield the way the previous implementation did.
+export async function csvToObjects(csv: string, delimiter = ","): Promise<Record<string, string>[]> {
+  const result = Papa.parse<Record<string, string>>(csv, {
+    header: true,
+    delimiter: (delimiter && delimiter[0]) || ",",
+    skipEmptyLines: true,
   });
+  return result.data;
 }
 
-function csvField(value) {
-  const s = String(value);
-  return /[",\\n\\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
-
-function objectsToCsv(objects) {
+export async function objectsToCsv(objects: unknown[], delimiter = ","): Promise<string> {
   if (!Array.isArray(objects)) throw new Error("Expected a JSON array of objects");
-  const headers = [];
-  const seen = new Set();
-  objects.forEach((obj) => {
+  // PapaParse's own default behavior only takes the FIRST object's keys as the header, silently
+  // dropping any key a later object introduces — computing the header ourselves (in first-seen
+  // order across every object) and passing it explicitly is what makes a ragged array of objects
+  // round-trip correctly instead of quietly losing data.
+  const fields: string[] = [];
+  const seen = new Set<string>();
+  for (const obj of objects) {
     if (typeof obj !== "object" || obj === null || Array.isArray(obj)) {
       throw new Error("Expected each array entry to be a flat object");
     }
-    Object.keys(obj).forEach((key) => {
-      if (!seen.has(key)) { seen.add(key); headers.push(key); }
-    });
-  });
-  const lines = [headers.map(csvField).join(",")];
-  objects.forEach((obj) => {
-    lines.push(headers.map((h) => csvField(obj[h] !== undefined ? obj[h] : "")).join(","));
-  });
-  return lines.join("\\r\\n");
+    for (const key of Object.keys(obj)) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        fields.push(key);
+      }
+    }
+  }
+  return Papa.unparse(
+    { fields, data: objects as Record<string, unknown>[] },
+    { delimiter: (delimiter && delimiter[0]) || "," },
+  );
 }
-`;
-
-const csvHelperFns: {
-  csvToObjects: (csv: string) => Record<string, string>[];
-  objectsToCsv: (objects: unknown[]) => string;
-} = new Function(`${CSV_HELPER_SOURCE}\nreturn { csvToObjects, objectsToCsv };`)();
-
-export const csvToObjects = csvHelperFns.csvToObjects;
-export const objectsToCsv = csvHelperFns.objectsToCsv;
 
 // XML to CSV bridge — looks for something CSV-shaped inside a parsed (xmlToJsonValue) result: a
 // repeated element (already an array under xmlToJsonValue's convention) whose entries are each a
@@ -147,19 +113,20 @@ export const objectsToCsv = csvHelperFns.objectsToCsv;
 // failing that, a single flat record (one row). Deliberately out of scope: a repeated element
 // containing only bare text (e.g. <items><item>a</item></items>) has no column name to hang a
 // header on, so it's rejected rather than guessed at; attributes on the wrapping/root element
-// itself aren't carried into row data.
-export const XML_ROWS_HELPER_SOURCE = `
-function extractXmlRows(parsedRoot) {
-  const isFlatRow = (v) =>
+// itself aren't carried into row data. A plain TS function (not the shared-source/new Function
+// pattern above) since it's only ever called by the interpreter now — xml.toCsv has no
+// compileExecute (see its own comment), so there's no compiled-path consumer to keep in sync with.
+export function extractXmlRows(parsedRoot: unknown): Record<string, string>[] {
+  const isFlatRow = (v: unknown): v is Record<string, string> =>
     typeof v === "object" && v !== null && !Array.isArray(v) && Object.values(v).every((x) => typeof x === "string");
 
-  const asRows = (v) => {
+  const asRows = (v: unknown): Record<string, string>[] | null => {
     if (!Array.isArray(v)) return null;
     if (!v.every(isFlatRow)) throw new Error("Expected every repeated XML element to be a flat record of attributes/text children");
     return v;
   };
 
-  const rootValue = Object.values(parsedRoot)[0];
+  const rootValue = Object.values(parsedRoot as Record<string, unknown>)[0];
   if (isFlatRow(rootValue)) return [rootValue];
   const direct = asRows(rootValue);
   if (direct) return direct;
@@ -172,8 +139,3 @@ function extractXmlRows(parsedRoot) {
   }
   throw new Error("Could not find a repeated element or flat record in the XML to convert to CSV rows");
 }
-`;
-
-export const extractXmlRows: (parsedRoot: unknown) => Record<string, string>[] = new Function(
-  `${XML_ROWS_HELPER_SOURCE}\nreturn extractXmlRows;`,
-)();

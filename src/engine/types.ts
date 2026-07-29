@@ -30,6 +30,14 @@ export interface PinDef {
    * any other string pin (which may carry a value outside this list — the dropdown only governs
    * how a LITERAL is entered, same relationship `integer` has to "number"). */
   options?: string[];
+  /** A "string" pin whose literal value is likely to span multiple lines (e.g. a CSV/XML blob) —
+   * gets a small "expand" button next to its normal single-line canvas widget, opening a floating
+   * textarea to edit the FULL value (see widgetSync.ts/multilineTextEditor.ts). The plain single-line
+   * `<input>` every string pin already gets silently collapses real newlines to spaces (a browser
+   * behavior, not something this app controls), which for a multi-row CSV literal means silent data
+   * loss — pasting three rows leaves one malformed row and no visible error. The inline input stays
+   * editable for short values; the expand button is the reliable path for real multi-line content. */
+  multiline?: boolean;
   /** Defaults to "single" when absent. See PinContainer's own doc comment. */
   container?: PinContainer;
   /** Only meaningful when container === "map" — the map's KEY type (`type` is the value type). */

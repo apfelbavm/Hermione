@@ -454,6 +454,27 @@ body.resizing {
   flex: 0 0 52px;
 }
 
+.typed-value-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.typed-value-input-wrapper .typed-value-input[type="text"] {
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
+}
+
+.typed-value-expand {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 18px;
+  font-size: 10px;
+}
+
 .typed-value-input[type="text"] {
   flex: 0 0 64px;
 }
@@ -659,6 +680,78 @@ body.resizing {
 
 .pin-widget-select {
   cursor: pointer;
+}
+
+.pin-widget-expand {
+  box-sizing: border-box;
+  background: #2a2e35;
+  border: 1px solid #454a52;
+  border-radius: 3px;
+  color: #cfd3d8;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.pin-widget-expand:hover {
+  background: #3b6b8a;
+  color: #ffffff;
+}
+
+.multiline-text-editor {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #24272d;
+  border: 1px solid #454a52;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 8px;
+}
+
+.multiline-text-editor-textarea {
+  box-sizing: border-box;
+  width: 420px;
+  height: 220px;
+  resize: both;
+  background: #14161a;
+  border: 1px solid #454a52;
+  border-radius: 3px;
+  color: #e8e8e8;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 12px;
+  padding: 6px;
+}
+
+.multiline-text-editor-textarea:focus {
+  outline: none;
+  border-color: #e8b339;
+}
+
+.multiline-text-editor-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.multiline-text-editor-buttons button {
+  background: #2a2e35;
+  border: 1px solid #454a52;
+  border-radius: 4px;
+  color: #e8e8e8;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.multiline-text-editor-buttons button:hover {
+  background: #3b6b8a;
+}
+
+.multiline-text-editor-save {
+  background: #3b6b8a !important;
+  border-color: #4d84a8 !important;
 }
 
 .node-search-menu {
