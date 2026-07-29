@@ -171,7 +171,15 @@ function drawPinShape(
     ctx.lineTo(x + r * 1.2, y);
     ctx.lineTo(x - r, y + r);
     ctx.closePath();
-    ctx.fill();
+    // Same "hollow until wired, filled once connected" convention as a plain data pin below —
+    // an unconnected exec arrow is outline-only so an unwired exec chain reads at a glance.
+    if (connected) {
+      ctx.fill();
+    } else {
+      ctx.lineWidth = Math.max(1, r * 0.3);
+      ctx.strokeStyle = color;
+      ctx.stroke();
+    }
     return;
   }
 
@@ -192,7 +200,8 @@ function drawPinShape(
     default:
       // A single-container data pin is hollow (border only) until something's actually wired to
       // it, filled once it is — same "empty vs. filled circle" convention Unreal uses for its own
-      // data pins. Exec pins (above) and the container shapes stay solid regardless.
+      // data pins (and now exec pins too, above). The container shapes (array/set/map) stay solid
+      // regardless of wiring — there's no natural "hollow" rendering for a grid or brace glyph.
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       if (connected) {
