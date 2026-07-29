@@ -3,7 +3,7 @@ import {
   XML_BUILD_OPTIONS_LITERAL,
   XML_IMPORT_LINE,
   XML_PARSE_OPTIONS_LITERAL,
-  extractXmlRows,
+  extractTabularRows,
   jsonValueToXml,
   objectsToCsv,
   xmlToJsonValue,
@@ -84,7 +84,7 @@ registerNode({
   latent: true,
   execute: async ({ inputs }) => {
     try {
-      const rows = extractXmlRows(xmlToJsonValue(String(inputs.xml ?? "")));
+      const rows = extractTabularRows(xmlToJsonValue(String(inputs.xml ?? "")));
       const csv = await objectsToCsv(rows, String(inputs.delimiter ?? ","));
       return { nextExec: "exec-out", outputs: { csv, success: true } };
     } catch {

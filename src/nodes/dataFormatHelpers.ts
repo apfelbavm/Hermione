@@ -107,22 +107,27 @@ export async function objectsToCsv(objects: unknown[], delimiter = ","): Promise
   );
 }
 
-// XML to CSV bridge — looks for something CSV-shaped inside a parsed (xmlToJsonValue) result: a
-// repeated element (already an array under xmlToJsonValue's convention) whose entries are each a
-// flat record of attributes/text-only child elements (so every entry has the same "columns"), or,
-// failing that, a single flat record (one row). Deliberately out of scope: a repeated element
-// containing only bare text (e.g. <items><item>a</item></items>) has no column name to hang a
-// header on, so it's rejected rather than guessed at; attributes on the wrapping/root element
-// itself aren't carried into row data. A plain TS function (not the shared-source/new Function
-// pattern above) since it's only ever called by the interpreter now — xml.toCsv has no
-// compileExecute (see its own comment), so there's no compiled-path consumer to keep in sync with.
-export function extractXmlRows(parsedRoot: unknown): Record<string, string>[] {
-  const isFlatRow = (v: unknown): v is Record<string, string> =>
-    typeof v === "object" && v !== null && !Array.isArray(v) && Object.values(v).every((x) => typeof x === "string");
+// Tabular-rows bridge — looks for something CSV-shaped inside a single wrapped JSON object (either
+// xmlToJsonValue's own parse of a root/row XML shape, or the identical { rootTag: { rowTag: [...] }
+// } convention csv.toJson/csv.toXml build by hand): a repeated element (already an array under that
+// convention) whose entries are each a flat record of scalar columns (so every entry has the same
+// "columns"), or, failing that, a single flat record (one row). A "flat" value is any non-object,
+// non-array leaf (string, number, boolean, null) — deliberately not string-only, even though every
+// leaf xmlToJsonValue itself produces is a string (see its own comment): json.toCsv feeds this same
+// function real JSON, where a column can legitimately be a number or boolean. Deliberately out of
+// scope: a repeated element containing only bare values (e.g. <items><item>a</item></items>) has no
+// column name to hang a header on, so it's rejected rather than guessed at; attributes on the
+// wrapping/root element itself aren't carried into row data. A plain TS function (not the
+// shared-source/new Function pattern above) since it's only ever called by the interpreter now —
+// neither xml.toCsv nor json.toCsv has a compileExecute (see their own comments), so there's no
+// compiled-path consumer to keep in sync with.
+export function extractTabularRows(parsedRoot: unknown): Record<string, unknown>[] {
+  const isFlatRow = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" && v !== null && !Array.isArray(v) && Object.values(v).every((x) => x === null || typeof x !== "object");
 
-  const asRows = (v: unknown): Record<string, string>[] | null => {
+  const asRows = (v: unknown): Record<string, unknown>[] | null => {
     if (!Array.isArray(v)) return null;
-    if (!v.every(isFlatRow)) throw new Error("Expected every repeated XML element to be a flat record of attributes/text children");
+    if (!v.every(isFlatRow)) throw new Error("Expected every repeated element to be a flat record of scalar columns");
     return v;
   };
 
@@ -137,5 +142,5 @@ export function extractXmlRows(parsedRoot: unknown): Record<string, string>[] {
       if (rows) return rows;
     }
   }
-  throw new Error("Could not find a repeated element or flat record in the XML to convert to CSV rows");
+  throw new Error("Could not find a repeated element or flat record to convert to CSV rows");
 }

@@ -1,5 +1,5 @@
 import { registerNode } from "../engine/registry";
-import { csvToObjects, jsonValueToXml, objectsToCsv } from "./dataFormatHelpers";
+import { csvToObjects, extractTabularRows, jsonValueToXml, objectsToCsv } from "./dataFormatHelpers";
 
 // CSV <-> JSON, backed by PapaParse (see dataFormatHelpers.ts). Both nodes are latent (exec, not
 // pure) rather than a plain data node: a large file (thousands of rows x hundreds of columns) is
@@ -9,6 +9,16 @@ import { csvToObjects, jsonValueToXml, objectsToCsv } from "./dataFormatHelpers"
 // Compiler support (compileExecute) is intentionally out of scope for now, same call already made
 // for http.request/the OAuth2 nodes — these nodes have data outputs beyond a single result, which
 // no exec node compiles yet.
+//
+// csv.toJson's "json" pin is a single object, not an Array<Object>: the rows are wrapped under a
+// caller-chosen root/row tag pair, e.g. { rows: { row: [...] } } — the same convention csv.toXml
+// already used to hand rows to jsonValueToXml (a bare array has no element name of its own to be
+// built under). Wrapping here too, rather than emitting the raw array, is what lets this node's
+// output pin (container-less "object") wire directly into other single-object JSON pins like
+// xml.fromJson's "json" input — pins only connect when their container matches exactly (see
+// registry.ts's isPinTypeCompatible), so an Array<Object> output could never reach a plain object
+// input. json.toCsv (below) unwraps the same convention via extractTabularRows so the round trip —
+// and feeding in xml.toJson's output instead — both still work.
 registerNode({
   type: "csv.toJson",
   label: "CSV to JSON",
@@ -17,17 +27,21 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "csv", label: "CSV", type: "string", direction: "input", defaultValue: "", multiline: true },
     { id: "delimiter", label: "Delimiter", type: "string", direction: "input", defaultValue: "," },
+    { id: "rootTag", label: "Root Tag", type: "string", direction: "input", defaultValue: "rows" },
+    { id: "rowTag", label: "Row Tag", type: "string", direction: "input", defaultValue: "row" },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
-    { id: "json", label: "JSON", type: "object", container: "array", direction: "output" },
+    { id: "json", label: "JSON", type: "object", direction: "output" },
     { id: "success", label: "Success", type: "boolean", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
     try {
-      const json = await csvToObjects(String(inputs.csv ?? ""), String(inputs.delimiter ?? ","));
-      return { nextExec: "exec-out", outputs: { json, success: true } };
+      const rows = await csvToObjects(String(inputs.csv ?? ""), String(inputs.delimiter ?? ","));
+      const rootTag = String(inputs.rootTag ?? "").trim() || "rows";
+      const rowTag = String(inputs.rowTag ?? "").trim() || "row";
+      return { nextExec: "exec-out", outputs: { json: { [rootTag]: { [rowTag]: rows } }, success: true } };
     } catch {
-      return { nextExec: "exec-out", outputs: { json: [], success: false } };
+      return { nextExec: "exec-out", outputs: { json: null, success: false } };
     }
   },
 });
@@ -38,7 +52,7 @@ registerNode({
   group: "CSV",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "json", label: "JSON", type: "object", container: "array", direction: "input", defaultValue: [] },
+    { id: "json", label: "JSON", type: "object", direction: "input", defaultValue: null },
     { id: "delimiter", label: "Delimiter", type: "string", direction: "input", defaultValue: "," },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
     { id: "csv", label: "CSV", type: "string", direction: "output" },
@@ -47,7 +61,8 @@ registerNode({
   latent: true,
   execute: async ({ inputs }) => {
     try {
-      const csv = await objectsToCsv(inputs.json as unknown[], String(inputs.delimiter ?? ","));
+      const rows = extractTabularRows(inputs.json);
+      const csv = await objectsToCsv(rows, String(inputs.delimiter ?? ","));
       return { nextExec: "exec-out", outputs: { csv, success: true } };
     } catch {
       return { nextExec: "exec-out", outputs: { csv: "", success: false } };
@@ -57,7 +72,7 @@ registerNode({
 
 // CSV to XML — bridges through jsonValueToXml() (see dataFormatHelpers.ts) by wrapping the parsed
 // rows under a caller-chosen root/row tag pair, e.g. { rows: { row: [...] } }, since a bare array
-// has no XML element name of its own to be built under.
+// has no XML element name of its own to be built under. (Same wrapping csv.toJson now does, above.)
 registerNode({
   type: "csv.toXml",
   label: "CSV to XML",

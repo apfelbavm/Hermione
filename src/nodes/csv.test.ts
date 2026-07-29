@@ -13,47 +13,51 @@ async function executeNode(type: string, inputs: Record<string, unknown>) {
 }
 
 describe("csv.toJson", () => {
-  it("converts CSV rows into an array of objects keyed by the header row, as real objects not a JSON string", async () => {
-    const result = await executeNode("csv.toJson", { csv: "name,age\nAlice,30\nBob,25", delimiter: "," });
+  it("converts CSV rows into a single object wrapping rows under root/row tags, as real objects not a JSON string", async () => {
+    const result = await executeNode("csv.toJson", { csv: "name,age\nAlice,30\nBob,25", delimiter: ",", rootTag: "", rowTag: "" });
     expect(result.success).toBe(true);
-    expect(result.json).toEqual([
-      { name: "Alice", age: "30" },
-      { name: "Bob", age: "25" },
-    ]);
+    expect(result.json).toEqual({
+      rows: { row: [{ name: "Alice", age: "30" }, { name: "Bob", age: "25" }] },
+    });
+  });
+
+  it("honors custom root/row tags", async () => {
+    const result = await executeNode("csv.toJson", { csv: "name\nAlice", delimiter: ",", rootTag: "people", rowTag: "person" });
+    expect(result.json).toEqual({ people: { person: [{ name: "Alice" }] } });
   });
 
   it("handles quoted fields containing commas, quotes, and newlines", async () => {
     const csv = 'name,note\n"Doe, Jane","she said ""hi""\nline two"';
-    const result = await executeNode("csv.toJson", { csv, delimiter: "," });
-    expect(result.json).toEqual([{ name: "Doe, Jane", note: 'she said "hi"\nline two' }]);
+    const result = await executeNode("csv.toJson", { csv, delimiter: ",", rootTag: "", rowTag: "" });
+    expect(result.json).toEqual({ rows: { row: [{ name: "Doe, Jane", note: 'she said "hi"\nline two' }] } });
   });
 
   it("honors a custom delimiter", async () => {
-    const result = await executeNode("csv.toJson", { csv: "name;age\nAlice;30", delimiter: ";" });
-    expect(result.json).toEqual([{ name: "Alice", age: "30" }]);
+    const result = await executeNode("csv.toJson", { csv: "name;age\nAlice;30", delimiter: ";", rootTag: "", rowTag: "" });
+    expect(result.json).toEqual({ rows: { row: [{ name: "Alice", age: "30" }] } });
   });
 
   it("supports tab as a delimiter", async () => {
-    const result = await executeNode("csv.toJson", { csv: "name\tage\nAlice\t30", delimiter: "\t" });
-    expect(result.json).toEqual([{ name: "Alice", age: "30" }]);
+    const result = await executeNode("csv.toJson", { csv: "name\tage\nAlice\t30", delimiter: "\t", rootTag: "", rowTag: "" });
+    expect(result.json).toEqual({ rows: { row: [{ name: "Alice", age: "30" }] } });
   });
 
   it("ignores a single trailing newline", async () => {
-    const result = await executeNode("csv.toJson", { csv: "a,b\n1,2\n", delimiter: "," });
-    expect(result.json).toEqual([{ a: "1", b: "2" }]);
+    const result = await executeNode("csv.toJson", { csv: "a,b\n1,2\n", delimiter: ",", rootTag: "", rowTag: "" });
+    expect(result.json).toEqual({ rows: { row: [{ a: "1", b: "2" }] } });
   });
 
-  it("returns an empty array (not the string \"[]\") for empty input", async () => {
-    const result = await executeNode("csv.toJson", { csv: "", delimiter: "," });
+  it("wraps an empty array (not the string \"[]\") for empty input", async () => {
+    const result = await executeNode("csv.toJson", { csv: "", delimiter: ",", rootTag: "", rowTag: "" });
     expect(result.success).toBe(true);
-    expect(result.json).toEqual([]);
+    expect(result.json).toEqual({ rows: { row: [] } });
   });
 });
 
 describe("json.toCsv", () => {
-  it("converts a real array of flat objects into a CSV string with a header row", async () => {
+  it("converts a single object wrapping a real array of flat objects into a CSV string with a header row", async () => {
     const result = await executeNode("json.toCsv", {
-      json: [{ name: "Alice", age: 30 }, { name: "Bob", age: 25 }],
+      json: { rows: { row: [{ name: "Alice", age: 30 }, { name: "Bob", age: 25 }] } },
       delimiter: ",",
     });
     expect(result.success).toBe(true);
@@ -61,22 +65,34 @@ describe("json.toCsv", () => {
   });
 
   it("quotes a field containing the delimiter", async () => {
-    const result = await executeNode("json.toCsv", { json: [{ name: "Doe, Jane" }], delimiter: "," });
+    const result = await executeNode("json.toCsv", { json: { rows: { row: [{ name: "Doe, Jane" }] } }, delimiter: "," });
     expect(result.csv).toBe('name\r\n"Doe, Jane"');
   });
 
   it("honors a custom delimiter, only quoting fields containing THAT delimiter", async () => {
-    const result = await executeNode("json.toCsv", { json: [{ name: "Doe, Jane" }], delimiter: ";" });
+    const result = await executeNode("json.toCsv", { json: { rows: { row: [{ name: "Doe, Jane" }] } }, delimiter: ";" });
     expect(result.csv).toBe("name\r\nDoe, Jane");
   });
 
   it("unions keys across objects, filling missing ones with an empty field", async () => {
-    const result = await executeNode("json.toCsv", { json: [{ a: 1 }, { a: 2, b: 3 }], delimiter: "," });
+    const result = await executeNode("json.toCsv", { json: { rows: { row: [{ a: 1 }, { a: 2, b: 3 }] } }, delimiter: "," });
     expect(result.csv).toBe("a,b\r\n1,\r\n2,3");
   });
 
-  it("reports success: false for a non-array value instead of throwing", async () => {
-    const result = await executeNode("json.toCsv", { json: { a: 1 }, delimiter: "," });
+  it("accepts a single flat object as one row", async () => {
+    const result = await executeNode("json.toCsv", { json: { row: { name: "Alice" } }, delimiter: "," });
+    expect(result.success).toBe(true);
+    expect(result.csv).toBe("name\r\nAlice");
+  });
+
+  it("reports success: false for a shape with no rows to find instead of throwing", async () => {
+    const result = await executeNode("json.toCsv", { json: { a: { b: { c: 1 } } }, delimiter: "," });
+    expect(result.success).toBe(false);
+    expect(result.csv).toBe("");
+  });
+
+  it("reports success: false instead of throwing for the default null input", async () => {
+    const result = await executeNode("json.toCsv", { json: null, delimiter: "," });
     expect(result.success).toBe(false);
     expect(result.csv).toBe("");
   });
