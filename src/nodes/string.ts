@@ -45,6 +45,22 @@ registerNode({
 });
 
 registerNode({
+  type: "string.fromDate",
+  label: "To String (Date)",
+  group: "String",
+  pins: [
+    { id: "value", label: "Value", type: "date", direction: "input", defaultValue: "" },
+    { id: "result", label: "Result", type: "string", direction: "output" },
+  ],
+  evaluate: ({ inputs }) => ({
+    result: new Date((inputs.value || 0) as number | string | Date).toISOString(),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `new Date(${inputs.value} || 0).toISOString()`,
+  }),
+});
+
+registerNode({
   type: "string.fromJson",
   label: "To String (JSON)",
   group: "String",

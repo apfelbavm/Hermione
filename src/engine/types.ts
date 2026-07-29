@@ -1,7 +1,7 @@
 import { Graph } from "./graph";
 import { NodeInstance } from "./nodeInstance";
 
-export type PinType = "exec" | "number" | "boolean" | "string" | "object";
+export type PinType = "exec" | "number" | "boolean" | "string" | "object" | "date";
 
 /** Orthogonal to PinType (see PinDef.container/Variable.container) — "single" (the default, a
  * plain value of `type`) vs. a collection of `type`. Never a new PinType member: this keeps every

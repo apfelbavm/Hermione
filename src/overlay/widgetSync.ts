@@ -7,7 +7,7 @@ import { MULTILINE_EXPAND_BUTTON_WIDTH, pinWidgetWidth } from "../render/layout"
 import type { NodeScreenGeometry } from "../render/nodeGeometry";
 import { getEditingGraph, type Store } from "../state/store";
 
-const WIDGET_TYPES: readonly PinType[] = ["number", "boolean", "string"];
+const WIDGET_TYPES: readonly PinType[] = ["number", "boolean", "string", "date"];
 
 type WidgetElement = HTMLInputElement | HTMLSelectElement;
 
@@ -109,7 +109,8 @@ function createWidgetEntry(pinDef: PinDef, nodeId: string, pinId: string, store:
   const type = pinDef.type;
   const el = document.createElement("input");
   el.className = "pin-widget";
-  el.type = type === "boolean" ? "checkbox" : type === "number" ? "number" : "text";
+  el.type =
+    type === "boolean" ? "checkbox" : type === "number" ? "number" : type === "date" ? "datetime-local" : "text";
   el.autocomplete = "off";
   if (pinDef.integer) el.step = "1";
   if (pinDef.multiline) el.title = 'Use the "⤢" button to edit multi-line text without losing line breaks';

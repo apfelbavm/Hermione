@@ -35,6 +35,7 @@ export const DEFAULT_VALUE_BY_TYPE: Record<PinType, unknown> = {
   boolean: false,
   string: "",
   object: null,
+  date: "",
 };
 
 /** Removes one entry pin from a node with an expandable, user-editable pin list (see

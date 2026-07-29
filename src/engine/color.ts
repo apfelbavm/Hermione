@@ -86,6 +86,7 @@ export namespace Colors {
     number: "#3b8a5c",
     string: "#c542a0",
     object: "#4f9bd6",
+    date: "#d6a23b",
   };
 
   export const CANVAS_BG = "#1e2126";
@@ -102,6 +103,8 @@ export namespace Colors {
     Events: "#8a3b3b",
     "Flow Control": NODE_HEADER_DEFAULT,
     Math: PIN_COLORS.number,
+    // Same color as a "date" pin/wire, tying the whole node category to that type visually.
+    Date: PIN_COLORS.date,
     Debug: "#6b6b3b",
     Variables: "#7a4f9b",
     // Neither has a separate color of its own anymore — both read as the same category as Flow

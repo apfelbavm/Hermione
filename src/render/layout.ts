@@ -69,6 +69,7 @@ export function pinWidgetWidth(pin: PinDef): number {
   if (pin.type === "string" && pin.options && pin.options.length > 0) return 110;
   if (pin.type === "number") return 54;
   if (pin.type === "string" && pin.multiline) return 90 + MULTILINE_EXPAND_BUTTON_WIDTH + 4;
+  if (pin.type === "date") return 150;
   return 90;
 }
 

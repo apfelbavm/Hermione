@@ -3,7 +3,7 @@ import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
 import type { PinContainer, PinType } from "../engine/types";
 import { guardAgainstMultilinePaste, openMultilineTextEditor } from "./multilineTextEditor";
 
-const PIN_TYPE_OPTIONS: readonly PinType[] = ["number", "boolean", "string", "object"];
+const PIN_TYPE_OPTIONS: readonly PinType[] = ["number", "boolean", "string", "object", "date"];
 const PIN_CONTAINER_OPTIONS: readonly PinContainer[] = ["single", "array", "set", "map"];
 const CONTAINER_LABELS: Record<PinContainer, string> = {
   single: "Single",
@@ -69,7 +69,8 @@ function createScalarInput(type: PinType, value: unknown, onChange: (value: unkn
 
   const input = document.createElement("input");
   input.className = "typed-value-input";
-  input.type = type === "boolean" ? "checkbox" : type === "number" ? "number" : "text";
+  input.type =
+    type === "boolean" ? "checkbox" : type === "number" ? "number" : type === "date" ? "datetime-local" : "text";
   input.autocomplete = "off";
   if (type === "boolean") input.checked = Boolean(value);
   else input.value = value == null ? "" : String(value);
