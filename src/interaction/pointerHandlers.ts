@@ -605,6 +605,16 @@ export function setupPointerInteraction(
       const node = graph.nodes.find((n) => n.id === nodeHit.nodeId)!;
       const worldPos = camera.screenToWorld(pos.x, pos.y);
 
+      // A single click on a Code node jumps straight to its script's Inputs/Outputs in the
+      // sidebar Details panel, same as clicking that script's own row in the Scripts list would —
+      // unlike Get/Set Variable (only on double-click, see the dblclick handler below), since a
+      // script's whole reason for being on the canvas is usually to check/edit its signature.
+      // mousedown's own unconditional reset above already cleared sidebarSelection; setting it
+      // here afterward correctly wins in detailsPanel.ts's own precedence order.
+      if (node.type === "code.run" && node.scriptId) {
+        store.state.sidebarSelection = { kind: "script", scriptId: node.scriptId };
+      }
+
       if (e.ctrlKey || e.metaKey) {
         // Ctrl/Cmd-click toggles this node's membership in the current multi-selection.
         const next = new Set(store.state.selectedNodeIds);
