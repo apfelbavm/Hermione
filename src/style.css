@@ -348,7 +348,13 @@ body.resizing {
   gap: 6px;
   padding: 4px 6px;
   border-radius: 4px;
-  background: #1c1f24;
+  /* background: #1c1f24; */
+}
+
+/* Same hover background as the canvas's right-click node-search menu (.node-search-list li:hover)
+ * — excluded on a row that's already selected/active so hovering it doesn't wash out that state. */
+.variable-row:hover:not(.variable-row-selected):not(.function-row-active) {
+  background: #84a1b475;
 }
 
 .variable-type-dot {
