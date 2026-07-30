@@ -11,7 +11,7 @@ import {
 } from "../engine/graphMutations";
 import type { FunctionDef, PinSignatureEntry, PinType } from "../engine/types";
 import type { Store } from "../state/store";
-import { setupCollapsibleSection } from "./collapsibleSection";
+import { setSectionEmpty, setupCollapsibleSection } from "./collapsibleSection";
 import { FUNCTION_IO_ENTRY_DRAG_MIME } from "./dragTypes";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
@@ -73,6 +73,7 @@ export function createFunctionIoPanel(
 
     elements.list.innerHTML = "";
     const entries = entriesOf(fn);
+    setSectionEmpty(elements.section, entries.length === 0);
     const update = kind === "input" ? updateFunctionInput : updateFunctionOutput;
     const removeEntry = kind === "input" ? removeFunctionInput : removeFunctionOutput;
 

@@ -1,7 +1,7 @@
 import { createTemplatedCodeScriptDef, moveScript, removeCodeScriptDef } from "../engine/graphMutations";
 import type { CodeScriptDef } from "../engine/types";
 import { closeScriptTab, openScriptTab, type Store } from "../state/store";
-import { setupCollapsibleSection } from "./collapsibleSection";
+import { setSectionEmpty, setupCollapsibleSection } from "./collapsibleSection";
 import { SCRIPT_DRAG_MIME } from "./dragTypes";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
@@ -45,6 +45,7 @@ export function createScriptsPanel(elements: ScriptsPanelElements, store: Store)
   function render(): void {
     if (isRenamingWithinList(elements.list)) return;
 
+    setSectionEmpty(elements.section, store.state.rootGraph.scripts.length === 0);
     elements.list.innerHTML = "";
     for (const script of store.state.rootGraph.scripts) {
       const isEditing = editingId === script.id;

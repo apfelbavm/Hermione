@@ -12,7 +12,7 @@ import {
 } from "../engine/graphMutations";
 import type { CodeScriptDef, PinSignatureEntry, PinType } from "../engine/types";
 import type { Store } from "../state/store";
-import { setupCollapsibleSection } from "./collapsibleSection";
+import { setSectionEmpty, setupCollapsibleSection } from "./collapsibleSection";
 import { SCRIPT_IO_ENTRY_DRAG_MIME } from "./dragTypes";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
@@ -72,6 +72,7 @@ export function createScriptIoPanel(
 
     elements.list.innerHTML = "";
     const entries = entriesOf(script);
+    setSectionEmpty(elements.section, entries.length === 0);
     const update = kind === "input" ? updateScriptInput : updateScriptOutput;
     const removeEntry = kind === "input" ? removeScriptInput : removeScriptOutput;
     const moveEntry = kind === "input" ? moveScriptInput : moveScriptOutput;

@@ -314,6 +314,14 @@ body.resizing {
   content: "▸ ";
 }
 
+/* No expand/collapse arrow on a category with nothing in it (see collapsibleSection.ts's
+   setSectionEmpty) — there's nothing to reveal, so the affordance would be dead weight. Still
+   takes up its 12px slot (just the glyph is blanked) so the title text doesn't jump left/right
+   as items are added/removed. */
+.panel-section.panel-section-empty .panel-header-title::before {
+  content: "";
+}
+
 .panel-section.collapsed .panel-body {
   display: none;
 }

@@ -1,7 +1,7 @@
 import { createFunctionDef, moveFunction, removeFunctionDef } from "../engine/graphMutations";
 import type { FunctionDef } from "../engine/types";
 import { closeFunctionTab, openFunctionTab, type Store } from "../state/store";
-import { setupCollapsibleSection } from "./collapsibleSection";
+import { setSectionEmpty, setupCollapsibleSection } from "./collapsibleSection";
 import { FUNCTION_DRAG_MIME } from "./dragTypes";
 import { createEditableNameInput, createEditableNameLabel, focusAndSelect, isRenamingWithinList } from "./editableNameCell";
 import { openRowContextMenu } from "./rowContextMenu";
@@ -46,6 +46,7 @@ export function createFunctionsPanel(elements: FunctionsPanelElements, store: St
   function render(): void {
     if (isRenamingWithinList(elements.list)) return;
 
+    setSectionEmpty(elements.section, store.state.rootGraph.functions.length === 0);
     elements.list.innerHTML = "";
     for (const fn of store.state.rootGraph.functions) {
       const isEditing = editingId === fn.id;
