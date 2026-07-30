@@ -2,6 +2,7 @@ import "./style.css";
 import { registerBuiltins } from "./nodes";
 import { createExecutionContext, runExecFrom } from "./engine/executor";
 import { connectPins, insertRerouteOnConnection, removeInstancePin } from "./engine/graphMutations";
+import { canCollapseSelectionToFunction, collapseSelectionToFunction } from "./engine/collapseToFunction";
 import { connectionsTouchingPin } from "./engine/graphQueries";
 import { allNodeDefs, findCompatibleNodeDefs, getNodeDef, isPinTypeCompatible, topLevelGroup } from "./engine/registry";
 import type { CodeScriptDef, FunctionDef, NodeDef, Variable } from "./engine/types";
@@ -33,6 +34,7 @@ import { createGraphTabs } from "./overlay/graphTabs";
 import { openNodeSearchMenu } from "./overlay/nodeSearchMenu";
 import { FUNCTION_DRAG_MIME, SCRIPT_DRAG_MIME, VARIABLE_DRAG_MIME } from "./overlay/dragTypes";
 import { openRowContextMenu, type ContextMenuItem } from "./overlay/rowContextMenu";
+import { nextAvailableName } from "./overlay/uniqueName";
 import { loadGraphFromFile, loadGraphFromLocalStorage } from "./persistence/load";
 import { deleteSavedGraph, downloadGraphAsFile, saveGraphToLocalStorage } from "./persistence/save";
 import { downloadCompiledGraph } from "./compiler/codegen";
@@ -473,6 +475,22 @@ canvas.addEventListener("contextmenu", (e) => {
         },
       },
     ];
+
+    // Operates on the FULL current selection (unlike Delete/Disable above, which only ever act on
+    // the single right-clicked node) — the whole point is collapsing a multi-node selection, and by
+    // this point selectedNodeIds already reflects either that multi-selection (if the right-clicked
+    // node was already part of it) or the single node it was just replaced with (see above).
+    const selection = store.state.selectedNodeIds;
+    items.push({
+      label: "Collapse to Function",
+      disabled: !canCollapseSelectionToFunction(store.state.rootGraph, graph, selection, variables, functions, scripts),
+      onClick: () => {
+        const name = nextAvailableName(store.state.rootGraph.functions.map((f) => f.name), "NewFunction");
+        const { callNodeId } = collapseSelectionToFunction(store.state.rootGraph, graph, selection, variables, functions, scripts, name);
+        store.state.selectedNodeIds = new Set([callNodeId]);
+        store.notify();
+      },
+    });
 
     if (node.canToggleDisabled(variables, functions, scripts)) {
       const isDisabled = !!node.disabled;

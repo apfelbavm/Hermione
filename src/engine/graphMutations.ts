@@ -486,7 +486,7 @@ export interface TypedEntryPatch {
 /** A brand-new default for `type`/`container` — an empty list for any non-"single" container
  * (Array/Set/Map are all backed by a plain array, see PinContainer's own doc comment), otherwise
  * the plain per-type default. */
-function defaultValueFor(
+export function defaultValueFor(
   type: PinType,
   container: PinContainer | undefined,
 ): unknown {
