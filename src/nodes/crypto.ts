@@ -13,6 +13,15 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+// Dropdown choices for the encryption-tuning pins below, taken straight from openpgp's own enums
+// so a new algorithm openpgp.js adds later shows up automatically — the numeric enum VALUE is what
+// openpgp.config actually wants, but pins show/store the readable KEY ("aes256", not 9).
+// "experimentalGCM" is deliberately excluded: openpgp.js's own docs mark it non-standard/unstable,
+// not something to offer as a normal choice alongside eax/ocb/gcm.
+const PGP_SYMMETRIC_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.symmetric);
+const PGP_COMPRESSION_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.compression);
+const PGP_AEAD_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.aead).filter((k) => k !== "experimentalGCM");
+
 registerNode({
   type: "crypto.pgpEncrypt",
   label: "PGP Encrypt",
@@ -22,6 +31,39 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "plaintext", label: "Plaintext", type: "string", direction: "input", defaultValue: "", multiline: true },
     { id: "publicKeyArmored", label: "Public Key", type: "string", direction: "input", defaultValue: "", multiline: true },
+    // When true (the default), none of the pins below are applied at all — openpgp.encrypt() picks
+    // every one of them itself (mainly negotiated from the recipient key's own stated preferences),
+    // which is the normal, recommended OpenPGP behavior. Turn it off to override any of them.
+    { id: "autoDetectSettings", label: "Auto-Detect Settings", type: "boolean", direction: "input", defaultValue: true },
+    {
+      id: "symmetricAlgorithm",
+      label: "Symmetric Algorithm",
+      type: "string",
+      direction: "input",
+      defaultValue: "aes256",
+      options: PGP_SYMMETRIC_ALGORITHM_OPTIONS,
+    },
+    {
+      id: "compressionAlgorithm",
+      label: "Compression",
+      type: "string",
+      direction: "input",
+      defaultValue: "uncompressed",
+      options: PGP_COMPRESSION_ALGORITHM_OPTIONS,
+    },
+    { id: "aeadProtect", label: "Use AEAD", type: "boolean", direction: "input", defaultValue: openpgp.config.aeadProtect },
+    {
+      id: "aeadAlgorithm",
+      label: "AEAD Algorithm",
+      type: "string",
+      direction: "input",
+      defaultValue: "gcm",
+      options: PGP_AEAD_ALGORITHM_OPTIONS,
+    },
+    { id: "showVersion", label: "Show Version Comment", type: "boolean", direction: "input", defaultValue: openpgp.config.showVersion },
+    { id: "versionString", label: "Version Comment", type: "string", direction: "input", defaultValue: openpgp.config.versionString },
+    { id: "showComment", label: "Show Comment", type: "boolean", direction: "input", defaultValue: openpgp.config.showComment },
+    { id: "commentString", label: "Comment", type: "string", direction: "input", defaultValue: openpgp.config.commentString },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
     { id: "encryptedArmored", label: "Encrypted", type: "string", direction: "output" },
     { id: "success", label: "Success", type: "boolean", direction: "output" },
@@ -31,7 +73,20 @@ registerNode({
     try {
       const publicKey = await openpgp.readKey({ armoredKey: String(inputs.publicKeyArmored ?? "") });
       const message = await openpgp.createMessage({ text: String(inputs.plaintext ?? "") });
-      const encryptedArmored = await openpgp.encrypt({ message, encryptionKeys: publicKey });
+      const config = inputs.autoDetectSettings
+        ? undefined
+        : {
+            preferredSymmetricAlgorithm: openpgp.enums.symmetric[String(inputs.symmetricAlgorithm) as keyof typeof openpgp.enums.symmetric],
+            preferredCompressionAlgorithm:
+              openpgp.enums.compression[String(inputs.compressionAlgorithm) as keyof typeof openpgp.enums.compression],
+            aeadProtect: Boolean(inputs.aeadProtect),
+            preferredAEADAlgorithm: openpgp.enums.aead[String(inputs.aeadAlgorithm) as keyof typeof openpgp.enums.aead],
+            showVersion: Boolean(inputs.showVersion),
+            versionString: String(inputs.versionString ?? ""),
+            showComment: Boolean(inputs.showComment),
+            commentString: String(inputs.commentString ?? ""),
+          };
+      const encryptedArmored = await openpgp.encrypt({ message, encryptionKeys: publicKey, config });
       return { nextExec: "exec-out", outputs: { encryptedArmored, success: true, error: "" } };
     } catch (err) {
       return { nextExec: "exec-out", outputs: { encryptedArmored: "", success: false, error: errorMessage(err) } };
@@ -42,7 +97,17 @@ registerNode({
       try {
         const publicKey = await openpgp.readKey({ armoredKey: ${inputs.publicKeyArmored} });
         const message = await openpgp.createMessage({ text: ${inputs.plaintext} });
-        const encryptedArmored = await openpgp.encrypt({ message, encryptionKeys: publicKey });
+        const config = ${inputs.autoDetectSettings} ? undefined : {
+          preferredSymmetricAlgorithm: openpgp.enums.symmetric[${inputs.symmetricAlgorithm}],
+          preferredCompressionAlgorithm: openpgp.enums.compression[${inputs.compressionAlgorithm}],
+          aeadProtect: Boolean(${inputs.aeadProtect}),
+          preferredAEADAlgorithm: openpgp.enums.aead[${inputs.aeadAlgorithm}],
+          showVersion: Boolean(${inputs.showVersion}),
+          versionString: String(${inputs.versionString} ?? ""),
+          showComment: Boolean(${inputs.showComment}),
+          commentString: String(${inputs.commentString} ?? ""),
+        };
+        const encryptedArmored = await openpgp.encrypt({ message, encryptionKeys: publicKey, config });
         return { encryptedArmored, success: true, error: "" };
       } catch (err) {
         return { encryptedArmored: "", success: false, error: err instanceof Error ? err.message : String(err) };
@@ -68,6 +133,25 @@ registerNode({
     { id: "privateKeyArmored", label: "Private Key", type: "string", direction: "input", defaultValue: "", multiline: true },
     // Left empty for a private key that isn't itself passphrase-protected.
     { id: "passphrase", label: "Passphrase", type: "string", direction: "input", defaultValue: "" },
+    // Same "off by default" gate as crypto.pgpEncrypt's own — decrypt already reads which algorithm
+    // was used straight off the message itself, so these two pins are strictly about how STRICT to
+    // be with a message/key that fails one of openpgp's own safety checks, not "how to decrypt."
+    { id: "autoDetectSettings", label: "Auto-Detect Settings", type: "boolean", direction: "input", defaultValue: true },
+    {
+      id: "allowUnauthenticatedMessages",
+      label: "Allow Unauthenticated Messages",
+      type: "boolean",
+      direction: "input",
+      defaultValue: openpgp.config.allowUnauthenticatedMessages,
+    },
+    {
+      id: "minRSABits",
+      label: "Minimum RSA Key Size",
+      type: "number",
+      direction: "input",
+      defaultValue: openpgp.config.minRSABits,
+      integer: true,
+    },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
     { id: "plaintext", label: "Plaintext", type: "string", direction: "output" },
     { id: "success", label: "Success", type: "boolean", direction: "output" },
@@ -79,7 +163,13 @@ registerNode({
       const passphrase = String(inputs.passphrase ?? "");
       if (passphrase) privateKey = await openpgp.decryptKey({ privateKey, passphrase });
       const message = await openpgp.readMessage({ armoredMessage: String(inputs.encryptedArmored ?? "") });
-      const { data: plaintext } = await openpgp.decrypt({ message, decryptionKeys: privateKey });
+      const config = inputs.autoDetectSettings
+        ? undefined
+        : {
+            allowUnauthenticatedMessages: Boolean(inputs.allowUnauthenticatedMessages),
+            minRSABits: Number(inputs.minRSABits),
+          };
+      const { data: plaintext } = await openpgp.decrypt({ message, decryptionKeys: privateKey, config });
       return { nextExec: "exec-out", outputs: { plaintext: String(plaintext), success: true, error: "" } };
     } catch (err) {
       return { nextExec: "exec-out", outputs: { plaintext: "", success: false, error: errorMessage(err) } };
@@ -92,7 +182,11 @@ registerNode({
         const passphrase = ${inputs.passphrase};
         if (passphrase) privateKey = await openpgp.decryptKey({ privateKey, passphrase });
         const message = await openpgp.readMessage({ armoredMessage: ${inputs.encryptedArmored} });
-        const { data: plaintext } = await openpgp.decrypt({ message, decryptionKeys: privateKey });
+        const config = ${inputs.autoDetectSettings} ? undefined : {
+          allowUnauthenticatedMessages: Boolean(${inputs.allowUnauthenticatedMessages}),
+          minRSABits: Number(${inputs.minRSABits}),
+        };
+        const { data: plaintext } = await openpgp.decrypt({ message, decryptionKeys: privateKey, config });
         return { plaintext: String(plaintext), success: true, error: "" };
       } catch (err) {
         return { plaintext: "", success: false, error: err instanceof Error ? err.message : String(err) };

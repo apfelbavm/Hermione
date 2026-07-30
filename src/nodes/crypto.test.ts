@@ -115,6 +115,63 @@ describe("crypto.pgpEncrypt / crypto.pgpDecrypt", () => {
     expect(decOutputs.get("dec3:success")).toBe(false);
     expect(decOutputs.get("dec3:plaintext")).toBe("");
   });
+
+  it("leaves the config untouched (auto-negotiated) when autoDetectSettings is true, even if the tuning pins hold different values", async () => {
+    const outputs = await runNode("crypto.pgpEncrypt", "enc4", {
+      plaintext: "hi",
+      publicKeyArmored,
+      autoDetectSettings: true,
+      showVersion: true,
+      versionString: "should-be-ignored",
+    });
+    expect(outputs.get("enc4:success")).toBe(true);
+    // Auto mode never passes a config object at all, so openpgp's own default (showVersion: false)
+    // applies regardless of what the (unused) showVersion/versionString pins are set to.
+    expect(outputs.get("enc4:encryptedArmored") as string).not.toContain("should-be-ignored");
+  });
+
+  it("applies the explicit tuning pins end-to-end when autoDetectSettings is false", async () => {
+    const encOutputs = await runNode("crypto.pgpEncrypt", "enc5", {
+      plaintext: "tunable message",
+      publicKeyArmored,
+      autoDetectSettings: false,
+      symmetricAlgorithm: "aes128",
+      compressionAlgorithm: "zip",
+      aeadProtect: false,
+      showVersion: true,
+      versionString: "Hermione-Test/1.0",
+      showComment: true,
+      commentString: "a custom comment",
+    });
+    expect(encOutputs.get("enc5:success")).toBe(true);
+    const encryptedArmored = encOutputs.get("enc5:encryptedArmored") as string;
+    expect(encryptedArmored).toContain("Version: Hermione-Test/1.0");
+    expect(encryptedArmored).toContain("Comment: a custom comment");
+
+    // The message still decrypts normally regardless of which symmetric/compression algorithm the
+    // sender picked — that's negotiated once at encryption time and simply recorded in the message.
+    const decOutputs = await runNode("crypto.pgpDecrypt", "dec5", {
+      encryptedArmored,
+      privateKeyArmored,
+      passphrase: "",
+    });
+    expect(decOutputs.get("dec5:success")).toBe(true);
+    expect(decOutputs.get("dec5:plaintext")).toBe("tunable message");
+  });
+
+  it("still round-trips correctly when decrypt's own autoDetectSettings is turned off with matching (permissive) values", async () => {
+    const encOutputs = await runNode("crypto.pgpEncrypt", "enc6", { plaintext: "explicit decrypt config", publicKeyArmored });
+    const decOutputs = await runNode("crypto.pgpDecrypt", "dec6", {
+      encryptedArmored: encOutputs.get("enc6:encryptedArmored"),
+      privateKeyArmored,
+      passphrase: "",
+      autoDetectSettings: false,
+      allowUnauthenticatedMessages: false,
+      minRSABits: 2047,
+    });
+    expect(decOutputs.get("dec6:success")).toBe(true);
+    expect(decOutputs.get("dec6:plaintext")).toBe("explicit decrypt config");
+  });
 });
 
 describe("crypto.pkcs7Encrypt / crypto.pkcs7Decrypt", () => {
