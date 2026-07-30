@@ -82,9 +82,15 @@ export function hitTestPin(
   return null;
 }
 
+/** Which corner of a comment box is being grabbed to resize it — all four are resizable, even
+ * though the drawn triangle affordance (see drawComments.ts) only ever appears at "se", matching
+ * Unreal's own comment box (a visible handle in one corner, but every corner is actually live). */
+export type CommentCorner = "nw" | "ne" | "sw" | "se";
+
 export interface CommentResizeHit {
   kind: "comment-resize";
   commentId: string;
+  corner: CommentCorner;
 }
 
 export interface CommentHeaderHit {
@@ -102,15 +108,21 @@ export function hitTestCommentResizeHandle(
     const box = graph.commentBoxes[i];
     const rect = computeCommentScreenRect(box, camera);
     const hs = COMMENT_RESIZE_HANDLE_SCREEN_SIZE;
-    const hx = rect.screenX + rect.width;
-    const hy = rect.screenY + rect.height;
-    if (
-      screenX >= hx - hs &&
-      screenX <= hx &&
-      screenY >= hy - hs &&
-      screenY <= hy
-    ) {
-      return { kind: "comment-resize", commentId: box.id };
+    const corners: { corner: CommentCorner; x: number; y: number }[] = [
+      { corner: "nw", x: rect.screenX, y: rect.screenY },
+      { corner: "ne", x: rect.screenX + rect.width, y: rect.screenY },
+      { corner: "sw", x: rect.screenX, y: rect.screenY + rect.height },
+      { corner: "se", x: rect.screenX + rect.width, y: rect.screenY + rect.height },
+    ];
+    for (const c of corners) {
+      if (
+        screenX >= c.x - hs &&
+        screenX <= c.x + hs &&
+        screenY >= c.y - hs &&
+        screenY <= c.y + hs
+      ) {
+        return { kind: "comment-resize", commentId: box.id, corner: c.corner };
+      }
     }
   }
   return null;

@@ -30,6 +30,7 @@ import {
   DEFAULT_COMMENT_WIDTH,
   rectContains,
   rectIntersects,
+  type WorldRect,
 } from "../render/commentGeometry";
 import { snapPositionToGrid } from "../render/drawGrid";
 import {
@@ -42,6 +43,7 @@ import {
   hitTestNode,
   hitTestNodeAddButton,
   hitTestPin,
+  type CommentCorner,
   type PinHit,
 } from "../render/hitTest";
 import {
@@ -74,7 +76,15 @@ type DragMode =
       grabOffsetX: number;
       grabOffsetY: number;
     }
-  | { kind: "comment-resize"; commentId: string };
+  | {
+      kind: "comment-resize";
+      commentId: string;
+      corner: CommentCorner;
+      /** World-space position of the box's OPPOSITE corner, fixed for the whole drag — e.g.
+       * grabbing "nw" anchors the box's bottom-right — so the new rect can be derived from just
+       * this plus the cursor's current world position, regardless of which corner was grabbed. */
+      anchor: { x: number; y: number };
+    };
 
 export interface WireAnchor {
   /** The pin end that stays fixed while the other end follows the cursor. */
@@ -183,6 +193,17 @@ function recomputeContainment(
     .map((n) => n.id);
 }
 
+/** The marquee's own start/current corners (in either order) as a normalized world-space rect —
+ * shared by every "what does the marquee touch" query below. */
+function marqueeWorldRect(marquee: MarqueeSelectionState): WorldRect {
+  return {
+    x: Math.min(marquee.startWorld.x, marquee.currentWorld.x),
+    y: Math.min(marquee.startWorld.y, marquee.currentWorld.y),
+    width: Math.abs(marquee.currentWorld.x - marquee.startWorld.x),
+    height: Math.abs(marquee.currentWorld.y - marquee.startWorld.y),
+  };
+}
+
 /** Every node id whose world rect intersects a marquee-select box (start/current corners, in either
  * order) — shared by the marquee's own mousemove (so the selection updates live as the box is
  * dragged, matching Unreal/most node editors) and its mouseup (which just finalizes the same
@@ -194,12 +215,7 @@ function computeMarqueeSelectedNodeIds(
   scripts: CodeScriptDef[],
   marquee: MarqueeSelectionState,
 ): Set<string> {
-  const box = {
-    x: Math.min(marquee.startWorld.x, marquee.currentWorld.x),
-    y: Math.min(marquee.startWorld.y, marquee.currentWorld.y),
-    width: Math.abs(marquee.currentWorld.x - marquee.startWorld.x),
-    height: Math.abs(marquee.currentWorld.y - marquee.startWorld.y),
-  };
+  const box = marqueeWorldRect(marquee);
   const touched = graph.nodes.filter((n) =>
     rectIntersects(
       box,
@@ -207,6 +223,30 @@ function computeMarqueeSelectedNodeIds(
     ),
   );
   return new Set(touched.map((n) => n.id));
+}
+
+/** The id of a comment box the marquee touches, or null — the hot zone is deliberately just the
+ * box's TITLE BAR (matching hitTestCommentHeader's own click/drag hot zone), not its whole body,
+ * so a marquee drawn entirely inside a large comment box (to select nodes placed within it)
+ * doesn't also always drag the comment box itself into the selection. Comment boxes only support
+ * one active selection at a time (see AppState.selectedCommentId) — if the marquee happens to
+ * touch more than one header, the last one (topmost in z-order) wins, same as a click would. */
+function computeMarqueeSelectedCommentId(
+  graph: Graph,
+  marquee: MarqueeSelectionState,
+): string | null {
+  const box = marqueeWorldRect(marquee);
+  let selected: string | null = null;
+  for (const commentBox of graph.commentBoxes) {
+    const headerRect: WorldRect = {
+      x: commentBox.position.x,
+      y: commentBox.position.y,
+      width: commentBox.size.width,
+      height: COMMENT_HEADER_HEIGHT,
+    };
+    if (rectIntersects(box, headerRect)) selected = commentBox.id;
+  }
+  return selected;
 }
 
 export interface PointerInteraction {
@@ -368,6 +408,7 @@ export function setupPointerInteraction(
       scripts,
       marquee,
     );
+    store.state.selectedCommentId = computeMarqueeSelectedCommentId(graph, marquee);
   }
 
   function startAutoPanLoop(): void {
@@ -590,9 +631,28 @@ export function setupPointerInteraction(
 
     const resizeHit = hitTestCommentResizeHandle(graph, camera, pos.x, pos.y);
     if (resizeHit) {
+      const box = graph.commentBoxes.find((b) => b.id === resizeHit.commentId)!;
+      // The FIXED opposite corner — e.g. grabbing "nw" anchors the box's bottom-right — captured
+      // once here so the whole drag can derive the new rect from just this plus the live cursor
+      // position (see the mousemove handler below), regardless of which corner was grabbed.
+      const anchor = {
+        x:
+          resizeHit.corner === "nw" || resizeHit.corner === "sw"
+            ? box.position.x + box.size.width
+            : box.position.x,
+        y:
+          resizeHit.corner === "nw" || resizeHit.corner === "ne"
+            ? box.position.y + box.size.height
+            : box.position.y,
+      };
       store.state.selectedCommentId = resizeHit.commentId;
       store.state.selectedNodeIds = new Set();
-      drag = { kind: "comment-resize", commentId: resizeHit.commentId };
+      drag = {
+        kind: "comment-resize",
+        commentId: resizeHit.commentId,
+        corner: resizeHit.corner,
+        anchor,
+      };
       store.notify();
       return;
     }
@@ -693,19 +753,25 @@ export function setupPointerInteraction(
   window.addEventListener("mousemove", (e) => {
     lastMouseScreenPos = screenPos(e);
 
-    // Resize-cursor hover feedback over the comment box's corner handle — shown while just
-    // hovering it (not dragging anything) or throughout an active resize (keeps it consistent for
-    // the whole drag, rather than flickering back to the default cursor mid-resize).
+    // Resize-cursor hover feedback over any of the comment box's four corners — shown while just
+    // hovering one (not dragging anything) or throughout an active resize (keeps it consistent for
+    // the whole drag, rather than flickering back to the default cursor mid-resize). The diagonal
+    // matches the corner: "nw"/"se" run top-left-to-bottom-right, "ne"/"sw" the other way.
     if (drag.kind === "none" || drag.kind === "comment-resize") {
-      const hovering =
-        drag.kind === "comment-resize" ||
-        !!hitTestCommentResizeHandle(
-          getEditingGraph(store.state),
-          store.state.camera,
-          lastMouseScreenPos.x,
-          lastMouseScreenPos.y,
-        );
-      canvas.style.cursor = hovering ? "nwse-resize" : "";
+      const corner =
+        drag.kind === "comment-resize"
+          ? drag.corner
+          : hitTestCommentResizeHandle(
+              getEditingGraph(store.state),
+              store.state.camera,
+              lastMouseScreenPos.x,
+              lastMouseScreenPos.y,
+            )?.corner;
+      canvas.style.cursor = corner
+        ? corner === "nw" || corner === "se"
+          ? "nwse-resize"
+          : "nesw-resize"
+        : "";
     }
 
     if (drag.kind === "none") return;
@@ -767,19 +833,22 @@ export function setupPointerInteraction(
     }
 
     if (drag.kind === "comment-resize") {
-      const { commentId } = drag;
+      const { commentId, anchor } = drag;
       const box = graph.commentBoxes.find((b) => b.id === commentId);
       if (box) {
         const pos = screenPos(e);
         const worldPos = camera.screenToWorld(pos.x, pos.y);
-        box.size.width = Math.max(
-          COMMENT_MIN_SIZE,
-          worldPos.x - box.position.x,
-        );
-        box.size.height = Math.max(
-          COMMENT_MIN_SIZE,
-          worldPos.y - box.position.y,
-        );
+        // The new rect is fully determined by the fixed anchor (the opposite corner) plus the
+        // cursor's current world position — works for any of the four corners uniformly, since
+        // "which side grows" falls out of which side of the anchor the cursor is currently on.
+        const rawWidth = worldPos.x - anchor.x;
+        const rawHeight = worldPos.y - anchor.y;
+        const width = Math.max(COMMENT_MIN_SIZE, Math.abs(rawWidth));
+        const height = Math.max(COMMENT_MIN_SIZE, Math.abs(rawHeight));
+        box.position.x = rawWidth >= 0 ? anchor.x : anchor.x - width;
+        box.position.y = rawHeight >= 0 ? anchor.y : anchor.y - height;
+        box.size.width = width;
+        box.size.height = height;
       }
       store.notify();
     }
@@ -855,6 +924,7 @@ export function setupPointerInteraction(
         const functions = store.state.rootGraph.functions;
         const scripts = store.state.rootGraph.scripts;
         store.state.selectedNodeIds = computeMarqueeSelectedNodeIds(graph, variables, functions, scripts, marquee);
+        store.state.selectedCommentId = computeMarqueeSelectedCommentId(graph, marquee);
       }
       store.state.marqueeSelection = null;
       drag = { kind: "none" };

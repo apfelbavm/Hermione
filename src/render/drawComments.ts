@@ -7,9 +7,11 @@ import {
   DEFAULT_COMMENT_COLOR,
 } from "./commentGeometry";
 
-const BOX_FILL = "rgba(255, 255, 255, 0.14)";
 const SELECTED_BORDER = "#e8b339";
-const COLOR_OPACITY = 0.5;
+const HEADER_COLOR_OPACITY = 0.5;
+// The body uses the SAME user-chosen color as the header (see box.color), just far more
+// transparent — a colored wash rather than the header's solid-reading band.
+const BODY_COLOR_OPACITY = 0.14;
 
 export function drawComments(
   ctx: CanvasRenderingContext2D,
@@ -20,15 +22,14 @@ export function drawComments(
   for (const box of graph.commentBoxes) {
     const rect = computeCommentScreenRect(box, camera);
     const selected = selectedCommentId === box.id;
+    const color = box.color ?? DEFAULT_COMMENT_COLOR;
     // The title bar background and the border are both the user-defined color (default
     // white), always rendered at 75% opacity so the box is never fully opaque — matching
-    // Unreal's comment-box look. The body stays a neutral, low-opacity fill.
-    const tint = Colors.hexToRgba(
-      box.color ?? DEFAULT_COMMENT_COLOR,
-      COLOR_OPACITY,
-    );
+    // Unreal's comment-box look. The body uses that same color, just far more transparent.
+    const tint = Colors.hexToRgba(color, HEADER_COLOR_OPACITY);
+    const bodyTint = Colors.hexToRgba(color, BODY_COLOR_OPACITY);
 
-    ctx.fillStyle = BOX_FILL;
+    ctx.fillStyle = bodyTint;
     ctx.fillRect(rect.screenX, rect.screenY, rect.width, rect.height);
 
     ctx.fillStyle = tint;
