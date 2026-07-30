@@ -20,6 +20,7 @@ import "./reroute";
 import "./xml";
 import "./csv";
 import "./code";
+import "./crypto";
 
 let registered = false;
 

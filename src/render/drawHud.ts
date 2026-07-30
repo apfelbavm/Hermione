@@ -10,7 +10,7 @@ export function drawMouseCoordinates(ctx: CanvasRenderingContext2D, worldPos: { 
 
   ctx.save();
   ctx.globalAlpha = 0.15;
-  ctx.font = `${FONT_SIZE}px Segoe UI, sans-serif`;
+  ctx.font = `bold ${FONT_SIZE}px Segoe UI, sans-serif`;
   ctx.fillStyle = Colors.TEXT_PRIMARY;
   ctx.textAlign = "right";
   ctx.textBaseline = "bottom";
