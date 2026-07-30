@@ -1035,7 +1035,12 @@ body.resizing {
 }
 
 .comment-title {
+  /* display: inline-block (not the default block) so an absolutely-positioned title with only
+     left/top set shrink-wraps to its own text instead of stretching to fill available width. */
+  display: inline-block;
   box-sizing: border-box;
+  min-width: 2em;
+  min-height: 1.25em;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 3px;
@@ -1049,11 +1054,11 @@ body.resizing {
   cursor: text;
 }
 
-/* No background wash on hover/focus — it used to cover a small content-fit box, but now that the
-   title spans nearly the whole header, a filled background there just reads as a stray dark box.
-   A border is enough to hint that it's editable. */
+/* Shrink-wrapped to its own text now (see above), so a filled background reads as highlighting
+   the actual editable field instead of covering a big stray box across the whole header. */
 .comment-title:hover,
 .comment-title:focus {
+  background: rgba(255, 255, 255, 0.1);
   border-color: #454a52;
 }
 

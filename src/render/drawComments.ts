@@ -7,7 +7,7 @@ import {
   DEFAULT_COMMENT_COLOR,
 } from "./commentGeometry";
 
-const BOX_FILL = "rgba(255, 255, 255, 0.04)";
+const BOX_FILL = "rgba(255, 255, 255, 0.14)";
 const SELECTED_BORDER = "#e8b339";
 const COLOR_OPACITY = 0.5;
 

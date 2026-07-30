@@ -43,11 +43,15 @@ export function createCommentOverlay(overlay: HTMLElement, canvas: HTMLCanvasEle
       const headerHeightPx = COMMENT_HEADER_HEIGHT * camera.zoom;
       const padding = 6 * camera.zoom;
 
+      // Left/top only (no explicit width/height) so the box shrink-wraps its actual text instead of
+      // claiming the whole header — max-width still caps it from overflowing the comment box on a
+      // long title, and max-height still caps runaway wrapping, but an empty/short title now reads
+      // (and hover-highlights) as just its own small box rather than a big invisible click target.
       entry.titleEl.style.position = "absolute";
       entry.titleEl.style.left = `${rect.screenX + padding}px`;
-      entry.titleEl.style.top = `${rect.screenY}px`;
-      entry.titleEl.style.width = `${rect.width - padding * 2}px`;
-      entry.titleEl.style.height = `${headerHeightPx}px`;
+      entry.titleEl.style.top = `${rect.screenY + padding}px`;
+      entry.titleEl.style.maxWidth = `${rect.width - padding * 2}px`;
+      entry.titleEl.style.maxHeight = `${headerHeightPx - padding * 2}px`;
       entry.titleEl.style.fontSize = `${12 * camera.zoom}px`;
 
       if (document.activeElement !== entry.titleEl) {
