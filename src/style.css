@@ -1001,7 +1001,8 @@ body.resizing {
 .node-search-menu {
   position: absolute;
   width: 350px;
-  max-height: 480px;
+  height: 480px;
+  max-height: calc(100% - 32px);
   background: #24272d;
   border: 1px solid #454a52;
   border-radius: 6px;
@@ -1031,6 +1032,12 @@ body.resizing {
   margin: 0;
   padding: 4px;
   overflow-y: auto;
+  /* Fills whatever vertical space .node-search-menu's fixed/clamped height leaves after the
+     search input above — min-height: 0 overrides a flex item's default auto min-height, which
+     would otherwise keep this list at its full content size and defeat overflow-y: auto entirely
+     (the menu box would grow instead of this list scrolling). */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .node-search-list li {
