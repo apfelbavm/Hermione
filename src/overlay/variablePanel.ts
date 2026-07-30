@@ -172,7 +172,7 @@ export function createVariablePanel(
               (screenPos) => {
                 openRowContextMenu(screenPos, [
                   {
-                    label: "Edit",
+                    label: "Rename",
                     onClick: () => {
                       editingId = variable.id;
                       store.notify();

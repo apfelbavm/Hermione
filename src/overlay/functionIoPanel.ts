@@ -131,7 +131,7 @@ export function createFunctionIoPanel(
           : createEditableNameLabel(entry.name, (screenPos) => {
               openRowContextMenu(screenPos, [
                 {
-                  label: "Edit",
+                  label: "Rename",
                   onClick: () => {
                     editingId = entry.id;
                     store.notify();

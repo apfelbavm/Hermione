@@ -653,6 +653,21 @@ export function setupPointerInteraction(
       return;
     }
 
+    // Entry (the function's inputs, as its own output pins) or Return (the function's outputs, as
+    // its own input pins) — jump to that function's Inputs/Outputs in the sidebar Details panel,
+    // same as double-clicking a Get/Set Variable node jumps to its variable below.
+    if (
+      (node.type === "function.entry" || node.type === "function.return") &&
+      node.functionId
+    ) {
+      store.state.sidebarSelection = {
+        kind: "function",
+        functionId: node.functionId,
+      };
+      store.notify();
+      return;
+    }
+
     // Same idea as Call Function above, but for the lower panel instead of the canvas tab strip —
     // opens (or focuses) this script's Monaco tab there (see scriptEditor.ts/openScriptTab).
     if (node.type === "code.run" && node.scriptId) {
