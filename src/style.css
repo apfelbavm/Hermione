@@ -898,6 +898,57 @@ body.resizing {
   white-space: pre-wrap;
 }
 
+/* Per-node instance description (see NodeInstance.description/detailsPanel.ts) — a persistent
+   speech-bubble above the node on the canvas, only ever created for a node that HAS one (see
+   nodeDescriptionOverlay.ts). Same look as .hover-tooltip (it's meant to read as "that same kind
+   of note"), just translucent (per-spec 75% background opacity, letting the grid/wires show
+   through a little) since — unlike the hover tooltip — it's always on screen rather than a
+   transient hint, and it needs its own comic-style tail pointing down at the node it belongs to. */
+.node-description-bubble {
+  position: absolute;
+  /* Y only — left/right untouched, so the bubble's own left edge lines up with the node's left
+     edge (see nodeDescriptionOverlay.ts) instead of being centered over it. */
+  transform: translateY(-100%);
+  z-index: 5;
+  max-width: 220px;
+  background: rgba(247, 246, 243, 0.75);
+  border: 1px solid rgba(214, 212, 205, 0.75);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  padding: 6px 10px;
+  color: #1c1c1a;
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+
+/* The speech-bubble's tail: a border-color triangle (::before) with a slightly smaller,
+   fill-color triangle (::after) laid on top of it, leaving a thin visible rim — the standard
+   two-triangle CSS speech-bubble technique. Both point straight down, offset near the bubble's
+   left edge (matching its own left-aligned position) rather than centered under it. */
+.node-description-bubble::before,
+.node-description-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 16px;
+  border-style: solid;
+  border-color: transparent;
+}
+
+.node-description-bubble::before {
+  transform: translateX(-50%);
+  border-width: 8px 8px 0 8px;
+  border-top-color: rgba(214, 212, 205, 0.75);
+}
+
+.node-description-bubble::after {
+  transform: translateX(-50%) translateY(-1px);
+  border-width: 7px 7px 0 7px;
+  border-top-color: rgba(247, 246, 243, 0.75);
+}
+
 .details-description-row {
   display: flex;
   flex-direction: column;

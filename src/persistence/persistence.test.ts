@@ -51,6 +51,7 @@ describe("persistence round-trip", () => {
       "print",
     );
     print.pins.message.value = "round-tripped";
+    print.description = "Reminder: this logs to the shared log panel";
     connectPins(graph, graph.variables, graph.functions, {
       fromNode: start.id,
       fromPin: "exec-out",

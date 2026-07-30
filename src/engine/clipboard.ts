@@ -175,6 +175,7 @@ function cloneOptionalFields(target: NodeInstance, source: NodeInstance): void {
   target.elementType = source.elementType;
   target.mapKeyType = source.mapKeyType;
   target.container = source.container;
+  target.description = source.description;
 }
 
 /** Deep-clones the given selection for copying: the nodes themselves (minus Entry/Return, which are

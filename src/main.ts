@@ -20,6 +20,7 @@ import { createStore, getEditingGraph, getVisibleVariablesForState } from "./sta
 import { createHistoryManager } from "./state/history";
 import { selectAllNodes, setupPointerInteraction, type WireAnchor } from "./interaction/pointerHandlers";
 import { createWidgetSync } from "./overlay/widgetSync";
+import { createNodeDescriptionOverlay } from "./overlay/nodeDescriptionOverlay";
 import { setupNodeHoverTooltip } from "./overlay/nodeTooltip";
 import { createCommentOverlay } from "./overlay/commentOverlay";
 import { setupResizablePanels } from "./overlay/resizablePanels";
@@ -125,6 +126,7 @@ function resizeCanvas(): void {
 const widgetSync = createWidgetSync(overlay, store);
 setupNodeHoverTooltip(canvas, store);
 const commentOverlay = createCommentOverlay(overlay, canvas, store);
+const nodeDescriptionOverlay = createNodeDescriptionOverlay(overlay, store);
 const variablePanel = createVariablePanel(
   {
     section: document.getElementById("variables-section") as HTMLDivElement,
@@ -272,8 +274,9 @@ const detailsPanel = createDetailsPanel(
 );
 
 /** The cheap, purely-visual half of a frame: canvas drawing + the DOM overlays that sit directly on
- * top of it (widgetSync, comment titles). Safe to run on every mousemove regardless of the graph's
- * size — unlike render() below, it never touches a sidebar panel's DOM. */
+ * top of it (widgetSync, comment titles, per-node description bubbles). Safe to run on every
+ * mousemove regardless of the graph's size — unlike render() below, it never touches a sidebar
+ * panel's DOM. */
 function renderCanvas(): void {
   const { camera, selectedNodeIds, selectedCommentId, executingNodeId, firedConnectionIds, wireDrag, marqueeSelection } = store.state;
   const graph = getEditingGraph(store.state);
@@ -294,6 +297,7 @@ function renderCanvas(): void {
   drawMouseCoordinates(ctx, camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y), width, height);
   widgetSync.sync(geometries);
   commentOverlay.sync();
+  nodeDescriptionOverlay.sync(geometries);
 }
 
 function render(): void {

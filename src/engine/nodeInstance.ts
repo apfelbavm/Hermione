@@ -36,6 +36,12 @@ export class NodeInstance {
    * depending on whichever wire it gets spliced into (see graphMutations.ts's
    * insertRerouteOnConnection), so its container has to live per-instance too. */
   container?: PinContainer;
+  /** User-authored, per-instance note — edited in the Details panel (see detailsPanel.ts) and shown
+   * as a small speech-bubble above this node on the canvas whenever it's non-empty (see
+   * overlay/nodeDescriptionOverlay.ts). Distinct from NodeDef.description (the node TYPE's static,
+   * shared blurb) and from a function.call's own resolveNodeDescription (its bound FunctionDef's
+   * description) — this is specific to this one instance, e.g. "remember to reset this before prod". */
+  description?: string;
 
   constructor(
     id: string,
@@ -57,6 +63,7 @@ export class NodeInstance {
     this.elementType = undefined;
     this.mapKeyType = undefined;
     this.container = undefined;
+    this.description = undefined;
   }
 
   /** Seed element/key type for a freshly-created configurableElementType node instance (see

@@ -71,6 +71,22 @@ export function createDetailsPanel(
 
     elements.nodeFieldsContainer.innerHTML = "";
 
+    const descRow = document.createElement("div");
+    descRow.className = "details-description-row";
+    const descLabel = document.createElement("span");
+    descLabel.className = "variable-name";
+    descLabel.textContent = "Description";
+    const descTextarea = document.createElement("textarea");
+    descTextarea.className = "details-description-input";
+    descTextarea.placeholder = "Shown as a speech bubble above this node on the canvas";
+    descTextarea.value = node.description ?? "";
+    descTextarea.addEventListener("input", () => {
+      node.description = descTextarea.value;
+      store.notify();
+    });
+    descRow.append(descLabel, descTextarea);
+    elements.nodeFieldsContainer.appendChild(descRow);
+
     if (def.configurableElementType) {
       const elementRow = document.createElement("div");
       elementRow.className = "variable-row";
@@ -232,14 +248,12 @@ export function createDetailsPanel(
       const [onlyId] = store.state.selectedNodeIds;
       const node = graph.nodes.find((n) => n.id === onlyId);
       const def = node ? getNodeDef(node.type) : undefined;
-      const properties = def?.detailProperties ?? [];
-      if (
-        node &&
-        def &&
-        (properties.length > 0 || def.configurableElementType)
-      ) {
+      // Every node gets the panel now — at minimum for its own instance Description field (see
+      // renderNodeProperties) — regardless of whether its type has any detailProperties/
+      // configurableElementType of its own to show alongside it.
+      if (node && def) {
         selectedNode = node;
-        nodeProperties = properties;
+        nodeProperties = def.detailProperties ?? [];
       }
     }
 

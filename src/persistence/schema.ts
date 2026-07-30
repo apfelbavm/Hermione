@@ -36,6 +36,7 @@ function reviveNode(node: NodeInstance): NodeInstance {
   revived.elementType = node.elementType;
   revived.mapKeyType = node.mapKeyType;
   revived.container = node.container;
+  revived.description = node.description;
   return revived;
 }
 
