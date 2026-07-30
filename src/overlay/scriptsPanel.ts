@@ -86,6 +86,12 @@ export function createScriptsPanel(elements: ScriptsPanelElements, store: Store)
         store.notify();
       });
 
+      function editScript(): void {
+        openScriptTab(store.state, script.id);
+        store.state.sidebarSelection = { kind: "script", scriptId: script.id };
+        store.notify();
+      }
+
       let nameInputToFocus: HTMLInputElement | null = null;
       const nameEl = isEditing
         ? (() => {
@@ -104,6 +110,10 @@ export function createScriptsPanel(elements: ScriptsPanelElements, store: Store)
             const label = createEditableNameLabel(script.name, (screenPos) => {
               openRowContextMenu(screenPos, [
                 {
+                  label: "Edit Script",
+                  onClick: editScript,
+                },
+                {
                   label: "Rename",
                   onClick: () => {
                     editingId = script.id;
@@ -114,11 +124,7 @@ export function createScriptsPanel(elements: ScriptsPanelElements, store: Store)
             });
             label.classList.add("function-name");
             label.title = "Click to open this script in the lower panel";
-            label.addEventListener("click", () => {
-              openScriptTab(store.state, script.id);
-              store.state.sidebarSelection = { kind: "script", scriptId: script.id };
-              store.notify();
-            });
+            label.addEventListener("click", editScript);
             return label;
           })();
 
