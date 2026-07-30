@@ -108,11 +108,10 @@ registerNode({
       type: "string",
       direction: "input",
       defaultValue: "",
-      multiline: true,
     },
     { id: "passphrase", label: "Passphrase", type: "string", direction: "input", defaultValue: "" },
     { id: "filePath", label: "File Path", type: "string", direction: "input", defaultValue: "" },
-    { id: "content", label: "Content", type: "string", direction: "input", defaultValue: "", multiline: true },
+    { id: "content", label: "Content", type: "string", direction: "input", defaultValue: "" },
     {
       id: "encoding",
       label: "Encoding",

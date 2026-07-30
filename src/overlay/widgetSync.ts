@@ -13,9 +13,9 @@ type WidgetElement = HTMLInputElement | HTMLSelectElement;
 
 interface WidgetEntry {
   el: WidgetElement;
-  /** Present only for a multiline string pin (see PinDef.multiline) — opens a floating textarea
-   * (multilineTextEditor.ts) to edit the pin's full value, since `el` itself is still a plain
-   * single-line <input> that silently collapses real newlines to spaces. */
+  /** Present for any free-text string pin (not a dropdown — see createWidgetEntry) — opens a
+   * floating textarea (multilineTextEditor.ts) to edit the pin's full value, since `el` itself is
+   * still a plain single-line <input> that silently collapses real newlines to spaces. */
   expandButton?: HTMLButtonElement;
   /** Snapshot of whatever about this pin's def determines the widget's DOM shape (see
    * widgetSignature) — compared every sync() pass so a pin whose TYPE changes without its id
@@ -29,7 +29,7 @@ interface WidgetEntry {
 /** Everything about a PinDef that determines which kind of DOM element its widget must be —
  * two calls with the same signature are safe to keep sharing one cached widget element. */
 function widgetSignature(pinDef: PinDef): string {
-  return [pinDef.type, pinDef.integer ? "int" : "", pinDef.multiline ? "multiline" : "", (pinDef.options ?? []).join(",")].join("|");
+  return [pinDef.type, pinDef.integer ? "int" : "", (pinDef.options ?? []).join(",")].join("|");
 }
 
 export interface WidgetSync {
@@ -113,7 +113,7 @@ function createWidgetEntry(pinDef: PinDef, nodeId: string, pinId: string, store:
     type === "boolean" ? "checkbox" : type === "number" ? "number" : type === "date" ? "datetime-local" : "text";
   el.autocomplete = "off";
   if (pinDef.integer) el.step = "1";
-  if (pinDef.multiline) el.title = 'Use the "⤢" button to edit multi-line text without losing line breaks';
+  if (type === "string") el.title = 'Use the "⤢" button to edit multi-line text without losing line breaks';
 
   // On every keystroke ("input") the graph's own value always rounds immediately if this is an
   // integer pin — but the textbox itself is only corrected once the user's done editing ("change",
@@ -134,7 +134,7 @@ function createWidgetEntry(pinDef: PinDef, nodeId: string, pinId: string, store:
   el.addEventListener("mousedown", (e) => e.stopPropagation());
 
   let expandButton: HTMLButtonElement | undefined;
-  if (type === "string" && pinDef.multiline) {
+  if (type === "string") {
     const commitFullValue = (newValue: string) => {
       setPinLiteralValue(getEditingGraph(store.state), nodeId, pinId, newValue);
       el.value = newValue;

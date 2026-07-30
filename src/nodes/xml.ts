@@ -16,7 +16,7 @@ registerNode({
   description: "Parses an XML string into a JSON object, failing safely with success:false on invalid XML.",
   group: "Conversion",
   pins: [
-    { id: "xml", label: "XML", type: "string", direction: "input", defaultValue: "", multiline: true },
+    { id: "xml", label: "XML", type: "string", direction: "input", defaultValue: "" },
     { id: "json", label: "JSON", type: "object", direction: "output" },
     { id: "success", label: "Success", type: "boolean", direction: "output" },
   ],
@@ -73,7 +73,7 @@ registerNode({
   group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "xml", label: "XML", type: "string", direction: "input", defaultValue: "", multiline: true },
+    { id: "xml", label: "XML", type: "string", direction: "input", defaultValue: "" },
     { id: "delimiter", label: "Delimiter", type: "string", direction: "input", defaultValue: "," },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
     { id: "csv", label: "CSV", type: "string", direction: "output" },

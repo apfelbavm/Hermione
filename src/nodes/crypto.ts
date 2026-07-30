@@ -29,8 +29,8 @@ registerNode({
   group: "Crypto.PGP",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "plaintext", label: "Plaintext", type: "string", direction: "input", defaultValue: "", multiline: true },
-    { id: "publicKeyArmored", label: "Public Key", type: "string", direction: "input", defaultValue: "", multiline: true },
+    { id: "plaintext", label: "Plaintext", type: "string", direction: "input", defaultValue: "" },
+    { id: "publicKeyArmored", label: "Public Key", type: "string", direction: "input", defaultValue: "" },
     // When true (the default), none of the pins below are applied at all — openpgp.encrypt() picks
     // every one of them itself (mainly negotiated from the recipient key's own stated preferences),
     // which is the normal, recommended OpenPGP behavior. Turn it off to override any of them.
@@ -129,8 +129,8 @@ registerNode({
   group: "Crypto.PGP",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "encryptedArmored", label: "Encrypted", type: "string", direction: "input", defaultValue: "", multiline: true },
-    { id: "privateKeyArmored", label: "Private Key", type: "string", direction: "input", defaultValue: "", multiline: true },
+    { id: "encryptedArmored", label: "Encrypted", type: "string", direction: "input", defaultValue: "" },
+    { id: "privateKeyArmored", label: "Private Key", type: "string", direction: "input", defaultValue: "" },
     // Left empty for a private key that isn't itself passphrase-protected.
     { id: "passphrase", label: "Passphrase", type: "string", direction: "input", defaultValue: "" },
     // Same "off by default" gate as crypto.pgpEncrypt's own — decrypt already reads which algorithm
@@ -220,8 +220,8 @@ registerNode({
   group: "Crypto.PKCS7",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "plaintext", label: "Plaintext", type: "string", direction: "input", defaultValue: "", multiline: true },
-    { id: "recipientCertPem", label: "Recipient Certificate", type: "string", direction: "input", defaultValue: "", multiline: true },
+    { id: "plaintext", label: "Plaintext", type: "string", direction: "input", defaultValue: "" },
+    { id: "recipientCertPem", label: "Recipient Certificate", type: "string", direction: "input", defaultValue: "" },
     // Same "off by default" gate as the PGP nodes' own — when true, p7.encrypt() is called with no
     // arguments at all, so forge picks its own built-in default cipher (aes256-CBC) itself.
     { id: "autoDetectSettings", label: "Auto-Detect Settings", type: "boolean", direction: "input", defaultValue: true },
@@ -292,8 +292,8 @@ registerNode({
   group: "Crypto.PKCS7",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "envelopedDataPem", label: "Enveloped Data", type: "string", direction: "input", defaultValue: "", multiline: true },
-    { id: "privateKeyPem", label: "Private Key", type: "string", direction: "input", defaultValue: "", multiline: true },
+    { id: "envelopedDataPem", label: "Enveloped Data", type: "string", direction: "input", defaultValue: "" },
+    { id: "privateKeyPem", label: "Private Key", type: "string", direction: "input", defaultValue: "" },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
     { id: "plaintext", label: "Plaintext", type: "string", direction: "output" },
     { id: "success", label: "Success", type: "boolean", direction: "output" },

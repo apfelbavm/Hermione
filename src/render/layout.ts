@@ -22,8 +22,8 @@ export const PIN_LABEL_GAP = 10;
 export const LABEL_WIDGET_GAP = 10;
 /** Gap held between an input widget's right edge and the start of the reserved output-label zone. */
 export const WIDGET_OUTPUT_GAP = 10;
-/** Width of a multiline string pin's "expand" button (see PinDef.multiline), reserved alongside its
- * normal single-line widget width — kept in one place so layout.ts and widgetSync.ts can't drift. */
+/** Width of a string pin's "expand" button (see widgetSync.ts), reserved alongside its normal
+ * single-line widget width — kept in one place so layout.ts and widgetSync.ts can't drift. */
 export const MULTILINE_EXPAND_BUTTON_WIDTH = 20;
 
 // Rough monospace-ish average character width at the render font size (13px),
@@ -73,7 +73,9 @@ export function pinWidgetWidth(pin: PinDef): number {
   if (pin.type === "boolean") return 16;
   if ((pin.type === "string" || pin.type === "enum") && pin.options && pin.options.length > 0) return 110;
   if (pin.type === "number") return 54;
-  if (pin.type === "string" && pin.multiline) return 90 + MULTILINE_EXPAND_BUTTON_WIDTH + 4;
+  // Every free-text string pin (i.e. not a dropdown, handled above) gets the "expand" button — see
+  // widgetSync.ts — since a plain single-line <input> silently collapses real newlines to spaces.
+  if (pin.type === "string") return 90 + MULTILINE_EXPAND_BUTTON_WIDTH + 4;
   if (pin.type === "date") return 150;
   return 90;
 }

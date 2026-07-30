@@ -27,7 +27,7 @@ registerNode({
   group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "csv", label: "CSV", type: "string", direction: "input", defaultValue: "", multiline: true },
+    { id: "csv", label: "CSV", type: "string", direction: "input", defaultValue: "" },
     { id: "delimiter", label: "Delimiter", type: "string", direction: "input", defaultValue: "," },
     { id: "rootTag", label: "Root Tag", type: "string", direction: "input", defaultValue: "rows" },
     { id: "rowTag", label: "Row Tag", type: "string", direction: "input", defaultValue: "row" },
@@ -83,7 +83,7 @@ registerNode({
   group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "csv", label: "CSV", type: "string", direction: "input", defaultValue: "", multiline: true },
+    { id: "csv", label: "CSV", type: "string", direction: "input", defaultValue: "" },
     { id: "delimiter", label: "Delimiter", type: "string", direction: "input", defaultValue: "," },
     { id: "rootTag", label: "Root Tag", type: "string", direction: "input", defaultValue: "rows" },
     { id: "rowTag", label: "Row Tag", type: "string", direction: "input", defaultValue: "row" },
