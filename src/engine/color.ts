@@ -87,6 +87,9 @@ export namespace Colors {
     string: "#c542a0",
     object: "#4f9bd6",
     date: "#d6a23b",
+    // Dark olive green — distinct from "number"'s own teal-green above — matching Unreal's enum
+    // pin color convention (see PinType's own doc comment for why it's a separate type at all).
+    enum: "#1f6b45",
   };
 
   export const CANVAS_BG = "#1e2126";

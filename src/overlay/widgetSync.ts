@@ -7,7 +7,7 @@ import { MULTILINE_EXPAND_BUTTON_WIDTH, pinWidgetWidth } from "../render/layout"
 import type { NodeScreenGeometry } from "../render/nodeGeometry";
 import { getEditingGraph, type Store } from "../state/store";
 
-const WIDGET_TYPES: readonly PinType[] = ["number", "boolean", "string", "date"];
+const WIDGET_TYPES: readonly PinType[] = ["number", "boolean", "string", "date", "enum"];
 
 type WidgetElement = HTMLInputElement | HTMLSelectElement;
 
@@ -102,7 +102,7 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
 
 function createWidgetEntry(pinDef: PinDef, nodeId: string, pinId: string, store: Store): WidgetEntry {
   const signature = widgetSignature(pinDef);
-  if (pinDef.type === "string" && pinDef.options && pinDef.options.length > 0) {
+  if ((pinDef.type === "string" || pinDef.type === "enum") && pinDef.options && pinDef.options.length > 0) {
     return { el: createOptionsWidgetElement(pinDef.options, nodeId, pinId, store), signature };
   }
 

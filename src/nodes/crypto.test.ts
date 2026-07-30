@@ -248,4 +248,43 @@ describe("crypto.pkcs7Encrypt / crypto.pkcs7Decrypt", () => {
     expect(decOutputs.get("pdec2:success")).toBe(false);
     expect(decOutputs.get("pdec2:plaintext")).toBe("");
   });
+
+  it("uses forge's own default cipher (aes256-CBC) when autoDetectSettings is true, regardless of the (unused) cipherAlgorithm pin", async () => {
+    const outputs = await runNode("crypto.pkcs7Encrypt", "pauto", {
+      plaintext: "hi",
+      recipientCertPem: certPem,
+      autoDetectSettings: true,
+      cipherAlgorithm: "3des",
+    });
+    // The actual content-encryption cipher lives on the message's own top-level encryptedContent
+    // (not each recipient's own encryptedContent, which is the RSA key-transport algorithm instead)
+    // — @types/node-forge doesn't declare this field at all, hence the `as any`.
+    const parsed = forge.pkcs7.messageFromPem(outputs.get("pauto:envelopedDataPem") as string) as any;
+    expect(parsed.encryptedContent.algorithm).toBe(forge.pki.oids["aes256-CBC"]);
+  });
+
+  it("applies the explicit cipherAlgorithm pin end-to-end when autoDetectSettings is false, and still decrypts correctly", async () => {
+    for (const [option, oidName] of [
+      ["aes128", "aes128-CBC"],
+      ["3des", "des-EDE3-CBC"],
+    ] as const) {
+      const id = `penc-${option}`;
+      const encOutputs = await runNode("crypto.pkcs7Encrypt", id, {
+        plaintext: `encrypted with ${option}`,
+        recipientCertPem: certPem,
+        autoDetectSettings: false,
+        cipherAlgorithm: option,
+      });
+      expect(encOutputs.get(`${id}:success`)).toBe(true);
+      const envelopedDataPem = encOutputs.get(`${id}:envelopedDataPem`) as string;
+
+      const parsed = forge.pkcs7.messageFromPem(envelopedDataPem) as any;
+      expect(parsed.encryptedContent.algorithm).toBe(forge.pki.oids[oidName]);
+
+      const decId = `pdec-${option}`;
+      const decOutputs = await runNode("crypto.pkcs7Decrypt", decId, { envelopedDataPem, privateKeyPem });
+      expect(decOutputs.get(`${decId}:success`)).toBe(true);
+      expect(decOutputs.get(`${decId}:plaintext`)).toBe(`encrypted with ${option}`);
+    }
+  });
 });

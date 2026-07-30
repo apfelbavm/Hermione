@@ -36,6 +36,7 @@ export const DEFAULT_VALUE_BY_TYPE: Record<PinType, unknown> = {
   string: "",
   object: null,
   date: "",
+  enum: "",
 };
 
 /** Removes one entry pin from a node with an expandable, user-editable pin list (see

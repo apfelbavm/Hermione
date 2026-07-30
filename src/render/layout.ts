@@ -71,7 +71,7 @@ export function pinWidgetWidth(pin: PinDef): number {
   // inline literal editor (see typedValueInput.ts's list editor for the Details-panel equivalent).
   if (pin.container && pin.container !== "single") return 0;
   if (pin.type === "boolean") return 16;
-  if (pin.type === "string" && pin.options && pin.options.length > 0) return 110;
+  if ((pin.type === "string" || pin.type === "enum") && pin.options && pin.options.length > 0) return 110;
   if (pin.type === "number") return 54;
   if (pin.type === "string" && pin.multiline) return 90 + MULTILINE_EXPAND_BUTTON_WIDTH + 4;
   if (pin.type === "date") return 150;

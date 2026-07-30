@@ -38,7 +38,7 @@ registerNode({
     {
       id: "symmetricAlgorithm",
       label: "Symmetric Algorithm",
-      type: "string",
+      type: "enum",
       direction: "input",
       defaultValue: "aes256",
       options: PGP_SYMMETRIC_ALGORITHM_OPTIONS,
@@ -46,7 +46,7 @@ registerNode({
     {
       id: "compressionAlgorithm",
       label: "Compression",
-      type: "string",
+      type: "enum",
       direction: "input",
       defaultValue: "uncompressed",
       options: PGP_COMPRESSION_ALGORITHM_OPTIONS,
@@ -55,7 +55,7 @@ registerNode({
     {
       id: "aeadAlgorithm",
       label: "AEAD Algorithm",
-      type: "string",
+      type: "enum",
       direction: "input",
       defaultValue: "gcm",
       options: PGP_AEAD_ALGORITHM_OPTIONS,
@@ -201,6 +201,18 @@ registerNode({
   compileImports: ['import * as openpgp from "openpgp";'],
 });
 
+// node-forge's own pkcs7.js only implements exactly these four ciphers for EnvelopedData (anything
+// else throws "Unsupported symmetric cipher" at encrypt time) — see PKCS7_CIPHER_OID_NAMES below,
+// which maps each readable option key to the forge.pki.oids name p7.encrypt()'s second argument
+// actually wants. Default matches forge's own built-in default (aes256-CBC).
+const PKCS7_CIPHER_OPTIONS = ["aes128", "aes192", "aes256", "3des"];
+const PKCS7_CIPHER_OID_NAMES: Record<string, string> = {
+  aes128: "aes128-CBC",
+  aes192: "aes192-CBC",
+  aes256: "aes256-CBC",
+  "3des": "des-EDE3-CBC",
+};
+
 registerNode({
   type: "crypto.pkcs7Encrypt",
   label: "PKCS7 Encrypt",
@@ -210,6 +222,17 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "plaintext", label: "Plaintext", type: "string", direction: "input", defaultValue: "", multiline: true },
     { id: "recipientCertPem", label: "Recipient Certificate", type: "string", direction: "input", defaultValue: "", multiline: true },
+    // Same "off by default" gate as the PGP nodes' own — when true, p7.encrypt() is called with no
+    // arguments at all, so forge picks its own built-in default cipher (aes256-CBC) itself.
+    { id: "autoDetectSettings", label: "Auto-Detect Settings", type: "boolean", direction: "input", defaultValue: true },
+    {
+      id: "cipherAlgorithm",
+      label: "Cipher Algorithm",
+      type: "enum",
+      direction: "input",
+      defaultValue: "aes256",
+      options: PKCS7_CIPHER_OPTIONS,
+    },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
     { id: "envelopedDataPem", label: "Enveloped Data", type: "string", direction: "output" },
     { id: "success", label: "Success", type: "boolean", direction: "output" },
@@ -221,7 +244,12 @@ registerNode({
       const p7 = forge.pkcs7.createEnvelopedData();
       p7.addRecipient(cert);
       p7.content = forge.util.createBuffer(forge.util.encodeUtf8(String(inputs.plaintext ?? "")));
-      p7.encrypt();
+      if (inputs.autoDetectSettings) {
+        p7.encrypt();
+      } else {
+        const oidName = PKCS7_CIPHER_OID_NAMES[String(inputs.cipherAlgorithm)];
+        p7.encrypt(undefined, forge.pki.oids[oidName]);
+      }
       // @types/node-forge types messageToPem as accepting only PkcsSignedData — it works identically
       // for PkcsEnvelopedData at runtime (both just serialize via .toAsn1()); the .d.ts is just narrow.
       const envelopedDataPem = forge.pkcs7.messageToPem(p7 as unknown as forge.pkcs7.PkcsSignedData);
@@ -237,7 +265,12 @@ registerNode({
         const p7 = forge.pkcs7.createEnvelopedData();
         p7.addRecipient(cert);
         p7.content = forge.util.createBuffer(forge.util.encodeUtf8(${inputs.plaintext}));
-        p7.encrypt();
+        if (${inputs.autoDetectSettings}) {
+          p7.encrypt();
+        } else {
+          const oidName = ${JSON.stringify(PKCS7_CIPHER_OID_NAMES)}[${inputs.cipherAlgorithm}];
+          p7.encrypt(undefined, forge.pki.oids[oidName]);
+        }
         return { envelopedDataPem: forge.pkcs7.messageToPem(p7), success: true, error: "" };
       } catch (err) {
         return { envelopedDataPem: "", success: false, error: err instanceof Error ? err.message : String(err) };

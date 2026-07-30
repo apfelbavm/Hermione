@@ -53,4 +53,13 @@ describe("isPinTypeCompatible", () => {
       ),
     ).toBe(false);
   });
+
+  it("is false between two enum pins, even with identical options — enum is never wireable", () => {
+    expect(isPinTypeCompatible({ type: "enum" }, { type: "enum" })).toBe(false);
+  });
+
+  it("is false between an enum pin and any other type on either side", () => {
+    expect(isPinTypeCompatible({ type: "enum" }, { type: "string" })).toBe(false);
+    expect(isPinTypeCompatible({ type: "string" }, { type: "enum" })).toBe(false);
+  });
 });

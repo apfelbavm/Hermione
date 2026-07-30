@@ -1,7 +1,13 @@
 import { Graph } from "./graph";
 import { NodeInstance } from "./nodeInstance";
 
-export type PinType = "exec" | "number" | "boolean" | "string" | "object" | "date";
+/** "enum" is a literal-only config knob (a PinDef with `options` set) — never wireable in either
+ * direction, on purpose (see isPinTypeCompatible), and drawn in its own dark-green color (see
+ * Colors.PIN_COLORS) so it visually reads as "pick one," not "plug something in," matching
+ * Unreal's own enum pins — minus Unreal's "you can still wire two of the same enum together"
+ * allowance, since this engine has no real enum *classes* to match on, just an ad hoc options
+ * list per pin. */
+export type PinType = "exec" | "number" | "boolean" | "string" | "object" | "date" | "enum";
 
 /** Orthogonal to PinType (see PinDef.container/Variable.container) — "single" (the default, a
  * plain value of `type`) vs. a collection of `type`. Never a new PinType member: this keeps every

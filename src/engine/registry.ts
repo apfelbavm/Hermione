@@ -37,8 +37,10 @@ export interface PinTypeShape {
  * their element type matches, and — for a "map" container — their key type also matches. A
  * container pin never silently connects to a differently-shaped one (no Array<Number> ->
  * Set<Number>, no Map<string,X> -> Map<number,X>); the user would need an explicit conversion node
- * (e.g. Set To Array) for that. */
+ * (e.g. Set To Array) for that. "enum" is never compatible with anything, including another enum
+ * pin — see PinType's own doc comment for why. */
 export function isPinTypeCompatible(a: PinTypeShape, b: PinTypeShape): boolean {
+  if (a.type === "enum" || b.type === "enum") return false;
   const containerA = a.container ?? "single";
   const containerB = b.container ?? "single";
   if (containerA !== containerB) return false;
