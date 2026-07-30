@@ -905,17 +905,29 @@ body.resizing {
    through a little) since — unlike the hover tooltip — it's always on screen rather than a
    transient hint, and it needs its own comic-style tail pointing down at the node it belongs to. */
 .node-description-bubble {
+  /* Set inline per-instance (see nodeDescriptionOverlay.ts) — every calc() below rides on this so
+     padding/border/the tail all scale in lockstep with the font-size/max-width also set inline,
+     instead of staying a fixed screen size while everything else shrinks or grows around zoom. */
+  --zoom: 1;
   position: absolute;
   /* Y only — left/right untouched, so the bubble's own left edge lines up with the node's left
      edge (see nodeDescriptionOverlay.ts) instead of being centered over it. */
   transform: translateY(-100%);
   z-index: 5;
+  /* Without this, an absolutely-positioned element with only `left` set (no `right`) is
+     shrink-to-fit BOUNDED BY THE CONTAINING BLOCK'S REMAINING WIDTH (#overlay's width minus
+     `left`) per the CSS spec — a bubble sitting far enough right on screen would get squeezed
+     and wrap early no matter how much max-width still allows, and since panning/zooming
+     constantly changes where a node's left edge lands on screen, that squeeze came and went
+     unpredictably. `width: max-content` sizes from the text itself instead, so max-width below
+     is the ONLY thing that ever decides wrapping. */
+  width: max-content;
   max-width: 220px;
   background: rgba(247, 246, 243, 0.75);
-  border: 1px solid rgba(214, 212, 205, 0.75);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  padding: 6px 10px;
+  border: calc(1px * var(--zoom)) solid rgba(214, 212, 205, 0.75);
+  border-radius: calc(6px * var(--zoom));
+  box-shadow: 0 calc(8px * var(--zoom)) calc(24px * var(--zoom)) rgba(0, 0, 0, 0.35);
+  padding: calc(6px * var(--zoom)) calc(10px * var(--zoom));
   color: #1c1c1a;
   font-size: 12px;
   line-height: 1.4;
@@ -926,26 +938,29 @@ body.resizing {
 /* The speech-bubble's tail: a border-color triangle (::before) with a slightly smaller,
    fill-color triangle (::after) laid on top of it, leaving a thin visible rim — the standard
    two-triangle CSS speech-bubble technique. Both point straight down, offset near the bubble's
-   left edge (matching its own left-aligned position) rather than centered under it. */
+   left edge (matching its own left-aligned position) rather than centered under it. Every length
+   scales with --zoom too, same reasoning as the bubble box itself above — otherwise a
+   fixed-pixel offset/size drifts out of proportion (or off the edge entirely) as the bubble
+   itself grows or shrinks with zoom. */
 .node-description-bubble::before,
 .node-description-bubble::after {
   content: "";
   position: absolute;
   top: 100%;
-  left: 16px;
+  left: calc(16px * var(--zoom));
   border-style: solid;
   border-color: transparent;
 }
 
 .node-description-bubble::before {
   transform: translateX(-50%);
-  border-width: 8px 8px 0 8px;
+  border-width: calc(8px * var(--zoom)) calc(8px * var(--zoom)) 0 calc(8px * var(--zoom));
   border-top-color: rgba(214, 212, 205, 0.75);
 }
 
 .node-description-bubble::after {
-  transform: translateX(-50%) translateY(-1px);
-  border-width: 7px 7px 0 7px;
+  transform: translateX(-50%) translateY(calc(-1px * var(--zoom)));
+  border-width: calc(7px * var(--zoom)) calc(7px * var(--zoom)) 0 calc(7px * var(--zoom));
   border-top-color: rgba(247, 246, 243, 0.75);
 }
 

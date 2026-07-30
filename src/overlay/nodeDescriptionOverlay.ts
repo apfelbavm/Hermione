@@ -52,6 +52,12 @@ export function createNodeDescriptionOverlay(overlay: HTMLElement, store: Store)
       entry.el.style.top = `${geo.screenY - GAP_WORLD * camera.zoom}px`;
       entry.el.style.fontSize = `${12 * camera.zoom}px`;
       entry.el.style.maxWidth = `${220 * camera.zoom}px`;
+      // Drives every other zoom-scaled measurement in style.css's .node-description-bubble rules
+      // (padding, border, the tail's offset/size) via calc(Npx * var(--zoom)) — padding in
+      // particular has to scale in lockstep with max-width/font-size above, or its FIXED size would
+      // eat a zoom-invariant chunk out of a shrinking max-width, leaving disproportionately less
+      // room for text at low zoom and wrapping lines that fit fine at zoom 1.
+      entry.el.style.setProperty("--zoom", String(camera.zoom));
     }
 
     for (const [id, entry] of entries) {
