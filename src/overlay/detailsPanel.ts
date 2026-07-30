@@ -258,18 +258,21 @@ export function createDetailsPanel(
     }
 
     // Same fallthrough rule as selectedNode above — a comment box only takes over once nothing
-    // else claims the panel. selectedNodeIds/selectedCommentId are already mutually exclusive (see
-    // pointerHandlers.ts), so this mainly guards against a stale sidebarSelection.
+    // else claims the panel. Only shown for a single selected comment box, same reasoning as
+    // selectedNode above requiring selectedNodeIds.size === 1 — there's only one set of color
+    // fields to show, so a multi-comment selection (see pointerHandlers.ts) shows nothing here
+    // rather than arbitrarily picking one of them.
     let selectedComment: CommentBox | undefined;
     if (
       !variable &&
       !validFunction &&
       !validScript &&
       !selectedNode &&
-      store.state.selectedCommentId
+      store.state.selectedCommentIds.size === 1
     ) {
+      const [onlyCommentId] = store.state.selectedCommentIds;
       selectedComment = getEditingGraph(store.state).commentBoxes.find(
-        (b) => b.id === store.state.selectedCommentId,
+        (b) => b.id === onlyCommentId,
       );
     }
 

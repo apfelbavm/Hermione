@@ -18,7 +18,7 @@ import { drawWires, drawWireDragPreview } from "./render/drawWires";
 import { drawMarqueeSelection } from "./render/drawMarquee";
 import { createStore, getEditingGraph, getVisibleVariablesForState } from "./state/store";
 import { createHistoryManager } from "./state/history";
-import { selectAllNodes, setupPointerInteraction, type WireAnchor } from "./interaction/pointerHandlers";
+import { selectAllCommentBoxes, selectAllNodes, setupPointerInteraction, type WireAnchor } from "./interaction/pointerHandlers";
 import { createWidgetSync } from "./overlay/widgetSync";
 import { createNodeDescriptionOverlay } from "./overlay/nodeDescriptionOverlay";
 import { setupNodeHoverTooltip } from "./overlay/nodeTooltip";
@@ -102,7 +102,7 @@ const store = createStore({
   camera: new Camera(),
   snapToGrid: true,
   selectedNodeIds: new Set(),
-  selectedCommentId: null,
+  selectedCommentIds: new Set(),
   executingNodeId: null,
   firedConnectionIds: new Set(),
   wireDrag: null,
@@ -278,7 +278,7 @@ const detailsPanel = createDetailsPanel(
  * mousemove regardless of the graph's size — unlike render() below, it never touches a sidebar
  * panel's DOM. */
 function renderCanvas(): void {
-  const { camera, selectedNodeIds, selectedCommentId, executingNodeId, firedConnectionIds, wireDrag, marqueeSelection } = store.state;
+  const { camera, selectedNodeIds, selectedCommentIds, executingNodeId, firedConnectionIds, wireDrag, marqueeSelection } = store.state;
   const graph = getEditingGraph(store.state);
   const variables = getVisibleVariablesForState(store.state);
   const functions = store.state.rootGraph.functions;
@@ -287,7 +287,7 @@ function renderCanvas(): void {
   const height = canvas.clientHeight;
 
   drawGrid(ctx, camera, width, height);
-  drawComments(ctx, graph, camera, selectedCommentId);
+  drawComments(ctx, graph, camera, selectedCommentIds);
   const geometries = computeAllNodeGeometries(graph, camera, variables, functions, scripts);
   drawWires(ctx, graph, camera, geometries, firedConnectionIds, variables, functions, scripts);
   if (wireDrag) drawWireDragPreview(ctx, wireDrag);
@@ -467,7 +467,7 @@ canvas.addEventListener("contextmenu", (e) => {
     // all of them) instead of collapsing it down to just the one node under the cursor.
     if (!store.state.selectedNodeIds.has(node.id)) {
       store.state.selectedNodeIds = new Set([node.id]);
-      store.state.selectedCommentId = null;
+      store.state.selectedCommentIds = new Set();
     }
 
     const items: ContextMenuItem[] = [
@@ -515,7 +515,7 @@ canvas.addEventListener("contextmenu", (e) => {
       label: "Select All (Ctrl+A)",
       onClick: () => {
         store.state.selectedNodeIds = selectAllNodes(graph);
-        store.state.selectedCommentId = null;
+        store.state.selectedCommentIds = selectAllCommentBoxes(graph);
         store.notify();
       },
     });
@@ -745,7 +745,7 @@ loadFileInput.addEventListener("change", async () => {
     store.state.activeLowerTabId = null;
     store.state.sidebarSelection = null;
     store.state.selectedNodeIds = new Set();
-    store.state.selectedCommentId = null;
+    store.state.selectedCommentIds = new Set();
     store.state.executingNodeId = null;
     store.state.firedConnectionIds = new Set();
     saveGraphToLocalStorage(graph);

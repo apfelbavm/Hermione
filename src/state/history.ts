@@ -79,7 +79,7 @@ export function createHistoryManager(store: Store): HistoryManager {
       store.state.activeLowerTabId = null;
       store.state.sidebarSelection = null;
       store.state.selectedNodeIds = new Set();
-      store.state.selectedCommentId = null;
+      store.state.selectedCommentIds = new Set();
       store.state.executingNodeId = null;
       store.state.firedConnectionIds = new Set();
       store.notify();

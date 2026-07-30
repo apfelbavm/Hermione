@@ -17,11 +17,11 @@ export function drawComments(
   ctx: CanvasRenderingContext2D,
   graph: Graph,
   camera: Camera,
-  selectedCommentId: string | null,
+  selectedCommentIds: ReadonlySet<string>,
 ): void {
   for (const box of graph.commentBoxes) {
     const rect = computeCommentScreenRect(box, camera);
-    const selected = selectedCommentId === box.id;
+    const selected = selectedCommentIds.has(box.id);
     const color = box.color ?? DEFAULT_COMMENT_COLOR;
     // The title bar background and the border are both the user-defined color (default
     // white), always rendered at 75% opacity so the box is never fully opaque — matching

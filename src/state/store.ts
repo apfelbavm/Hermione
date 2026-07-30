@@ -55,7 +55,7 @@ export interface AppState {
    * the canvas. Never retroactively applied to nodes already sitting at an off-grid position. */
   snapToGrid: boolean;
   selectedNodeIds: Set<string>;
-  selectedCommentId: string | null;
+  selectedCommentIds: Set<string>;
   executingNodeId: string | null;
   firedConnectionIds: Set<string>;
   wireDrag: WireDragState | null;

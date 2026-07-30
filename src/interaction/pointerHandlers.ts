@@ -72,9 +72,13 @@ type DragMode =
   | { kind: "wire-multi"; anchors: WireAnchor[] }
   | {
       kind: "comment-move";
-      commentId: string;
-      grabOffsetX: number;
-      grabOffsetY: number;
+      startWorld: { x: number; y: number };
+      /** Every SELECTED comment box's own top-left at drag-start — the whole group moves together,
+       * mirroring "nodes"'s own multi-drag above. */
+      initialBoxPositions: Map<string, { x: number; y: number }>;
+      /** Every node contained by any of those boxes (deduped by id, in case of overlapping boxes),
+       * at drag-start — moves by the same delta as its owning box. */
+      initialNodePositions: Map<string, { x: number; y: number }>;
     }
   | {
       kind: "comment-resize";
@@ -111,8 +115,8 @@ function findConnectionToInput(graph: Graph, nodeId: string, pinId: string) {
 
 /** Every node id in `graph` — used by both the global Ctrl+A shortcut below and the node right-click
  * menu's own "Select All" item (see main.ts's contextmenu handler), so both mean exactly the same
- * thing. Callers still assign the result to store.state.selectedNodeIds and clear
- * selectedCommentId/notify themselves — this only computes WHAT gets selected. */
+ * thing. Callers still assign the result to store.state.selectedNodeIds and notify themselves —
+ * this only computes WHAT gets selected (see selectAllCommentBoxes below for its sibling). */
 export function selectAllNodes(graph: Graph): Set<string> {
   return new Set(graph.nodes.map((n) => n.id));
 }
@@ -225,28 +229,33 @@ function computeMarqueeSelectedNodeIds(
   return new Set(touched.map((n) => n.id));
 }
 
-/** The id of a comment box the marquee touches, or null — the hot zone is deliberately just the
- * box's TITLE BAR (matching hitTestCommentHeader's own click/drag hot zone), not its whole body,
- * so a marquee drawn entirely inside a large comment box (to select nodes placed within it)
- * doesn't also always drag the comment box itself into the selection. Comment boxes only support
- * one active selection at a time (see AppState.selectedCommentId) — if the marquee happens to
- * touch more than one header, the last one (topmost in z-order) wins, same as a click would. */
-function computeMarqueeSelectedCommentId(
+/** Every comment box id the marquee touches — the hot zone is deliberately just the box's TITLE
+ * BAR (matching hitTestCommentHeader's own click/drag hot zone), not its whole body, so a marquee
+ * drawn entirely inside a large comment box (to select nodes placed within it) doesn't also always
+ * drag the comment box itself into the selection. */
+function computeMarqueeSelectedCommentIds(
   graph: Graph,
   marquee: MarqueeSelectionState,
-): string | null {
+): Set<string> {
   const box = marqueeWorldRect(marquee);
-  let selected: string | null = null;
-  for (const commentBox of graph.commentBoxes) {
+  const touched = graph.commentBoxes.filter((commentBox) => {
     const headerRect: WorldRect = {
       x: commentBox.position.x,
       y: commentBox.position.y,
       width: commentBox.size.width,
       height: COMMENT_HEADER_HEIGHT,
     };
-    if (rectIntersects(box, headerRect)) selected = commentBox.id;
-  }
-  return selected;
+    return rectIntersects(box, headerRect);
+  });
+  return new Set(touched.map((b) => b.id));
+}
+
+/** Every comment box id in `graph` — the comment-box counterpart of selectAllNodes above, used by
+ * both the global Ctrl+A shortcut below and the node right-click menu's own "Select All" item (see
+ * main.ts's contextmenu handler), so Ctrl+A always means "everything," nodes and comment boxes
+ * alike. */
+export function selectAllCommentBoxes(graph: Graph): Set<string> {
+  return new Set(graph.commentBoxes.map((b) => b.id));
 }
 
 export interface PointerInteraction {
@@ -408,7 +417,7 @@ export function setupPointerInteraction(
       scripts,
       marquee,
     );
-    store.state.selectedCommentId = computeMarqueeSelectedCommentId(graph, marquee);
+    store.state.selectedCommentIds = computeMarqueeSelectedCommentIds(graph, marquee);
   }
 
   function startAutoPanLoop(): void {
@@ -602,7 +611,7 @@ export function setupPointerInteraction(
         if (next.has(node.id)) next.delete(node.id);
         else next.add(node.id);
         store.state.selectedNodeIds = next;
-        store.state.selectedCommentId = null;
+        store.state.selectedCommentIds = new Set();
         if (!next.has(node.id)) {
           // Just deselected it — nothing to grab from here.
           drag = { kind: "none" };
@@ -613,7 +622,7 @@ export function setupPointerInteraction(
       } else if (!store.state.selectedNodeIds.has(node.id)) {
         // Fresh click on a node outside the current selection replaces the selection.
         store.state.selectedNodeIds = new Set([node.id]);
-        store.state.selectedCommentId = null;
+        store.state.selectedCommentIds = new Set();
       }
       // else: the clicked node is already part of an existing multi-selection — keep the whole
       // selection intact so the drag below moves the whole group, Unreal-style.
@@ -645,7 +654,9 @@ export function setupPointerInteraction(
             ? box.position.y + box.size.height
             : box.position.y,
       };
-      store.state.selectedCommentId = resizeHit.commentId;
+      // Resizing always targets just the one grabbed box, even if it's part of a larger
+      // multi-selection — there's no meaningful "resize several boxes at once" gesture here.
+      store.state.selectedCommentIds = new Set([resizeHit.commentId]);
       store.state.selectedNodeIds = new Set();
       drag = {
         kind: "comment-resize",
@@ -659,16 +670,52 @@ export function setupPointerInteraction(
 
     const headerHit = hitTestCommentHeader(graph, camera, pos.x, pos.y);
     if (headerHit) {
-      const box = graph.commentBoxes.find((b) => b.id === headerHit.commentId)!;
-      recomputeContainment(graph, variables, functions, scripts, box);
       const worldPos = camera.screenToWorld(pos.x, pos.y);
-      store.state.selectedCommentId = box.id;
-      store.state.selectedNodeIds = new Set();
+
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl/Cmd-click toggles this box's membership in the current multi-selection, mirroring
+        // the node ctrl-click above.
+        const next = new Set(store.state.selectedCommentIds);
+        if (next.has(headerHit.commentId)) next.delete(headerHit.commentId);
+        else next.add(headerHit.commentId);
+        store.state.selectedCommentIds = next;
+        store.state.selectedNodeIds = new Set();
+        if (!next.has(headerHit.commentId)) {
+          // Just deselected it — nothing to grab from here.
+          drag = { kind: "none" };
+          store.notify();
+          return;
+        }
+        // Otherwise fall through and start a group-drag of the updated selection below.
+      } else if (!store.state.selectedCommentIds.has(headerHit.commentId)) {
+        // Fresh click on a box outside the current selection replaces the selection.
+        store.state.selectedCommentIds = new Set([headerHit.commentId]);
+        store.state.selectedNodeIds = new Set();
+      }
+      // else: the clicked box is already part of an existing multi-selection — keep the whole
+      // selection intact so the drag below moves the whole group, Unreal-style.
+
+      // Every selected box (not just the one grabbed) moves together — same "whole group, one
+      // motion" shape as the node drag above. Containment is recomputed fresh per box (picking up
+      // anything moved into it since its last resize/move) before capturing drag-start positions.
+      const initialBoxPositions = new Map<string, { x: number; y: number }>();
+      const initialNodePositions = new Map<string, { x: number; y: number }>();
+      for (const id of store.state.selectedCommentIds) {
+        const box = graph.commentBoxes.find((b) => b.id === id);
+        if (!box) continue;
+        recomputeContainment(graph, variables, functions, scripts, box);
+        initialBoxPositions.set(id, { x: box.position.x, y: box.position.y });
+        for (const nodeId of box.containedNodeIds) {
+          if (initialNodePositions.has(nodeId)) continue; // already captured via another selected box
+          const node = graph.nodes.find((n) => n.id === nodeId);
+          if (node) initialNodePositions.set(nodeId, { x: node.position.x, y: node.position.y });
+        }
+      }
       drag = {
         kind: "comment-move",
-        commentId: box.id,
-        grabOffsetX: worldPos.x - box.position.x,
-        grabOffsetY: worldPos.y - box.position.y,
+        startWorld: worldPos,
+        initialBoxPositions,
+        initialNodePositions,
       };
       store.notify();
       return;
@@ -676,7 +723,7 @@ export function setupPointerInteraction(
 
     // Empty space: clear selection and start a rubber-band marquee-select box.
     store.state.selectedNodeIds = new Set();
-    store.state.selectedCommentId = null;
+    store.state.selectedCommentIds = new Set();
     const worldPos = camera.screenToWorld(pos.x, pos.y);
     store.state.marqueeSelection = {
       startWorld: worldPos,
@@ -806,27 +853,29 @@ export function setupPointerInteraction(
     }
 
     if (drag.kind === "comment-move") {
-      const { commentId, grabOffsetX, grabOffsetY } = drag;
-      const box = graph.commentBoxes.find((b) => b.id === commentId);
-      if (box) {
-        const pos = screenPos(e);
-        const worldPos = camera.screenToWorld(pos.x, pos.y);
-        const raw = {
-          x: worldPos.x - grabOffsetX,
-          y: worldPos.y - grabOffsetY,
-        };
-        const snapped = store.state.snapToGrid ? snapPositionToGrid(raw) : raw;
-        const dx = snapped.x - box.position.x;
-        const dy = snapped.y - box.position.y;
+      // Same "delta from drag-start, applied to each initial position, independently snapped"
+      // shape as updateNodeDragPositions above — here applied to every selected box AND every
+      // node any of them contains, so the whole group moves together in one motion.
+      const { startWorld, initialBoxPositions, initialNodePositions } = drag;
+      const pos = screenPos(e);
+      const worldPos = camera.screenToWorld(pos.x, pos.y);
+      const dx = worldPos.x - startWorld.x;
+      const dy = worldPos.y - startWorld.y;
+      for (const [commentId, initial] of initialBoxPositions) {
+        const box = graph.commentBoxes.find((b) => b.id === commentId);
+        if (!box) continue;
+        const next = { x: initial.x + dx, y: initial.y + dy };
+        const snapped = store.state.snapToGrid ? snapPositionToGrid(next) : next;
         box.position.x = snapped.x;
         box.position.y = snapped.y;
-        for (const nodeId of box.containedNodeIds) {
-          const node = graph.nodes.find((n) => n.id === nodeId);
-          if (node) {
-            node.position.x += dx;
-            node.position.y += dy;
-          }
-        }
+      }
+      for (const [nodeId, initial] of initialNodePositions) {
+        const node = graph.nodes.find((n) => n.id === nodeId);
+        if (!node) continue;
+        const next = { x: initial.x + dx, y: initial.y + dy };
+        const snapped = store.state.snapToGrid ? snapPositionToGrid(next) : next;
+        node.position.x = snapped.x;
+        node.position.y = snapped.y;
       }
       store.notify();
       return;
@@ -924,7 +973,7 @@ export function setupPointerInteraction(
         const functions = store.state.rootGraph.functions;
         const scripts = store.state.rootGraph.scripts;
         store.state.selectedNodeIds = computeMarqueeSelectedNodeIds(graph, variables, functions, scripts, marquee);
-        store.state.selectedCommentId = computeMarqueeSelectedCommentId(graph, marquee);
+        store.state.selectedCommentIds = computeMarqueeSelectedCommentIds(graph, marquee);
       }
       store.state.marqueeSelection = null;
       drag = { kind: "none" };
@@ -966,17 +1015,19 @@ export function setupPointerInteraction(
     const graph = getEditingGraph(store.state);
 
     if (e.key === "Delete" || e.key === "Backspace") {
-      const { selectedNodeIds, selectedCommentId } = store.state;
-      if (selectedNodeIds.size === 0 && !selectedCommentId) return;
+      const { selectedNodeIds, selectedCommentIds } = store.state;
+      if (selectedNodeIds.size === 0 && selectedCommentIds.size === 0) return;
       const variables = getVisibleVariablesForState(store.state);
       const functions = store.state.rootGraph.functions;
       const scripts = store.state.rootGraph.scripts;
       for (const nodeId of selectedNodeIds) {
         graph.removeNode(variables, functions, nodeId, scripts);
       }
-      if (selectedCommentId) removeCommentBox(graph, selectedCommentId);
+      for (const commentId of selectedCommentIds) {
+        removeCommentBox(graph, commentId);
+      }
       store.state.selectedNodeIds = new Set();
-      store.state.selectedCommentId = null;
+      store.state.selectedCommentIds = new Set();
       store.notify();
       return;
     }
@@ -984,7 +1035,7 @@ export function setupPointerInteraction(
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
       e.preventDefault();
       store.state.selectedNodeIds = selectAllNodes(graph);
-      store.state.selectedCommentId = null;
+      store.state.selectedCommentIds = selectAllCommentBoxes(graph);
       store.notify();
       return;
     }
@@ -1080,7 +1131,7 @@ export function setupPointerInteraction(
             );
             if (newIds.length > 0) {
               store.state.selectedNodeIds = new Set(newIds);
-              store.state.selectedCommentId = null;
+              store.state.selectedCommentIds = new Set();
               store.state.sidebarSelection = null;
               store.notify();
             }
@@ -1140,7 +1191,7 @@ export function setupPointerInteraction(
           color: DEFAULT_COMMENT_COLOR,
         };
         addCommentBox(graph, box);
-        store.state.selectedCommentId = box.id;
+        store.state.selectedCommentIds = new Set([box.id]);
         store.notify();
       } else {
         // Nothing selected: drop a default-sized empty box at the cursor.
@@ -1160,7 +1211,7 @@ export function setupPointerInteraction(
           color: DEFAULT_COMMENT_COLOR,
         };
         addCommentBox(graph, box);
-        store.state.selectedCommentId = box.id;
+        store.state.selectedCommentIds = new Set([box.id]);
         store.notify();
       }
     }
