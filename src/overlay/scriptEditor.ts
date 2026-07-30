@@ -36,30 +36,20 @@ export interface ScriptEditorElements {
 // dynamic import on first actual use (opening a script tab) rather than a static top-level import,
 // so an app session that never touches a Code node never pays for it. Cached in a module-level
 // promise so a second script tab (or switching back to one already open) reuses the same load
-// instead of re-fetching. Loaded together with the two workers it needs (the generic editor worker,
-// plus the TypeScript/JavaScript language worker for the "typescript" model language) — Monaco reads
-// `self.MonacoEnvironment.getWorker` to know how to spin those up; the `?worker` import suffix is
-// Vite's own convention for "bundle this as a Worker entry, give me a constructor," needing no extra
-// vite.config.ts wiring.
+// instead of re-fetching.
+//
+// Loading goes through @monaco-editor/react's `loader` (backed by @monaco-editor/loader) rather
+// than importing "monaco-editor" + its workers directly with Vite's `?worker` suffix: that suffix
+// was Vite-specific and doesn't resolve under Next.js's webpack-based bundler. `loader` instead
+// fetches Monaco (and wires up its worker environment, including the TypeScript/JavaScript
+// language worker) from a CDN at runtime — no bundler-specific worker config needed, which matters
+// most for a tool like this one that's meant to run under plain `next dev` on localhost with
+// minimal build-tooling surface area.
 let monacoPromise: Promise<typeof import("monaco-editor")> | null = null;
 
 function loadMonaco(): Promise<typeof import("monaco-editor")> {
   if (!monacoPromise) {
-    monacoPromise = Promise.all([
-      import("monaco-editor"),
-      // No "esm/vs/" prefix here — the package's own exports map (`"./*.js": "./esm/vs/*.js"`)
-      // already adds that, so including it too would double it up and fail to resolve.
-      import("monaco-editor/editor/editor.worker.js?worker"),
-      import("monaco-editor/language/typescript/ts.worker.js?worker"),
-    ]).then(([monaco, editorWorker, tsWorker]) => {
-      (self as unknown as { MonacoEnvironment: unknown }).MonacoEnvironment = {
-        getWorker(_workerId: string, label: string) {
-          if (label === "typescript" || label === "javascript") return new tsWorker.default();
-          return new editorWorker.default();
-        },
-      };
-      return monaco;
-    });
+    monacoPromise = import("@monaco-editor/react").then(({ loader }) => loader.init());
   }
   return monacoPromise;
 }
