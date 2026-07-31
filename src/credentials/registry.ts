@@ -1,9 +1,5 @@
 import type { CredentialTypeId } from "./types";
 
-/** Mirrors engine/registry.ts's registerNode/getNodeDef pattern exactly — the same "a registry of
- * typed definitions, one call per kind" idiom this codebase already uses for node types. Adding a
- * third credential type later is one more registerCredentialType() call plus a data interface in
- * types.ts; the Credential Vault dialog/list render generically off this, no page changes needed. */
 export interface CredentialFieldDef {
   id: string;
   label: string;

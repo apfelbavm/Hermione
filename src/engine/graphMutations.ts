@@ -432,7 +432,16 @@ const TEMPLATE_OUTPUT_NAME = "MyOutputPin";
  * way through that same `await`, since awaiting a non-Promise value just resolves to it immediately
  * (see code.ts's own test coverage for that guarantee). */
 function templateScriptSource(): string {
-  return ["async function run(", "  log: (message: string) => void,", `  inputs: { ${TEMPLATE_INPUT_NAME}: string },`, `): Promise<{ ${TEMPLATE_OUTPUT_NAME}: string }> {`, `  log(inputs.${TEMPLATE_INPUT_NAME});`, `  return { ${TEMPLATE_OUTPUT_NAME}: "I am Alive" };`, "}", ""].join("\n");
+  return [
+    "async function run(",
+    "  log: (message: string) => void,",
+    `  inputs: { ${TEMPLATE_INPUT_NAME}: string },`,
+    `): Promise<{ ${TEMPLATE_OUTPUT_NAME}: string }> {`,
+    `  log(inputs.${TEMPLATE_INPUT_NAME});`,
+    `  return { ${TEMPLATE_OUTPUT_NAME}: "I am Alive" };`,
+    "}",
+    "",
+  ].join("\n");
 }
 
 /** The exact plain-JS equivalent of templateScriptSource() above, with every type annotation

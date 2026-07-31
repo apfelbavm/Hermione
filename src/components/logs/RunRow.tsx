@@ -19,18 +19,10 @@ function getExecutionTimeString(executionMs: number): string {
   return m + i18n.components.run_row.m;
 }
 
-export function RunRow({
-  run,
-  project,
-}: {
-  run: RunLog;
-  project?: { name: string; href: string };
-}) {
+export function RunRow({ run, project }: { run: RunLog; project?: { name: string; href: string } }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <li className="run-row">
-      {/* A real <button> can't legally contain another interactive element (the project Link below),
-          so this toggle is a div with the same keyboard semantics instead. */}
       <div
         className="run-row-header"
         role="button"
@@ -45,11 +37,7 @@ export function RunRow({
       >
         <span className="run-row-caret">{expanded ? "▾" : "▸"}</span>
         {project && (
-          <Link
-            href={project.href}
-            className="run-row-project-name"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <Link href={project.href} className="run-row-project-name" onClick={(e) => e.stopPropagation()}>
             {project.name}
           </Link>
         )}
@@ -63,34 +51,13 @@ export function RunRow({
             </span>
           )}
         </span>
-        <span className={`run-row-kind run-row-kind-${run.kind}`}>
-          {run.kind === "simulate"
-            ? i18n.components.run_row.simulate
-            : i18n.components.run_row.production}
-        </span>
-        <span className="run-row-time">
-          {new Date(run.startedAt).toLocaleString()}
-        </span>
+        <span className={`run-row-kind run-row-kind-${run.kind}`}>{run.kind === "simulate" ? i18n.components.run_row.simulate : i18n.components.run_row.production}</span>
+        <span className="run-row-time">{new Date(run.startedAt).toLocaleString()}</span>
         <span className="run-row-count">
-          {run.entries.length}{" "}
-          {run.entries.length === 1
-            ? i18n.components.run_row.entry
-            : i18n.components.run_row.entries}
+          {run.entries.length} {run.entries.length === 1 ? i18n.components.run_row.entry : i18n.components.run_row.entries}
         </span>
       </div>
-      {expanded && (
-        <div className="run-entries">
-          {run.entries.length === 0 ? (
-            <p className="page-empty-note">
-              {i18n.components.run_row.no_output}
-            </p>
-          ) : (
-            run.entries.map((entry) => (
-              <LogEntryView key={entry.id} entry={entry} />
-            ))
-          )}
-        </div>
-      )}
+      {expanded && <div className="run-entries">{run.entries.length === 0 ? <p className="page-empty-note">{i18n.components.run_row.no_output}</p> : run.entries.map((entry) => <LogEntryView key={entry.id} entry={entry} />)}</div>}
     </li>
   );
 }

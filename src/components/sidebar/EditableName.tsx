@@ -3,11 +3,6 @@
 import { useEffect, useRef } from "react";
 import { attachHoverTooltip } from "../../overlay/tooltip";
 
-/** A row's name in edit mode — an autofocused, select-all text input. Commits on blur/Enter,
- * reverts (no rename applied) on Escape. Mirrors overlay/editableNameCell.ts's
- * createEditableNameInput; the settled-ref guard exists for the same reason it did there — Escape
- * calls .blur() itself to trigger commit-time cleanup, and the guard stops that from ALSO running
- * the commit path. */
 export function EditableNameInput({ name, onCommit, onCancel }: { name: string; onCommit: (newName: string) => void; onCancel: () => void }) {
   const settledRef = useRef(false);
   return (
@@ -35,8 +30,6 @@ export function EditableNameInput({ name, onCommit, onCancel }: { name: string; 
   );
 }
 
-/** A row's name in its normal, non-editing display state — a plain label. Right-click opens the
- * caller-provided context menu (its "Edit"/"Rename" entry is what actually enters edit mode). */
 export function EditableNameLabel({
   name,
   className,
@@ -49,19 +42,15 @@ export function EditableNameLabel({
   name: string;
   className?: string;
   title?: string;
-  /** Wires overlay/tooltip.ts's custom delayed hover-tooltip (e.g. a function's description)
-   * instead of a native `title` attribute — the two are mutually exclusive per row. */
+
   hoverTooltip?: () => string | undefined | null;
-  /** Suppresses both the click handler and the rename context menu — e.g. while a Simulate run is
-   * in progress. There's no native `disabled` for a `<span>`; this just skips calling the callbacks. */
+
   disabled?: boolean;
   onContextMenu: (screenPos: { x: number; y: number }) => void;
   onClick?: () => void;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
-  // Kept fresh every render (a plain ref write, not an effect) so the listener attached below —
-  // only ever once, since re-attaching per render would leak a duplicate listener on every render —
-  // still calls whatever the CURRENT hoverTooltip closure is when a hover eventually fires.
+
   const hoverTooltipRef = useRef(hoverTooltip);
   hoverTooltipRef.current = hoverTooltip;
   useEffect(() => {

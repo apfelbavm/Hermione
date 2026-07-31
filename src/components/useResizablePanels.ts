@@ -2,17 +2,6 @@
 
 import { useEffect } from "react";
 
-/** Wires a thin drag handle to resize an adjacent flex sibling (a sidebar's width, the log panel's
- * height) by adjusting its flex-basis — persisted to localStorage so a resize survives a reload,
- * restored (clamped to the CURRENT viewport, in case the window shrank since) on setup. Returns a
- * cleanup function removing the one listener it attaches (pointerdown); the pointermove/pointerup
- * pair added per-drag already remove themselves in onUp, so there's nothing else to unwind.
- * `growSign` says which pointer direction grows `target`: -1 (the default) when the handle sits on
- * the side of `target` closer to the OTHER flex content — so dragging TOWARD that content grows
- * `target` — true for the right sidebar (handle on its left, growing means dragging left) and the
- * log panel (handle on its top, growing means dragging up); +1 when target sits on the SAME side
- * the pointer coordinate increases toward, e.g. the left sidebar (handle on its right, growing
- * means dragging right, away from it). */
 function wireResizeHandle(opts: { handle: HTMLElement; target: HTMLElement; storageKey: string; min: number; max: () => number; getPointerPos: (e: PointerEvent) => number; getSize: (rect: DOMRect) => number; growSign?: 1 | -1 }): () => void {
   const { handle, target, storageKey, min, max, getPointerPos, getSize, growSign = -1 } = opts;
 
@@ -49,9 +38,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-/** Both sidebars (width) and the log panel (height) each get a drag-to-resize handle — see
- * AppShellMarkup.tsx for the #left-sidebar-resizer/#right-sidebar-resizer/#log-resizer elements
- * this binds to. Call once from AppShell's top level (not conditionally). */
 export function useResizablePanels(): void {
   useEffect(() => {
     const teardowns = [
