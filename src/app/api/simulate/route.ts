@@ -80,7 +80,7 @@ export async function POST(request: Request): Promise<Response> {
       }
 
       const execCtx = createExecutionContext(graph, {
-        log: (message) => send("log", { message }),
+        log: (message, format) => send("log", { message, format }),
         onNodeStart: async (nodeId) => {
           if (aborted) throw new Error("Simulation aborted by client");
           send("node-start", { nodeId });

@@ -2,6 +2,7 @@ import { XMLParser, XMLValidator } from "fast-xml-parser";
 import XMLBuilder from "fast-xml-builder";
 import * as Papa from "papaparse";
 import { registerNode } from "../engine/registry";
+import type { LogFormat } from "../engine/types";
 import { XML_BUILDER_IMPORT_LINE, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, XML_PRETTY_BUILD_OPTIONS_LITERAL } from "./dataFormatHelpers";
 
 registerNode({
@@ -74,7 +75,8 @@ registerNode({
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
   execute: ({ inputs, ctx }) => {
-    ctx.log(formatForLog(String(inputs.message ?? ""), String(inputs.format ?? FORMATS[0])));
+    const format = String(inputs.format ?? FORMATS[0]) as LogFormat;
+    ctx.log(formatForLog(String(inputs.message ?? ""), format), format);
     return { nextExec: "exec-out" };
   },
   compileExecute: ({ inputs, compileFrom }) => [`rt.log(formatForLog(String(${inputs.message}), String(${inputs.format})));`, ...compileFrom("exec-out")],

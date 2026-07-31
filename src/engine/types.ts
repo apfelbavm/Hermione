@@ -9,6 +9,11 @@ import { NodeInstance } from "./nodeInstance";
  * list per pin. */
 export type PinType = "exec" | "number" | "boolean" | "string" | "object" | "date" | "enum";
 
+/** Same 4 values debug.ts's "Print (Formatted)" node resolves its own Format pin to (see FORMATS
+ * there) — shared here so ExecutionContext.log and persistence/runLogs.ts's LogEntry both refer to
+ * one canonical type instead of two identical unions that could quietly drift apart. */
+export type LogFormat = "text" | "json" | "xml" | "csv";
+
 /** Orthogonal to PinType (see PinDef.container/Variable.container) — "single" (the default, a
  * plain value of `type`) vs. a collection of `type`. Never a new PinType member: this keeps every
  * exhaustive `Record<PinType, ...>` map (PIN_COLORS, DEFAULT_VALUE_BY_TYPE) untouched, since a
@@ -300,7 +305,11 @@ export interface ExecutionContext {
   entryArgs?: Record<string, unknown>;
   /** Set only inside a function-body walk: called by function.return with its resolved input values. */
   onReturn?: (values: Record<string, unknown>) => void;
-  log: (message: string) => void;
+  /** `format` mirrors debug.ts's "Print (Formatted)" node's own Format pin — omitted (plain "Print")
+   * means plain text. Threaded through to the Logs page (see persistence/runLogs.ts's LogEntry,
+   * which reuses this same LogFormat type) so it can render each entry accordingly instead of just
+   * dumping monospace text for everything. */
+  log: (message: string, format?: LogFormat) => void;
   /** May return a Promise to introduce a visualization pause between exec steps; awaited by the executor. */
   onNodeStart?: (nodeId: string) => void | Promise<void>;
   onExecFire?: (connectionId: string) => void;

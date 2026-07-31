@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { registerBuiltins } from "../nodes";
-import { connectPins, insertRerouteOnConnection, removeInstancePin } from "../engine/graphMutations";
+import { connectPins, insertRerouteOnConnection, nextId, removeInstancePin } from "../engine/graphMutations";
 import { canCollapseSelectionToFunction, collapseSelectionToFunction } from "../engine/collapseToFunction";
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { allNodeDefs, findCompatibleNodeDefs, getNodeDef, isPinTypeCompatible, topLevelGroup } from "../engine/registry";
-import type { CodeScriptDef, FunctionDef, NodeDef, Variable } from "../engine/types";
+import type { CodeScriptDef, FunctionDef, LogFormat, NodeDef, Variable } from "../engine/types";
 import { buildDemoGraph } from "../demoGraph";
 import { Camera } from "../render/camera";
 import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGeometry";
@@ -30,8 +30,10 @@ import { openNodeSearchMenu } from "../overlay/nodeSearchMenu";
 import { FUNCTION_DRAG_MIME, SCRIPT_DRAG_MIME, VARIABLE_DRAG_MIME } from "../overlay/dragTypes";
 import { openRowContextMenu, type ContextMenuItem } from "../overlay/rowContextMenu";
 import { nextAvailableName } from "../overlay/uniqueName";
-import { loadGraphFromFile, loadGraphFromLocalStorage } from "../persistence/load";
-import { deleteSavedGraph, downloadGraphAsFile, saveGraphToLocalStorage, serializeGraph } from "../persistence/save";
+import { loadGraphFromFile } from "../persistence/load";
+import { downloadGraphAsFile, serializeGraph } from "../persistence/save";
+import { deleteFlowGraph, getFlow, loadFlowGraph, saveFlowGraph } from "../persistence/projects";
+import { appendRun, type RunLog } from "../persistence/runLogs";
 import { downloadCompiledGraph } from "../compiler/codegen";
 import { isNodeLatent } from "../engine/latency";
 import { NodeInstance } from "../engine/nodeInstance";
@@ -77,15 +79,15 @@ async function* readServerSentEvents(response: Response): AsyncGenerator<{ event
  * browser at all — it POSTs the graph to /api/simulate and drives the exact same
  * executingNodeId/firedConnectionIds/log state from the server's streamed events instead of a
  * local ExecutionContext. See src/app/api/simulate/route.ts for the server side. */
-export default function AppShell() {
+export default function AppShell({ projectId, flowId }: { projectId: string; flowId: string }) {
   // Lazy-initialized once, on first client render — this component is only ever mounted client-side
-  // (see app/page.tsx's ssr:false dynamic import), so it's safe to read localStorage here. Lives in
-  // component state (not the mount effect below) so the React panel components in AppShellMarkup
-  // can receive the same `store` instance synchronously on their very first render, instead of a
-  // render pass with no store yet.
+  // (see app/projects/[projectId]/flows/[flowId]/page.tsx's ssr:false dynamic import), so it's safe
+  // to read localStorage here. Lives in component state (not the mount effect below) so the React
+  // panel components in AppShellMarkup can receive the same `store` instance synchronously on their
+  // very first render, instead of a render pass with no store yet.
   const [store] = useState(() =>
     createStore({
-      rootGraph: loadGraphFromLocalStorage() ?? buildDemoGraph(),
+      rootGraph: loadFlowGraph(flowId) ?? buildDemoGraph(),
       activeFunctionId: null,
       openFunctionTabs: [],
       openScriptTabs: [],
@@ -560,6 +562,16 @@ export default function AppShell() {
     // before that arrives (right after the fetch starts) or once the run's ended. Needed so
     // onPauseClick/onContinueClick know which server-side run (see simulationControl.ts) to target.
     let currentRunId: string | null = null;
+    // This Flow's own persisted run/log history entry for whichever Simulate run is currently in
+    // progress (see persistence/runLogs.ts) — built up as "log" SSE events arrive, then written out
+    // via appendRun() once the run ends, however it ends (finished, errored, Stopped). Distinct from
+    // currentRunId (the server's own run identifier for pause/resume) — this is the CLIENT's own
+    // record of the run for the Logs page, keyed by nothing the server needs to know about.
+    let currentRun: RunLog | null = null;
+
+    function recordLogEntry(message: string, format: LogFormat = "text"): void {
+      currentRun?.entries.push({ id: nextId("log"), message, format, timestamp: new Date().toISOString() });
+    }
 
     /** Which function's body graph contains `nodeId`, or null if it's in the root graph (or the id
      * isn't found anywhere) — functions are never nested (see Graph.functions's own doc comment),
@@ -627,6 +639,7 @@ export default function AppShell() {
       store.state.simulating = true;
       store.state.paused = false;
       currentRunId = null;
+      currentRun = { id: nextId("run"), projectId, flowId, flowName: getFlow(projectId, flowId)?.name ?? "Flow", startedAt: new Date().toISOString(), entries: [] };
       logPanel.innerHTML = "";
       store.state.firedConnectionIds = new Set();
       store.state.pinValues = new Map();
@@ -645,6 +658,7 @@ export default function AppShell() {
         if (!response.ok || !response.body) {
           const text = await response.text().catch(() => response.statusText);
           appendLog(`Simulation request failed: ${text}`);
+          recordLogEntry(`Simulation request failed: ${text}`);
           return;
         }
 
@@ -692,16 +706,21 @@ export default function AppShell() {
               store.state.paused = false;
               store.notify();
               break;
-            case "log":
-              appendLog((data as { message: string }).message);
+            case "log": {
+              const { message, format } = data as { message: string; format?: LogFormat };
+              appendLog(message);
+              recordLogEntry(message, format ?? "text");
               break;
+            }
             case "done":
               break;
           }
         }
       } catch (err) {
         if (!controller.signal.aborted) {
-          appendLog(`Error: ${err instanceof Error ? err.message : String(err)}`);
+          const message = `Error: ${err instanceof Error ? err.message : String(err)}`;
+          appendLog(message);
+          recordLogEntry(message);
         }
       } finally {
         if (activeSimulation === controller) {
@@ -709,6 +728,11 @@ export default function AppShell() {
           store.state.simulating = false;
           store.state.paused = false;
           currentRunId = null;
+          if (currentRun) {
+            currentRun.finishedAt = new Date().toISOString();
+            appendRun(currentRun);
+            currentRun = null;
+          }
           store.notify();
           runButton.disabled = false;
           activeSimulation = null;
@@ -758,7 +782,7 @@ export default function AppShell() {
     // that same JSON out as a file, as a separate, explicit action ---
     async function onSaveClick(): Promise<void> {
       await scriptEditor.flushDirtyScripts();
-      saveGraphToLocalStorage(store.state.rootGraph);
+      saveFlowGraph(flowId, store.state.rootGraph);
     }
     saveButton.addEventListener("click", onSaveClick);
 
@@ -791,7 +815,7 @@ export default function AppShell() {
         store.state.executingNodeId = null;
         store.state.firedConnectionIds = new Set();
         store.state.pinValues = new Map();
-        saveGraphToLocalStorage(graph);
+        saveFlowGraph(flowId, graph);
         store.notify();
       } catch (err) {
         appendLog(`Failed to load graph: ${err instanceof Error ? err.message : String(err)}`);
@@ -811,7 +835,7 @@ export default function AppShell() {
     compileButton.addEventListener("click", onCompileClick);
 
     function onDeleteClick(): void {
-      deleteSavedGraph();
+      deleteFlowGraph(flowId);
       location.reload();
     }
     deleteButton.addEventListener("click", onDeleteClick);
@@ -862,5 +886,5 @@ export default function AppShell() {
     };
   }, []);
 
-  return <AppShellMarkup store={store} />;
+  return <AppShellMarkup store={store} projectId={projectId} />;
 }

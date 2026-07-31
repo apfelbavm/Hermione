@@ -1231,3 +1231,328 @@ body.resizing {
   border: none;
   border-radius: 2px;
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Home / Projects / Project / Logs / Credential Vault — the plain (non-canvas) pages surrounding
+   the editor. Reuses the same dark palette as the toolbar/sidebar (#1e2126/#24272d/#33383f/#e8e8e8)
+   rather than inventing a separate visual language for them. */
+
+#back-to-project-button {
+  color: #9aa0a8;
+  text-decoration: none;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+#back-to-project-button:hover {
+  background: #33383f;
+  color: #e8e8e8;
+}
+
+.landing-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  background: #1e2126;
+  color: #e8e8e8;
+}
+
+.landing-title {
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.landing-links {
+  display: flex;
+  gap: 16px;
+}
+
+.landing-link {
+  display: inline-block;
+  padding: 10px 22px;
+  background: #33383f;
+  color: #e8e8e8;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.landing-link:hover {
+  background: #454a52;
+}
+
+.page-shell {
+  min-height: 100vh;
+  background: #1e2126;
+  color: #e8e8e8;
+  padding: 24px 32px 48px;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.page-header h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.page-title-editable {
+  cursor: pointer;
+}
+
+.page-title-editable:hover {
+  text-decoration: underline dotted;
+}
+
+.page-title-input {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.back-link {
+  color: #9aa0a8;
+  text-decoration: none;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+
+.back-link:hover {
+  background: #33383f;
+  color: #e8e8e8;
+}
+
+.section-heading {
+  font-size: 16px;
+  margin: 28px 0 12px;
+  color: #b8bec7;
+}
+
+.page-empty-note {
+  color: #9aa0a8;
+  font-size: 13px;
+}
+
+.logs-link {
+  display: inline-block;
+  color: #6db3e8;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.logs-link:hover {
+  text-decoration: underline;
+}
+
+.create-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.create-row input[type="text"] {
+  flex: 1 1 auto;
+  background: #24272d;
+  border: 1px solid #3d4148;
+  border-radius: 4px;
+  color: #e8e8e8;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.create-row button {
+  background: #3b8a5c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.create-row button:hover {
+  background: #46a56d;
+}
+
+.entity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #33383f;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.entity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #24272d;
+  border-bottom: 1px solid #33383f;
+}
+
+.entity-row:last-child {
+  border-bottom: none;
+}
+
+.entity-row:hover {
+  background: #282c33;
+}
+
+.entity-name {
+  flex: 1 1 auto;
+  color: #e8e8e8;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.entity-name:hover {
+  text-decoration: underline;
+}
+
+.entity-rename-input {
+  flex: 1 1 auto;
+  background: #1e2126;
+  border: 1px solid #3b6b8a;
+  border-radius: 4px;
+  color: #e8e8e8;
+  padding: 5px 8px;
+  font-size: 14px;
+}
+
+.entity-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.entity-actions button {
+  background: #33383f;
+  color: #e8e8e8;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.entity-actions button:hover {
+  background: #454a52;
+}
+
+.run-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.run-row {
+  border: 1px solid #33383f;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #24272d;
+}
+
+.run-row-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  color: #e8e8e8;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+}
+
+.run-row-header:hover {
+  background: #2b2f36;
+}
+
+.run-row-caret {
+  color: #9aa0a8;
+  flex: 0 0 auto;
+}
+
+.run-row-flow-name {
+  font-weight: 600;
+  flex: 1 1 auto;
+}
+
+.run-row-time,
+.run-row-count {
+  color: #9aa0a8;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.run-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 14px 14px;
+  border-top: 1px solid #33383f;
+}
+
+.log-entry-text {
+  margin: 0;
+  background: #1c1f24;
+  border: 1px solid #33383f;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: "Consolas", "Courier New", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #d8dce2;
+}
+
+.log-entry-json {
+  color: #cfe8c8;
+}
+
+.log-entry-xml {
+  color: #e8d9a0;
+}
+
+.log-entry-csv-wrapper {
+  overflow-x: auto;
+  border: 1px solid #33383f;
+  border-radius: 4px;
+}
+
+.log-entry-csv {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+}
+
+.log-entry-csv td {
+  padding: 4px 10px;
+  border: 1px solid #33383f;
+  color: #d8dce2;
+  white-space: nowrap;
+}
+
+.log-entry-csv tr:nth-child(odd) {
+  background: #1c1f24;
+}

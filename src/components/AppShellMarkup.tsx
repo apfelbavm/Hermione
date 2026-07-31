@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { FunctionDef } from "../engine/types";
 import type { Store } from "../state/store";
 import { useStoreRevision } from "../state/useStore";
@@ -11,7 +12,7 @@ import { VariablePanel } from "./sidebar/VariablePanel";
  * (see ./sidebar/*); everything not yet converted (canvas overlays, Monaco, resizers) keeps the
  * same element ids the still-imperative AppShell.tsx mount effect looks up via
  * document.getElementById, exactly as it did when this was static HTML. */
-export default function AppShellMarkup({ store }: { store: Store }) {
+export default function AppShellMarkup({ store, projectId }: { store: Store; projectId: string }) {
   useStoreRevision(store);
 
   const activeFunction: FunctionDef | null = store.state.activeFunctionId ? (store.state.rootGraph.functions.find((f) => f.id === store.state.activeFunctionId) ?? null) : null;
@@ -20,6 +21,9 @@ export default function AppShellMarkup({ store }: { store: Store }) {
     <div id="app">
       <div id="toolbar">
         <div id="toolbar-left">
+          <Link href={`/projects/${projectId}`} id="back-to-project-button" title="Back to the project">
+            ← Back
+          </Link>
           <span id="toolbar-title">Hermione</span>
         </div>
         <div id="toolbar-center">
