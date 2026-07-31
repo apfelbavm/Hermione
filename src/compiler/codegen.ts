@@ -240,10 +240,12 @@ export function compileGraph(graph: Graph): CompileResult {
   return { code: parts.join("\n"), manifest: { triggers } };
 }
 
-/** Compiles the graph and triggers a browser download of the generated source. `.mjs` (not `.js`) so the
- * file runs as ESM under plain `node` regardless of any surrounding package.json — see scripts/compileGraph.ts. */
-export function downloadCompiledGraph(graph: Graph, filename: string = `${graph.name || "graph"}.compiled.mjs`): void {
-  const { code } = compileGraph(graph);
+/** Triggers a browser download of already-compiled source — e.g. AppShell.tsx's Deploy button,
+ * which gets `code` back from the server after persisting it (see client/api.ts's deployFlow)
+ * rather than compiling the graph a second time just to download it. `.mjs` (not `.js`) so the file
+ * runs as ESM under plain `node` regardless of any surrounding package.json — see
+ * scripts/compileGraph.ts. */
+export function downloadCompiledCode(code: string, filename: string): void {
   const blob = new Blob([code], { type: "text/javascript" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

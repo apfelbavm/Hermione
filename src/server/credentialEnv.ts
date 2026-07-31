@@ -19,7 +19,7 @@ function camelToEnvKey(key: string): string {
  * `HERMIONE_CRED_<SANITIZED NAME>_<FIELD>` names a compiled node's own env-reading helper (see
  * nodes/oauth2Saml.ts's credentialFromEnv) looks them up by — so a Flow whose compiled output reads
  * a credential by name actually finds it when run server-side (see
- * api/localhost-deployment/run/route.ts), the same way it would after being deployed standalone with
+ * api/emulate/run/route.ts), the same way it would after being deployed standalone with
  * those env vars set by hand. Derived generically off each credential's own `data` keys rather than
  * hand-listing fields per type, so any future credential type gets this for free the moment its own
  * node type adds a compileExecute that reads env vars the same way. Only meaningful for the one

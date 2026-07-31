@@ -1798,6 +1798,22 @@ body.resizing {
   flex: 1 1 auto;
 }
 
+/* Only rendered by the global Logs page (app/logs/page.tsx) — the per-project one omits it since
+   which project a run belongs to is already implied by the page itself. */
+.run-row-project-name {
+  flex: 0 0 auto;
+  color: var(--pp-link);
+  text-decoration: none;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--pp-surface-hover);
+}
+
+.run-row-project-name:hover {
+  text-decoration: underline;
+}
+
 .run-row-time,
 .run-row-count {
   color: var(--pp-text-muted);
@@ -1806,7 +1822,7 @@ body.resizing {
 }
 
 /* Distinguishes a Simulate run (interpreted, editor-only) from a production run (the Flow's own
-   compiled output, see api/localhost-deployment/run/route.ts) at a glance — see RunLog.kind. */
+   compiled output, see api/emulate/run/route.ts) at a glance — see RunLog.kind. */
 .run-row-kind {
   flex: 0 0 auto;
   font-size: 11px;

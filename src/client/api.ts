@@ -1,5 +1,5 @@
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
-import type { FlowSummary, ProjectSummary, RunLog } from "../server/models";
+import type { DeployedScriptSummary, FlowSummary, ProjectSummary, RunLog } from "../server/models";
 
 // Browser-side counterpart to src/server/DatabaseManager.ts — every function here is a thin
 // fetch() wrapper around the API routes under src/app/api/, since the database itself
@@ -65,15 +65,35 @@ export function saveFlowGraph(projectId: string, flowId: string, graphJson: stri
   return requestJson(`/api/projects/${projectId}/flows/${flowId}/graph`, { method: "PUT", body: graphJson });
 }
 
+/** The editor's "Deploy" button — compiles `graphJson` server-side and stores it as this Flow's one
+ * DeployedScript row (see api/projects/[projectId]/flows/[flowId]/deploy/route.ts), replacing any
+ * previous deployment. Returns the compiled `code` so the caller can still trigger a file download
+ * from the exact bytes just persisted (see compiler/codegen.ts's downloadCompiledCode). */
+export function deployFlow(projectId: string, flowId: string, graphJson: string): Promise<{ code: string; deployedAt: string }> {
+  return requestJson(`/api/projects/${projectId}/flows/${flowId}/deploy`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ graph: graphJson }) });
+}
+
+/** Every Flow in `projectId` that's actually been deployed (see deployFlow above) — feeds the
+ * Emulate page's picker. */
+export function listDeployedScripts(projectId: string): Promise<DeployedScriptSummary[]> {
+  return requestJson(`/api/projects/${projectId}/deployed-scripts`);
+}
+
 export function listRuns(projectId: string): Promise<RunLog[]> {
   return requestJson(`/api/projects/${projectId}/runs`);
 }
 
-/** Runs a Flow's own COMPILED output server-side (see api/localhost-deployment/run/route.ts) — used
- * by the Localhost Deployment page, distinct from Simulate (which streams via SSE for the editor's
- * own step-through visualization). This one just awaits the whole run and returns its RunLog. */
+/** Every run across every project (see api/runs/route.ts) — feeds the global Logs page. */
+export function listAllRuns(): Promise<RunLog[]> {
+  return requestJson("/api/runs");
+}
+
+/** Runs a Flow's DEPLOYED compiled output server-side (see api/emulate/run/route.ts) —
+ * used by the Emulate page, distinct from Simulate (which streams via SSE for the
+ * editor's own step-through visualization). This one just awaits the whole run and returns its
+ * RunLog. */
 export function runProductionFlow(projectId: string, flowId: string): Promise<{ run: RunLog }> {
-  return requestJson("/api/localhost-deployment/run", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ projectId, flowId }) });
+  return requestJson("/api/emulate/run", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ projectId, flowId }) });
 }
 
 export function listCredentials(): Promise<CredentialSummary[]> {

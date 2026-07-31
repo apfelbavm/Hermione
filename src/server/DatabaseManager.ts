@@ -4,7 +4,8 @@ import path from "node:path";
 import { nextId } from "../engine/graphMutations";
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
 import { MAX_RUNS_PER_PROJECT } from "../shared/runLogConstants";
-import type { FlowSummary, LogEntry, ProjectSummary, RunKind, RunLog } from "./models";
+import type { DeployedScript, DeployedScriptSummary, FlowSummary, LogEntry, ProjectSummary, RunKind, RunLog } from "./models";
+import type { TriggerDescriptor } from "../compiler/codegen";
 
 const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "hermione.db");
 
@@ -45,6 +46,16 @@ interface CredentialRow {
   data_json: string;
   created_at: string;
   updated_at: string;
+}
+
+interface DeployedScriptRow {
+  id: string;
+  project_id: string;
+  flow_id: string;
+  flow_name: string;
+  code: string;
+  manifest_json: string;
+  deployed_at: string;
 }
 
 /** The one and only place in this app that touches a database — no other module imports
@@ -104,6 +115,17 @@ export class DatabaseManager {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS deployed_scripts (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        flow_id TEXT NOT NULL UNIQUE,
+        flow_name TEXT NOT NULL,
+        code TEXT NOT NULL,
+        manifest_json TEXT NOT NULL,
+        deployed_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_deployed_scripts_project_id ON deployed_scripts (project_id);
     `);
     this.migrateAddRunsKindColumn();
   }
@@ -150,6 +172,21 @@ export class DatabaseManager {
     return { ...this.toCredentialSummary(row), data: JSON.parse(row.data_json) as CredentialData };
   }
 
+  private toDeployedScriptSummary(row: DeployedScriptRow): DeployedScriptSummary {
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      flowId: row.flow_id,
+      flowName: row.flow_name,
+      manifest: JSON.parse(row.manifest_json) as { triggers: TriggerDescriptor[] },
+      deployedAt: row.deployed_at,
+    };
+  }
+
+  private toDeployedScript(row: DeployedScriptRow): DeployedScript {
+    return { ...this.toDeployedScriptSummary(row), code: row.code };
+  }
+
   // --- Projects ---
 
   listProjects(): ProjectSummary[] {
@@ -179,6 +216,7 @@ export class DatabaseManager {
   deleteProject(projectId: string): void {
     const del = this.db.transaction((id: string) => {
       this.db.prepare("DELETE FROM runs WHERE project_id = ?").run(id);
+      this.db.prepare("DELETE FROM deployed_scripts WHERE project_id = ?").run(id);
       this.db.prepare("DELETE FROM flows WHERE project_id = ?").run(id);
       this.db.prepare("DELETE FROM projects WHERE id = ?").run(id);
     });
@@ -210,6 +248,7 @@ export class DatabaseManager {
 
   deleteFlow(projectId: string, flowId: string): void {
     const del = this.db.transaction((pId: string, fId: string) => {
+      this.db.prepare("DELETE FROM deployed_scripts WHERE flow_id = ?").run(fId);
       this.db.prepare("DELETE FROM flows WHERE project_id = ? AND id = ?").run(pId, fId);
     });
     del(projectId, flowId);
@@ -233,6 +272,13 @@ export class DatabaseManager {
   /** Every run for `projectId`, newest first. */
   listRuns(projectId: string): RunLog[] {
     const rows = this.db.prepare<[string], RunRow>("SELECT * FROM runs WHERE project_id = ? ORDER BY started_at DESC").all(projectId);
+    return rows.map((row) => this.toRunLog(row));
+  }
+
+  /** Every run across every project, newest first — feeds the global Logs page (app/logs/page.tsx),
+   * as opposed to listRuns above, which is scoped to one project's own Logs page. */
+  listAllRuns(): RunLog[] {
+    const rows = this.db.prepare<[], RunRow>("SELECT * FROM runs ORDER BY started_at DESC").all();
     return rows.map((row) => this.toRunLog(row));
   }
 
@@ -288,6 +334,45 @@ export class DatabaseManager {
 
   deleteCredential(id: string): void {
     this.db.prepare("DELETE FROM credentials WHERE id = ?").run(id);
+  }
+
+  // --- Deployed scripts ---
+
+  /** Every deployed Flow in `projectId`, newest first — never includes `code` (see
+   * DeployedScriptSummary's own doc comment), just enough for the Emulate page's
+   * picker to show what's actually runnable. */
+  listDeployedScripts(projectId: string): DeployedScriptSummary[] {
+    const rows = this.db.prepare<[string], DeployedScriptRow>("SELECT * FROM deployed_scripts WHERE project_id = ? ORDER BY deployed_at DESC").all(projectId);
+    return rows.map((row) => this.toDeployedScriptSummary(row));
+  }
+
+  /** Includes `code` — only ever called server-side, right before actually running it (see
+   * api/emulate/run/route.ts). */
+  getDeployedScript(flowId: string): DeployedScript | undefined {
+    const row = this.db.prepare<[string], DeployedScriptRow>("SELECT * FROM deployed_scripts WHERE flow_id = ?").get(flowId);
+    return row ? this.toDeployedScript(row) : undefined;
+  }
+
+  /** One row per Flow — a redeploy overwrites the previous snapshot (same `id`) rather than growing
+   * a history, matching "Deploy" as "replace what's currently live," not an audit log. */
+  upsertDeployedScript(input: { projectId: string; flowId: string; flowName: string; code: string; manifest: { triggers: TriggerDescriptor[] } }): DeployedScript {
+    const existing = this.db.prepare<[string], { id: string }>("SELECT id FROM deployed_scripts WHERE flow_id = ?").get(input.flowId);
+    const record: DeployedScript = {
+      id: existing?.id ?? nextId("deployment"),
+      projectId: input.projectId,
+      flowId: input.flowId,
+      flowName: input.flowName,
+      code: input.code,
+      manifest: input.manifest,
+      deployedAt: new Date().toISOString(),
+    };
+    this.db
+      .prepare(
+        `INSERT INTO deployed_scripts (id, project_id, flow_id, flow_name, code, manifest_json, deployed_at) VALUES (@id, @projectId, @flowId, @flowName, @code, @manifestJson, @deployedAt)
+         ON CONFLICT(flow_id) DO UPDATE SET flow_name = @flowName, code = @code, manifest_json = @manifestJson, deployed_at = @deployedAt`,
+      )
+      .run({ id: record.id, projectId: record.projectId, flowId: record.flowId, flowName: record.flowName, code: record.code, manifestJson: JSON.stringify(record.manifest), deployedAt: record.deployedAt });
+    return record;
   }
 }
 

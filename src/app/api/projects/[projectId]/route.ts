@@ -1,4 +1,5 @@
 import { getDatabaseManager } from "../../../../server/DatabaseManager";
+import { deleteDeployedScriptFile } from "../../../../server/deployedScriptFile";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,9 @@ export async function PATCH(request: Request, { params }: { params: Params }): P
 
 export async function DELETE(_request: Request, { params }: { params: Params }): Promise<Response> {
   const { projectId } = await params;
-  getDatabaseManager().deleteProject(projectId);
+  const db = getDatabaseManager();
+  const deployedFlowIds = db.listDeployedScripts(projectId).map((s) => s.flowId);
+  db.deleteProject(projectId);
+  for (const flowId of deployedFlowIds) deleteDeployedScriptFile(flowId);
   return new Response(null, { status: 204 });
 }

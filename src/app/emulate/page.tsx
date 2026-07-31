@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { listFlows, listProjects, runProductionFlow } from "../../client/api";
-import type { FlowSummary, ProjectSummary, RunLog } from "../../server/models";
+import { listDeployedScripts, listProjects, runProductionFlow } from "../../client/api";
+import type { ProjectSummary, RunLog } from "../../server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 
@@ -14,16 +13,18 @@ interface FlowOption {
   flowName: string;
 }
 
-/** Runs a saved Flow's own COMPILED output (not the interpreted Simulate path — see
+/** Runs a Flow's DEPLOYED compiled output (not the interpreted Simulate path — see
  * api/localhost-deployment/run/route.ts) directly on this machine, as a stand-in for an actual
- * deployment target. Every project's Flows are fetched up front (there's no flat "all flows" API —
- * see client/api.ts's listProjects/listFlows) and flattened into one picker grouped by project. */
+ * deployment target. Only Flows that have actually been deployed (see AppShell.tsx's Deploy button)
+ * show up here — every project's deployed scripts are fetched up front (there's no flat "all
+ * deployments" API — see client/api.ts's listProjects/listDeployedScripts) and flattened into one
+ * picker grouped by project. */
 export default function LocalhostDeploymentPage() {
   const [options, setOptions] = useState<FlowOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [selected, setSelected] = useState("");
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<RunLog | null>(null);
+  const [_result, setResult] = useState<RunLog | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,8 +32,8 @@ export default function LocalhostDeploymentPage() {
       const projects = await listProjects();
       const perProject = await Promise.all(
         projects.map(async (project: ProjectSummary) => {
-          const flows = await listFlows(project.id);
-          return flows.map((flow: FlowSummary) => ({ projectId: project.id, projectName: project.name, flowId: flow.id, flowName: flow.name }));
+          const deployed = await listDeployedScripts(project.id);
+          return deployed.map((script) => ({ projectId: project.id, projectName: project.name, flowId: script.flowId, flowName: script.flowName }));
         }),
       );
       const flat = perProject.flat();
@@ -72,17 +73,14 @@ export default function LocalhostDeploymentPage() {
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Localhost Deployment" }]} />
-      <h1>Localhost Deployment</h1>
-      <p className="page-empty-note">
-        Runs a Flow&apos;s own compiled output directly on this machine — the same source a &quot;Compile&quot; click in the editor downloads — instead of the editor&apos;s interpreted
-        Simulate.
-      </p>
+      <Breadcrumbs items={[{ label: "Emulate" }]} />
+      <h1>Emulate</h1>
+      <p className="page-empty-note">Runs a Flow's deployed compiled output directly on this machine — the same snapshot the editor&apos;s &quot;Deploy&quot; button last persisted — instead of the editor&apos;s interpreted Simulate.</p>
 
       {loadingOptions ? (
-        <p className="page-empty-note">Loading Flows…</p>
+        <p className="page-empty-note">Loading deployed Flows…</p>
       ) : options.length === 0 ? (
-        <p className="page-empty-note">No Flows yet — create one from a project first.</p>
+        <p className="page-empty-note">No Flows have been deployed yet — open one in the editor and click Deploy.</p>
       ) : (
         <div className="create-row">
           <select value={selected} onChange={(e) => setSelected(e.target.value)} disabled={running}>
@@ -103,27 +101,6 @@ export default function LocalhostDeploymentPage() {
       )}
 
       {error && <p className="log-save-status log-save-status-error">{error}</p>}
-
-      {result && (
-        <div className="run-entries">
-          <h2 className="section-heading">Result</h2>
-          <p className="page-empty-note">
-            {result.entries.length} {result.entries.length === 1 ? "entry" : "entries"} —{" "}
-            <Link href={`/projects/${result.projectId}/logs`} className="logs-link">
-              view in Logs →
-            </Link>
-          </p>
-          {result.entries.length === 0 ? (
-            <p className="page-empty-note">No log output for this run.</p>
-          ) : (
-            result.entries.map((entry) => (
-              <div className="log-entry" key={entry.id}>
-                <pre className="log-entry-text">{entry.message}</pre>
-              </div>
-            ))
-          )}
-        </div>
-      )}
     </PageShell>
   );
 }

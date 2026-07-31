@@ -25,6 +25,14 @@ function CredentialVaultIcon() {
   );
 }
 
+function LogsIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+      <path d="M2 2.5A1.5 1.5 0 0 1 3.5 1h6.19a1.5 1.5 0 0 1 1.06.44l2.81 2.81a1.5 1.5 0 0 1 .44 1.06V13.5A1.5 1.5 0 0 1 12.5 15h-9A1.5 1.5 0 0 1 2 13.5v-11zM9.5 2H3.5a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5V6h-3a1 1 0 0 1-1-1V2zm1 .21V5h2.79L10.5 2.21zM4.75 8.5a.5.5 0 0 1 .5-.5h5.5a.5.5 0 0 1 0 1h-5.5a.5.5 0 0 1-.5-.5zm0 2.5a.5.5 0 0 1 .5-.5h5.5a.5.5 0 0 1 0 1h-5.5a.5.5 0 0 1-.5-.5z" />
+    </svg>
+  );
+}
+
 function DeploymentIcon() {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
@@ -52,7 +60,8 @@ interface SidebarLinkDef {
 const SIDEBAR_LINKS: SidebarLinkDef[] = [
   { href: "/projects", label: "Projects", icon: <ProjectsIcon /> },
   { href: "/credential-vault", label: "Credential Vault", icon: <CredentialVaultIcon /> },
-  { href: "/localhost-deployment", label: "Localhost Deployment", icon: <DeploymentIcon /> },
+  { href: "/logs", label: "Logs", icon: <LogsIcon /> },
+  { href: "/emulate", label: "Emulate", icon: <DeploymentIcon /> },
 ];
 
 /** The nav rail every plain page gets via PageShell (see PageHeader.tsx) — never rendered on the

@@ -1,14 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { registerBuiltins } from "../../../../nodes";
-import { compileGraph } from "../../../../compiler/codegen";
-import { deserializeGraph } from "../../../../persistence/load";
 import { nextId } from "../../../../engine/graphMutations";
 import { getDatabaseManager } from "../../../../server/DatabaseManager";
 import { applyCredentialEnvVars } from "../../../../server/credentialEnv";
+import { deployedScriptPath } from "../../../../server/deployedScriptFile";
 import type { LogEntry, RunLog } from "../../../../server/models";
 
 // Same reasoning as api/simulate/route.ts: dynamic-importing a compiled module and running real
@@ -22,13 +18,18 @@ interface RunProductionRequestBody {
   flowId: string;
 }
 
-/** Runs a saved Flow's own COMPILED output (see compiler/codegen.ts) — the exact same source a
- * "Compile" click in the editor would download — rather than the INTERPRETED graph api/simulate's
- * route runs. Only "On Start" trigger(s) (manifest kind "manual" — see nodes/event.ts's own doc
- * comment contrasting it with "On Run", which is Simulate-only and never compiled into anything this
- * route would find) fire here, mirroring how a real deployed graph would actually start. Persists the
- * result as a RunLog the same way Simulate does, tagged kind: "production" so the Logs page can tell
- * the two apart. */
+/** Runs a Flow's DEPLOYED compiled output (see api/projects/[projectId]/flows/[flowId]/deploy/route.ts
+ * and DatabaseManager.getDeployedScript) — a snapshot taken the last time "Deploy" was clicked in the
+ * editor, not whatever the graph currently looks like — rather than the INTERPRETED graph
+ * api/simulate's route runs. Only the "On Run" trigger (manifest kind "run" — nodes/event.ts's
+ * event.run, which compiles to a function named "eventRun" by default) fires here: this is the
+ * graph's one designated entry point for a deployed run, same node the editor's own Simulate button
+ * fires. If the graph has no such node, that's reported as a log line (see EVENT_RUN_MISSING_MESSAGE
+ * below), not an error — the deployment itself is still valid, it just has nothing to do. Every
+ * credential the graph might need is pulled from the Credential Vault into env vars first (see
+ * server/credentialEnv.ts) so a compiled node reading one by name (e.g. oauth2Saml) finds it the same
+ * way it would after being deployed standalone. Persists the result as a RunLog the same way Simulate
+ * does, tagged kind: "production" so the Logs page can tell the two apart. */
 export async function POST(request: Request): Promise<Response> {
   let body: RunProductionRequestBody;
   try {
@@ -39,14 +40,10 @@ export async function POST(request: Request): Promise<Response> {
 
   const { projectId, flowId } = body;
   const db = getDatabaseManager();
-  const flow = db.getFlow(projectId, flowId);
-  if (!flow) {
-    return Response.json({ error: "Flow not found" }, { status: 404 });
-  }
 
-  const graphJson = db.loadFlowGraphJson(flowId);
-  if (!graphJson) {
-    return Response.json({ error: "This Flow has never been saved — nothing to compile/run." }, { status: 400 });
+  const deployed = db.getDeployedScript(flowId);
+  if (!deployed || deployed.projectId !== projectId) {
+    return Response.json({ error: "This Flow hasn't been deployed yet — click Deploy in the editor first." }, { status: 400 });
   }
 
   const entries: LogEntry[] = [];
@@ -55,21 +52,18 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const startedAt = new Date().toISOString();
-  let tempDir: string | null = null;
   try {
-    const graph = deserializeGraph(graphJson);
-    const { code, manifest } = compileGraph(graph);
-    const manualTriggers = manifest.triggers.filter((t) => t.kind === "manual");
+    const runTrigger = deployed.manifest.triggers.find((t) => t.kind === "run");
 
-    if (manualTriggers.length === 0) {
-      recordLogEntry('No "On Start" node in this graph — nothing to run in production mode.');
+    if (!runTrigger) {
+      recordLogEntry('The "EventRun" function does not exist in this graph.');
     } else {
       applyCredentialEnvVars(db);
 
-      tempDir = mkdtempSync(join(tmpdir(), "hermione-deploy-"));
-      const file = join(tempDir, "graph.compiled.mjs");
-      writeFileSync(file, code, "utf8");
-      const url = `${pathToFileURL(file).href}?t=${Date.now()}-${randomUUID()}`;
+      // The file on disk always reflects the LATEST deploy (see writeDeployedScriptFile) — cache-bust
+      // the import so a redeploy between two runs in the same server process isn't served Node's
+      // stale cached module for this same path.
+      const url = `${pathToFileURL(deployedScriptPath(flowId)).href}?t=${Date.now()}-${randomUUID()}`;
       // The compiled module's path is only known at request time — never statically resolvable —
       // so bundlers must leave this import() alone and defer it to Node's real ESM loader.
       const compiled = (await import(/* webpackIgnore: true */ url)) as Record<string, unknown>;
@@ -81,23 +75,19 @@ export async function POST(request: Request): Promise<Response> {
         // formatForLog's output into the call site) — so every entry here is plain "text".
         log: (message: string) => recordLogEntry(message),
       };
-      for (const trigger of manualTriggers) {
-        const fn = compiled[trigger.functionName] as (rt: unknown) => Promise<void>;
-        await fn(rt);
-      }
+      const fn = compiled[runTrigger.functionName] as (rt: unknown) => Promise<void>;
+      await fn(rt);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     recordLogEntry(`Error: ${message}`);
-  } finally {
-    if (tempDir) rmSync(tempDir, { recursive: true, force: true });
   }
 
   const runLog: RunLog = {
     id: nextId("run"),
     projectId,
     flowId,
-    flowName: flow.name,
+    flowName: deployed.flowName,
     startedAt,
     finishedAt: new Date().toISOString(),
     entries,
