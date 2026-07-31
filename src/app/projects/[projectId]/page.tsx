@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { createFlow, deleteFlow, getProject, listFlows, renameFlow, renameProject } from "../../../client/api";
 import type { FlowSummary, ProjectSummary } from "../../../server/models";
+import { PageHeader } from "../../../components/PageHeader";
+import { Breadcrumbs } from "../../../components/Breadcrumbs";
 
 export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -57,40 +59,40 @@ export default function ProjectPage() {
   if (!project) {
     return (
       <main className="page-shell">
-        <div className="page-header">
-          <Link href="/projects" className="back-link">
-            ← Back
-          </Link>
-          <h1>Project not found</h1>
-        </div>
+        <PageHeader />
+        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Projects", href: "/projects" }]} />
+        <Link href="/projects" className="back-link">
+          ← Back
+        </Link>
+        <h1>Project not found</h1>
       </main>
     );
   }
 
   return (
     <main className="page-shell">
-      <div className="page-header">
-        <Link href="/projects" className="back-link">
-          ← Back
-        </Link>
-        {editingProjectName ? (
-          <input
-            type="text"
-            className="entity-rename-input page-title-input"
-            defaultValue={project.name}
-            autoFocus
-            onBlur={(e) => void commitProjectRename(e.currentTarget.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-              if (e.key === "Escape") setEditingProjectName(false);
-            }}
-          />
-        ) : (
-          <h1 className="page-title-editable" title="Click to rename" onClick={() => setEditingProjectName(true)}>
-            {project.name}
-          </h1>
-        )}
-      </div>
+      <PageHeader />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Projects", href: "/projects" }, { label: project.name }]} />
+      <Link href="/projects" className="back-link">
+        ← Back
+      </Link>
+      {editingProjectName ? (
+        <input
+          type="text"
+          className="entity-rename-input page-title-input"
+          defaultValue={project.name}
+          autoFocus
+          onBlur={(e) => void commitProjectRename(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") setEditingProjectName(false);
+          }}
+        />
+      ) : (
+        <h1 className="page-title-editable" title="Click to rename" onClick={() => setEditingProjectName(true)}>
+          {project.name}
+        </h1>
+      )}
 
       <Link href={`/projects/${projectId}/logs`} className="logs-link">
         View Run Logs →

@@ -13,14 +13,72 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0;
 }
 
+/* Theme variables for the plain pages around the Flow editor (Home/Projects/Project/Logs/
+   Credential Vault — see that whole section further down) — light is the default (:root), dark is
+   an override activated by [data-theme="dark"] on <html> (see components/ThemeToggle.tsx and the
+   inline bootstrap script in app/layout.tsx that sets it before first paint). The Flow editor
+   itself never references any `--pp-*` variable — its own colors (toolbar, sidebar, canvas/pin
+   colors in engine/color.ts) stay the fixed dark palette they've always been, regardless of this
+   toggle, by design (see the task this was introduced for: "except for the actual flow editor"). */
+:root {
+  --pp-bg: #f5f6f8;
+  --pp-surface: #ffffff;
+  --pp-surface-hover: #eef1f4;
+  --pp-surface-hover-alt: #e4e8ec;
+  --pp-surface-alt: #eef0f3;
+  --pp-border: #dde1e6;
+  --pp-border-strong: #c9ced4;
+  --pp-border-accent: #3b82c4;
+  --pp-text: #1b1e22;
+  --pp-text-muted: #5b6169;
+  --pp-text-muted-strong: #43484f;
+  --pp-text-dim: #8a9098;
+  --pp-link: #1a6fb0;
+  --pp-json: #2f7a4a;
+  --pp-xml: #8a6d1f;
+  --pp-danger: #c23b3f;
+  --pp-accent: #3b8a5c;
+  --pp-accent-hover: #2f7549;
+  --pp-button-bg: #e7e9ec;
+  --pp-button-bg-hover: #d7dbe0;
+  --pp-modal-backdrop: rgba(15, 17, 20, 0.45);
+}
+
+:root[data-theme="dark"] {
+  --pp-bg: #1e2126;
+  --pp-surface: #24272d;
+  --pp-surface-hover: #282c33;
+  --pp-surface-hover-alt: #2b2f36;
+  --pp-surface-alt: #1c1f24;
+  --pp-border: #33383f;
+  --pp-border-strong: #3d4148;
+  --pp-border-accent: #3b6b8a;
+  --pp-text: #e8e8e8;
+  --pp-text-muted: #9aa0a8;
+  --pp-text-muted-strong: #b8bec7;
+  --pp-text-dim: #6b7078;
+  --pp-link: #6db3e8;
+  --pp-json: #cfe8c8;
+  --pp-xml: #e8d9a0;
+  --pp-danger: #e5484d;
+  --pp-accent: #3b8a5c;
+  --pp-accent-hover: #46a56d;
+  --pp-button-bg: #33383f;
+  --pp-button-bg-hover: #454a52;
+  --pp-modal-backdrop: rgba(0, 0, 0, 0.55);
+}
+
 html,
 body {
   margin: 0;
   height: 100%;
   overflow: hidden;
   font-family: "Segoe UI", sans-serif;
-  background: #1e2126;
-  color: #e8e8e8;
+  /* The Flow editor (#app below) always paints its own explicit dark background/text regardless of
+     this — these vars only matter for the plain pages around it (Home/Projects/Logs/Credential
+     Vault — see that section further down), which is why only they're theme-aware. */
+  background: var(--pp-bg);
+  color: var(--pp-text);
 }
 
 #app {
@@ -1260,6 +1318,62 @@ body.resizing {
   color: #e8e8e8;
 }
 
+.page-top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--pp-border);
+}
+
+.page-top-header-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--pp-text);
+}
+
+.theme-toggle-button {
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  border: 1px solid var(--pp-border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.theme-toggle-button:hover {
+  background: var(--pp-button-bg-hover);
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--pp-text-muted);
+  margin-bottom: 16px;
+}
+
+.breadcrumbs a {
+  color: var(--pp-link);
+  text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-current {
+  color: var(--pp-text);
+}
+
+.breadcrumb-sep {
+  color: var(--pp-text-dim);
+}
+
 .landing-page {
   /* height (not min-height) + its own overflow-y, since html/body are overflow: hidden globally
      (see that rule near the top of this file) — every plain page needs to scroll internally rather
@@ -1268,11 +1382,21 @@ body.resizing {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  background: var(--pp-bg);
+  color: var(--pp-text);
+  padding: 24px 32px;
+  max-width: 860px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.landing-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 24px;
-  background: #1e2126;
-  color: #e8e8e8;
 }
 
 .landing-title {
@@ -1290,23 +1414,23 @@ body.resizing {
 .landing-link {
   display: inline-block;
   padding: 10px 22px;
-  background: #33383f;
-  color: #e8e8e8;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
   text-decoration: none;
   border-radius: 6px;
   font-size: 14px;
 }
 
 .landing-link:hover {
-  background: #454a52;
+  background: var(--pp-button-bg-hover);
 }
 
 .page-shell {
   /* height (not min-height) + its own overflow-y — see .landing-page's identical comment above. */
   height: 100vh;
   overflow-y: auto;
-  background: #1e2126;
-  color: #e8e8e8;
+  background: var(--pp-bg);
+  color: var(--pp-text);
   padding: 24px 32px 48px;
   max-width: 860px;
   margin: 0 auto;
@@ -1338,33 +1462,35 @@ body.resizing {
 }
 
 .back-link {
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
   text-decoration: none;
   font-size: 13px;
   padding: 4px 8px;
   border-radius: 4px;
   flex: 0 0 auto;
+  display: inline-block;
+  margin-bottom: 16px;
 }
 
 .back-link:hover {
-  background: #33383f;
-  color: #e8e8e8;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
 }
 
 .section-heading {
   font-size: 16px;
   margin: 28px 0 12px;
-  color: #b8bec7;
+  color: var(--pp-text-muted-strong);
 }
 
 .page-empty-note {
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
   font-size: 13px;
 }
 
 .logs-link {
   display: inline-block;
-  color: #6db3e8;
+  color: var(--pp-link);
   font-size: 13px;
   text-decoration: none;
 }
@@ -1381,16 +1507,16 @@ body.resizing {
 
 .create-row input[type="text"] {
   flex: 1 1 auto;
-  background: #24272d;
-  border: 1px solid #3d4148;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
   border-radius: 4px;
-  color: #e8e8e8;
+  color: var(--pp-text);
   padding: 7px 10px;
   font-size: 13px;
 }
 
 .create-row button {
-  background: #3b8a5c;
+  background: var(--pp-accent);
   color: #fff;
   border: none;
   border-radius: 4px;
@@ -1400,14 +1526,14 @@ body.resizing {
 }
 
 .create-row button:hover {
-  background: #46a56d;
+  background: var(--pp-accent-hover);
 }
 
 .entity-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid #33383f;
+  border: 1px solid var(--pp-border);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -1417,8 +1543,8 @@ body.resizing {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  background: #24272d;
-  border-bottom: 1px solid #33383f;
+  background: var(--pp-surface);
+  border-bottom: 1px solid var(--pp-border);
 }
 
 .entity-row:last-child {
@@ -1426,12 +1552,12 @@ body.resizing {
 }
 
 .entity-row:hover {
-  background: #282c33;
+  background: var(--pp-surface-hover);
 }
 
 .entity-name {
   flex: 1 1 auto;
-  color: #e8e8e8;
+  color: var(--pp-text);
   text-decoration: none;
   font-size: 14px;
 }
@@ -1442,10 +1568,10 @@ body.resizing {
 
 .entity-rename-input {
   flex: 1 1 auto;
-  background: #1e2126;
-  border: 1px solid #3b6b8a;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border-accent);
   border-radius: 4px;
-  color: #e8e8e8;
+  color: var(--pp-text);
   padding: 5px 8px;
   font-size: 14px;
 }
@@ -1457,8 +1583,8 @@ body.resizing {
 }
 
 .entity-actions button {
-  background: #33383f;
-  color: #e8e8e8;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
   border: none;
   border-radius: 4px;
   padding: 5px 10px;
@@ -1467,7 +1593,7 @@ body.resizing {
 }
 
 .entity-actions button:hover {
-  background: #454a52;
+  background: var(--pp-button-bg-hover);
 }
 
 .run-list {
@@ -1480,10 +1606,10 @@ body.resizing {
 }
 
 .run-row {
-  border: 1px solid #33383f;
+  border: 1px solid var(--pp-border);
   border-radius: 6px;
   overflow: hidden;
-  background: #24272d;
+  background: var(--pp-surface);
 }
 
 .run-row-header {
@@ -1494,18 +1620,18 @@ body.resizing {
   padding: 10px 14px;
   background: none;
   border: none;
-  color: #e8e8e8;
+  color: var(--pp-text);
   cursor: pointer;
   font-size: 13px;
   text-align: left;
 }
 
 .run-row-header:hover {
-  background: #2b2f36;
+  background: var(--pp-surface-hover-alt);
 }
 
 .run-row-caret {
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
   flex: 0 0 auto;
 }
 
@@ -1516,7 +1642,7 @@ body.resizing {
 
 .run-row-time,
 .run-row-count {
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
   font-size: 12px;
   flex: 0 0 auto;
 }
@@ -1526,7 +1652,7 @@ body.resizing {
   flex-direction: column;
   gap: 8px;
   padding: 4px 14px 14px;
-  border-top: 1px solid #33383f;
+  border-top: 1px solid var(--pp-border);
 }
 
 .log-entry {
@@ -1542,14 +1668,14 @@ body.resizing {
 }
 
 .log-entry-time {
-  color: #6b7078;
+  color: var(--pp-text-dim);
   font-size: 11px;
   font-family: "Consolas", "Courier New", monospace;
 }
 
 .log-entry-download {
-  background: #33383f;
-  color: #e8e8e8;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
   border: none;
   border-radius: 4px;
   padding: 2px 8px;
@@ -1558,20 +1684,20 @@ body.resizing {
 }
 
 .log-entry-download:hover {
-  background: #454a52;
+  background: var(--pp-button-bg-hover);
 }
 
 .log-entry-text {
   margin: 0;
-  background: #1c1f24;
-  border: 1px solid #33383f;
+  background: var(--pp-surface-alt);
+  border: 1px solid var(--pp-border);
   border-radius: 4px;
   padding: 8px 10px;
   font-size: 12px;
   font-family: "Consolas", "Courier New", monospace;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #d8dce2;
+  color: var(--pp-text);
   /* A single huge logged message shouldn't be able to blow out the whole page — clamp it to its
      own scrollable box instead. */
   max-height: 80vh;
@@ -1579,17 +1705,17 @@ body.resizing {
 }
 
 .log-entry-json {
-  color: #cfe8c8;
+  color: var(--pp-json);
 }
 
 .log-entry-xml {
-  color: #e8d9a0;
+  color: var(--pp-xml);
 }
 
 .log-entry-csv-wrapper {
   overflow: auto;
   max-height: 80vh;
-  border: 1px solid #33383f;
+  border: 1px solid var(--pp-border);
   border-radius: 4px;
 }
 
@@ -1601,27 +1727,27 @@ body.resizing {
 
 .log-entry-csv td {
   padding: 4px 10px;
-  border: 1px solid #33383f;
-  color: #d8dce2;
+  border: 1px solid var(--pp-border);
+  color: var(--pp-text);
   white-space: nowrap;
 }
 
 .log-entry-csv tr:nth-child(odd) {
-  background: #1c1f24;
+  background: var(--pp-surface-alt);
 }
 
 .entity-type-tag {
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
   font-size: 11px;
   font-weight: normal;
 }
 
 /* Credential Vault's Add/Edit dialog — a hand-rolled overlay (no dialog library in this codebase
-   yet, and this is a one-off), matching the same dark-panel language as the rest of these pages. */
+   yet, and this is a one-off), matching the same panel language as the rest of these pages. */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--pp-modal-backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1629,14 +1755,14 @@ body.resizing {
 }
 
 .modal-box {
-  background: #24272d;
-  border: 1px solid #3d4148;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
   border-radius: 8px;
   padding: 20px 24px;
   width: 380px;
   max-width: calc(100vw - 32px);
-  color: #e8e8e8;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  color: var(--pp-text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
 .modal-title {
@@ -1653,21 +1779,21 @@ body.resizing {
 
 .modal-field-label {
   font-size: 12px;
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
 }
 
 .modal-field-row input,
 .modal-field-row select {
-  background: #1e2126;
-  border: 1px solid #3d4148;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border-strong);
   border-radius: 4px;
-  color: #e8e8e8;
+  color: var(--pp-text);
   padding: 6px 8px;
   font-size: 13px;
 }
 
 .modal-error {
-  color: #e5484d;
+  color: var(--pp-danger);
   font-size: 12px;
   margin: 4px 0 0;
 }
@@ -1680,8 +1806,8 @@ body.resizing {
 }
 
 .modal-actions button {
-  background: #33383f;
-  color: #e8e8e8;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
   border: none;
   border-radius: 4px;
   padding: 7px 16px;
@@ -1690,13 +1816,14 @@ body.resizing {
 }
 
 .modal-actions button:last-child {
-  background: #3b8a5c;
+  background: var(--pp-accent);
+  color: #fff;
 }
 
 .modal-actions button:hover {
-  background: #454a52;
+  background: var(--pp-button-bg-hover);
 }
 
 .modal-actions button:last-child:hover {
-  background: #46a56d;
+  background: var(--pp-accent-hover);
 }

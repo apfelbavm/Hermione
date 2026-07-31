@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { createCredential, deleteCredential, getCredential, listCredentials, updateCredential } from "../../client/api";
 import { allCredentialTypeDefs, getCredentialTypeDef } from "../../credentials/registry";
 import type { CredentialData, CredentialSummary, CredentialTypeId } from "../../credentials/types";
+import { PageHeader } from "../../components/PageHeader";
+import { Breadcrumbs } from "../../components/Breadcrumbs";
 
 const DEFAULT_TYPE: CredentialTypeId = allCredentialTypeDefs()[0].id;
 
@@ -125,12 +127,12 @@ export default function CredentialVaultPage() {
 
   return (
     <main className="page-shell">
-      <div className="page-header">
-        <Link href="/" className="back-link">
-          ← Back
-        </Link>
-        <h1>Credential Vault</h1>
-      </div>
+      <PageHeader />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Credential Vault" }]} />
+      <Link href="/" className="back-link">
+        ← Back
+      </Link>
+      <h1>Credential Vault</h1>
 
       <div className="create-row">
         <button type="button" onClick={() => setDialog(blankDialogState())}>

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { createProject, deleteProject, listProjects, renameProject } from "../../client/api";
 import type { ProjectSummary } from "../../server/models";
+import { PageHeader } from "../../components/PageHeader";
+import { Breadcrumbs } from "../../components/Breadcrumbs";
 
 /** No SSR-unsafe DB access happens during render — every client/api.ts call is only ever made
  * inside an effect/event handler, both client-only — so this can be a plain "use client" page
@@ -47,12 +49,12 @@ export default function ProjectsPage() {
 
   return (
     <main className="page-shell">
-      <div className="page-header">
-        <Link href="/" className="back-link">
-          ← Back
-        </Link>
-        <h1>Projects</h1>
-      </div>
+      <PageHeader />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Projects" }]} />
+      <Link href="/" className="back-link">
+        ← Back
+      </Link>
+      <h1>Projects</h1>
 
       <form className="create-row" onSubmit={handleCreate}>
         <input type="text" placeholder="New project name" value={newName} onChange={(e) => setNewName(e.target.value)} />
