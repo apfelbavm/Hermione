@@ -246,6 +246,13 @@ export class DatabaseManager {
     this.db.prepare("UPDATE projects SET name = ?, updated_at = ? WHERE id = ?").run(name, new Date().toISOString(), projectId);
   }
 
+  /** Bumps a project's own `updated_at` whenever something inside it changes — a Flow is added,
+   * renamed, deleted, saved, or versioned — so the project row reflects the most recent activity
+   * anywhere within it, not just edits to the project's own name. */
+  private touchProject(projectId: string, updatedAt: string): void {
+    this.db.prepare("UPDATE projects SET updated_at = ? WHERE id = ?").run(updatedAt, projectId);
+  }
+
   /** Deletes the project along with everything scoped to it — its Flows and its run/log history —
    * nothing scoped to a project should survive it. Credentials are NOT project-scoped (the vault is
    * global, shared across every project), so they're untouched here. */
@@ -283,11 +290,14 @@ export class DatabaseManager {
       updatedAt: now,
     };
     this.db.prepare("INSERT INTO flows (id, project_id, name, graph_json, version, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?)").run(flow.id, flow.projectId, flow.name, flow.version, flow.createdAt, flow.updatedAt);
+    this.touchProject(projectId, now);
     return flow;
   }
 
   renameFlow(projectId: string, flowId: string, name: string): void {
-    this.db.prepare("UPDATE flows SET name = ?, updated_at = ? WHERE project_id = ? AND id = ?").run(name, new Date().toISOString(), projectId, flowId);
+    const now = new Date().toISOString();
+    this.db.prepare("UPDATE flows SET name = ?, updated_at = ? WHERE project_id = ? AND id = ?").run(name, now, projectId, flowId);
+    this.touchProject(projectId, now);
   }
 
   deleteFlow(projectId: string, flowId: string): void {
@@ -295,6 +305,7 @@ export class DatabaseManager {
       this.db.prepare("DELETE FROM deployed_scripts WHERE flow_id = ?").run(fId);
       this.db.prepare("DELETE FROM flow_versions WHERE flow_id = ?").run(fId);
       this.db.prepare("DELETE FROM flows WHERE project_id = ? AND id = ?").run(pId, fId);
+      this.touchProject(pId, new Date().toISOString());
     });
     del(projectId, flowId);
   }
@@ -309,6 +320,7 @@ export class DatabaseManager {
       if (!row) return undefined;
       this.db.prepare("INSERT INTO flow_versions (id, flow_id, version, name, graph_json, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(nextId("flow_version"), row.id, row.version, row.name, row.graph_json, now);
       this.db.prepare("UPDATE flows SET version = ?, updated_at = ? WHERE project_id = ? AND id = ?").run(row.version + 1, now, pId, fId);
+      this.touchProject(pId, now);
       return this.getFlow(pId, fId);
     });
     return save(projectId, flowId);
@@ -324,7 +336,13 @@ export class DatabaseManager {
   }
 
   saveFlowGraphJson(flowId: string, graphJson: string): void {
-    this.db.prepare("UPDATE flows SET graph_json = ?, updated_at = ? WHERE id = ?").run(graphJson, new Date().toISOString(), flowId);
+    const now = new Date().toISOString();
+    const save = this.db.transaction((fId: string, json: string, ts: string) => {
+      const row = this.db.prepare<[string], { project_id: string }>("SELECT project_id FROM flows WHERE id = ?").get(fId);
+      this.db.prepare("UPDATE flows SET graph_json = ?, updated_at = ? WHERE id = ?").run(json, ts, fId);
+      if (row) this.touchProject(row.project_id, ts);
+    });
+    save(flowId, graphJson, now);
   }
 
   // --- Runs ---
