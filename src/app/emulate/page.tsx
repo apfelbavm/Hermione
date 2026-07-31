@@ -14,12 +14,12 @@ interface FlowOption {
 }
 
 /** Runs a Flow's DEPLOYED compiled output (not the interpreted Simulate path — see
- * api/localhost-deployment/run/route.ts) directly on this machine, as a stand-in for an actual
+ * api/emulate/run/route.ts) directly on this machine, as a stand-in for an actual
  * deployment target. Only Flows that have actually been deployed (see AppShell.tsx's Deploy button)
  * show up here — every project's deployed scripts are fetched up front (there's no flat "all
  * deployments" API — see client/api.ts's listProjects/listDeployedScripts) and flattened into one
  * picker grouped by project. */
-export default function LocalhostDeploymentPage() {
+export default function EmulatePage() {
   const [options, setOptions] = useState<FlowOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [selected, setSelected] = useState("");
