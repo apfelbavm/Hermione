@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { createProject, deleteProject, listProjects, renameProject } from "../../client/api";
-import type { ProjectSummary } from "../../server/projects";
+import type { ProjectSummary } from "../../server/models";
 
 /** No SSR-unsafe DB access happens during render — every client/api.ts call is only ever made
  * inside an effect/event handler, both client-only — so this can be a plain "use client" page

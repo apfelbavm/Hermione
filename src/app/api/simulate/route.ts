@@ -6,8 +6,8 @@ import { checkpointSimulation, disposeSimulationRun, registerSimulationRun, requ
 import { allGraphs, nextId } from "../../../engine/graphMutations";
 import type { Graph } from "../../../engine/graph";
 import type { LogFormat } from "../../../engine/types";
-import { getCredentialByName } from "../../../server/credentials";
-import { appendRun, type LogEntry, type RunLog } from "../../../server/runLogs";
+import { getDatabaseManager } from "../../../server/DatabaseManager";
+import type { LogEntry, RunLog } from "../../../server/models";
 
 // Must run under the Node runtime (not edge) — the interpreter and node implementations
 // (node-forge/openpgp for crypto, fetch-based http/odata/oauth2 nodes, etc.) assume a Node
@@ -36,7 +36,7 @@ interface SimulateRequestBody {
  * done events back as Server-Sent Events so the browser can drive the same visual highlighting the
  * old client-side interpreter did — with zero execution logic left in the browser. See the
  * "Simulate" button handler in AppShell.tsx for the client side of this. Also persists the run's own
- * log output as a RunLog (see server/runLogs.ts) — this is the only place a run's logs are actually
+ * log output as a RunLog (see server/DatabaseManager.ts's appendRun) — this is the only place a run's logs are actually
  * produced, so it's the natural place to record them, rather than the client reconstructing and
  * re-posting them after the fact. */
 export async function POST(request: Request): Promise<Response> {
@@ -53,6 +53,7 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
   const { projectId, flowId, flowName } = body;
+  const db = getDatabaseManager();
 
   const runId = randomUUID();
   registerSimulationRun(runId);
@@ -97,7 +98,7 @@ export async function POST(request: Request): Promise<Response> {
         recordLogEntry(message);
         send("done", {});
         runLog.finishedAt = new Date().toISOString();
-        appendRun(runLog);
+        db.appendRun(runLog);
         disposeSimulationRun(runId);
         controller.close();
         return;
@@ -108,7 +109,7 @@ export async function POST(request: Request): Promise<Response> {
           send("log", { message, format });
           recordLogEntry(message, format);
         },
-        getCredential: getCredentialByName,
+        getCredential: (name) => db.getCredentialByName(name),
         onNodeStart: async (nodeId) => {
           if (aborted) throw new Error("Simulation aborted by client");
           send("node-start", { nodeId });
@@ -142,7 +143,7 @@ export async function POST(request: Request): Promise<Response> {
       } finally {
         send("done", {});
         runLog.finishedAt = new Date().toISOString();
-        appendRun(runLog);
+        db.appendRun(runLog);
         disposeSimulationRun(runId);
         controller.close();
       }

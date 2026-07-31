@@ -1,4 +1,4 @@
-import { deleteFlowGraph, saveFlowGraphJson } from "../../../../../../../server/projects";
+import { getDatabaseManager } from "../../../../../../../server/DatabaseManager";
 
 export const runtime = "nodejs";
 
@@ -10,12 +10,12 @@ type Params = Promise<{ projectId: string; flowId: string }>;
 export async function PUT(request: Request, { params }: { params: Params }): Promise<Response> {
   const { flowId } = await params;
   const graphJson = await request.text();
-  saveFlowGraphJson(flowId, graphJson);
+  getDatabaseManager().saveFlowGraphJson(flowId, graphJson);
   return new Response(null, { status: 204 });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Params }): Promise<Response> {
   const { flowId } = await params;
-  deleteFlowGraph(flowId);
+  getDatabaseManager().deleteFlowGraph(flowId);
   return new Response(null, { status: 204 });
 }

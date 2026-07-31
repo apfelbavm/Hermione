@@ -1,12 +1,11 @@
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
-import type { FlowSummary, ProjectSummary } from "../server/projects";
-import type { RunLog } from "../server/runLogs";
+import type { FlowSummary, ProjectSummary, RunLog } from "../server/models";
 
-// Browser-side counterpart to src/server/*.ts — every function here is a thin fetch() wrapper
-// around the API routes under src/app/api/, since the DB itself (better-sqlite3, a native binding)
-// can only ever be touched server-side. Only TYPES are imported from src/server/* above (erased at
-// compile time), never any runtime value, so this file stays safe to import from "use client"
-// pages/components.
+// Browser-side counterpart to src/server/DatabaseManager.ts — every function here is a thin
+// fetch() wrapper around the API routes under src/app/api/, since the database itself
+// (better-sqlite3, a native binding, all encapsulated in that one class) can only ever be touched
+// server-side. Only TYPES are imported from src/server/models.ts above (erased at compile time),
+// never any runtime value, so this file stays safe to import from "use client" pages/components.
 
 async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);

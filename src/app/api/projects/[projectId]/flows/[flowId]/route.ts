@@ -1,4 +1,4 @@
-import { deleteFlow, getFlow, loadFlowGraphJson, renameFlow } from "../../../../../../server/projects";
+import { getDatabaseManager } from "../../../../../../server/DatabaseManager";
 
 export const runtime = "nodejs";
 
@@ -10,9 +10,10 @@ type Params = Promise<{ projectId: string; flowId: string }>;
  * means this Flow has never been saved yet — the client falls back to a fresh demo graph. */
 export async function GET(_request: Request, { params }: { params: Params }): Promise<Response> {
   const { projectId, flowId } = await params;
-  const flow = getFlow(projectId, flowId);
+  const db = getDatabaseManager();
+  const flow = db.getFlow(projectId, flowId);
   if (!flow) return Response.json({ error: "Not found" }, { status: 404 });
-  return Response.json({ flow, graphJson: loadFlowGraphJson(flowId) });
+  return Response.json({ flow, graphJson: db.loadFlowGraphJson(flowId) });
 }
 
 export async function PATCH(request: Request, { params }: { params: Params }): Promise<Response> {
@@ -21,12 +22,13 @@ export async function PATCH(request: Request, { params }: { params: Params }): P
   if (!name || !name.trim()) {
     return Response.json({ error: "name is required" }, { status: 400 });
   }
-  renameFlow(projectId, flowId, name.trim());
-  return Response.json(getFlow(projectId, flowId));
+  const db = getDatabaseManager();
+  db.renameFlow(projectId, flowId, name.trim());
+  return Response.json(db.getFlow(projectId, flowId));
 }
 
 export async function DELETE(_request: Request, { params }: { params: Params }): Promise<Response> {
   const { projectId, flowId } = await params;
-  deleteFlow(projectId, flowId);
+  getDatabaseManager().deleteFlow(projectId, flowId);
   return new Response(null, { status: 204 });
 }

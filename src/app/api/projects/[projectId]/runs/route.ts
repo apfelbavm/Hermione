@@ -1,4 +1,4 @@
-import { listRuns } from "../../../../../server/runLogs";
+import { getDatabaseManager } from "../../../../../server/DatabaseManager";
 
 export const runtime = "nodejs";
 
@@ -6,5 +6,5 @@ type Params = Promise<{ projectId: string }>;
 
 export async function GET(_request: Request, { params }: { params: Params }): Promise<Response> {
   const { projectId } = await params;
-  return Response.json(listRuns(projectId));
+  return Response.json(getDatabaseManager().listRuns(projectId));
 }

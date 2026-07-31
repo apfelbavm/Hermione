@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { createFlow, deleteFlow, getProject, listFlows, renameFlow, renameProject } from "../../../client/api";
-import type { FlowSummary, ProjectSummary } from "../../../server/projects";
+import type { FlowSummary, ProjectSummary } from "../../../server/models";
 
 export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
