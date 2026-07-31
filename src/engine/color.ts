@@ -100,6 +100,10 @@ interface SurfacePalette {
    * and fully-transparent gradient stops from the same color, whichever theme picked it. */
   nodeTopHighlightRgb: string;
   nodeTopHighlightAlpha: number;
+  /** The node header's own left-to-right falloff (see drawNodes.ts's headerShade gradient) — a
+   * dark falloff reads as a sheen over a dark-mode header, but the same black wash looks muddy
+   * once the rest of the chrome has gone light, so light mode ramps toward white instead. */
+  headerShadeRgb: string;
 }
 
 const DARK_SURFACE: SurfacePalette = {
@@ -112,6 +116,7 @@ const DARK_SURFACE: SurfacePalette = {
   textMuted: "#9aa0a8",
   nodeTopHighlightRgb: "255, 255, 255",
   nodeTopHighlightAlpha: 0.3,
+  headerShadeRgb: "0, 0, 0",
 };
 
 const LIGHT_SURFACE: SurfacePalette = {
@@ -124,6 +129,7 @@ const LIGHT_SURFACE: SurfacePalette = {
   textMuted: "#5b6169",
   nodeTopHighlightRgb: "0, 0, 0",
   nodeTopHighlightAlpha: 0.06,
+  headerShadeRgb: "255, 255, 255",
 };
 
 function surface(): SurfacePalette {
@@ -135,19 +141,23 @@ function surface(): SurfacePalette {
  * Color instances, so every existing `ctx.fillStyle = Colors.NODE_BORDER`-style call site keeps
  * working unchanged regardless of which category a given constant falls into. */
 export const Colors = {
-  /** Per-pin-TYPE colors — deliberately theme-independent. A number pin is the same green whether
-   * the app is in light or dark mode; that's the whole point of color-coding by type at a glance. */
-  PIN_COLORS: {
-    exec: "#f2f2f2",
-    boolean: "#a5322f",
-    number: "#3b8a5c",
-    string: "#c542a0",
-    object: "#4f9bd6",
-    date: "#d6a23b",
-    // Dark olive green — distinct from "number"'s own teal-green above — matching Unreal's enum
-    // pin color convention (see PinType's own doc comment for why it's a separate type at all).
-    enum: "#1f6b45",
-  } as Record<PinType, string>,
+  /** Per-pin-TYPE colors — deliberately theme-independent, EXCEPT exec: an exec wire/arrow is
+   * meant to read as "the flow of control," the same visual role as body text, so it tracks
+   * TEXT_PRIMARY (near-white on dark, near-black on light) instead of a fixed hue like every other
+   * pin type below it. */
+  get PIN_COLORS(): Record<PinType, string> {
+    return {
+      exec: surface().textPrimary,
+      boolean: "#a5322f",
+      number: "#3b8a5c",
+      string: "#c542a0",
+      object: "#4f9bd6",
+      date: "#d6a23b",
+      // Dark olive green — distinct from "number"'s own teal-green above — matching Unreal's enum
+      // pin color convention (see PinType's own doc comment for why it's a separate type at all).
+      enum: "#1f6b45",
+    };
+  },
 
   // The world-space x=0/y=0 origin axes (see drawGrid.ts) — deliberately plain black regardless of
   // theme, heavier than even the major grid lines, so the true origin always reads as a fixed
@@ -216,6 +226,9 @@ export const Colors = {
   },
   get NODE_TOP_HIGHLIGHT_ALPHA(): number {
     return surface().nodeTopHighlightAlpha;
+  },
+  get HEADER_SHADE_RGB(): string {
+    return surface().headerShadeRgb;
   },
 
   /** Converts a "#rrggbb" hex color (e.g. from a native color picker) into an rgba() string at the given alpha. */

@@ -80,18 +80,21 @@ export function drawNodes(
       ctx.roundRect(geo.screenX, geo.screenY, geo.width, headerHeight, headerCorners);
       ctx.fillStyle = resolveNodeHeaderColor(node, def, variables);
       ctx.fill();
-      // A black falloff over the header's own color — same path, no beginPath() needed (fill()
-      // doesn't clear it) — reads as a subtle depth/sheen rather than a flat block. Clear at both
-      // edges, ramping up to 75% dark over the first/last 32px so a node bound to a Variable (whose
-      // header color matches its own pin's color — see resolveNodeHeaderColor) still gets some
-      // contrast behind its edge pins instead of a flat same-color block, without darkening the
-      // whole header uniformly.
+      // A falloff over the header's own color — same path, no beginPath() needed (fill() doesn't
+      // clear it) — reads as a subtle depth/sheen rather than a flat block. Clear at both edges,
+      // ramping up to 85% over the first/last 32px so a node bound to a Variable (whose header
+      // color matches its own pin's color — see resolveNodeHeaderColor) still gets some contrast
+      // behind its edge pins instead of a flat same-color block, without shading the whole header
+      // uniformly. Dark falloff in dark mode, near-white in light mode (Colors.HEADER_SHADE_RGB) —
+      // a black wash reads as depth over a dark chrome but just looks muddy once the rest of the
+      // editor has gone light.
       const rampPx = 96 * camera.zoom;
       const rampFraction = geo.width > 0 ? Math.min(0.5, rampPx / geo.width) : 0.5;
+      const shadeRgb = Colors.HEADER_SHADE_RGB;
       const headerShade = ctx.createLinearGradient(geo.screenX, 0, geo.screenX + geo.width, 0);
-      headerShade.addColorStop(0, "rgba(0, 0, 0, 0.35)");
-      headerShade.addColorStop(1 - rampFraction, "rgba(0, 0, 0, 0.35)");
-      headerShade.addColorStop(1, "rgba(0, 0, 0, 0.85)");
+      headerShade.addColorStop(0, `rgba(${shadeRgb}, 0.35)`);
+      headerShade.addColorStop(1 - rampFraction, `rgba(${shadeRgb}, 0.35)`);
+      headerShade.addColorStop(1, `rgba(${shadeRgb}, 0.85)`);
       ctx.fillStyle = headerShade;
       ctx.fill();
 
