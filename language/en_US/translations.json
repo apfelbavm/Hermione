@@ -5,6 +5,12 @@
       "empty": "No runs yet — simulate or run a deployed Flow to see its logs here.",
       "page_title": "Logs"
     },
+    "ai_docs": {
+      "page_title": "AI Docs",
+      "description": "A reference doc listing every node type in this project plus the JSON format the graph editor pastes (Ctrl+V) — copy it into a prompt so an AI can generate a graph for you.",
+      "copy": "Copy to clipboard",
+      "copied": "Copied!"
+    },
     "emulate": {
       "loading_editor": "Loading editor…",
       "empty_note": "Runs a Flow's deployed compiled output directly on this machine — the same snapshot the editor's \"Deploy\" button last persisted — instead of the editor's interpreted Simulate.",
@@ -141,7 +147,8 @@
       "projects": "Projects",
       "credential_vault": "Credential Vault",
       "logs": "Logs",
-      "emulate": "Emulate"
+      "emulate": "Emulate",
+      "ai_docs": "AI Docs"
     },
     "theme_toggle": {
       "title": "Toggle light/dark theme",

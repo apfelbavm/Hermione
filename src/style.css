@@ -1648,6 +1648,18 @@ body.resizing {
   font-size: 13px;
 }
 
+.ai-docs-content {
+  margin-top: 12px;
+  padding: 16px;
+  border-radius: 6px;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .project-description-input {
   display: block;
   width: 100%;

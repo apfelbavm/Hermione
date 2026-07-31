@@ -24,11 +24,20 @@ const SIDEBAR_LINKS: SidebarLinkDef[] = [
     label: i18n.components.sidebar.credential_vault,
     icon: <IconManager.CredentialVaultIcon />,
   },
-  { href: "/logs", label: i18n.components.sidebar.logs, icon: <IconManager.LogsIcon /> },
+  {
+    href: "/logs",
+    label: i18n.components.sidebar.logs,
+    icon: <IconManager.LogsIcon />,
+  },
   {
     href: "/emulate",
     label: i18n.components.sidebar.emulate,
     icon: <IconManager.DeploymentIcon />,
+  },
+  {
+    href: "/ai-docs",
+    label: i18n.components.sidebar.ai_docs,
+    icon: <IconManager.AiDocsIcon />,
   },
 ];
 

@@ -108,4 +108,12 @@ export class IconManager {
       </svg>
     );
   }
+
+  static AiDocsIcon() {
+    return (
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+        <path d="M3.5 1A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V5.41a1.5 1.5 0 0 0-.44-1.06L10.65 1.44A1.5 1.5 0 0 0 9.59 1H3.5zM9 2.21 12.79 6H10a1 1 0 0 1-1-1V2.21zM4.75 8.5a.5.5 0 0 1 .5-.5h1.5a.5.5 0 0 1 0 1h-1.5a.5.5 0 0 1-.5-.5zm3.25-.5h1.5a.5.5 0 0 1 0 1h-1.5a.5.5 0 0 1 0-1zM4.75 11a.5.5 0 0 1 .5-.5h5.5a.5.5 0 0 1 0 1h-5.5a.5.5 0 0 1-.5-.5z" />
+      </svg>
+    );
+  }
 }
