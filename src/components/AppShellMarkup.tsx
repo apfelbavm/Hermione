@@ -49,7 +49,7 @@ export default function AppShellMarkup({ store, projectId }: { store: Store; pro
           <button id="save-button">Save</button>
           <button id="load-button">Load</button>
           <button id="download-button">Download</button>
-          <button id="compile-button">Deploy</button>
+          <button id="deploy-button">Deploy</button>
           <button id="delete-button" title="Delete the saved graph (from local storage)">
             Delete
           </button>

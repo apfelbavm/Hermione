@@ -131,7 +131,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     const saveButton = document.getElementById("save-button") as HTMLButtonElement;
     const loadButton = document.getElementById("load-button") as HTMLButtonElement;
     const downloadButton = document.getElementById("download-button") as HTMLButtonElement;
-    const compileButton = document.getElementById("compile-button") as HTMLButtonElement;
+    const deployButton = document.getElementById("deploy-button") as HTMLButtonElement;
     const deleteButton = document.getElementById("delete-button") as HTMLButtonElement;
     const snapToGridCheckbox = document.getElementById("snap-to-grid-checkbox") as HTMLInputElement;
     const autoPanCheckbox = document.getElementById("auto-pan-checkbox") as HTMLInputElement;
@@ -256,7 +256,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       saveButton.disabled = simulating;
       loadButton.disabled = simulating;
       downloadButton.disabled = simulating;
-      compileButton.disabled = simulating;
+      deployButton.disabled = simulating;
       deleteButton.disabled = simulating;
       snapToGridCheckbox.disabled = simulating;
       frameAllButton.disabled = simulating;
@@ -850,7 +850,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         appendLog(`Compile error: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
-    compileButton.addEventListener("click", onCompileClick);
+    deployButton.addEventListener("click", onCompileClick);
 
     async function onDeleteClick(): Promise<void> {
       await deleteFlowGraph(projectId, flowId);
@@ -900,7 +900,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       loadButton.removeEventListener("click", onLoadClick);
       downloadButton.removeEventListener("click", onDownloadClick);
       loadFileInput.removeEventListener("change", onLoadFileChange);
-      compileButton.removeEventListener("click", onCompileClick);
+      deployButton.removeEventListener("click", onCompileClick);
       deleteButton.removeEventListener("click", onDeleteClick);
       frameAllButton.removeEventListener("click", onFrameAllClick);
     };
