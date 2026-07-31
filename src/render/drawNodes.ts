@@ -80,15 +80,18 @@ export function drawNodes(
       ctx.roundRect(geo.screenX, geo.screenY, geo.width, headerHeight, headerCorners);
       ctx.fillStyle = resolveNodeHeaderColor(node, def, variables);
       ctx.fill();
-      // A left-to-right black falloff over the header's own color — same path, no beginPath()
-      // needed (fill() doesn't clear it) — reads as a subtle depth/sheen rather than a flat block.
-      // Never fades all the way to fully clear, unlike a plain sheen would: an output pin sits right
-      // at the header's own right edge (see layout.ts's headerOnly pin positioning), often the same
-      // color as a node bound to a Variable's own header (see resolveNodeHeaderColor) — a lingering
-      // bit of darkening there keeps the pin visible against its own header instead of blending in.
+      // A black falloff over the header's own color — same path, no beginPath() needed (fill()
+      // doesn't clear it) — reads as a subtle depth/sheen rather than a flat block. Clear at both
+      // edges, ramping up to 75% dark over the first/last 32px so a node bound to a Variable (whose
+      // header color matches its own pin's color — see resolveNodeHeaderColor) still gets some
+      // contrast behind its edge pins instead of a flat same-color block, without darkening the
+      // whole header uniformly.
+      const rampPx = 96 * camera.zoom;
+      const rampFraction = geo.width > 0 ? Math.min(0.5, rampPx / geo.width) : 0.5;
       const headerShade = ctx.createLinearGradient(geo.screenX, 0, geo.screenX + geo.width, 0);
-      headerShade.addColorStop(0, "rgba(0, 0, 0, 0.75)");
-      headerShade.addColorStop(1, "rgba(0, 0, 0, 0.35)");
+      headerShade.addColorStop(0, "rgba(0, 0, 0, 0.35)");
+      headerShade.addColorStop(1 - rampFraction, "rgba(0, 0, 0, 0.35)");
+      headerShade.addColorStop(1, "rgba(0, 0, 0, 0.85)");
       ctx.fillStyle = headerShade;
       ctx.fill();
 
