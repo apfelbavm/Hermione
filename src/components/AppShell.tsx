@@ -17,7 +17,7 @@ import { drawMouseCoordinates, drawSimulatingLabel } from "../render/drawHud";
 import { drawNodes } from "../render/drawNodes";
 import { drawWires, drawWireDragPreview } from "../render/drawWires";
 import { drawMarqueeSelection } from "../render/drawMarquee";
-import { createStore, getEditingGraph, getVisibleVariablesForState } from "../state/store";
+import { createStore, getEditingGraph, getVisibleVariablesForState, openFunctionTab } from "../state/store";
 import { createHistoryManager } from "../state/history";
 import { selectAllCommentBoxes, selectAllNodes, setupPointerInteraction, type WireAnchor } from "../interaction/pointerHandlers";
 import { createWidgetSync } from "../overlay/widgetSync";
@@ -555,6 +555,15 @@ export default function AppShell() {
     // onPauseClick/onContinueClick know which server-side run (see simulationControl.ts) to target.
     let currentRunId: string | null = null;
 
+    /** Which function's body graph contains `nodeId`, or null if it's in the root graph (or the id
+     * isn't found anywhere) — functions are never nested (see Graph.functions's own doc comment),
+     * so this is at most one level deep. */
+    function findOwningFunctionId(nodeId: string): string | null {
+      if (store.state.rootGraph.nodes.some((n) => n.id === nodeId)) return null;
+      const fn = store.state.rootGraph.functions.find((f) => f.body.nodes.some((n) => n.id === nodeId));
+      return fn?.id ?? null;
+    }
+
     // --- Auto-pan: while simulating (and the auto-pan HUD toggle is on), keeps whichever node is
     // currently executing centered in view by lerping the camera towards it every frame, rather
     // than snapping — a snap would be jarring for the fast node-to-node steps a simulation run does.
@@ -571,9 +580,11 @@ export default function AppShell() {
         const variables = getVisibleVariablesForState(store.state);
         const functions = store.state.rootGraph.functions;
         const scripts = store.state.rootGraph.scripts;
-        // Search every graph (root + every function body), not just the currently-open editing
-        // graph — the node executing may live in a function whose tab isn't open right now.
-        const containingGraph = [store.state.rootGraph, ...store.state.rootGraph.functions.map((f) => f.body)].find((g) => g.nodes.some((n) => n.id === nodeId));
+        // The node-start handler above already switches to whichever tab contains this node, but
+        // resolve independently (rather than trusting store.state.activeFunctionId) in case that
+        // switch hasn't taken effect yet, or the user has since switched tabs away from it.
+        const owningFunctionId = findOwningFunctionId(nodeId);
+        const containingGraph = owningFunctionId ? store.state.rootGraph.functions.find((f) => f.id === owningFunctionId)?.body : store.state.rootGraph;
         const node = containingGraph?.nodes.find((n) => n.id === nodeId);
         if (!node || !containingGraph) return;
 
@@ -639,6 +650,17 @@ export default function AppShell() {
             case "node-start": {
               const nodeId = (data as { nodeId: string }).nodeId;
               store.state.executingNodeId = nodeId;
+
+              // Follow execution across a function-call boundary — switches (opening if needed) to
+              // whichever tab actually contains the node now running, root or function body alike,
+              // so the canvas always shows the real step instead of silently doing nothing while a
+              // called function's body runs off-tab.
+              const owningFunctionId = findOwningFunctionId(nodeId);
+              if (owningFunctionId !== store.state.activeFunctionId) {
+                if (owningFunctionId) openFunctionTab(store.state, owningFunctionId);
+                else store.state.activeFunctionId = null;
+              }
+
               store.notify();
               if (store.state.autoPan) panCameraTowardsNode(nodeId);
               break;
