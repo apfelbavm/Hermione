@@ -51,5 +51,18 @@ export async function POST(request: Request, { params }: { params: Params }): Pr
   writeDeployedScriptFile(flowId, code);
   const deployed = db.upsertDeployedScript({ projectId, flowId, flowName: flow.name, code, manifest });
 
-  return Response.json({ code, manifest: deployed.manifest, deployedAt: deployed.deployedAt });
+  return Response.json({ code, manifest: deployed.manifest, version: deployed.version, deployedAt: deployed.deployedAt });
+}
+
+/** The Emulate page's script viewer (see app/emulate/page.tsx) — reads back the currently deployed
+ * snapshot for this Flow, `code` included, unlike the deployed-scripts LISTING route (see
+ * ../../deployed-scripts/route.ts), which deliberately omits it (see DeployedScriptSummary's own
+ * doc comment). */
+export async function GET(_request: Request, { params }: { params: Params }): Promise<Response> {
+  const { projectId, flowId } = await params;
+  const deployed = getDatabaseManager().getDeployedScript(flowId);
+  if (!deployed || deployed.projectId !== projectId) {
+    return Response.json({ error: "This Flow hasn't been deployed yet." }, { status: 404 });
+  }
+  return Response.json(deployed);
 }

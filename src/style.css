@@ -1938,6 +1938,34 @@ body.resizing {
   font-weight: normal;
 }
 
+/* Wraps the Emulate page's read-only Monaco viewer (see app/emulate/page.tsx) — position:relative
+   so .emulate-editor-meta can float top-right over the editor itself. */
+.emulate-editor-frame {
+  position: relative;
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+/* The deployed script's date/version, overlaid top-right of the editor — pointer-events:none so it
+   never intercepts a click meant for Monaco's own scrollbar/gutter underneath it. */
+.emulate-editor-meta {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 2;
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--pp-text-muted);
+  background: var(--pp-surface);
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--pp-border);
+  pointer-events: none;
+}
+
 /* Credential Vault's Add/Edit dialog — a hand-rolled overlay (no dialog library in this codebase
    yet, and this is a one-off), matching the same panel language as the rest of these pages. */
 .modal-backdrop {

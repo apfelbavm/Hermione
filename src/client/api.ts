@@ -1,5 +1,5 @@
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
-import type { DeployedScriptSummary, FlowSummary, ProjectSummary, RunLog } from "../server/models";
+import type { DeployedScript, DeployedScriptSummary, FlowSummary, ProjectSummary, RunLog } from "../server/models";
 
 // Browser-side counterpart to src/server/DatabaseManager.ts — every function here is a thin
 // fetch() wrapper around the API routes under src/app/api/, since the database itself
@@ -69,7 +69,7 @@ export function saveFlowGraph(projectId: string, flowId: string, graphJson: stri
  * DeployedScript row (see api/projects/[projectId]/flows/[flowId]/deploy/route.ts), replacing any
  * previous deployment. Returns the compiled `code` so the caller can still trigger a file download
  * from the exact bytes just persisted (see compiler/codegen.ts's downloadCompiledCode). */
-export function deployFlow(projectId: string, flowId: string, graphJson: string): Promise<{ code: string; deployedAt: string }> {
+export function deployFlow(projectId: string, flowId: string, graphJson: string): Promise<{ code: string; version: number; deployedAt: string }> {
   return requestJson(`/api/projects/${projectId}/flows/${flowId}/deploy`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ graph: graphJson }) });
 }
 
@@ -77,6 +77,12 @@ export function deployFlow(projectId: string, flowId: string, graphJson: string)
  * Emulate page's picker. */
 export function listDeployedScripts(projectId: string): Promise<DeployedScriptSummary[]> {
   return requestJson(`/api/projects/${projectId}/deployed-scripts`);
+}
+
+/** The full deployed record (`code` included) for one Flow — feeds the Emulate page's read-only
+ * script viewer (see the deploy route's own GET handler). */
+export function getDeployedScript(projectId: string, flowId: string): Promise<DeployedScript> {
+  return requestJson(`/api/projects/${projectId}/flows/${flowId}/deploy`);
 }
 
 export function listRuns(projectId: string): Promise<RunLog[]> {

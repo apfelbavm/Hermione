@@ -55,6 +55,7 @@ interface DeployedScriptRow {
   flow_name: string;
   code: string;
   manifest_json: string;
+  version: number;
   deployed_at: string;
 }
 
@@ -123,11 +124,13 @@ export class DatabaseManager {
         flow_name TEXT NOT NULL,
         code TEXT NOT NULL,
         manifest_json TEXT NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
         deployed_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_deployed_scripts_project_id ON deployed_scripts (project_id);
     `);
     this.migrateAddRunsKindColumn();
+    this.migrateAddDeployedScriptsVersionColumn();
   }
 
   /** `kind` was added after this app's first shipped `runs` table (see RunLog.kind's own doc
@@ -138,6 +141,15 @@ export class DatabaseManager {
     const columns = this.db.prepare("PRAGMA table_info(runs)").all() as { name: string }[];
     if (!columns.some((c) => c.name === "kind")) {
       this.db.exec("ALTER TABLE runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'simulate'");
+    }
+  }
+
+  /** `version` was added after this app's first shipped `deployed_scripts` table — same reasoning
+   * as migrateAddRunsKindColumn above. */
+  private migrateAddDeployedScriptsVersionColumn(): void {
+    const columns = this.db.prepare("PRAGMA table_info(deployed_scripts)").all() as { name: string }[];
+    if (!columns.some((c) => c.name === "version")) {
+      this.db.exec("ALTER TABLE deployed_scripts ADD COLUMN version INTEGER NOT NULL DEFAULT 1");
     }
   }
 
@@ -179,6 +191,7 @@ export class DatabaseManager {
       flowId: row.flow_id,
       flowName: row.flow_name,
       manifest: JSON.parse(row.manifest_json) as { triggers: TriggerDescriptor[] },
+      version: row.version,
       deployedAt: row.deployed_at,
     };
   }
@@ -354,9 +367,11 @@ export class DatabaseManager {
   }
 
   /** One row per Flow — a redeploy overwrites the previous snapshot (same `id`) rather than growing
-   * a history, matching "Deploy" as "replace what's currently live," not an audit log. */
+   * a history, matching "Deploy" as "replace what's currently live," not an audit log. `version`
+   * starts at 1 and increments by one on every redeploy of this same Flow (see
+   * DeployedScript.version's own doc comment). */
   upsertDeployedScript(input: { projectId: string; flowId: string; flowName: string; code: string; manifest: { triggers: TriggerDescriptor[] } }): DeployedScript {
-    const existing = this.db.prepare<[string], { id: string }>("SELECT id FROM deployed_scripts WHERE flow_id = ?").get(input.flowId);
+    const existing = this.db.prepare<[string], { id: string; version: number }>("SELECT id, version FROM deployed_scripts WHERE flow_id = ?").get(input.flowId);
     const record: DeployedScript = {
       id: existing?.id ?? nextId("deployment"),
       projectId: input.projectId,
@@ -364,14 +379,24 @@ export class DatabaseManager {
       flowName: input.flowName,
       code: input.code,
       manifest: input.manifest,
+      version: (existing?.version ?? 0) + 1,
       deployedAt: new Date().toISOString(),
     };
     this.db
       .prepare(
-        `INSERT INTO deployed_scripts (id, project_id, flow_id, flow_name, code, manifest_json, deployed_at) VALUES (@id, @projectId, @flowId, @flowName, @code, @manifestJson, @deployedAt)
-         ON CONFLICT(flow_id) DO UPDATE SET flow_name = @flowName, code = @code, manifest_json = @manifestJson, deployed_at = @deployedAt`,
+        `INSERT INTO deployed_scripts (id, project_id, flow_id, flow_name, code, manifest_json, version, deployed_at) VALUES (@id, @projectId, @flowId, @flowName, @code, @manifestJson, @version, @deployedAt)
+         ON CONFLICT(flow_id) DO UPDATE SET flow_name = @flowName, code = @code, manifest_json = @manifestJson, version = @version, deployed_at = @deployedAt`,
       )
-      .run({ id: record.id, projectId: record.projectId, flowId: record.flowId, flowName: record.flowName, code: record.code, manifestJson: JSON.stringify(record.manifest), deployedAt: record.deployedAt });
+      .run({
+        id: record.id,
+        projectId: record.projectId,
+        flowId: record.flowId,
+        flowName: record.flowName,
+        code: record.code,
+        manifestJson: JSON.stringify(record.manifest),
+        version: record.version,
+        deployedAt: record.deployedAt,
+      });
     return record;
   }
 }

@@ -51,14 +51,19 @@ export interface RunLog {
  * the previous row rather than growing a history). Running a Flow from the Emulate page
  * (api/emulate/run/route.ts) executes exactly this snapshot, not whatever the graph
  * currently looks like — the same "deploy a version, then run THAT version" separation a real
- * deployment target would have. Summary form (no `code`) is what listings return; the full record
- * (server-only, never sent to the client) is only ever read right before actually running it. */
+ * deployment target would have. `version` starts at 1 and increments by one on every redeploy of
+ * this same Flow (see DatabaseManager.upsertDeployedScript), so the Emulate page can show "which
+ * compile" the currently-viewed script is, not just when. Unlike DeployedScriptSummary/RunLog etc.,
+ * `code` is genuinely large and only ever needed right before actually viewing/running a script, so
+ * it's split into its own extended interface (the Emulate page's script-viewer fetches the full
+ * record; every listing only ever needs the summary). */
 export interface DeployedScriptSummary {
   id: string;
   projectId: string;
   flowId: string;
   flowName: string;
   manifest: { triggers: TriggerDescriptor[] };
+  version: number;
   deployedAt: string;
 }
 
