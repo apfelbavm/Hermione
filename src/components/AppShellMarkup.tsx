@@ -34,6 +34,10 @@ export default function AppShellMarkup({ store }: { store: Store }) {
             <button id="stop-button" style={{ display: "none" }} title="Stop the running simulation">
               ■ Stop
             </button>
+            <label id="auto-pan-toggle" className="toolbar-toggle" title="Pan the camera to follow whichever node is currently executing during a Simulate run">
+              <input type="checkbox" id="auto-pan-checkbox" />
+              Auto Pan
+            </label>
           </div>
         </div>
         <div id="toolbar-right">
@@ -66,10 +70,6 @@ export default function AppShellMarkup({ store }: { store: Store }) {
               <label id="snap-to-grid-toggle" className="toolbar-toggle">
                 <input type="checkbox" id="snap-to-grid-checkbox" />
                 Snap to Grid
-              </label>
-              <label id="auto-pan-toggle" className="toolbar-toggle" title="Pan the camera to follow whichever node is currently executing during a Simulate run">
-                <input type="checkbox" id="auto-pan-checkbox" />
-                Auto Pan
               </label>
               <button id="frame-all-button" className="canvas-hud-button" title="Fit graph to view">
                 ⛶
