@@ -127,6 +127,11 @@ export interface Store {
   state: AppState;
   subscribe: (listener: Listener) => () => void;
   notify: () => void;
+  /** Bumped once per coalesced notify() pass — lets a React component built on useSyncExternalStore
+   * (see state/useStore.ts) detect "something changed" without state itself ever changing identity
+   * (it's one mutable object, mutated in place throughout this app). Not meaningful on its own,
+   * just a change ticker; components still read whatever fields they need off `state` directly. */
+  getRevision: () => number;
 }
 
 /** Coalesces notify() calls into at most one listener pass per animation frame. */
@@ -134,12 +139,14 @@ export function createStore(initial: AppState): Store {
   const state = initial;
   const listeners = new Set<Listener>();
   let scheduled = false;
+  let revision = 0;
 
   function notify(): void {
     if (scheduled) return;
     scheduled = true;
     requestAnimationFrame(() => {
       scheduled = false;
+      revision++;
       listeners.forEach((l) => l());
     });
   }
@@ -149,5 +156,9 @@ export function createStore(initial: AppState): Store {
     return () => listeners.delete(listener);
   }
 
-  return { state, subscribe, notify };
+  function getRevision(): number {
+    return revision;
+  }
+
+  return { state, subscribe, notify, getRevision };
 }

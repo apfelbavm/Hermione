@@ -12,6 +12,7 @@ import { createHistoryManager } from "./history";
 // the subscribe/notify CONTRACT, not on real rAF batching).
 function createFakeStore(rootGraph: Graph): Store {
   const listeners = new Set<() => void>();
+  let revision = 0;
   const state: AppState = {
     rootGraph,
     activeFunctionId: null,
@@ -35,7 +36,11 @@ function createFakeStore(rootGraph: Graph): Store {
       return () => listeners.delete(listener);
     },
     notify() {
+      revision++;
       listeners.forEach((l) => l());
+    },
+    getRevision() {
+      return revision;
     },
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { registerBuiltins } from "../nodes";
 import { connectPins, insertRerouteOnConnection, removeInstancePin } from "../engine/graphMutations";
 import { canCollapseSelectionToFunction, collapseSelectionToFunction } from "../engine/collapseToFunction";
@@ -24,15 +24,8 @@ import { createWidgetSync } from "../overlay/widgetSync";
 import { createNodeDescriptionOverlay } from "../overlay/nodeDescriptionOverlay";
 import { setupNodeHoverTooltip } from "../overlay/nodeTooltip";
 import { createCommentOverlay } from "../overlay/commentOverlay";
-import { setupResizablePanels } from "../overlay/resizablePanels";
-import { createVariablePanel } from "../overlay/variablePanel";
-import { createFunctionsPanel } from "../overlay/functionsPanel";
-import { createFunctionIoPanel } from "../overlay/functionIoPanel";
-import { createScriptsPanel } from "../overlay/scriptsPanel";
-import { createScriptIoPanel } from "../overlay/scriptIoPanel";
+import { useResizablePanels } from "./useResizablePanels";
 import { createScriptEditor } from "../overlay/scriptEditor";
-import { createDetailsPanel } from "../overlay/detailsPanel";
-import { createGraphTabs } from "../overlay/graphTabs";
 import { openNodeSearchMenu } from "../overlay/nodeSearchMenu";
 import { FUNCTION_DRAG_MIME, SCRIPT_DRAG_MIME, VARIABLE_DRAG_MIME } from "../overlay/dragTypes";
 import { openRowContextMenu, type ContextMenuItem } from "../overlay/rowContextMenu";
@@ -85,6 +78,32 @@ async function* readServerSentEvents(response: Response): AsyncGenerator<{ event
  * executingNodeId/firedConnectionIds/log state from the server's streamed events instead of a
  * local ExecutionContext. See src/app/api/simulate/route.ts for the server side. */
 export default function AppShell() {
+  // Lazy-initialized once, on first client render — this component is only ever mounted client-side
+  // (see app/page.tsx's ssr:false dynamic import), so it's safe to read localStorage here. Lives in
+  // component state (not the mount effect below) so the React panel components in AppShellMarkup
+  // can receive the same `store` instance synchronously on their very first render, instead of a
+  // render pass with no store yet.
+  const [store] = useState(() =>
+    createStore({
+      rootGraph: loadGraphFromLocalStorage() ?? buildDemoGraph(),
+      activeFunctionId: null,
+      openFunctionTabs: [],
+      openScriptTabs: [],
+      activeLowerTabId: null,
+      camera: new Camera(),
+      snapToGrid: true,
+      selectedNodeIds: new Set(),
+      selectedCommentIds: new Set(),
+      executingNodeId: null,
+      firedConnectionIds: new Set(),
+      wireDrag: null,
+      marqueeSelection: null,
+      sidebarSelection: null,
+    }),
+  );
+  const [history] = useState(() => createHistoryManager(store));
+  useResizablePanels();
+
   useEffect(() => {
     const canvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
     const container = document.getElementById("canvas-container") as HTMLDivElement;
@@ -124,25 +143,6 @@ export default function AppShell() {
     }
     window.addEventListener("mousemove", onWindowMouseMove);
 
-    const store = createStore({
-      rootGraph: loadGraphFromLocalStorage() ?? buildDemoGraph(),
-      activeFunctionId: null,
-      openFunctionTabs: [],
-      openScriptTabs: [],
-      activeLowerTabId: null,
-      camera: new Camera(),
-      snapToGrid: true,
-      selectedNodeIds: new Set(),
-      selectedCommentIds: new Set(),
-      executingNodeId: null,
-      firedConnectionIds: new Set(),
-      wireDrag: null,
-      marqueeSelection: null,
-      sidebarSelection: null,
-    });
-
-    const history = createHistoryManager(store);
-
     function resizeCanvas(): void {
       const dpr = window.devicePixelRatio || 1;
       const rect = container.getBoundingClientRect();
@@ -158,102 +158,12 @@ export default function AppShell() {
     setupNodeHoverTooltip(canvas, store);
     const commentOverlay = createCommentOverlay(overlay, canvas, store);
     const nodeDescriptionOverlay = createNodeDescriptionOverlay(overlay, store);
-    const variablePanel = createVariablePanel(
-      {
-        section: document.getElementById("variables-section") as HTMLDivElement,
-        header: document.getElementById("variables-header") as HTMLDivElement,
-        list: document.getElementById("variables-list") as HTMLDivElement,
-        addButton: document.getElementById("add-variable-button") as HTMLButtonElement,
-      },
-      store,
-      () => store.state.rootGraph,
-    );
 
     function getActiveFunction(): FunctionDef | null {
       const id = store.state.activeFunctionId;
       if (!id) return null;
       return store.state.rootGraph.functions.find((f) => f.id === id) ?? null;
     }
-
-    function getSelectedFunctionForDetails(): FunctionDef | null {
-      const selection = store.state.sidebarSelection;
-      if (selection?.kind !== "function") return null;
-      return store.state.rootGraph.functions.find((f) => f.id === selection.functionId) ?? null;
-    }
-
-    const functionsPanel = createFunctionsPanel(
-      {
-        section: document.getElementById("functions-section") as HTMLDivElement,
-        header: document.getElementById("functions-header") as HTMLDivElement,
-        list: document.getElementById("functions-list") as HTMLDivElement,
-        addButton: document.getElementById("add-function-button") as HTMLButtonElement,
-      },
-      store,
-    );
-
-    const inputsPanel = createFunctionIoPanel(
-      {
-        section: document.getElementById("inputs-section") as HTMLDivElement,
-        header: document.getElementById("inputs-header") as HTMLDivElement,
-        list: document.getElementById("inputs-list") as HTMLDivElement,
-        addButton: document.getElementById("add-input-button") as HTMLButtonElement,
-      },
-      store,
-      "input",
-      getSelectedFunctionForDetails,
-    );
-
-    const outputsPanel = createFunctionIoPanel(
-      {
-        section: document.getElementById("outputs-section") as HTMLDivElement,
-        header: document.getElementById("outputs-header") as HTMLDivElement,
-        list: document.getElementById("outputs-list") as HTMLDivElement,
-        addButton: document.getElementById("add-output-button") as HTMLButtonElement,
-      },
-      store,
-      "output",
-      getSelectedFunctionForDetails,
-    );
-
-    const scriptsPanel = createScriptsPanel(
-      {
-        section: document.getElementById("scripts-section") as HTMLDivElement,
-        header: document.getElementById("scripts-header") as HTMLDivElement,
-        list: document.getElementById("scripts-list") as HTMLDivElement,
-        addButton: document.getElementById("add-script-button") as HTMLButtonElement,
-      },
-      store,
-    );
-
-    function getSelectedScriptForDetails(): CodeScriptDef | null {
-      const selection = store.state.sidebarSelection;
-      if (selection?.kind !== "script") return null;
-      return store.state.rootGraph.scripts.find((s) => s.id === selection.scriptId) ?? null;
-    }
-
-    const scriptInputsPanel = createScriptIoPanel(
-      {
-        section: document.getElementById("script-inputs-section") as HTMLDivElement,
-        header: document.getElementById("script-inputs-header") as HTMLDivElement,
-        list: document.getElementById("script-inputs-list") as HTMLDivElement,
-        addButton: document.getElementById("add-script-input-button") as HTMLButtonElement,
-      },
-      store,
-      "input",
-      getSelectedScriptForDetails,
-    );
-
-    const scriptOutputsPanel = createScriptIoPanel(
-      {
-        section: document.getElementById("script-outputs-section") as HTMLDivElement,
-        header: document.getElementById("script-outputs-header") as HTMLDivElement,
-        list: document.getElementById("script-outputs-list") as HTMLDivElement,
-        addButton: document.getElementById("add-script-output-button") as HTMLButtonElement,
-      },
-      store,
-      "output",
-      getSelectedScriptForDetails,
-    );
 
     const scriptEditor = createScriptEditor(
       {
@@ -263,38 +173,6 @@ export default function AppShell() {
         saveButton: logSaveButton,
         saveStatus: logSaveStatus,
         clearButton: logClearButton,
-      },
-      store,
-    );
-
-    const localVariablesSection = document.getElementById("local-variables-section") as HTMLDivElement;
-    const localVariablePanel = createVariablePanel(
-      {
-        section: localVariablesSection,
-        header: document.getElementById("local-variables-header") as HTMLDivElement,
-        list: document.getElementById("local-variables-list") as HTMLDivElement,
-        addButton: document.getElementById("add-local-variable-button") as HTMLButtonElement,
-      },
-      store,
-      () => getActiveFunction()?.body ?? store.state.rootGraph,
-    );
-
-    const graphTabs = createGraphTabs(document.getElementById("graph-tabs") as HTMLDivElement, store);
-
-    const detailsPanel = createDetailsPanel(
-      {
-        section: document.getElementById("details-section") as HTMLDivElement,
-        variableContent: document.getElementById("variable-details") as HTMLDivElement,
-        variableNameLabel: document.getElementById("variable-details-name") as HTMLDivElement,
-        variableFieldsContainer: document.getElementById("variable-details-fields") as HTMLDivElement,
-        nodeContent: document.getElementById("node-details") as HTMLDivElement,
-        nodeNameLabel: document.getElementById("node-details-name") as HTMLDivElement,
-        nodeFieldsContainer: document.getElementById("node-details-fields") as HTMLDivElement,
-        commentContent: document.getElementById("comment-details") as HTMLDivElement,
-        commentFieldsContainer: document.getElementById("comment-details-fields") as HTMLDivElement,
-        functionContent: document.getElementById("function-details") as HTMLDivElement,
-        functionFieldsContainer: document.getElementById("function-details-fields") as HTMLDivElement,
-        scriptContent: document.getElementById("script-details") as HTMLDivElement,
       },
       store,
     );
@@ -324,21 +202,8 @@ export default function AppShell() {
 
     function render(): void {
       renderCanvas();
-      variablePanel.render();
-      functionsPanel.render();
-      inputsPanel.render();
-      outputsPanel.render();
-      scriptsPanel.render();
-      scriptInputsPanel.render();
-      scriptOutputsPanel.render();
       scriptEditor.render();
-      graphTabs.render();
-      detailsPanel.render();
       snapToGridCheckbox.checked = store.state.snapToGrid;
-
-      const activeFn = getActiveFunction();
-      localVariablesSection.style.display = activeFn ? "" : "none";
-      if (activeFn) localVariablePanel.render();
     }
 
     const unsubscribe = store.subscribe(render);
@@ -346,7 +211,6 @@ export default function AppShell() {
     const resizeObserver = new ResizeObserver(resizeCanvas);
     resizeObserver.observe(container);
     resizeCanvas();
-    setupResizablePanels();
 
     function onSnapToGridChange(): void {
       store.state.snapToGrid = snapToGridCheckbox.checked;
@@ -803,5 +667,5 @@ export default function AppShell() {
     };
   }, []);
 
-  return <AppShellMarkup />;
+  return <AppShellMarkup store={store} />;
 }
