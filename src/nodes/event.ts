@@ -1,3 +1,4 @@
+import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
 
 registerNode({
@@ -5,6 +6,7 @@ registerNode({
   label: "On Start",
   description: "Fires once when the graph starts running.",
   group: "Events",
+  colorCategory: NodeColorCategory.Events,
   pins: [{ id: "exec-out", label: "", type: "exec", direction: "output" }],
   execute: () => ({ nextExec: "exec-out" }),
   eventTrigger: { kind: "manual" },
@@ -15,6 +17,7 @@ registerNode({
   label: "On Interval",
   description: "Fires repeatedly on a configurable interval, in milliseconds.",
   group: "Events",
+  colorCategory: NodeColorCategory.Events,
   pins: [{ id: "exec-out", label: "", type: "exec", direction: "output" }],
   // Editable in the Details panel when this node is selected, not as a wireable pin — see
   // NodeDef.detailProperties.
@@ -33,6 +36,7 @@ registerNode({
   label: "On Run",
   description: "Fires when the editor's own Run button is pressed.",
   group: "Events",
+  colorCategory: NodeColorCategory.Events,
   pins: [{ id: "exec-out", label: "", type: "exec", direction: "output" }],
   execute: () => ({ nextExec: "exec-out" }),
   eventTrigger: { kind: "run" },

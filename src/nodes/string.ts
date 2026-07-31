@@ -1,5 +1,6 @@
 import { NodeInstance } from "../engine/nodeInstance";
 import { registerNode } from "../engine/registry";
+import { NodeColorCategory } from "../engine/types";
 import type { PinDef } from "../engine/types";
 
 registerNode({
@@ -7,6 +8,7 @@ registerNode({
   label: "To String (Number)",
   description: "Converts a number to its text representation.",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     {
       id: "value",
@@ -28,6 +30,7 @@ registerNode({
   label: "To String (Boolean)",
   description: "Converts a boolean to its text representation.",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     {
       id: "value",
@@ -51,6 +54,7 @@ registerNode({
   label: "To String (Date)",
   description: "Converts a date to an ISO 8601 text string.",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     { id: "value", label: "Value", type: "date", direction: "input", defaultValue: "" },
     { id: "result", label: "Result", type: "string", direction: "output" },
@@ -68,6 +72,7 @@ registerNode({
   label: "To String (JSON)",
   description: "Converts a value to its JSON text representation.",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     { id: "value", label: "Value", type: "object", direction: "input" },
     { id: "result", label: "Result", type: "string", direction: "output" },
@@ -83,6 +88,7 @@ registerNode({
   label: "Equal ( == ) case-sensitive",
   description: "True if two strings are exactly equal, case-sensitive.",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     {
       id: "a",
@@ -113,6 +119,7 @@ registerNode({
   label: "Equal ( == ) case-insensitive",
   description: "True if two strings are equal, ignoring letter case.",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     {
       id: "a",
@@ -143,6 +150,7 @@ registerNode({
   label: "Length",
   description: "Returns how many characters are in the string.",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
     { id: "result", label: "Result", type: "number", direction: "output" },
@@ -158,6 +166,7 @@ registerNode({
   label: "Replace",
   description: "Replaces only the first occurrence of a substring with another string.",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
     { id: "search", label: "Search", type: "string", direction: "input", defaultValue: "" },
@@ -177,6 +186,7 @@ registerNode({
   label: "Replace All",
   description: "Replaces every occurrence of a substring with another string.",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
     { id: "search", label: "Search", type: "string", direction: "input", defaultValue: "" },
@@ -196,6 +206,7 @@ registerNode({
   label: "Substring",
   description: "Returns the characters between Start and End (order-independent, clamped to the string's bounds).",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
     { id: "start", label: "Start", type: "number", direction: "input", defaultValue: 0, integer: true },
@@ -217,6 +228,7 @@ registerNode({
   label: "Slice",
   description: "Returns the characters between Start and End, where a negative index counts from the string's end.",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
     { id: "start", label: "Start", type: "number", direction: "input", defaultValue: 0, integer: true },
@@ -272,6 +284,7 @@ registerNode({
   label: "Append String",
   description: "Concatenates all of its string inputs into one result.",
   group: "String",
+  colorCategory: NodeColorCategory.String,
   pins: [
     {
       id: `${ENTRY_PREFIX}0`,

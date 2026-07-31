@@ -2,6 +2,7 @@ import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
 import { registerNode } from "../engine/registry";
 import { connectionsFrom } from "../engine/graphQueries";
 import { runExecFrom } from "../engine/executor";
+import { NodeColorCategory } from "../engine/types";
 import type { PinDef, PinType } from "../engine/types";
 import { NodeInstance } from "../engine/nodeInstance";
 
@@ -130,6 +131,7 @@ registerNode({
   label: "Make Map",
   description: "Builds a new map from the given key-value pairs.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [
     {
@@ -182,6 +184,7 @@ registerNode({
   label: "Map Length",
   description: "Returns how many key-value pairs are in the map.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), { id: "length", label: "Length", type: "number", direction: "output" }],
   deriveInstancePins: (node) => [mapPin(valueTypeOf(node), keyTypeOf(node)), { id: "length", label: "Length", type: "number", direction: "output" }],
@@ -196,6 +199,7 @@ registerNode({
   label: "Map Add",
   description: "Sets the value for a key, adding it or overwriting the existing one.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), keyPin("string"), valuePin("number", "value", "Value"), mapOutPin("number", "string")],
   deriveInstancePins: (node) => {
@@ -220,6 +224,7 @@ registerNode({
   label: "Map Remove",
   description: "Removes the entry for a key, if one exists.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), keyPin("string"), mapOutPin("number", "string"), { id: "removed", label: "Removed", type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
@@ -245,6 +250,7 @@ registerNode({
   label: "Map Clear",
   description: "Returns an empty map, discarding all entries.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), mapOutPin("number", "string")],
   deriveInstancePins: (node) => [mapPin(valueTypeOf(node), keyTypeOf(node)), mapOutPin(valueTypeOf(node), keyTypeOf(node))],
@@ -257,6 +263,7 @@ registerNode({
   label: "Map Contains Key",
   description: "True if the map has an entry stored under this key.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), keyPin("string"), { id: "contains", label: "Contains", type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
@@ -286,6 +293,7 @@ registerNode({
   label: "Map Find",
   description: "Returns the value stored under a key, and whether it was found.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), keyPin("string"), valuePin("number", "value", "Value", "output"), { id: "found", label: "Found", type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
@@ -314,6 +322,7 @@ registerNode({
   label: "Map Keys",
   description: "Returns an array of every key currently in the map.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [
     mapPin("number", "string"),
@@ -352,6 +361,7 @@ registerNode({
   label: "Map Values",
   description: "Returns an array of every value currently in the map.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [
     mapPin("number", "string"),
@@ -390,6 +400,7 @@ registerNode({
   label: "Map Is Empty",
   description: "True if the map has no entries.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => [mapPin(valueTypeOf(node), keyTypeOf(node)), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
@@ -408,6 +419,7 @@ registerNode({
   label: "Map For Each",
   description: "Runs the loop body once for each key-value pair in the map.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

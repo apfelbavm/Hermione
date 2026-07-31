@@ -1,4 +1,5 @@
 import * as oauth from "oauth4webapi";
+import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
 
 // OAuth2 Client Credentials (RFC 6749 §4.4) — the standard app-only / service-to-service grant:
@@ -17,6 +18,7 @@ registerNode({
   label: "OAuth2 Client Credentials",
   description: "Requests an access token from an OAuth2 token endpoint using the client credentials grant (client ID and secret, no user involved).",
   group: "Auth",
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "tokenServiceUrl", label: "Token Service URL", type: "string", direction: "input", defaultValue: "" },

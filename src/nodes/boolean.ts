@@ -1,3 +1,4 @@
+import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
 
 registerNode({
@@ -5,6 +6,7 @@ registerNode({
   label: "Not",
   description: "Inverts a boolean value — true becomes false and false becomes true.",
   group: "Boolean",
+  colorCategory: NodeColorCategory.Boolean,
   pins: [
     { id: "value", label: "Value", type: "boolean", direction: "input", defaultValue: false },
     { id: "result", label: "Result", type: "boolean", direction: "output" },

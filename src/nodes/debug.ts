@@ -2,6 +2,7 @@ import { XMLParser, XMLValidator } from "fast-xml-parser";
 import XMLBuilder from "fast-xml-builder";
 import * as Papa from "papaparse";
 import { registerNode } from "../engine/registry";
+import { NodeColorCategory } from "../engine/types";
 import type { LogFormat } from "../engine/types";
 import { XML_BUILDER_IMPORT_LINE, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, XML_PRETTY_BUILD_OPTIONS_LITERAL } from "./dataFormatHelpers";
 
@@ -10,6 +11,7 @@ registerNode({
   label: "Print",
   description: "Logs a text message to the console for debugging.",
   group: "Debug",
+  colorCategory: NodeColorCategory.Debug,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "message", label: "Message", type: "string", direction: "input", defaultValue: "" },
@@ -68,6 +70,7 @@ registerNode({
   label: "Print (Formatted)",
   description: "Logs a message pretty-printed according to a chosen format.",
   group: "Debug",
+  colorCategory: NodeColorCategory.Debug,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "message", label: "Message", type: "string", direction: "input", defaultValue: "" },

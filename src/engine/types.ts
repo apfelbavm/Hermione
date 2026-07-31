@@ -90,6 +90,19 @@ export interface EventTrigger {
   describeInstance?: (node: NodeInstance) => Record<string, unknown>;
 }
 
+export enum NodeColorCategory {
+  Default = 0,
+  Events,
+  Integration,
+  Math,
+  Date,
+  Boolean,
+  Debug,
+  Variables,
+  String,
+  Collections,
+}
+
 export interface NodeDef {
   type: string;
   label: string;
@@ -100,6 +113,10 @@ export interface NodeDef {
   description: string;
   /** Where this node appears in the node-creation menu, e.g. "Math" or "Math.Comparison" for a nested subgroup. */
   group: string;
+  /** The node header's fixed background color category (see NodeColorCategory above) — omit for
+   * the neutral default grey. A node bound to a Variable (Get/Set) ignores this entirely and
+   * colors by the variable's own TYPE instead (see drawNodes.ts's resolveNodeHeaderColor). */
+  colorCategory?: NodeColorCategory;
   pins: PinDef[];
   execute?: (args: ExecuteArgs) => Promise<ExecuteResult> | ExecuteResult;
   evaluate?: (args: EvaluateArgs) => Record<string, unknown> | Promise<Record<string, unknown>>;

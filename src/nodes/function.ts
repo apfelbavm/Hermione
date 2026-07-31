@@ -1,4 +1,5 @@
 import { runFunctionCall } from "../engine/executor";
+import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
 
 // Compiler support (compileExecute/compileEvaluate) for these three node types is intentionally
@@ -10,6 +11,7 @@ registerNode({
   label: "Entry",
   description: "Starts a function's body and outputs its call's input arguments.",
   group: "Functions",
+  colorCategory: NodeColorCategory.Integration,
   pins: [], // real pins are derived per-instance from the owning FunctionDef's inputs
   deriveFunctionPins: (fn) => [
     { id: "exec-out", label: "", type: "exec", direction: "output" },
@@ -31,6 +33,7 @@ registerNode({
   label: "Return",
   description: "Ends a function's body, sending its output values back to the caller.",
   group: "Functions",
+  colorCategory: NodeColorCategory.Integration,
   pins: [], // real pins are derived per-instance from the owning FunctionDef's outputs
   deriveFunctionPins: (fn) => [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -56,6 +59,7 @@ registerNode({
   label: "Call Function",
   description: "Invokes a user-defined function with the given arguments.",
   group: "Functions",
+  colorCategory: NodeColorCategory.Integration,
   pins: [], // real pins are derived per-instance from the target FunctionDef's full signature
   deriveFunctionPins: (fn) => [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

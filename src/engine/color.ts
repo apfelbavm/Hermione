@@ -1,4 +1,5 @@
 import { HermioneMath } from "./hermioneMath";
+import { NodeColorCategory } from "./types";
 import type { PinType } from "./types";
 
 export class Color {
@@ -170,29 +171,24 @@ export const Colors = {
   NODE_HEADER_DEFAULT: "#78818b",
   NODE_BORDER_SELECTED: "#e8b339",
 
-  get NODE_HEADER_BG(): Record<string, string> {
-    const flowControlBg = "#3b6b8a";
-    return {
-      Events: "#8a3b3b",
-      "Flow Control": this.NODE_HEADER_DEFAULT,
-      Math: this.PIN_COLORS.number,
-      // Same color as a "date" pin/wire, tying the whole node category to that type visually.
-      Date: this.PIN_COLORS.date,
-      // Same color as a "boolean" pin/wire, tying the whole node category to that type visually.
-      Boolean: this.PIN_COLORS.boolean,
-      Debug: "#6b6b3b",
-      Variables: "#7a4f9b",
-      // Neither has a separate color of its own anymore — both read as the same category as Flow
-      // Control (Branch, Delay, Sequence, etc.).
-      Actions: flowControlBg,
-      Auth: flowControlBg,
-      // Same color as a "string" pin/wire, tying the whole node category to that type visually.
-      String: this.PIN_COLORS.string,
-      Collections: "#5a4a8a",
-      // Entry/Return/Call (see function.ts) — function-flow related, but a distinct concept from
-      // Flow Control itself, so a neutral grey (matching the generic fallback) rather than its own hue.
-      Functions: flowControlBg,
-    };
+  /** Indexed by NodeColorCategory (engine/types.ts) — each node type declares its own
+   * `colorCategory`, resolved to a color here (see drawNodes.ts's resolveNodeHeaderColor) instead
+   * of the old scheme of matching NodeDef.group's text against a lookup table. */
+  get NODE_CATEGORY_COLORS(): string[] {
+    const colors: string[] = [];
+    colors[NodeColorCategory.Default] = this.NODE_HEADER_DEFAULT;
+    colors[NodeColorCategory.Events] = "#8a3b3b";
+    colors[NodeColorCategory.Integration] = "#3b6b8a";
+    // Same color as a "number"/"date"/"boolean"/"string" pin/wire, tying the whole category to
+    // that type visually.
+    colors[NodeColorCategory.Math] = this.PIN_COLORS.number;
+    colors[NodeColorCategory.Date] = this.PIN_COLORS.date;
+    colors[NodeColorCategory.Boolean] = this.PIN_COLORS.boolean;
+    colors[NodeColorCategory.Debug] = "#6b6b3b";
+    colors[NodeColorCategory.Variables] = "#7a4f9b";
+    colors[NodeColorCategory.String] = this.PIN_COLORS.string;
+    colors[NodeColorCategory.Collections] = "#5a4a8a";
+    return colors;
   },
 
   get WIRE_COLOR_EXEC(): string {

@@ -1,6 +1,7 @@
 import { Colors } from "../engine/color";
 import { connectionsTouchingPin } from "../engine/graphQueries";
-import { getNodeDef, topLevelGroup } from "../engine/registry";
+import { getNodeDef } from "../engine/registry";
+import { NodeColorCategory } from "../engine/types";
 import type { CodeScriptDef, FunctionDef, NodeDef, PinDef, Variable } from "../engine/types";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
@@ -16,7 +17,7 @@ function resolveNodeHeaderColor(node: NodeInstance, def: NodeDef, variables: Var
     const variable = variables.find((v) => v.id === node.variableId);
     if (variable) return Colors.PIN_COLORS[variable.type];
   }
-  return Colors.NODE_HEADER_BG[topLevelGroup(def.group)] ?? Colors.NODE_HEADER_DEFAULT;
+  return Colors.NODE_CATEGORY_COLORS[def.colorCategory ?? NodeColorCategory.Default];
 }
 
 export function drawNodes(

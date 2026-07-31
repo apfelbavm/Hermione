@@ -1,3 +1,4 @@
+import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
 
 // Every "connection" node that needs to authenticate (HTTP Request today, others later) takes the
@@ -27,6 +28,7 @@ registerNode({
   label: "Basic Auth",
   description: "Builds an HTTP Basic Auth header value from a username and password.",
   group: "Auth",
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "username", label: "Username", type: "string", direction: "input", defaultValue: "" },
     { id: "password", label: "Password", type: "string", direction: "input", defaultValue: "" },

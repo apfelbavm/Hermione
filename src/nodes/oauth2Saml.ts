@@ -1,3 +1,4 @@
+import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
 import { compileResultVar } from "../engine/compileUtils";
 import type { Oauth2SamlBearerCredentialData } from "../credentials/types";
@@ -127,6 +128,7 @@ registerNode({
   label: "OAuth2 SAML Bearer",
   description: "Fetches a signed SAML assertion from an IdP endpoint, then exchanges it for an OAuth2 access token from a token endpoint, using a named Credential Vault entry.",
   group: "Auth",
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "credentialName", label: "Credential Name", type: "string", direction: "input", defaultValue: "" },

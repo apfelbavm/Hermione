@@ -1,3 +1,4 @@
+import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
 
 /** Normalizes a "date" pin's runtime value into a Date instance to operate on — a real Date
@@ -14,6 +15,7 @@ registerNode({
   label: "Now",
   description: "Returns the current date and time as a Date.",
   group: "Date",
+  colorCategory: NodeColorCategory.Date,
   pins: [{ id: "result", label: "Result", type: "date", direction: "output" }],
   evaluate: () => ({ result: new Date() }),
   compileEvaluate: () => ({
@@ -26,6 +28,7 @@ registerNode({
   label: "To Date (String)",
   description: "Parses a text string into a Date.",
   group: "Date",
+  colorCategory: NodeColorCategory.Date,
   pins: [
     { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
     { id: "result", label: "Result", type: "date", direction: "output" },
@@ -41,6 +44,7 @@ registerNode({
   label: "To Date (Number)",
   description: "Converts a number of milliseconds since epoch into a Date.",
   group: "Date",
+  colorCategory: NodeColorCategory.Date,
   pins: [
     { id: "value", label: "Value", type: "number", direction: "input", defaultValue: 0 },
     { id: "result", label: "Result", type: "date", direction: "output" },
@@ -56,6 +60,7 @@ registerNode({
   label: "Subtract ( - )",
   description: "Returns the difference between two dates in milliseconds.",
   group: "Date",
+  colorCategory: NodeColorCategory.Date,
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
     { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
@@ -74,6 +79,7 @@ registerNode({
   label: "Equal ( == )",
   description: "True if two dates represent the same moment in time.",
   group: "Date.Comparison",
+  colorCategory: NodeColorCategory.Date,
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
     { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
@@ -92,6 +98,7 @@ registerNode({
   label: "Unequal ( != )",
   description: "True if two dates do not represent the same moment in time.",
   group: "Date.Comparison",
+  colorCategory: NodeColorCategory.Date,
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
     { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
@@ -110,6 +117,7 @@ registerNode({
   label: "Greater than ( > )",
   description: "True if date A is later than date B.",
   group: "Date.Comparison",
+  colorCategory: NodeColorCategory.Date,
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
     { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
@@ -128,6 +136,7 @@ registerNode({
   label: "Greater equal ( >= )",
   description: "True if date A is later than or the same as date B.",
   group: "Date.Comparison",
+  colorCategory: NodeColorCategory.Date,
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
     { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
@@ -146,6 +155,7 @@ registerNode({
   label: "Less than ( < )",
   description: "True if date A is earlier than date B.",
   group: "Date.Comparison",
+  colorCategory: NodeColorCategory.Date,
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
     { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
@@ -164,6 +174,7 @@ registerNode({
   label: "Less equal ( <= )",
   description: "True if date A is earlier than or the same as date B.",
   group: "Date.Comparison",
+  colorCategory: NodeColorCategory.Date,
   pins: [
     { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
     { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },

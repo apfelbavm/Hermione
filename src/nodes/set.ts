@@ -2,6 +2,7 @@ import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
 import { registerNode } from "../engine/registry";
 import { connectionsFrom } from "../engine/graphQueries";
 import { runExecFrom } from "../engine/executor";
+import { NodeColorCategory } from "../engine/types";
 import type { PinDef, PinType } from "../engine/types";
 import { NodeInstance } from "../engine/nodeInstance";
 
@@ -109,6 +110,7 @@ registerNode({
   label: "Make Set",
   description: "Builds a new set from the given elements, dropping duplicates.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [
     {
@@ -146,6 +148,7 @@ registerNode({
   label: "Set Length",
   description: "Returns how many unique elements are in the set.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [setPin("number"), { id: "length", label: "Length", type: "number", direction: "output" }],
   deriveInstancePins: (node) => [setPin(elementTypeOf(node)), { id: "length", label: "Length", type: "number", direction: "output" }],
@@ -160,6 +163,7 @@ registerNode({
   label: "Set Add",
   description: "Adds a value to the set, unless it's already present.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [setPin("number"), itemPin("item", "Item", "number"), setOutPin("number"), { id: "added", label: "Added", type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
@@ -188,6 +192,7 @@ registerNode({
   label: "Set Remove",
   description: "Removes a value from the set if it is present.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [setPin("number"), itemPin("item", "Item", "number"), setOutPin("number"), { id: "removed", label: "Removed", type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
@@ -212,6 +217,7 @@ registerNode({
   label: "Set Clear",
   description: "Returns an empty set, discarding all elements.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [setPin("number"), setOutPin("number")],
   deriveInstancePins: (node) => {
@@ -227,6 +233,7 @@ registerNode({
   label: "Set Contains",
   description: "True if the set already contains this value.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [setPin("number"), itemPin("item", "Item", "number"), { id: "contains", label: "Contains", type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
@@ -255,6 +262,7 @@ registerNode({
   label: "Set Is Empty",
   description: "True if the set has no elements.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [setPin("number"), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => [setPin(elementTypeOf(node)), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
@@ -269,6 +277,7 @@ registerNode({
   label: "Set To Array",
   description: "Converts the set's elements into an ordinary array.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [
     setPin("number"),
@@ -304,6 +313,7 @@ registerNode({
   label: "Set Union",
   description: "Combines two sets, keeping every distinct element from both.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
   deriveInstancePins: (node) => {
@@ -323,6 +333,7 @@ registerNode({
   label: "Set Intersection",
   description: "Returns only the elements present in both sets.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
   deriveInstancePins: (node) => {
@@ -346,6 +357,7 @@ registerNode({
   label: "Set Difference",
   description: "Returns elements in the first set that aren't in the second.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
   deriveInstancePins: (node) => {
@@ -373,6 +385,7 @@ registerNode({
   label: "Set For Each",
   description: "Runs the loop body once for each element in the set.",
   group: GROUP,
+  colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
