@@ -19,22 +19,30 @@ export default function AppShellMarkup({ store }: { store: Store }) {
   return (
     <div id="app">
       <div id="toolbar">
-        <span id="toolbar-title">Hermione</span>
-        <button id="run-button">Simulate ▶</button>
-        <button id="pause-button" style={{ display: "none" }} title="Pause the running simulation">
-          ⏸ Pause
-        </button>
-        <button id="continue-button" style={{ display: "none" }} title="Continue past the current breakpoint/pause">
-          ▶ Continue
-        </button>
-        <button id="save-button">Save</button>
-        <button id="load-button">Load</button>
-        <button id="download-button">Download</button>
-        <button id="compile-button">Compile</button>
-        <button id="delete-button" title="Delete the saved graph (from local storage)">
-          Delete
-        </button>
-        <input id="load-file-input" type="file" accept="application/json" style={{ display: "none" }} />
+        <div id="toolbar-left">
+          <span id="toolbar-title">Hermione</span>
+        </div>
+        <div id="toolbar-center">
+          <div id="simulation-controls" className="toolbar-button-group">
+            <button id="run-button">Simulate ▶</button>
+            <button id="pause-button" style={{ display: "none" }} title="Pause the running simulation">
+              ⏸ Pause
+            </button>
+            <button id="continue-button" style={{ display: "none" }} title="Continue past the current breakpoint/pause">
+              ▶ Continue
+            </button>
+          </div>
+        </div>
+        <div id="toolbar-right">
+          <button id="save-button">Save</button>
+          <button id="load-button">Load</button>
+          <button id="download-button">Download</button>
+          <button id="compile-button">Compile</button>
+          <button id="delete-button" title="Delete the saved graph (from local storage)">
+            Delete
+          </button>
+          <input id="load-file-input" type="file" accept="application/json" style={{ display: "none" }} />
+        </div>
       </div>
       <div id="main-area">
         <div id="left-sidebar" className="side-panel">

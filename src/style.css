@@ -29,10 +29,14 @@ body {
   height: 100vh;
 }
 
+/* Three-column grid (not flex) so #toolbar-center lands exactly in the bar's horizontal center
+   regardless of how wide #toolbar-left/#toolbar-right end up being — a flex "auto margins on the
+   center item" trick only centers it within the LEFTOVER space, which drifts off-center the moment
+   the two side groups differ in width (as they do here: a one-word title vs. five buttons). */
 #toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 12px;
   height: 40px;
   flex: 0 0 auto;
   padding: 0 12px;
@@ -40,9 +44,42 @@ body {
   border-bottom: 1px solid #33383f;
 }
 
+#toolbar-left,
+#toolbar-center,
+#toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#toolbar-left {
+  justify-self: start;
+}
+
+#toolbar-center {
+  justify-self: center;
+}
+
+#toolbar-right {
+  justify-self: end;
+}
+
 #toolbar-title {
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+
+/* Wraps a related run of toolbar buttons in one bordered box — same "reads as one grouped control"
+   language as #canvas-hud-toolbar's own border+background, just inline in the main toolbar instead
+   of floating over the canvas. Currently just the Simulate/Pause/Continue trio. */
+.toolbar-button-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid #3d4148;
+  border-radius: 6px;
+  background: rgba(36, 39, 45, 0.6);
 }
 
 #run-button {
