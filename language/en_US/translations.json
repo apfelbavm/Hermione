@@ -1,0 +1,12 @@
+{
+  "pages": {
+    "logs": {
+      "title": "Every run across every project (grouped by run — expand one to inspect its individual log entries).",
+      "empty": "No runs yet — simulate or run a deployed Flow to see its logs here."
+    },
+    "emulate": {
+      "loading_editor": "Loading editor…",
+      "empty_note": "Runs a Flow's deployed compiled output directly on this machine — the same snapshot the editor's \"Deploy\" button last persisted — instead of the editor's interpreted Simulate."
+    }
+  }
+}

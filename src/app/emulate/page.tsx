@@ -9,13 +9,14 @@ import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 import { getCurrentTheme, THEME_CHANGE_EVENT } from "../../client/theme";
 import { formatLogTimestamp } from "../../shared/formatLogTimestamp";
+import { i18n } from "@i18n";
 
 // Same reasoning as overlay/scriptEditor.ts: Monaco's own JS is multi-megabyte, so it's only ever
 // loaded on demand (here, the moment this page actually renders one) rather than bundled into every
 // page's initial load. `ssr:false` since Monaco needs real browser APIs.
 const Editor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
-  loading: () => <p className="page-empty-note">Loading editor…</p>,
+  loading: () => <p className="page-empty-note">{i18n.pages.emulate.loading_editor}</p>,
 });
 
 /** Monaco's own theme names, distinct from this app's "light"/"dark" — same mapping
@@ -129,10 +130,7 @@ export default function EmulatePage() {
     <PageShell contentClassName="emulate-content">
       <Breadcrumbs items={[{ label: "Emulate" }]} />
       <h1>Emulate</h1>
-      <p className="page-empty-note">
-        Runs a Flow&apos;s deployed compiled output directly on this machine — the same snapshot the editor&apos;s &quot;Deploy&quot; button last persisted — instead of the editor&apos;s
-        interpreted Simulate.
-      </p>
+      <p className="page-empty-note">{i18n.pages.emulate.empty_note}</p>
 
       {loadingProjects ? (
         <p className="page-empty-note">Loading projects…</p>
@@ -180,14 +178,7 @@ export default function EmulatePage() {
             <span>{formatLogTimestamp(scriptDetail.deployedAt)}</span>
             <span>Version: {scriptDetail.version}</span>
           </div>
-          <Editor
-            height="100%"
-            language="typescript"
-            path={scriptDetail.flowId}
-            value={scriptDetail.code}
-            theme={monacoTheme}
-            options={{ readOnly: true, minimap: { enabled: false }, fontSize: 13, domReadOnly: true }}
-          />
+          <Editor height="100%" language="typescript" path={scriptDetail.flowId} value={scriptDetail.code} theme={monacoTheme} options={{ readOnly: true, minimap: { enabled: false }, fontSize: 13, domReadOnly: true }} />
         </div>
       )}
 

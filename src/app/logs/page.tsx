@@ -6,6 +6,7 @@ import type { ProjectSummary, RunLog } from "../../server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 import { RunRow } from "../../components/logs/RunRow";
+import { i18n } from "@i18n";
 
 /** The global counterpart of a project's own Logs page (projects/[projectId]/logs/page.tsx) — same
  * run list/entry rendering (shared via components/logs/RunRow.tsx), just spanning every project
@@ -25,9 +26,9 @@ export default function GlobalLogsPage() {
     <PageShell>
       <Breadcrumbs items={[{ label: "Logs" }]} />
       <h1>Logs</h1>
-      <p className="page-empty-note">Every run across every project (grouped by run — expand one to inspect its individual log entries).</p>
+      <p className="page-empty-note">{i18n.pages.logs.title}</p>
       {runs.length === 0 ? (
-        <p className="page-empty-note">No runs yet — simulate or run a deployed Flow to see its logs here.</p>
+        <p className="page-empty-note">{i18n.pages.logs.empty}</p>
       ) : (
         <ul className="run-list">
           {runs.map((run) => {

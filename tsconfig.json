@@ -11,6 +11,9 @@
     "skipLibCheck": true,
     /* Bundler mode */
     "moduleResolution": "bundler",
+    "paths": {
+      "@i18n": ["./src/shared/i18n.ts"]
+    },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,
     "moduleDetection": "force",
