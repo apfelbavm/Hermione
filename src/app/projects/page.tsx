@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { i18n } from "@i18n";
 import {
   createProject,
@@ -12,6 +12,77 @@ import {
 import type { ProjectSummary } from "../../server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
+import { useDebounce } from "../../hooks/useDebounce";
+
+/** The "Create Project" dialog just collects a name — unlike CreateFlowDialog there's no template
+ * concept for Projects, so this stays a single-field modal (same skeleton as DuplicateFlowDialog on
+ * the Project page). */
+function CreateProjectDialog({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void;
+  onCreate: (name: string) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(): Promise<void> {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError(i18n.pages.projects.create_name_required);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onCreate(trimmed);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="modal-backdrop"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="modal-box">
+        <h2 className="modal-title">{i18n.pages.projects.create_title}</h2>
+        <label className="modal-field-row">
+          <span className="modal-field-label">
+            {i18n.pages.projects.new_project_placeholder}
+          </span>
+          <input
+            type="text"
+            value={name}
+            autoFocus
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleSubmit();
+            }}
+          />
+        </label>
+        {error && <p className="modal-error">{error}</p>}
+        <div className="modal-actions">
+          <button type="button" onClick={onClose} disabled={saving}>
+            {i18n.pages.projects.create_cancel}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={saving}
+          >
+            {saving
+              ? i18n.pages.projects.create_saving
+              : i18n.pages.projects.create_confirm}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** No SSR-unsafe DB access happens during render — every client/api.ts call is only ever made
  * inside an effect/event handler, both client-only — so this can be a plain "use client" page
@@ -20,8 +91,15 @@ import { Breadcrumbs } from "../../components/Breadcrumbs";
  * first render (well, kicks off that fetch there — see that file's own comment). */
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [newName, setNewName] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 150);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const visibleProjects = projects.filter((project) =>
+    project.name
+      .toLowerCase()
+      .includes(debouncedSearchTerm.trim().toLowerCase()),
+  );
 
   async function refresh(): Promise<void> {
     setProjects(await listProjects());
@@ -31,12 +109,9 @@ export default function ProjectsPage() {
     void refresh();
   }, []);
 
-  async function handleCreate(e: FormEvent<HTMLFormElement>): Promise<void> {
-    e.preventDefault();
-    const name = newName.trim();
-    if (!name) return;
+  async function handleCreate(name: string): Promise<void> {
     await createProject(name);
-    setNewName("");
+    setShowCreateDialog(false);
     await refresh();
   }
 
@@ -59,21 +134,28 @@ export default function ProjectsPage() {
       <Breadcrumbs items={[{ label: i18n.pages.projects.title }]} />
       <h1>{i18n.pages.projects.title}</h1>
 
-      <form className="create-row" onSubmit={handleCreate}>
+      <div className="search-create-row">
         <input
-          type="text"
-          placeholder={i18n.pages.projects.new_project_placeholder}
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
+          type="search"
+          className="search-input"
+          placeholder={i18n.pages.projects.search_placeholder}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <button type="submit">{i18n.pages.projects.create_project}</button>
-      </form>
+        <button type="button" onClick={() => setShowCreateDialog(true)}>
+          {i18n.pages.projects.create_project}
+        </button>
+      </div>
 
-      {projects.length === 0 ? (
-        <p className="page-empty-note">{i18n.pages.projects.empty}</p>
+      {visibleProjects.length === 0 ? (
+        <p className="page-empty-note">
+          {projects.length === 0
+            ? i18n.pages.projects.empty
+            : i18n.pages.projects.no_matches}
+        </p>
       ) : (
         <ul className="entity-list">
-          {projects.map((project) => (
+          {visibleProjects.map((project) => (
             <li key={project.id} className="entity-row">
               {editingId === project.id ? (
                 <input
@@ -108,6 +190,13 @@ export default function ProjectsPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {showCreateDialog && (
+        <CreateProjectDialog
+          onClose={() => setShowCreateDialog(false)}
+          onCreate={handleCreate}
+        />
       )}
     </PageShell>
   );

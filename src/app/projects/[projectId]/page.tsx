@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { i18n } from "@i18n";
 import {
   createFlow,
@@ -17,6 +17,8 @@ import {
 import type { FlowSummary, ProjectSummary } from "../../../server/models";
 import { PageShell } from "../../../components/PageHeader";
 import { Breadcrumbs } from "../../../components/Breadcrumbs";
+import { CreateFlowDialog } from "../../../components/CreateFlowDialog";
+import { useDebounce } from "../../../hooks/useDebounce";
 
 /** The "⋯" options menu on a Flow row — Rename/Duplicate/Delete used to be three separate buttons
  * in .entity-actions; folded into one menu instead as the row's action surface grows. Positioned via
@@ -181,11 +183,16 @@ export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [flows, setFlows] = useState<FlowSummary[]>([]);
-  const [newFlowName, setNewFlowName] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 150);
+  const [showCreateFlowDialog, setShowCreateFlowDialog] = useState(false);
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
   const [editingProjectName, setEditingProjectName] = useState(false);
   const [duplicatingFlow, setDuplicatingFlow] = useState<FlowSummary | null>(
     null,
+  );
+  const visibleFlows = flows.filter((flow) =>
+    flow.name.toLowerCase().includes(debouncedSearchTerm.trim().toLowerCase()),
   );
 
   async function refresh(): Promise<void> {
@@ -203,13 +210,12 @@ export default function ProjectPage() {
   }, [projectId]);
 
   async function handleCreateFlow(
-    e: FormEvent<HTMLFormElement>,
+    name: string,
+    graphJson: string,
   ): Promise<void> {
-    e.preventDefault();
-    const name = newFlowName.trim();
-    if (!name) return;
-    await createFlow(projectId, name);
-    setNewFlowName("");
+    const flow = await createFlow(projectId, name);
+    await saveFlowGraph(projectId, flow.id, graphJson);
+    setShowCreateFlowDialog(false);
     await refresh();
   }
 
@@ -303,21 +309,28 @@ export default function ProjectPage() {
       </Link>
 
       <h2 className="section-heading">{i18n.pages.project.flows_heading}</h2>
-      <form className="create-row" onSubmit={handleCreateFlow}>
+      <div className="search-create-row">
         <input
-          type="text"
-          placeholder={i18n.pages.project.new_flow_placeholder}
-          value={newFlowName}
-          onChange={(e) => setNewFlowName(e.target.value)}
+          type="search"
+          className="search-input"
+          placeholder={i18n.pages.project.search_flows_placeholder}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <button type="submit">{i18n.pages.project.create_flow}</button>
-      </form>
+        <button type="button" onClick={() => setShowCreateFlowDialog(true)}>
+          {i18n.pages.project.create_flow}
+        </button>
+      </div>
 
-      {flows.length === 0 ? (
-        <p className="page-empty-note">{i18n.pages.project.flows_empty}</p>
+      {visibleFlows.length === 0 ? (
+        <p className="page-empty-note">
+          {flows.length === 0
+            ? i18n.pages.project.flows_empty
+            : i18n.pages.project.flows_no_matches}
+        </p>
       ) : (
         <ul className="entity-list">
-          {flows.map((flow) => (
+          {visibleFlows.map((flow) => (
             <li key={flow.id} className="entity-row">
               {editingFlowId === flow.id ? (
                 <input
@@ -351,6 +364,13 @@ export default function ProjectPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {showCreateFlowDialog && (
+        <CreateFlowDialog
+          onClose={() => setShowCreateFlowDialog(false)}
+          onCreate={handleCreateFlow}
+        />
       )}
 
       {duplicatingFlow && (
