@@ -165,8 +165,7 @@ body {
 #save-button,
 #load-button,
 #download-button,
-#deploy-button,
-#delete-button {
+#deploy-button {
   background: var(--pp-button-bg);
   color: var(--pp-text);
   border: none;
@@ -182,8 +181,7 @@ body {
 #save-button:hover,
 #load-button:hover,
 #download-button:hover,
-#deploy-button:hover,
-#delete-button:hover {
+#deploy-button:hover {
   background: var(--pp-button-bg-hover);
 }
 

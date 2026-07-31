@@ -48,11 +48,8 @@ export default function AppShellMarkup({ store, projectId }: { store: Store; pro
         <div id="toolbar-right">
           <button id="save-button">Save</button>
           <button id="load-button">Load</button>
-          <button id="download-button">Download</button>
+          <button id="download-button">Download (Graph)</button>
           <button id="deploy-button">Deploy</button>
-          <button id="delete-button" title="Delete the saved graph (from local storage)">
-            Delete
-          </button>
           <input id="load-file-input" type="file" accept="application/json" style={{ display: "none" }} />
           <ThemeToggle />
         </div>

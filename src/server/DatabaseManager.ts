@@ -228,10 +228,6 @@ export class DatabaseManager {
     this.db.prepare("UPDATE flows SET graph_json = ?, updated_at = ? WHERE id = ?").run(graphJson, new Date().toISOString(), flowId);
   }
 
-  deleteFlowGraph(flowId: string): void {
-    this.db.prepare("UPDATE flows SET graph_json = NULL, updated_at = ? WHERE id = ?").run(new Date().toISOString(), flowId);
-  }
-
   // --- Runs ---
 
   /** Every run for `projectId`, newest first. */

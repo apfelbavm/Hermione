@@ -65,10 +65,6 @@ export function saveFlowGraph(projectId: string, flowId: string, graphJson: stri
   return requestJson(`/api/projects/${projectId}/flows/${flowId}/graph`, { method: "PUT", body: graphJson });
 }
 
-export function deleteFlowGraph(projectId: string, flowId: string): Promise<void> {
-  return requestJson(`/api/projects/${projectId}/flows/${flowId}/graph`, { method: "DELETE" });
-}
-
 export function listRuns(projectId: string): Promise<RunLog[]> {
   return requestJson(`/api/projects/${projectId}/runs`);
 }

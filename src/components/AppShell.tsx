@@ -35,7 +35,7 @@ import { deserializeGraph, loadGraphFromFile } from "../persistence/load";
 import { downloadGraphAsFile, serializeGraph } from "../persistence/save";
 import { formatLogTimestamp } from "../shared/formatLogTimestamp";
 import { THEME_CHANGE_EVENT } from "../client/theme";
-import { deleteFlowGraph, getFlowWithGraph, saveFlowGraph } from "../client/api";
+import { getFlowWithGraph, saveFlowGraph } from "../client/api";
 import { downloadCompiledGraph } from "../compiler/codegen";
 import { isNodeLatent } from "../engine/latency";
 import { NodeInstance } from "../engine/nodeInstance";
@@ -132,7 +132,6 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     const loadButton = document.getElementById("load-button") as HTMLButtonElement;
     const downloadButton = document.getElementById("download-button") as HTMLButtonElement;
     const deployButton = document.getElementById("deploy-button") as HTMLButtonElement;
-    const deleteButton = document.getElementById("delete-button") as HTMLButtonElement;
     const snapToGridCheckbox = document.getElementById("snap-to-grid-checkbox") as HTMLInputElement;
     const autoPanCheckbox = document.getElementById("auto-pan-checkbox") as HTMLInputElement;
     const frameAllButton = document.getElementById("frame-all-button") as HTMLButtonElement;
@@ -257,7 +256,6 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       loadButton.disabled = simulating;
       downloadButton.disabled = simulating;
       deployButton.disabled = simulating;
-      deleteButton.disabled = simulating;
       snapToGridCheckbox.disabled = simulating;
       frameAllButton.disabled = simulating;
       loadFileInput.disabled = simulating;
@@ -852,12 +850,6 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     }
     deployButton.addEventListener("click", onCompileClick);
 
-    async function onDeleteClick(): Promise<void> {
-      await deleteFlowGraph(projectId, flowId);
-      location.reload();
-    }
-    deleteButton.addEventListener("click", onDeleteClick);
-
     function onFrameAllClick(): void {
       const graph = getEditingGraph(store.state);
       const variables = getVisibleVariablesForState(store.state);
@@ -901,7 +893,6 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       downloadButton.removeEventListener("click", onDownloadClick);
       loadFileInput.removeEventListener("change", onLoadFileChange);
       deployButton.removeEventListener("click", onCompileClick);
-      deleteButton.removeEventListener("click", onDeleteClick);
       frameAllButton.removeEventListener("click", onFrameAllClick);
     };
   }, []);

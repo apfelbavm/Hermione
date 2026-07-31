@@ -13,9 +13,3 @@ export async function PUT(request: Request, { params }: { params: Params }): Pro
   getDatabaseManager().saveFlowGraphJson(flowId, graphJson);
   return new Response(null, { status: 204 });
 }
-
-export async function DELETE(_request: Request, { params }: { params: Params }): Promise<Response> {
-  const { flowId } = await params;
-  getDatabaseManager().deleteFlowGraph(flowId);
-  return new Response(null, { status: 204 });
-}
