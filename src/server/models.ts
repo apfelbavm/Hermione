@@ -8,6 +8,7 @@ import type { TriggerDescriptor } from "../compiler/codegen";
 export interface ProjectSummary {
   id: string;
   name: string;
+  description: string;
   createdAt: string;
   updatedAt: string;
 }

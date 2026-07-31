@@ -15,6 +15,7 @@ const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "hermione.db");
 interface ProjectRow {
   id: string;
   name: string;
+  description: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -93,6 +94,7 @@ export class DatabaseManager {
       CREATE TABLE IF NOT EXISTS projects (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        description TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -162,6 +164,7 @@ export class DatabaseManager {
     return {
       id: row.id,
       name: row.name,
+      description: row.description ?? "",
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -258,15 +261,20 @@ export class DatabaseManager {
     const project: ProjectSummary = {
       id: nextId("project"),
       name,
+      description: "",
       createdAt: now,
       updatedAt: now,
     };
-    this.db.prepare("INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)").run(project.id, project.name, project.createdAt, project.updatedAt);
+    this.db.prepare("INSERT INTO projects (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run(project.id, project.name, project.description, project.createdAt, project.updatedAt);
     return project;
   }
 
   renameProject(projectId: string, name: string): void {
     this.db.prepare("UPDATE projects SET name = ?, updated_at = ? WHERE id = ?").run(name, new Date().toISOString(), projectId);
+  }
+
+  updateProjectDescription(projectId: string, description: string): void {
+    this.db.prepare("UPDATE projects SET description = ?, updated_at = ? WHERE id = ?").run(description, new Date().toISOString(), projectId);
   }
 
   /** Bumps a project's own `updated_at` whenever something inside it changes — a Flow is added,

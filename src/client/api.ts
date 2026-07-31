@@ -43,6 +43,14 @@ export function renameProject(projectId: string, name: string): Promise<ProjectS
   });
 }
 
+export function updateProjectDescription(projectId: string, description: string): Promise<ProjectSummary> {
+  return requestJson(`/api/projects/${projectId}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ description }),
+  });
+}
+
 export function deleteProject(projectId: string): Promise<void> {
   return requestJson(`/api/projects/${projectId}`, { method: "DELETE" });
 }

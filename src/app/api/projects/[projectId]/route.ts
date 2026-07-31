@@ -14,12 +14,18 @@ export async function GET(_request: Request, { params }: { params: Params }): Pr
 
 export async function PATCH(request: Request, { params }: { params: Params }): Promise<Response> {
   const { projectId } = await params;
-  const { name } = (await request.json()) as { name?: string };
-  if (!name || !name.trim()) {
-    return Response.json({ error: "name is required" }, { status: 400 });
-  }
+  const { name, description } = (await request.json()) as {
+    name?: string;
+    description?: string;
+  };
   const db = getDatabaseManager();
-  db.renameProject(projectId, name.trim());
+  if (name !== undefined) {
+    if (!name.trim()) return Response.json({ error: "name is required" }, { status: 400 });
+    db.renameProject(projectId, name.trim());
+  }
+  if (description !== undefined) {
+    db.updateProjectDescription(projectId, description);
+  }
   return Response.json(db.getProject(projectId));
 }
 

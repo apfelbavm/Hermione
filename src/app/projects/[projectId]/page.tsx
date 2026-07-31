@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { i18n } from "@i18n";
-import { createFlow, deleteFlow, getFlowWithGraph, getProject, listFlows, renameFlow, saveFlowGraph, saveNewFlowVersion } from "../../../client/api";
+import { createFlow, deleteFlow, getFlowWithGraph, getProject, listFlows, renameFlow, saveFlowGraph, saveNewFlowVersion, updateProjectDescription } from "../../../client/api";
 import type { FlowSummary, ProjectSummary } from "../../../server/models";
 import { PageShell } from "../../../components/PageHeader";
 import { Breadcrumbs } from "../../../components/Breadcrumbs";
@@ -142,12 +142,20 @@ export default function ProjectPage() {
   const [showCreateFlowDialog, setShowCreateFlowDialog] = useState(false);
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
   const [duplicatingFlow, setDuplicatingFlow] = useState<FlowSummary | null>(null);
+  const [description, setDescription] = useState("");
   const visibleFlows = flows.filter((flow) => flow.name.toLowerCase().includes(debouncedSearchTerm.trim().toLowerCase()));
 
   async function refresh(): Promise<void> {
     const [proj, flowList] = await Promise.all([getProject(projectId).catch(() => null), listFlows(projectId)]);
     setProject(proj);
+    setDescription(proj?.description ?? "");
     setFlows(flowList);
+  }
+
+  async function commitDescription(value: string): Promise<void> {
+    if (project && value === project.description) return;
+    const updated = await updateProjectDescription(projectId, value);
+    setProject(updated);
   }
 
   useEffect(() => {
@@ -203,6 +211,8 @@ export default function ProjectPage() {
     <PageShell>
       <Breadcrumbs items={[{ label: i18n.pages.projects.title, href: "/projects" }, { label: project.name }]} />
       <h1>"{project.name}" Flows</h1>
+
+      <textarea className="project-description-input" placeholder={i18n.pages.project.description_placeholder} value={description} onChange={(e) => setDescription(e.target.value)} onBlur={(e) => void commitDescription(e.target.value)} />
 
       <Link href={`/projects/${projectId}/logs`} className="logs-link">
         {i18n.pages.project.view_logs}

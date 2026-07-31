@@ -1648,6 +1648,22 @@ body.resizing {
   font-size: 13px;
 }
 
+.project-description-input {
+  display: block;
+  width: 100%;
+  max-width: 560px;
+  min-height: 44px;
+  margin: 4px 0 12px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--pp-text);
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: 6px;
+  resize: vertical;
+}
+
 .logs-link {
   display: inline-block;
   color: var(--pp-link);

@@ -42,6 +42,7 @@
     },
     "project": {
       "not_found": "Project not found",
+      "description_placeholder": "Add a description…",
       "view_logs": "View Logs",
       "flows_heading": "Flows",
       "search_flows_placeholder": "Search Flows…",
