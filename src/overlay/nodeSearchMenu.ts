@@ -22,6 +22,13 @@ export interface NodeSearchMenuOptions {
 // entirely) unreachable outside the graph area.
 const MENU_EDGE_PADDING = 16;
 
+// Vanilla-DOM equivalent of IconManager.ChevronDownIcon/ChevronRightIcon — this menu is built with
+// raw DOM calls rather than React, so it can't render the shared component directly.
+function chevronSvg(direction: "down" | "right"): string {
+  const d = direction === "down" ? "M3 6 8 11l5-5" : "M6 3 11 8l-5 5";
+  return `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}" /></svg>`;
+}
+
 export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOptions): void {
   const menu = document.createElement("div");
   menu.className = "node-search-menu";
@@ -45,7 +52,10 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
   const expanded = new Set<string>();
 
   function computeTreeRows(): VisibleRow[] {
-    const pinnedRows: VisibleRow[] = pinned.map((def) => ({ depth: 0, node: { kind: "leaf", def } }));
+    const pinnedRows: VisibleRow[] = pinned.map((def) => ({
+      depth: 0,
+      node: { kind: "leaf", def },
+    }));
     return [...pinnedRows, ...flattenVisible(tree, expanded)];
   }
 
@@ -107,9 +117,9 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
         li.classList.add("node-search-pinned-divider");
       }
 
-      // A fixed-width icon slot shared by every row — a group's ▾/▸ arrow sits here, and a leaf row
-      // (no icon of its own) gets an empty same-width slot instead, so its label lines up with a
-      // group's NAME text (which starts right after that arrow) rather than with the arrow itself.
+      // A fixed-width icon slot shared by every row — a group's chevron arrow sits here, and a
+      // leaf row (no icon of its own) gets an empty same-width slot instead, so its label lines
+      // up with a group's NAME text (which starts right after that arrow) rather than the arrow.
       const icon = document.createElement("span");
       icon.className = "node-search-row-icon";
 
@@ -118,7 +128,7 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
 
       if (row.node.kind === "group") {
         li.classList.add("node-search-group");
-        icon.textContent = expanded.has(row.node.path) ? "▾" : "▸";
+        icon.innerHTML = chevronSvg(expanded.has(row.node.path) ? "down" : "right");
         labelEl.textContent = row.node.name;
         li.addEventListener("mousedown", (e) => {
           e.preventDefault();

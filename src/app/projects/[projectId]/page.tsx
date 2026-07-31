@@ -202,9 +202,6 @@ export default function ProjectPage() {
     return (
       <PageShell>
         <Breadcrumbs items={[{ label: "Projects", href: "/projects" }]} />
-        <Link href="/projects" className="back-link">
-          ← Back
-        </Link>
         <h1>Project not found</h1>
       </PageShell>
     );
@@ -213,9 +210,6 @@ export default function ProjectPage() {
   return (
     <PageShell>
       <Breadcrumbs items={[{ label: i18n.pages.projects.title, href: "/projects" }, { label: project.name }]} />
-      <Link href="/projects" className="back-link">
-        {i18n.pages.project.back}
-      </Link>
       {editingProjectName ? (
         <input
           type="text"
@@ -236,7 +230,7 @@ export default function ProjectPage() {
       )}
 
       <Link href={`/projects/${projectId}/logs`} className="logs-link">
-        {i18n.pages.project.view_run_logs}
+        {i18n.pages.project.view_logs}
       </Link>
 
       <h2 className="section-heading">{i18n.pages.project.flows_heading}</h2>

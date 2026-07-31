@@ -21,6 +21,7 @@ export default function AppShellMarkup({ store, projectId }: { store: Store; pro
       <div id="toolbar">
         <div id="toolbar-left">
           <Link href={`/projects/${projectId}`} id="back-to-project-button" title={i18n.components.app_shell_markup.back_title}>
+            <IconManager.ChevronLeftIcon />
             {i18n.components.app_shell_markup.back}
           </Link>
           <span id="toolbar-title">Hermione</span>

@@ -10,6 +10,7 @@ import type { ProjectSummary, RunLog } from "../../../../server/models";
 import { PageShell } from "../../../../components/PageHeader";
 import { Breadcrumbs } from "../../../../components/Breadcrumbs";
 import { RunRow } from "../../../../components/logs/RunRow";
+import { IconManager } from "../../../../shared/iconManager";
 
 export default function LogsPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -37,15 +38,11 @@ export default function LogsPage() {
         ]}
       />
       <Link href={`/projects/${projectId}`} className="back-link">
+        <IconManager.ChevronLeftIcon />
         {i18n.pages.project_logs.back}
       </Link>
       <h1>{i18n.pages.project_logs.title}</h1>
-      <p className="page-empty-note">
-        {i18n.pages.project_logs.description.replace(
-          "{max}",
-          String(MAX_RUNS_PER_PROJECT),
-        )}
-      </p>
+      <p className="page-empty-note">{i18n.pages.project_logs.description.replace("{max}", String(MAX_RUNS_PER_PROJECT))}</p>
       {runs.length === 0 ? (
         <p className="page-empty-note">{i18n.pages.project_logs.empty}</p>
       ) : (

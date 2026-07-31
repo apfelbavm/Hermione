@@ -41,11 +41,10 @@
       "meta_updated": "Updated {date}"
     },
     "project": {
-      "back": "← Back",
       "not_found": "Project not found",
       "title_prefix": "Project: ",
       "title_rename_hint": "Click to rename",
-      "view_run_logs": "View Run Logs →",
+      "view_logs": "View Logs",
       "flows_heading": "Flows",
       "search_flows_placeholder": "Search Flows…",
       "new_flow_placeholder": "New Flow name",
@@ -76,7 +75,7 @@
       "duplicate_confirm": "Duplicate"
     },
     "project_logs": {
-      "back": "← Back",
+      "back": "Back",
       "title": "Run Logs",
       "project_fallback": "Project",
       "description": "Showing the latest {max} runs (grouped by run — expand one to inspect its individual log entries).",
@@ -152,7 +151,7 @@
       "loading": "Theme"
     },
     "app_shell_markup": {
-      "back": "← Back",
+      "back": "Back",
       "back_title": "Back to the project",
       "simulate": "Simulate ▶",
       "pause": "⏸ Pause",

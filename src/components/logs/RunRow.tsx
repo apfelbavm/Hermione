@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { i18n } from "@i18n";
 import type { RunLog } from "../../server/models";
+import { IconManager } from "../../shared/iconManager";
 import { LogEntryView } from "./LogEntryView";
 
 function getExecutionTimeString(executionMs: number): string {
@@ -35,7 +36,7 @@ export function RunRow({ run, project }: { run: RunLog; project?: { name: string
           }
         }}
       >
-        <span className="run-row-caret">{expanded ? "▾" : "▸"}</span>
+        <span className="run-row-caret">{expanded ? <IconManager.ChevronDownIcon /> : <IconManager.ChevronRightIcon />}</span>
         {project && (
           <Link href={project.href} className="run-row-project-name" onClick={(e) => e.stopPropagation()}>
             {project.name}

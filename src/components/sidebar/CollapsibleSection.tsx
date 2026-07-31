@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { IconManager } from "../../shared/iconManager";
 
 /** A collapsible sidebar section (Functions/Variables/Scripts/Local Variables/Inputs/Outputs) —
  * click the header to toggle, "+" adds an entry (and always un-collapses first, so a freshly added
@@ -29,8 +30,9 @@ export function CollapsibleSection({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   return (
-    <div id={id} className={"panel-section" + (collapsed ? " collapsed" : "") + (empty ? " panel-section-empty" : "")}>
+    <div id={id} className={"panel-section" + (collapsed ? " collapsed" : "")}>
       <div className="panel-header" onClick={() => setCollapsed((c) => !c)}>
+        <span className="panel-header-arrow">{!empty && (collapsed ? <IconManager.ChevronRightIcon /> : <IconManager.ChevronDownIcon />)}</span>
         <span className="panel-header-title">{title}</span>
         <button
           type="button"

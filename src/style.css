@@ -471,22 +471,12 @@ body.resizing {
   white-space: nowrap;
 }
 
-.panel-header-title::before {
-  content: "▾ ";
-  display: inline-block;
+/* Fixed-width slot so the title text doesn't shift when the arrow disappears on an empty section
+   (see CollapsibleSection.tsx, which leaves this span empty rather than omitting it). */
+.panel-header-arrow {
+  display: inline-flex;
   width: 12px;
-}
-
-.panel-section.collapsed .panel-header-title::before {
-  content: "▸ ";
-}
-
-/* No expand/collapse arrow on a category with nothing in it (see collapsibleSection.ts's
-   setSectionEmpty) — there's nothing to reveal, so the affordance would be dead weight. Still
-   takes up its 12px slot (just the glyph is blanked) so the title text doesn't jump left/right
-   as items are added/removed. */
-.panel-section.panel-section-empty .panel-header-title::before {
-  content: "";
+  flex: 0 0 auto;
 }
 
 .panel-section.collapsed .panel-body {
@@ -1256,13 +1246,15 @@ body.resizing {
   gap: 4px;
 }
 
-/** Fixed-width slot shared by every tree row (see nodeSearchMenu.ts) — a group's ▾/▸ arrow renders
- * here; a leaf row leaves it empty so its label still starts at this exact same x position, lining
- * up with a group's NAME text rather than with the arrow glyph itself. */
+/** Fixed-width slot shared by every tree row (see nodeSearchMenu.ts) — a group's chevron arrow
+ * renders here; a leaf row leaves it empty so its label still starts at this exact same x
+ * position, lining up with a group's NAME text rather than with the arrow icon itself. */
 .node-search-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  width: 12px;
-  text-align: center;
+  width: 14px;
 }
 
 .node-search-row-label {
@@ -1349,6 +1341,9 @@ body.resizing {
    rather than inventing a separate visual language for them. */
 
 #back-to-project-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--pp-text-muted);
   text-decoration: none;
   font-size: 13px;
@@ -1638,13 +1633,15 @@ body.resizing {
 }
 
 .back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--pp-text-muted);
   text-decoration: none;
   font-size: 13px;
   padding: 4px 8px;
   border-radius: 4px;
   flex: 0 0 auto;
-  display: inline-block;
   margin-bottom: 16px;
 }
 
@@ -1903,6 +1900,8 @@ body.resizing {
 }
 
 .run-row-caret {
+  display: inline-flex;
+  align-items: center;
   color: var(--pp-text-muted);
   flex: 0 0 auto;
 }
