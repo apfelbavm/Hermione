@@ -67,9 +67,9 @@ export function saveFlowGraph(projectId: string, flowId: string, graphJson: stri
 
 /** The editor's "Deploy" button — compiles `graphJson` server-side and stores it as this Flow's one
  * DeployedScript row (see api/projects/[projectId]/flows/[flowId]/deploy/route.ts), replacing any
- * previous deployment. Returns the compiled `code` so the caller can still trigger a file download
- * from the exact bytes just persisted (see compiler/codegen.ts's downloadCompiledCode). */
-export function deployFlow(projectId: string, flowId: string, graphJson: string): Promise<{ code: string; version: number; deployedAt: string }> {
+ * previous deployment. No longer triggers a file download of its own — the compiled script only
+ * ever runs from the Emulate page now (see getDeployedScript below). */
+export function deployFlow(projectId: string, flowId: string, graphJson: string): Promise<{ version: number; deployedAt: string }> {
   return requestJson(`/api/projects/${projectId}/flows/${flowId}/deploy`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ graph: graphJson }) });
 }
 

@@ -36,7 +36,6 @@ import { downloadGraphAsFile, serializeGraph } from "../persistence/save";
 import { formatLogTimestamp } from "../shared/formatLogTimestamp";
 import { THEME_CHANGE_EVENT } from "../client/theme";
 import { deployFlow, getFlowWithGraph, saveFlowGraph } from "../client/api";
-import { downloadCompiledCode } from "../compiler/codegen";
 import { isNodeLatent } from "../engine/latency";
 import { NodeInstance } from "../engine/nodeInstance";
 import AppShellMarkup from "./AppShellMarkup";
@@ -839,15 +838,13 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     }
     loadFileInput.addEventListener("change", onLoadFileChange);
 
-    // --- Deploy: compiles the graph server-side (see src/compiler/codegen.ts), persists it as this
-    // Flow's one DeployedScript row (see api/projects/[projectId]/flows/[flowId]/deploy/route.ts —
-    // this is what the Emulate page actually runs), then downloads the same compiled
-    // bytes as a file, same as this button always has ---
+    // --- Deploy: compiles the graph server-side (see src/compiler/codegen.ts) and persists it as
+    // this Flow's one DeployedScript row (see api/projects/[projectId]/flows/[flowId]/deploy/route.ts
+    // — this is what the Emulate page actually runs). No longer also triggers a file download ---
     async function onCompileClick(): Promise<void> {
       await scriptEditor.flushDirtyScripts();
       try {
-        const { code } = await deployFlow(projectId, flowId, serializeGraph(store.state.rootGraph));
-        downloadCompiledCode(code, `${store.state.rootGraph.name || "graph"}.compiled.mjs`);
+        await deployFlow(projectId, flowId, serializeGraph(store.state.rootGraph));
       } catch (err) {
         appendLog(`Deploy error: ${err instanceof Error ? err.message : String(err)}`);
       }
