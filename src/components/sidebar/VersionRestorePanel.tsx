@@ -4,9 +4,9 @@ import { i18n } from "@i18n";
 import type { FlowVersionSummary } from "../../server/models";
 import { formatLogTimestamp } from "../../shared/formatLogTimestamp";
 
-/** The dedicated sidebar for the "Restore old version" page — the version picker plus the Restore/
- * Cancel actions, always visible above the (read-only, reused) Functions/Variables/Scripts panels
- * so the user can both pick a version AND browse its contents from the same sidebar. */
+/** The sole content of #restore-sidebar, the "Restore old version" page's own leftmost sidebar —
+ * the version picker plus the Restore/Cancel actions, kept separate from the (read-only, reused)
+ * Functions/Variables/Scripts panels in #left-sidebar to its right. */
 export function VersionRestorePanel({
   versions,
   selectedVersionId,

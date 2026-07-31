@@ -23,7 +23,7 @@ export function drawMouseCoordinates(ctx: CanvasRenderingContext2D, worldPos: { 
 export function drawSimulatingLabel(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number): void {
   ctx.save();
   ctx.globalAlpha = 0.15;
-  ctx.font = `bold ${FONT_SIZE}px Segoe UI, sans-serif`;
+  ctx.font = `bold ${FONT_SIZE * 2}px Segoe UI, sans-serif`;
   ctx.fillStyle = Colors.TEXT_PRIMARY;
   ctx.textAlign = "right";
   ctx.textBaseline = "bottom";
@@ -36,7 +36,7 @@ export function drawSimulatingLabel(ctx: CanvasRenderingContext2D, canvasWidth: 
 export function drawReadOnlyLabel(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number): void {
   ctx.save();
   ctx.globalAlpha = 0.15;
-  ctx.font = `bold ${FONT_SIZE}px Segoe UI, sans-serif`;
+  ctx.font = `bold ${FONT_SIZE * 2}px Segoe UI, sans-serif`;
   ctx.fillStyle = Colors.TEXT_PRIMARY;
   ctx.textAlign = "right";
   ctx.textBaseline = "bottom";

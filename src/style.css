@@ -341,6 +341,16 @@ textarea:disabled {
   border-right: 1px solid var(--pp-border);
 }
 
+/* Restore-version page only (see RestoreVersionMarkup.tsx): its own standalone sidebar, left of the
+   graph's own #left-sidebar, so the version picker/Restore/Cancel controls stay visually separate
+   from the read-only Functions/Variables/Scripts panels. Narrower and unresizable — unlike
+   #left-sidebar/#right-sidebar, its content never needs more room than a version dropdown and two
+   buttons. */
+#restore-sidebar {
+  flex-basis: 220px;
+  border-right: 1px solid var(--pp-border);
+}
+
 #right-sidebar {
   border-left: 1px solid var(--pp-border);
 }
