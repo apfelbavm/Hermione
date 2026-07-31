@@ -126,7 +126,7 @@ export default function EmulatePage() {
   }
 
   return (
-    <PageShell>
+    <PageShell contentClassName="emulate-content">
       <Breadcrumbs items={[{ label: "Emulate" }]} />
       <h1>Emulate</h1>
       <p className="page-empty-note">
@@ -181,7 +181,7 @@ export default function EmulatePage() {
             <span>Version: {scriptDetail.version}</span>
           </div>
           <Editor
-            height="420px"
+            height="100%"
             language="typescript"
             path={scriptDetail.flowId}
             value={scriptDetail.code}

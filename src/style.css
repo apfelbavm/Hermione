@@ -1962,14 +1962,22 @@ body.resizing {
   font-weight: normal;
 }
 
-/* Wraps the Emulate page's read-only Monaco viewer (see app/emulate/page.tsx) — position:relative
-   so .emulate-editor-meta can float top-right over the editor itself. */
+.emulate-content {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 16px;
+}
+
 .emulate-editor-frame {
   position: relative;
   border: 1px solid var(--pp-border-strong);
   border-radius: 6px;
   overflow: hidden;
   margin-bottom: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* The deployed script's date/version, overlaid top-right of the editor — pointer-events:none so it
