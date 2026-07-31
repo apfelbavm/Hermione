@@ -14,6 +14,7 @@ import "./auth";
 import "./oauth2Saml";
 import "./oauth2ClientCredentials";
 import "./dropbox";
+import "./github";
 import "./array";
 import "./set";
 import "./map";

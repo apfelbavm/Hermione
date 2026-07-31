@@ -2,7 +2,7 @@
  * (src/server/credentials.ts) and browser (the Credential Vault page, the oauth2Saml node's
  * interpreter path) can import this freely, unlike src/server/* itself. */
 
-export type CredentialTypeId = "usernamePassword" | "oauth2SamlBearer" | "dropboxOAuth2";
+export type CredentialTypeId = "usernamePassword" | "oauth2SamlBearer" | "dropboxOAuth2" | "githubToken" | "githubApp";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -33,7 +33,21 @@ export interface DropboxOAuth2CredentialData {
   refreshToken: string;
 }
 
-export type CredentialData = UsernamePasswordCredentialData | Oauth2SamlBearerCredentialData | DropboxOAuth2CredentialData;
+/** A GitHub personal access token — the simplest of GitHub's two auth flows (see nodes/github.ts,
+ * which resolves either this or GithubAppCredentialData into a GithubManager). */
+export interface GithubTokenCredentialData {
+  token: string;
+}
+
+/** A GitHub App installation's credentials — the flow GitHub recommends for anything acting on
+ * behalf of an org/repo rather than a single user (see nodes/github.ts). */
+export interface GithubAppCredentialData {
+  appId: string;
+  privateKey: string;
+  installationId: string;
+}
+
+export type CredentialData = UsernamePasswordCredentialData | Oauth2SamlBearerCredentialData | DropboxOAuth2CredentialData | GithubTokenCredentialData | GithubAppCredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */

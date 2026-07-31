@@ -131,38 +131,6 @@ export class DatabaseManager {
       );
       CREATE INDEX IF NOT EXISTS idx_deployed_scripts_project_id ON deployed_scripts (project_id);
     `);
-    this.migrateAddRunsKindColumn();
-    this.migrateAddRunsExecutionMsColumn();
-    this.migrateAddDeployedScriptsVersionColumn();
-  }
-
-  /** `kind` was added after this app's first shipped `runs` table (see RunLog.kind's own doc
-   * comment) — `CREATE TABLE IF NOT EXISTS` above is a no-op against an already-existing table, so
-   * an existing on-disk DB needs this one-time ALTER TABLE to catch up. Safe to run every startup:
-   * it only actually alters the table the first time. */
-  private migrateAddRunsKindColumn(): void {
-    const columns = this.db.prepare("PRAGMA table_info(runs)").all() as { name: string }[];
-    if (!columns.some((c) => c.name === "kind")) {
-      this.db.exec("ALTER TABLE runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'simulate'");
-    }
-  }
-
-  /** `execution_ms` was added after this app's first shipped `runs` table — same reasoning as
-   * migrateAddRunsKindColumn above. */
-  private migrateAddRunsExecutionMsColumn(): void {
-    const columns = this.db.prepare("PRAGMA table_info(runs)").all() as { name: string }[];
-    if (!columns.some((c) => c.name === "execution_ms")) {
-      this.db.exec("ALTER TABLE runs ADD COLUMN execution_ms REAL");
-    }
-  }
-
-  /** `version` was added after this app's first shipped `deployed_scripts` table — same reasoning
-   * as migrateAddRunsKindColumn above. */
-  private migrateAddDeployedScriptsVersionColumn(): void {
-    const columns = this.db.prepare("PRAGMA table_info(deployed_scripts)").all() as { name: string }[];
-    if (!columns.some((c) => c.name === "version")) {
-      this.db.exec("ALTER TABLE deployed_scripts ADD COLUMN version INTEGER NOT NULL DEFAULT 1");
-    }
   }
 
   // --- Row -> model mapping — the only place a snake_case column name is ever read. ---

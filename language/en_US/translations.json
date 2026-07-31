@@ -447,6 +447,73 @@
         "pin_allocated": "Allocated (bytes)"
       }
     },
+    "github": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_owner": "Owner",
+        "pin_repo": "Repo",
+        "pin_state": "State",
+        "pin_title": "Title",
+        "pin_body": "Body",
+        "pin_number": "Number",
+        "pin_url": "URL",
+        "pin_issue_number": "Issue Number",
+        "pin_sha": "SHA",
+        "pin_path": "Path",
+        "pin_ref": "Ref",
+        "pin_content": "Content"
+      },
+      "listIssues": {
+        "label": "GitHub List Issues",
+        "description": "Lists issues in a GitHub repository, optionally filtered by state.",
+        "pin_issues": "Issues"
+      },
+      "createIssue": {
+        "label": "GitHub Create Issue",
+        "description": "Creates a new issue in a GitHub repository."
+      },
+      "commentOnIssue": {
+        "label": "GitHub Comment On Issue",
+        "description": "Adds a comment to an existing issue in a GitHub repository."
+      },
+      "listPullRequests": {
+        "label": "GitHub List Pull Requests",
+        "description": "Lists pull requests in a GitHub repository, optionally filtered by state.",
+        "pin_pull_requests": "Pull Requests"
+      },
+      "createPullRequest": {
+        "label": "GitHub Create Pull Request",
+        "description": "Opens a new pull request in a GitHub repository from one branch into another.",
+        "pin_head": "Head Branch",
+        "pin_base": "Base Branch"
+      },
+      "mergePullRequest": {
+        "label": "GitHub Merge Pull Request",
+        "description": "Merges an open pull request in a GitHub repository using the chosen merge method.",
+        "pin_pull_number": "Pull Number",
+        "pin_merge_method": "Merge Method",
+        "pin_merged": "Merged"
+      },
+      "getFileContent": {
+        "label": "GitHub Get File Content",
+        "description": "Fetches the decoded text content of a file at a path in a GitHub repository, optionally at a specific branch/tag/commit.",
+        "pin_content": "Content"
+      },
+      "createOrUpdateFile": {
+        "label": "GitHub Create Or Update File",
+        "description": "Creates or updates a file at a path in a GitHub repository. Pass the SHA from GitHub Get File Content to update an existing file, or leave it blank to create a new one.",
+        "pin_message": "Commit Message",
+        "pin_branch": "Branch",
+        "pin_result_sha": "File SHA",
+        "pin_commit_sha": "Commit SHA"
+      },
+      "request": {
+        "label": "GitHub Request",
+        "description": "Sends a raw request to any GitHub REST API route not covered by the other GitHub nodes, e.g. \"GET /repos/{owner}/{repo}\".",
+        "pin_route": "Route",
+        "pin_params": "Params (JSON)"
+      }
+    },
     "boolean": {
       "not": {
         "label": "Not",

@@ -73,3 +73,19 @@ registerCredentialType({
     { id: "privateKey", label: "Private Key", secret: true },
   ],
 });
+
+registerCredentialType({
+  id: "githubToken",
+  label: "GitHub Token",
+  fields: [{ id: "token", label: "Personal Access Token", secret: true }],
+});
+
+registerCredentialType({
+  id: "githubApp",
+  label: "GitHub App",
+  fields: [
+    { id: "appId", label: "App ID" },
+    { id: "privateKey", label: "Private Key", secret: true },
+    { id: "installationId", label: "Installation ID" },
+  ],
+});
