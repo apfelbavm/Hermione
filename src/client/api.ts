@@ -24,7 +24,11 @@ export function listProjects(): Promise<ProjectSummary[]> {
 }
 
 export function createProject(name: string): Promise<ProjectSummary> {
-  return requestJson("/api/projects", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name }) });
+  return requestJson("/api/projects", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name }),
+  });
 }
 
 export function getProject(projectId: string): Promise<ProjectSummary> {
@@ -32,7 +36,11 @@ export function getProject(projectId: string): Promise<ProjectSummary> {
 }
 
 export function renameProject(projectId: string, name: string): Promise<ProjectSummary> {
-  return requestJson(`/api/projects/${projectId}`, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify({ name }) });
+  return requestJson(`/api/projects/${projectId}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name }),
+  });
 }
 
 export function deleteProject(projectId: string): Promise<void> {
@@ -44,15 +52,33 @@ export function listFlows(projectId: string): Promise<FlowSummary[]> {
 }
 
 export function createFlow(projectId: string, name: string): Promise<FlowSummary> {
-  return requestJson(`/api/projects/${projectId}/flows`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name }) });
+  return requestJson(`/api/projects/${projectId}/flows`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name }),
+  });
 }
 
 export function renameFlow(projectId: string, flowId: string, name: string): Promise<FlowSummary> {
-  return requestJson(`/api/projects/${projectId}/flows/${flowId}`, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify({ name }) });
+  return requestJson(`/api/projects/${projectId}/flows/${flowId}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name }),
+  });
 }
 
 export function deleteFlow(projectId: string, flowId: string): Promise<void> {
-  return requestJson(`/api/projects/${projectId}/flows/${flowId}`, { method: "DELETE" });
+  return requestJson(`/api/projects/${projectId}/flows/${flowId}`, {
+    method: "DELETE",
+  });
+}
+
+/** Archives the Flow's current state and bumps its live version number (see
+ * DatabaseManager.saveNewFlowVersion's own comment). */
+export function saveNewFlowVersion(projectId: string, flowId: string): Promise<FlowSummary> {
+  return requestJson(`/api/projects/${projectId}/flows/${flowId}/versions`, {
+    method: "POST",
+  });
 }
 
 /** `graphJson` is the raw serializeGraph() text (or null if this Flow's never been saved) — the
@@ -62,7 +88,10 @@ export function getFlowWithGraph(projectId: string, flowId: string): Promise<{ f
 }
 
 export function saveFlowGraph(projectId: string, flowId: string, graphJson: string): Promise<void> {
-  return requestJson(`/api/projects/${projectId}/flows/${flowId}/graph`, { method: "PUT", body: graphJson });
+  return requestJson(`/api/projects/${projectId}/flows/${flowId}/graph`, {
+    method: "PUT",
+    body: graphJson,
+  });
 }
 
 /** The editor's "Deploy" button — compiles `graphJson` server-side and stores it as this Flow's one
@@ -70,7 +99,11 @@ export function saveFlowGraph(projectId: string, flowId: string, graphJson: stri
  * previous deployment. No longer triggers a file download of its own — the compiled script only
  * ever runs from the Emulate page now (see getDeployedScript below). */
 export function deployFlow(projectId: string, flowId: string, graphJson: string): Promise<{ version: number; deployedAt: string }> {
-  return requestJson(`/api/projects/${projectId}/flows/${flowId}/deploy`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ graph: graphJson }) });
+  return requestJson(`/api/projects/${projectId}/flows/${flowId}/deploy`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ graph: graphJson }),
+  });
 }
 
 /** Every Flow in `projectId` that's actually been deployed (see deployFlow above) — feeds the
@@ -99,7 +132,11 @@ export function listAllRuns(): Promise<RunLog[]> {
  * editor's own step-through visualization). This one just awaits the whole run and returns its
  * RunLog. */
 export function runProductionFlow(projectId: string, flowId: string): Promise<{ run: RunLog }> {
-  return requestJson("/api/emulate/run", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ projectId, flowId }) });
+  return requestJson("/api/emulate/run", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ projectId, flowId }),
+  });
 }
 
 export function listCredentials(): Promise<CredentialSummary[]> {
@@ -111,11 +148,19 @@ export function getCredential(id: string): Promise<CredentialRecord> {
 }
 
 export function createCredential(name: string, type: CredentialTypeId, data: CredentialData): Promise<CredentialRecord> {
-  return requestJson("/api/credentials", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name, type, data }) });
+  return requestJson("/api/credentials", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name, type, data }),
+  });
 }
 
 export function updateCredential(id: string, name: string, type: CredentialTypeId, data: CredentialData): Promise<CredentialRecord> {
-  return requestJson(`/api/credentials/${id}`, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify({ name, type, data }) });
+  return requestJson(`/api/credentials/${id}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name, type, data }),
+  });
 }
 
 export function deleteCredential(id: string): Promise<void> {

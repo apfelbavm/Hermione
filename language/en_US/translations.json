@@ -36,7 +36,9 @@
       "no_matches": "No projects match your search.",
       "rename": "Rename",
       "delete": "Delete",
-      "delete_confirm": "Delete project \"{name}\"? This also deletes every Flow and run log inside it."
+      "delete_confirm": "Delete project \"{name}\"? This also deletes every Flow and run log inside it.",
+      "meta_created": "Created {date}",
+      "meta_updated": "Updated {date}"
     },
     "project": {
       "back": "← Back",
@@ -59,6 +61,11 @@
       "flow_rename": "Rename",
       "flow_duplicate": "Duplicate",
       "flow_delete": "Delete",
+      "flow_save_new_version": "Save new version",
+      "flow_restore_version": "Restore old version",
+      "flow_version_prefix": "V",
+      "meta_created": "Created {date}",
+      "meta_updated": "Updated {date}",
       "delete_flow_confirm": "Delete Flow \"{name}\"? This can't be undone.",
       "duplicate_title": "Duplicate Flow",
       "duplicate_new_name": "New name",
@@ -74,6 +81,11 @@
       "project_fallback": "Project",
       "description": "Showing the latest {max} runs (grouped by run — expand one to inspect its individual log entries).",
       "empty": "No runs yet — simulate a Flow to see its logs here."
+    },
+    "restore_flow_version": {
+      "title": "Restore old version",
+      "placeholder": "Restoring a previous version isn't available yet — coming soon.",
+      "cancel": "Cancel"
     },
     "credential_vault": {
       "title": "Credential Vault",

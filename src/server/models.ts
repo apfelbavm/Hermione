@@ -16,6 +16,7 @@ export interface FlowSummary {
   id: string;
   projectId: string;
   name: string;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }

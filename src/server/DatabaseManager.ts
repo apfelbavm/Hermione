@@ -24,6 +24,7 @@ interface FlowRow {
   project_id: string;
   name: string;
   graph_json: string | null;
+  version: number;
   created_at: string;
   updated_at: string;
 }
@@ -92,10 +93,23 @@ export class DatabaseManager {
         project_id TEXT NOT NULL,
         name TEXT NOT NULL,
         graph_json TEXT,
+        version INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_flows_project_id ON flows (project_id);
+
+      -- Archived snapshots created by "Save new version" - the live row in flows above always
+      -- holds the current/active version; nothing here is ever deleted when a newer version is saved.
+      CREATE TABLE IF NOT EXISTS flow_versions (
+        id TEXT PRIMARY KEY,
+        flow_id TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        graph_json TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_flow_versions_flow_id ON flow_versions (flow_id);
 
       CREATE TABLE IF NOT EXISTS runs (
         id TEXT PRIMARY KEY,
@@ -136,11 +150,23 @@ export class DatabaseManager {
   // --- Row -> model mapping — the only place a snake_case column name is ever read. ---
 
   private toProjectSummary(row: ProjectRow): ProjectSummary {
-    return { id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at };
+    return {
+      id: row.id,
+      name: row.name,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   private toFlowSummary(row: FlowRow): FlowSummary {
-    return { id: row.id, projectId: row.project_id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at };
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      version: row.version,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   private toRunLog(row: RunRow): RunLog {
@@ -158,11 +184,20 @@ export class DatabaseManager {
   }
 
   private toCredentialSummary(row: CredentialRow): CredentialSummary {
-    return { id: row.id, name: row.name, type: row.type, createdAt: row.created_at, updatedAt: row.updated_at };
+    return {
+      id: row.id,
+      name: row.name,
+      type: row.type,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   private toCredentialRecord(row: CredentialRow): CredentialRecord {
-    return { ...this.toCredentialSummary(row), data: JSON.parse(row.data_json) as CredentialData };
+    return {
+      ...this.toCredentialSummary(row),
+      data: JSON.parse(row.data_json) as CredentialData,
+    };
   }
 
   private toDeployedScriptSummary(row: DeployedScriptRow): DeployedScriptSummary {
@@ -171,7 +206,9 @@ export class DatabaseManager {
       projectId: row.project_id,
       flowId: row.flow_id,
       flowName: row.flow_name,
-      manifest: JSON.parse(row.manifest_json) as { triggers: TriggerDescriptor[] },
+      manifest: JSON.parse(row.manifest_json) as {
+        triggers: TriggerDescriptor[];
+      },
       version: row.version,
       deployedAt: row.deployed_at,
     };
@@ -195,7 +232,12 @@ export class DatabaseManager {
 
   createProject(name: string): ProjectSummary {
     const now = new Date().toISOString();
-    const project: ProjectSummary = { id: nextId("project"), name, createdAt: now, updatedAt: now };
+    const project: ProjectSummary = {
+      id: nextId("project"),
+      name,
+      createdAt: now,
+      updatedAt: now,
+    };
     this.db.prepare("INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)").run(project.id, project.name, project.createdAt, project.updatedAt);
     return project;
   }
@@ -211,6 +253,7 @@ export class DatabaseManager {
     const del = this.db.transaction((id: string) => {
       this.db.prepare("DELETE FROM runs WHERE project_id = ?").run(id);
       this.db.prepare("DELETE FROM deployed_scripts WHERE project_id = ?").run(id);
+      this.db.prepare("DELETE FROM flow_versions WHERE flow_id IN (SELECT id FROM flows WHERE project_id = ?)").run(id);
       this.db.prepare("DELETE FROM flows WHERE project_id = ?").run(id);
       this.db.prepare("DELETE FROM projects WHERE id = ?").run(id);
     });
@@ -231,8 +274,15 @@ export class DatabaseManager {
 
   createFlow(projectId: string, name: string): FlowSummary {
     const now = new Date().toISOString();
-    const flow: FlowSummary = { id: nextId("flow"), projectId, name, createdAt: now, updatedAt: now };
-    this.db.prepare("INSERT INTO flows (id, project_id, name, graph_json, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?)").run(flow.id, flow.projectId, flow.name, flow.createdAt, flow.updatedAt);
+    const flow: FlowSummary = {
+      id: nextId("flow"),
+      projectId,
+      name,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.db.prepare("INSERT INTO flows (id, project_id, name, graph_json, version, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?)").run(flow.id, flow.projectId, flow.name, flow.version, flow.createdAt, flow.updatedAt);
     return flow;
   }
 
@@ -243,9 +293,25 @@ export class DatabaseManager {
   deleteFlow(projectId: string, flowId: string): void {
     const del = this.db.transaction((pId: string, fId: string) => {
       this.db.prepare("DELETE FROM deployed_scripts WHERE flow_id = ?").run(fId);
+      this.db.prepare("DELETE FROM flow_versions WHERE flow_id = ?").run(fId);
       this.db.prepare("DELETE FROM flows WHERE project_id = ? AND id = ?").run(pId, fId);
     });
     del(projectId, flowId);
+  }
+
+  /** Archives the Flow's current name/graph as a `flow_versions` snapshot under its current version
+   * number, then bumps the live `flows` row to the next version — the live row stays the one and
+   * only active version; nothing under `flow_versions` is ever deleted (see "Restore old version"). */
+  saveNewFlowVersion(projectId: string, flowId: string): FlowSummary | undefined {
+    const now = new Date().toISOString();
+    const save = this.db.transaction((pId: string, fId: string) => {
+      const row = this.db.prepare<[string, string], FlowRow>("SELECT * FROM flows WHERE project_id = ? AND id = ?").get(pId, fId);
+      if (!row) return undefined;
+      this.db.prepare("INSERT INTO flow_versions (id, flow_id, version, name, graph_json, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(nextId("flow_version"), row.id, row.version, row.name, row.graph_json, now);
+      this.db.prepare("UPDATE flows SET version = ?, updated_at = ? WHERE project_id = ? AND id = ?").run(row.version + 1, now, pId, fId);
+      return this.getFlow(pId, fId);
+    });
+    return save(projectId, flowId);
   }
 
   /** A Flow's actual graph content, stored and returned as the same opaque serializeGraph/
@@ -317,7 +383,14 @@ export class DatabaseManager {
 
   createCredential(name: string, type: CredentialTypeId, data: CredentialData): CredentialRecord {
     const now = new Date().toISOString();
-    const record: CredentialRecord = { id: nextId("credential"), name, type, data, createdAt: now, updatedAt: now };
+    const record: CredentialRecord = {
+      id: nextId("credential"),
+      name,
+      type,
+      data,
+      createdAt: now,
+      updatedAt: now,
+    };
     this.db.prepare("INSERT INTO credentials (id, name, type, data_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)").run(record.id, record.name, record.type, JSON.stringify(record.data), record.createdAt, record.updatedAt);
     return record;
   }
