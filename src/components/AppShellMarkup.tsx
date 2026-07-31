@@ -92,7 +92,7 @@ export default function AppShellMarkup({ store, projectId }: { store: Store; pro
             <IconManager.SaveIcon />
           </button>
           <button id="log-clear-button" className="log-clear-button" title="Clear log">
-            🗑
+            <IconManager.ClearIcon />
           </button>
         </div>
         <div id="log-panel" />
