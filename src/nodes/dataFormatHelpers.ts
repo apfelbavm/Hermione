@@ -112,10 +112,7 @@ export async function objectsToCsv(objects: unknown[], delimiter = ","): Promise
       }
     }
   }
-  return Papa.unparse(
-    { fields, data: objects as Record<string, unknown>[] },
-    { delimiter: (delimiter && delimiter[0]) || "," },
-  );
+  return Papa.unparse({ fields, data: objects as Record<string, unknown>[] }, { delimiter: (delimiter && delimiter[0]) || "," });
 }
 
 // Tabular-rows bridge — looks for something CSV-shaped inside a single wrapped JSON object (either
@@ -133,8 +130,7 @@ export async function objectsToCsv(objects: unknown[], delimiter = ","): Promise
 // neither xml.toCsv nor json.toCsv has a compileExecute (see their own comments), so there's no
 // compiled-path consumer to keep in sync with.
 export function extractTabularRows(parsedRoot: unknown): Record<string, unknown>[] {
-  const isFlatRow = (v: unknown): v is Record<string, unknown> =>
-    typeof v === "object" && v !== null && !Array.isArray(v) && Object.values(v).every((x) => x === null || typeof x !== "object");
+  const isFlatRow = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v) && Object.values(v).every((x) => x === null || typeof x !== "object");
 
   const asRows = (v: unknown): Record<string, unknown>[] | null => {
     if (!Array.isArray(v)) return null;

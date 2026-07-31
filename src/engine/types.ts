@@ -96,9 +96,7 @@ export interface NodeDef {
   group: string;
   pins: PinDef[];
   execute?: (args: ExecuteArgs) => Promise<ExecuteResult> | ExecuteResult;
-  evaluate?: (
-    args: EvaluateArgs,
-  ) => Record<string, unknown> | Promise<Record<string, unknown>>;
+  evaluate?: (args: EvaluateArgs) => Record<string, unknown> | Promise<Record<string, unknown>>;
   derivePins?: (variable: Variable) => PinDef[];
   /** Sibling of derivePins for the Entry/Return/Call function nodes, dispatched off NodeInstance.functionId. */
   deriveFunctionPins?: (fn: FunctionDef) => PinDef[];

@@ -1,11 +1,7 @@
 import { Colors } from "../engine/color";
 import { Graph } from "../engine/graph";
 import type { Camera } from "./camera";
-import {
-  computeCommentScreenRect,
-  COMMENT_RESIZE_HANDLE_SCREEN_SIZE,
-  DEFAULT_COMMENT_COLOR,
-} from "./commentGeometry";
+import { computeCommentScreenRect, COMMENT_RESIZE_HANDLE_SCREEN_SIZE, DEFAULT_COMMENT_COLOR } from "./commentGeometry";
 
 const SELECTED_BORDER = "#e8b339";
 const HEADER_COLOR_OPACITY = 0.5;
@@ -13,12 +9,7 @@ const HEADER_COLOR_OPACITY = 0.5;
 // transparent — a colored wash rather than the header's solid-reading band.
 const BODY_COLOR_OPACITY = 0.14;
 
-export function drawComments(
-  ctx: CanvasRenderingContext2D,
-  graph: Graph,
-  camera: Camera,
-  selectedCommentIds: ReadonlySet<string>,
-): void {
+export function drawComments(ctx: CanvasRenderingContext2D, graph: Graph, camera: Camera, selectedCommentIds: ReadonlySet<string>): void {
   for (const box of graph.commentBoxes) {
     const rect = computeCommentScreenRect(box, camera);
     const selected = selectedCommentIds.has(box.id);

@@ -8,19 +8,8 @@ import type { Connection, PinContainer, PinType, Variable } from "./types";
 const CLIPBOARD_SOURCE = "hermione-graph-editor";
 const CLIPBOARD_VERSION = 1;
 
-const PIN_TYPES: readonly PinType[] = [
-  "exec",
-  "number",
-  "boolean",
-  "string",
-  "object",
-];
-const PIN_CONTAINERS: readonly PinContainer[] = [
-  "single",
-  "array",
-  "set",
-  "map",
-];
+const PIN_TYPES: readonly PinType[] = ["exec", "number", "boolean", "string", "object"];
+const PIN_CONTAINERS: readonly PinContainer[] = ["single", "array", "set", "map"];
 
 export interface NodesClipboardPayload {
   source: typeof CLIPBOARD_SOURCE;
@@ -44,20 +33,12 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 function isValidPosition(value: unknown): value is { x: number; y: number } {
-  return (
-    isPlainObject(value) &&
-    typeof value.x === "number" &&
-    typeof value.y === "number"
-  );
+  return isPlainObject(value) && typeof value.x === "number" && typeof value.y === "number";
 }
 
 function isValidPin(value: unknown): boolean {
   if (!isPlainObject(value)) return false;
-  if (
-    "connectionId" in value &&
-    value.connectionId !== undefined &&
-    typeof value.connectionId !== "string"
-  ) {
+  if ("connectionId" in value && value.connectionId !== undefined && typeof value.connectionId !== "string") {
     return false;
   }
   return true;
@@ -65,30 +46,16 @@ function isValidPin(value: unknown): boolean {
 
 function isValidNodeInstance(value: unknown): value is NodeInstance {
   if (!isPlainObject(value)) return false;
-  if (typeof value.id !== "string" || typeof value.type !== "string")
-    return false;
+  if (typeof value.id !== "string" || typeof value.type !== "string") return false;
   if (!isValidPosition(value.position)) return false;
-  if (
-    !isPlainObject(value.pins) ||
-    !Object.values(value.pins).every(isValidPin)
-  )
-    return false;
-  if (value.variableId !== undefined && typeof value.variableId !== "string")
-    return false;
-  if (value.functionId !== undefined && typeof value.functionId !== "string")
-    return false;
+  if (!isPlainObject(value.pins) || !Object.values(value.pins).every(isValidPin)) return false;
+  if (value.variableId !== undefined && typeof value.variableId !== "string") return false;
+  if (value.functionId !== undefined && typeof value.functionId !== "string") return false;
   return true;
 }
 
 function isValidConnection(value: unknown): value is Connection {
-  return (
-    isPlainObject(value) &&
-    typeof value.id === "string" &&
-    typeof value.fromNode === "string" &&
-    typeof value.fromPin === "string" &&
-    typeof value.toNode === "string" &&
-    typeof value.toPin === "string"
-  );
+  return isPlainObject(value) && typeof value.id === "string" && typeof value.fromNode === "string" && typeof value.fromPin === "string" && typeof value.toNode === "string" && typeof value.toPin === "string";
 }
 
 function isValidVariable(value: unknown): value is Variable {
@@ -99,11 +66,8 @@ function isValidVariable(value: unknown): value is Variable {
     typeof value.type === "string" &&
     PIN_TYPES.includes(value.type as PinType) &&
     "defaultValue" in value &&
-    (value.container === undefined ||
-      PIN_CONTAINERS.includes(value.container as PinContainer)) &&
-    (value.keyType === undefined ||
-      (typeof value.keyType === "string" &&
-        PIN_TYPES.includes(value.keyType as PinType)))
+    (value.container === undefined || PIN_CONTAINERS.includes(value.container as PinContainer)) &&
+    (value.keyType === undefined || (typeof value.keyType === "string" && PIN_TYPES.includes(value.keyType as PinType)))
   );
 }
 
@@ -119,22 +83,13 @@ export function parseClipboardPayload(raw: string): ClipboardPayload | null {
   } catch {
     return null;
   }
-  if (
-    !isPlainObject(data) ||
-    data.source !== CLIPBOARD_SOURCE ||
-    data.version !== CLIPBOARD_VERSION
-  ) {
+  if (!isPlainObject(data) || data.source !== CLIPBOARD_SOURCE || data.version !== CLIPBOARD_VERSION) {
     return null;
   }
 
   if (data.kind === "nodes") {
-    if (!Array.isArray(data.nodes) || !Array.isArray(data.connections))
-      return null;
-    if (
-      !data.nodes.every(isValidNodeInstance) ||
-      !data.connections.every(isValidConnection)
-    )
-      return null;
+    if (!Array.isArray(data.nodes) || !Array.isArray(data.connections)) return null;
+    if (!data.nodes.every(isValidNodeInstance) || !data.connections.every(isValidConnection)) return null;
     return data as unknown as NodesClipboardPayload;
   }
   if (data.kind === "variable") {
@@ -144,10 +99,7 @@ export function parseClipboardPayload(raw: string): ClipboardPayload | null {
   return null;
 }
 
-export function serializeNodesClipboardPayload(
-  nodes: NodeInstance[],
-  connections: Connection[],
-): string {
+export function serializeNodesClipboardPayload(nodes: NodeInstance[], connections: Connection[]): string {
   const payload: NodesClipboardPayload = {
     source: CLIPBOARD_SOURCE,
     kind: "nodes",
@@ -187,30 +139,15 @@ function cloneOptionalFields(target: NodeInstance, source: NodeInstance): void {
  * structuredClone (like object spread) only copies own enumerable properties, dropping the
  * NodeInstance prototype and its resolvePinDefs method, which then blows up wherever the pasted
  * node is later used. */
-export function cloneNodesForClipboard(
-  graph: Graph,
-  nodeIds: Set<string>,
-): { nodes: NodeInstance[]; connections: Connection[] } {
-  const selectedNodes = graph.nodes.filter(
-    (n) => nodeIds.has(n.id) && !Graph.UNDELETABLE_NODE_TYPES.has(n.type),
-  );
+export function cloneNodesForClipboard(graph: Graph, nodeIds: Set<string>): { nodes: NodeInstance[]; connections: Connection[] } {
+  const selectedNodes = graph.nodes.filter((n) => nodeIds.has(n.id) && !Graph.UNDELETABLE_NODE_TYPES.has(n.type));
   const copyableIds = new Set(selectedNodes.map((n) => n.id));
   const nodes = selectedNodes.map((n) => {
-    const clone = new NodeInstance(
-      n.id,
-      n.type,
-      { ...n.position },
-      structuredClone(n.pins),
-      n.variableId,
-      n.functionId,
-      n.scriptId,
-    );
+    const clone = new NodeInstance(n.id, n.type, { ...n.position }, structuredClone(n.pins), n.variableId, n.functionId, n.scriptId);
     cloneOptionalFields(clone, n);
     return clone;
   });
-  const connections = graph.connections
-    .filter((c) => copyableIds.has(c.fromNode) && copyableIds.has(c.toNode))
-    .map((c) => structuredClone(c));
+  const connections = graph.connections.filter((c) => copyableIds.has(c.fromNode) && copyableIds.has(c.toNode)).map((c) => structuredClone(c));
   return { nodes, connections };
 }
 
@@ -218,11 +155,7 @@ export function cloneNodesForClipboard(
  * connections, and the pin `connectionId`s that reference them), positioned so the selection's
  * top-left lands at `targetTopLeft`. Mirrors createNodeInstance/addNode's "fresh id, append to
  * graph" pattern. Returns the pasted nodes' new ids so the caller can select them. */
-export function pasteNodesIntoGraph(
-  graph: Graph,
-  payload: NodesClipboardPayload,
-  targetTopLeft: { x: number; y: number },
-): string[] {
+export function pasteNodesIntoGraph(graph: Graph, payload: NodesClipboardPayload, targetTopLeft: { x: number; y: number }): string[] {
   if (payload.nodes.length === 0) return [];
 
   const minX = Math.min(...payload.nodes.map((n) => n.position.x));
@@ -267,9 +200,7 @@ export function pasteNodesIntoGraph(
         toNode,
         toPin: original.toPin,
       };
-      const toPin = pastedNodes.find((n) => n.id === toNode)?.pins[
-        original.toPin
-      ];
+      const toPin = pastedNodes.find((n) => n.id === toNode)?.pins[original.toPin];
       if (toPin) toPin.connectionId = id;
       return connection;
     });
@@ -281,10 +212,7 @@ export function pasteNodesIntoGraph(
 
 /** The first "{name}"/"{name} 2"/"{name} 3"/... not already taken — used so pasting a variable
  * never silently collides with one of the same name already in the target graph. */
-function uniqueVariableName(
-  existingNames: Iterable<string>,
-  desiredName: string,
-): string {
+function uniqueVariableName(existingNames: Iterable<string>, desiredName: string): string {
   const taken = new Set(existingNames);
   if (!taken.has(desiredName)) return desiredName;
   let i = 2;
@@ -296,10 +224,7 @@ function uniqueVariableName(
  * already there. Pasted Get/Set nodes are never part of this — copying a variable only ever
  * copies its definition, matching how copying a variable.get/set node keeps its original
  * variableId rather than cloning the variable it points to. */
-export function pasteVariableIntoGraph(
-  graph: Graph,
-  variable: Variable,
-): Variable {
+export function pasteVariableIntoGraph(graph: Graph, variable: Variable): Variable {
   const clone: Variable = {
     ...structuredClone(variable),
     id: nextId("var"),

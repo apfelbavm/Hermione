@@ -14,9 +14,7 @@ import { VariablePanel } from "./sidebar/VariablePanel";
 export default function AppShellMarkup({ store }: { store: Store }) {
   useStoreRevision(store);
 
-  const activeFunction: FunctionDef | null = store.state.activeFunctionId
-    ? (store.state.rootGraph.functions.find((f) => f.id === store.state.activeFunctionId) ?? null)
-    : null;
+  const activeFunction: FunctionDef | null = store.state.activeFunctionId ? (store.state.rootGraph.functions.find((f) => f.id === store.state.activeFunctionId) ?? null) : null;
 
   return (
     <div id="app">
@@ -37,9 +35,7 @@ export default function AppShellMarkup({ store }: { store: Store }) {
           <FunctionsPanel store={store} />
           <VariablePanel id="variables-section" title="Variables" store={store} getGraph={() => store.state.rootGraph} />
           <ScriptsPanel store={store} />
-          {activeFunction && (
-            <VariablePanel id="local-variables-section" title="Local Variables" store={store} getGraph={() => activeFunction.body} />
-          )}
+          {activeFunction && <VariablePanel id="local-variables-section" title="Local Variables" store={store} getGraph={() => activeFunction.body} />}
         </div>
         <div id="left-sidebar-resizer" className="resizer resizer-vertical" />
         <div id="canvas-column">

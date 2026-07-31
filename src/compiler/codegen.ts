@@ -23,13 +23,7 @@ function findNode(graph: Graph, nodeId: string): NodeInstance {
 }
 
 /** Compile-time counterpart of resolveDataPin: returns a JS expression string instead of a value. */
-function compileResolveDataPin(
-  graph: Graph,
-  nodeId: string,
-  pinId: string,
-  helpers: Map<string, string>,
-  imports: Set<string>,
-): string {
+function compileResolveDataPin(graph: Graph, nodeId: string, pinId: string, helpers: Map<string, string>, imports: Set<string>): string {
   const node = findNode(graph, nodeId);
   const pin = node.pins[pinId];
   const conn = connectionTo(graph, nodeId, pinId);
@@ -51,34 +45,20 @@ function compileResolveDataPin(
     const outputs = upstreamDef.compileExecuteOutputs({ node: upstreamNode, graph });
     const expr = outputs[conn.fromPin];
     if (expr === undefined) {
-      throw new Error(
-        `Node type "${upstreamNode.type}" compileExecuteOutputs did not return an expression for output pin "${conn.fromPin}"`,
-      );
+      throw new Error(`Node type "${upstreamNode.type}" compileExecuteOutputs did not return an expression for output pin "${conn.fromPin}"`);
     }
     return expr;
   }
 
   if (!upstreamDef.compileEvaluate) {
-    throw new Error(
-      `Node type "${upstreamNode.type}" has no compileEvaluate — cannot compile this graph yet`,
-    );
+    throw new Error(`Node type "${upstreamNode.type}" has no compileEvaluate — cannot compile this graph yet`);
   }
 
-  const upstreamPinDefs = upstreamNode.resolvePinDefs(
-    graph.variables,
-    graph.functions,
-    graph.scripts,
-  );
+  const upstreamPinDefs = upstreamNode.resolvePinDefs(graph.variables, graph.functions, graph.scripts);
   const upstreamInputs: Record<string, string> = {};
   for (const pinDef of upstreamPinDefs) {
     if (pinDef.direction === "input" && pinDef.type !== "exec") {
-      upstreamInputs[pinDef.id] = compileResolveDataPin(
-        graph,
-        upstreamNode.id,
-        pinDef.id,
-        helpers,
-        imports,
-      );
+      upstreamInputs[pinDef.id] = compileResolveDataPin(graph, upstreamNode.id, pinDef.id, helpers, imports);
     }
   }
 
@@ -91,27 +71,19 @@ function compileResolveDataPin(
   });
   const expr = outputs[conn.fromPin];
   if (expr === undefined) {
-    throw new Error(
-      `Node type "${upstreamNode.type}" compileEvaluate did not return an expression for output pin "${conn.fromPin}"`,
-    );
+    throw new Error(`Node type "${upstreamNode.type}" compileEvaluate did not return an expression for output pin "${conn.fromPin}"`);
   }
   return expr;
 }
 
-function collectHelpers(
-  defHelpers: Record<string, string> | undefined,
-  helpers: Map<string, string>,
-): void {
+function collectHelpers(defHelpers: Record<string, string> | undefined, helpers: Map<string, string>): void {
   if (!defHelpers) return;
   for (const [name, source] of Object.entries(defHelpers)) {
     helpers.set(name, source);
   }
 }
 
-function collectImports(
-  defImports: string[] | undefined,
-  imports: Set<string>,
-): void {
+function collectImports(defImports: string[] | undefined, imports: Set<string>): void {
   if (!defImports) return;
   for (const line of defImports) {
     imports.add(line);
@@ -119,19 +91,10 @@ function collectImports(
 }
 
 /** Compile-time counterpart of runExecFrom's step walk: compiles whatever is wired to (nodeId, execInPin) into statements. */
-function compileFrom(
-  graph: Graph,
-  nodeId: string,
-  execInPin: string,
-  visiting: Set<string>,
-  helpers: Map<string, string>,
-  imports: Set<string>,
-): string[] {
+function compileFrom(graph: Graph, nodeId: string, execInPin: string, visiting: Set<string>, helpers: Map<string, string>, imports: Set<string>): string[] {
   const key = `${nodeId}:${execInPin}`;
   if (visiting.has(key)) {
-    throw new Error(
-      `Cyclic exec flow detected at ${key} — loop nodes aren't supported yet`,
-    );
+    throw new Error(`Cyclic exec flow detected at ${key} — loop nodes aren't supported yet`);
   }
   visiting.add(key);
 
@@ -154,16 +117,7 @@ function compileFrom(
     const statements: string[] = [];
     for (const pinId of execOutPins) {
       for (const conn of connectionsFrom(graph, node.id, pinId)) {
-        statements.push(
-          ...compileFrom(
-            graph,
-            conn.toNode,
-            conn.toPin,
-            visiting,
-            helpers,
-            imports,
-          ),
-        );
+        statements.push(...compileFrom(graph, conn.toNode, conn.toPin, visiting, helpers, imports));
       }
     }
     visiting.delete(key);
@@ -171,26 +125,14 @@ function compileFrom(
   }
   const def = getNodeDef(node.type);
   if (!def.compileExecute) {
-    throw new Error(
-      `Node type "${node.type}" has no compileExecute — cannot compile this graph yet`,
-    );
+    throw new Error(`Node type "${node.type}" has no compileExecute — cannot compile this graph yet`);
   }
 
-  const pinDefs = node.resolvePinDefs(
-    graph.variables,
-    graph.functions,
-    graph.scripts,
-  );
+  const pinDefs = node.resolvePinDefs(graph.variables, graph.functions, graph.scripts);
   const inputs: Record<string, string> = {};
   for (const pinDef of pinDefs) {
     if (pinDef.direction === "input" && pinDef.type !== "exec") {
-      inputs[pinDef.id] = compileResolveDataPin(
-        graph,
-        node.id,
-        pinDef.id,
-        helpers,
-        imports,
-      );
+      inputs[pinDef.id] = compileResolveDataPin(graph, node.id, pinDef.id, helpers, imports);
     }
   }
 
@@ -206,20 +148,11 @@ function compileFrom(
       // through normal editor use — this guard only catches a hand-edited/corrupted graph.
       const outgoing = connectionsFrom(graph, node.id, execOutPin);
       if (outgoing.length > 1) {
-        throw new Error(
-          `Node "${node.id}" (${node.type}) exec-out pin "${execOutPin}" fans out to ${outgoing.length} wires — parallel exec fan-out is not supported by the compiler yet`,
-        );
+        throw new Error(`Node "${node.id}" (${node.type}) exec-out pin "${execOutPin}" fans out to ${outgoing.length} wires — parallel exec fan-out is not supported by the compiler yet`);
       }
       if (outgoing.length === 0) return [];
       const [conn] = outgoing;
-      return compileFrom(
-        graph,
-        conn.toNode,
-        conn.toPin,
-        visiting,
-        helpers,
-        imports,
-      );
+      return compileFrom(graph, conn.toNode, conn.toPin, visiting, helpers, imports);
     },
   });
 
@@ -228,20 +161,13 @@ function compileFrom(
 }
 
 function functionNameFor(node: NodeInstance, usedNames: Set<string>): string {
-  const rawName =
-    typeof node.pins.name?.value === "string"
-      ? node.pins.name.value
-      : node.type;
+  const rawName = typeof node.pins.name?.value === "string" ? node.pins.name.value : node.type;
   const slug =
     rawName
       .replace(/[^a-zA-Z0-9]+/g, " ")
       .trim()
       .split(" ")
-      .map((word, i) =>
-        i === 0
-          ? word.charAt(0).toLowerCase() + word.slice(1)
-          : word.charAt(0).toUpperCase() + word.slice(1),
-      )
+      .map((word, i) => (i === 0 ? word.charAt(0).toLowerCase() + word.slice(1) : word.charAt(0).toUpperCase() + word.slice(1)))
       .join("") || "trigger";
 
   let candidate = slug;
@@ -273,28 +199,13 @@ export function compileGraph(graph: Graph): CompileResult {
         ? []
         : (() => {
             if (outgoing.length > 1) {
-              throw new Error(
-                `Event node "${node.id}" (${node.type}) exec-out fans out to ${outgoing.length} wires — parallel exec fan-out is not supported by the compiler yet`,
-              );
+              throw new Error(`Event node "${node.id}" (${node.type}) exec-out fans out to ${outgoing.length} wires — parallel exec fan-out is not supported by the compiler yet`);
             }
             const [conn] = outgoing;
-            return compileFrom(
-              graph,
-              conn.toNode,
-              conn.toPin,
-              new Set(),
-              helpers,
-              imports,
-            );
+            return compileFrom(graph, conn.toNode, conn.toPin, new Set(), helpers, imports);
           })();
 
-    functionBlocks.push(
-      [
-        `export async function ${functionName}(rt) {`,
-        ...indent(body),
-        `}`,
-      ].join("\n"),
-    );
+    functionBlocks.push([`export async function ${functionName}(rt) {`, ...indent(body), `}`].join("\n"));
 
     triggers.push({
       nodeId: node.id,
@@ -304,22 +215,11 @@ export function compileGraph(graph: Graph): CompileResult {
     });
   }
 
-  const stateEntries = graph.variables
-    .map(
-      (v) =>
-        `    ${JSON.stringify(v.id)}: ${JSON.stringify(v.defaultValue)}, // ${v.name}`,
-    )
-    .join("\n");
+  const stateEntries = graph.variables.map((v) => `    ${JSON.stringify(v.id)}: ${JSON.stringify(v.defaultValue)}, // ${v.name}`).join("\n");
 
   const parts: string[] = [
     `// Generated by Hermione from graph "${graph.name}" — do not edit by hand.`,
-    ...(imports.size > 0
-      ? [
-          "// This graph uses node(s) whose compiled logic depends on an npm package rather than a",
-          "// self-contained helper — running this file requires that package to be installed alongside it.",
-          ...[...imports.values()],
-        ]
-      : []),
+    ...(imports.size > 0 ? ["// This graph uses node(s) whose compiled logic depends on an npm package rather than a", "// self-contained helper — running this file requires that package to be installed alongside it.", ...[...imports.values()]] : []),
     "",
     ...[...helpers.values()],
     "",
@@ -342,10 +242,7 @@ export function compileGraph(graph: Graph): CompileResult {
 
 /** Compiles the graph and triggers a browser download of the generated source. `.mjs` (not `.js`) so the
  * file runs as ESM under plain `node` regardless of any surrounding package.json — see scripts/compileGraph.ts. */
-export function downloadCompiledGraph(
-  graph: Graph,
-  filename: string = `${graph.name || "graph"}.compiled.mjs`,
-): void {
+export function downloadCompiledGraph(graph: Graph, filename: string = `${graph.name || "graph"}.compiled.mjs`): void {
   const { code } = compileGraph(graph);
   const blob = new Blob([code], { type: "text/javascript" });
   const url = URL.createObjectURL(blob);

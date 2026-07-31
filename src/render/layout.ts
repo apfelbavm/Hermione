@@ -80,11 +80,7 @@ export function pinWidgetWidth(pin: PinDef): number {
   return 90;
 }
 
-export function computeNodeLayout(
-  label: string,
-  pinDefs: PinDef[],
-  options?: { showAddButton?: boolean; compact?: boolean },
-): NodeLayout {
+export function computeNodeLayout(label: string, pinDefs: PinDef[], options?: { showAddButton?: boolean; compact?: boolean }): NodeLayout {
   if (options?.compact) {
     const size = COMPACT_NODE_SIZE;
     const pins: PinLayout[] = pinDefs.map((pin) => ({
@@ -103,8 +99,7 @@ export function computeNodeLayout(
   const height = NODE_HEADER_HEIGHT + rows * PIN_ROW_HEIGHT + 10;
 
   const outputLabelMaxWidth = outputs.reduce((max, p) => Math.max(max, textWidth(p.label)), 0);
-  const rightReserve =
-    outputs.length > 0 ? PIN_LABEL_GAP + outputLabelMaxWidth + WIDGET_OUTPUT_GAP : PIN_MARGIN;
+  const rightReserve = outputs.length > 0 ? PIN_LABEL_GAP + outputLabelMaxWidth + WIDGET_OUTPUT_GAP : PIN_MARGIN;
 
   let widestRow = textWidth(label) + NODE_PADDING_X * 2;
   for (let i = 0; i < rows; i++) {
@@ -112,11 +107,7 @@ export function computeNodeLayout(
     const inLabel = inPin?.label ?? "";
     const outLabel = outputs[i]?.label ?? "";
     const widgetWidth = inPin ? pinWidgetWidth(inPin) : 0;
-    const rowWidth =
-      PIN_MARGIN +
-      textWidth(inLabel) +
-      (widgetWidth > 0 ? LABEL_WIDGET_GAP + widgetWidth : outLabel ? 20 : 0) +
-      rightReserve;
+    const rowWidth = PIN_MARGIN + textWidth(inLabel) + (widgetWidth > 0 ? LABEL_WIDGET_GAP + widgetWidth : outLabel ? 20 : 0) + rightReserve;
     widestRow = Math.max(widestRow, rowWidth);
   }
   const width = Math.max(NODE_MIN_WIDTH, Math.ceil(widestRow));

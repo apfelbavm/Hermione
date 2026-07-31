@@ -5,8 +5,7 @@ export function indent(lines: string[], spaces = 2): string[] {
 }
 
 /** Shared `delay` helper snippet — any latent node that just needs to wait can contribute this exact source under the name "delay", so the compiler dedupes it across the whole generated file instead of emitting near-duplicate helpers. */
-export const DELAY_HELPER_SOURCE =
-  "function delay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }";
+export const DELAY_HELPER_SOURCE = "function delay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }";
 
 /** A stable, valid-JS-identifier local variable name for a given node instance's compileExecute
  * result — shared by a node's own compileExecute (which declares it) and its compileExecuteOutputs

@@ -1,10 +1,5 @@
 import { getNodeDef } from "../engine/registry";
-import type {
-  CodeScriptDef,
-  FunctionDef,
-  PinDef,
-  Variable,
-} from "../engine/types";
+import type { CodeScriptDef, FunctionDef, PinDef, Variable } from "../engine/types";
 import { computeNodeLayout, type NodeLayout } from "./layout";
 import type { Camera } from "./camera";
 import { Graph } from "../engine/graph";
@@ -22,14 +17,7 @@ export interface NodeScreenGeometry {
   layout: NodeLayout;
 }
 
-export function computeNodeScreenGeometry(
-  node: NodeInstance,
-  label: string,
-  pinDefs: PinDef[],
-  camera: Camera,
-  showAddButton: boolean = false,
-  compact: boolean = false,
-): NodeScreenGeometry {
+export function computeNodeScreenGeometry(node: NodeInstance, label: string, pinDefs: PinDef[], camera: Camera, showAddButton: boolean = false, compact: boolean = false): NodeScreenGeometry {
   const layout = computeNodeLayout(label, pinDefs, { showAddButton, compact });
   const screen = camera.worldToScreen(node.position.x, node.position.y);
   const pinScreen: Record<string, { x: number; y: number }> = {};
@@ -72,14 +60,10 @@ export function computeNodeWorldRect(
   height: number;
 } {
   const def = getNodeDef(node.type);
-  const layout = computeNodeLayout(
-    node.resolveNodeLabel(def, variables, functions, scripts),
-    pinDefs,
-    {
-      showAddButton: !!def.addInstancePinEntry,
-      compact: !!def.compact,
-    },
-  );
+  const layout = computeNodeLayout(node.resolveNodeLabel(def, variables, functions, scripts), pinDefs, {
+    showAddButton: !!def.addInstancePinEntry,
+    compact: !!def.compact,
+  });
   return {
     x: node.position.x,
     y: node.position.y,
@@ -92,28 +76,12 @@ export function computeNodeWorldRect(
  * `variables` must be the full VISIBLE set (see getVisibleVariables) and `functions`/`scripts` the root's
  * function/script lists — `graph` may be a function's body, whose own `.variables`/`.functions`/`.scripts`
  * aren't the complete picture. */
-export function computeAllNodeGeometries(
-  graph: Graph,
-  camera: Camera,
-  variables: Variable[],
-  functions: FunctionDef[],
-  scripts: CodeScriptDef[] = [],
-): Map<string, NodeScreenGeometry> {
+export function computeAllNodeGeometries(graph: Graph, camera: Camera, variables: Variable[], functions: FunctionDef[], scripts: CodeScriptDef[] = []): Map<string, NodeScreenGeometry> {
   const map = new Map<string, NodeScreenGeometry>();
   for (const node of graph.nodes) {
     const def = getNodeDef(node.type);
     const pinDefs = node.resolvePinDefs(variables, functions, scripts);
-    map.set(
-      node.id,
-      computeNodeScreenGeometry(
-        node,
-        node.resolveNodeLabel(def, variables, functions, scripts),
-        pinDefs,
-        camera,
-        !!def.addInstancePinEntry,
-        !!def.compact,
-      ),
-    );
+    map.set(node.id, computeNodeScreenGeometry(node, node.resolveNodeLabel(def, variables, functions, scripts), pinDefs, camera, !!def.addInstancePinEntry, !!def.compact));
   }
   return map;
 }

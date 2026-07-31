@@ -343,7 +343,10 @@ export default function AppShell() {
           label: "Collapse to Function",
           disabled: !canCollapseSelectionToFunction(store.state.rootGraph, graph, selection, variables, functions, scripts),
           onClick: () => {
-            const name = nextAvailableName(store.state.rootGraph.functions.map((f) => f.name), "NewFunction");
+            const name = nextAvailableName(
+              store.state.rootGraph.functions.map((f) => f.name),
+              "NewFunction",
+            );
             const { callNodeId } = collapseSelectionToFunction(store.state.rootGraph, graph, selection, variables, functions, scripts, name);
             store.state.selectedNodeIds = new Set([callNodeId]);
             store.notify();
@@ -629,10 +632,7 @@ export default function AppShell() {
       const functions = store.state.rootGraph.functions;
       const scripts = store.state.rootGraph.scripts;
 
-      const rects = [
-        ...graph.nodes.map((n) => computeNodeWorldRect(n, n.resolvePinDefs(variables, functions, scripts), variables, functions, scripts)),
-        ...graph.commentBoxes.map((b) => ({ x: b.position.x, y: b.position.y, width: b.size.width, height: b.size.height })),
-      ];
+      const rects = [...graph.nodes.map((n) => computeNodeWorldRect(n, n.resolvePinDefs(variables, functions, scripts), variables, functions, scripts)), ...graph.commentBoxes.map((b) => ({ x: b.position.x, y: b.position.y, width: b.size.width, height: b.size.height }))];
       if (rects.length === 0) return;
 
       const minX = Math.min(...rects.map((r) => r.x));

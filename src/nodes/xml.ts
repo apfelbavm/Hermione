@@ -1,14 +1,5 @@
 import { registerNode } from "../engine/registry";
-import {
-  XML_BUILDER_IMPORT_LINE,
-  XML_BUILD_OPTIONS_LITERAL,
-  XML_IMPORT_LINE,
-  XML_PARSE_OPTIONS_LITERAL,
-  extractTabularRows,
-  jsonValueToXml,
-  objectsToCsv,
-  xmlToJsonValue,
-} from "./dataFormatHelpers";
+import { XML_BUILDER_IMPORT_LINE, XML_BUILD_OPTIONS_LITERAL, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, extractTabularRows, jsonValueToXml, objectsToCsv, xmlToJsonValue } from "./dataFormatHelpers";
 
 registerNode({
   type: "xml.toJson",
@@ -31,10 +22,7 @@ registerNode({
     // Both output expressions independently re-run the same try/parse IIFE — duplicated work, but
     // the same tradeoff array.ts's own multi-output pure nodes already accept, since compileEvaluate
     // has no way to compute a shared intermediate once and hand it to two output-pin expressions.
-    const attempt =
-      `(() => { try { const __v = XMLValidator.validate(${inputs.xml}); if (__v !== true) throw new Error(__v.err.msg); ` +
-      `return { json: new XMLParser(${XML_PARSE_OPTIONS_LITERAL}).parse(${inputs.xml}), success: true }; } ` +
-      `catch { return { json: null, success: false }; } })()`;
+    const attempt = `(() => { try { const __v = XMLValidator.validate(${inputs.xml}); if (__v !== true) throw new Error(__v.err.msg); ` + `return { json: new XMLParser(${XML_PARSE_OPTIONS_LITERAL}).parse(${inputs.xml}), success: true }; } ` + `catch { return { json: null, success: false }; } })()`;
     return { json: `${attempt}.json`, success: `${attempt}.success` };
   },
   compileImports: [XML_IMPORT_LINE],
@@ -58,9 +46,7 @@ registerNode({
     }
   },
   compileEvaluate: ({ inputs }) => {
-    const attempt =
-      `(() => { try { return { xml: new XMLBuilder(${XML_BUILD_OPTIONS_LITERAL}).build(${inputs.json}), success: true }; } ` +
-      `catch { return { xml: "", success: false }; } })()`;
+    const attempt = `(() => { try { return { xml: new XMLBuilder(${XML_BUILD_OPTIONS_LITERAL}).build(${inputs.json}), success: true }; } ` + `catch { return { xml: "", success: false }; } })()`;
     return { xml: `${attempt}.xml`, success: `${attempt}.success` };
   },
   compileImports: [XML_BUILDER_IMPORT_LINE],

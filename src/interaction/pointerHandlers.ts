@@ -1,59 +1,13 @@
-import {
-  cloneNodesForClipboard,
-  parseClipboardPayload,
-  pasteNodesIntoGraph,
-  pasteVariableIntoGraph,
-  serializeNodesClipboardPayload,
-  serializeVariableClipboardPayload,
-} from "../engine/clipboard";
-import {
-  addCommentBox,
-  connectPins,
-  disconnectPin,
-  nextId,
-  removeCommentBox,
-} from "../engine/graphMutations";
+import { cloneNodesForClipboard, parseClipboardPayload, pasteNodesIntoGraph, pasteVariableIntoGraph, serializeNodesClipboardPayload, serializeVariableClipboardPayload } from "../engine/clipboard";
+import { addCommentBox, connectPins, disconnectPin, nextId, removeCommentBox } from "../engine/graphMutations";
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { getNodeDef, isPinTypeCompatible } from "../engine/registry";
-import {
-  CodeScriptDef,
-  CommentBox,
-  FunctionDef,
-  PinDef,
-  Variable,
-} from "../engine/types";
-import {
-  COMMENT_HEADER_HEIGHT,
-  COMMENT_MIN_SIZE,
-  DEFAULT_COMMENT_COLOR,
-  DEFAULT_COMMENT_HEIGHT,
-  DEFAULT_COMMENT_WIDTH,
-  rectContains,
-  rectIntersects,
-  type WorldRect,
-} from "../render/commentGeometry";
+import { CodeScriptDef, CommentBox, FunctionDef, PinDef, Variable } from "../engine/types";
+import { COMMENT_HEADER_HEIGHT, COMMENT_MIN_SIZE, DEFAULT_COMMENT_COLOR, DEFAULT_COMMENT_HEIGHT, DEFAULT_COMMENT_WIDTH, rectContains, rectIntersects, type WorldRect } from "../render/commentGeometry";
 import { snapPositionToGrid } from "../render/drawGrid";
-import {
-  computeAllNodeGeometries,
-  computeNodeWorldRect,
-} from "../render/nodeGeometry";
-import {
-  hitTestCommentHeader,
-  hitTestCommentResizeHandle,
-  hitTestNode,
-  hitTestNodeAddButton,
-  hitTestPin,
-  type CommentCorner,
-  type PinHit,
-} from "../render/hitTest";
-import {
-  getEditingGraph,
-  getVisibleVariablesForState,
-  openFunctionTab,
-  openScriptTab,
-  type MarqueeSelectionState,
-  type Store,
-} from "../state/store";
+import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGeometry";
+import { hitTestCommentHeader, hitTestCommentResizeHandle, hitTestNode, hitTestNodeAddButton, hitTestPin, type CommentCorner, type PinHit } from "../render/hitTest";
+import { getEditingGraph, getVisibleVariablesForState, openFunctionTab, openScriptTab, type MarqueeSelectionState, type Store } from "../state/store";
 import type { HistoryManager } from "../state/history";
 import { Graph } from "../engine/graph";
 
@@ -101,16 +55,11 @@ export interface PointerInteractionCallbacks {
   /** Wire(s) released with no compatible pin under the cursor — the "filtered node menu" moment.
    * Always an array — a plain single-pin drag passes one anchor, a Ctrl+drag pickup passes every
    * anchor it grabbed, so picking a node from that menu reconnects all of them to it at once. */
-  onWireDroppedInEmptySpace: (
-    anchors: WireAnchor[],
-    screenPos: { x: number; y: number },
-  ) => void;
+  onWireDroppedInEmptySpace: (anchors: WireAnchor[], screenPos: { x: number; y: number }) => void;
 }
 
 function findConnectionToInput(graph: Graph, nodeId: string, pinId: string) {
-  return graph.connections.find(
-    (c) => c.toNode === nodeId && c.toPin === pinId,
-  );
+  return graph.connections.find((c) => c.toNode === nodeId && c.toPin === pinId);
 }
 
 /** Every node id in `graph` — used by both the global Ctrl+A shortcut below and the node right-click
@@ -125,22 +74,11 @@ export function selectAllNodes(graph: Graph): Set<string> {
  * they were gathered) if `target` is a valid, compatible, non-self partner — returns whether it
  * connected anything. Used by both a plain single-anchor wire release and a Ctrl+drag "wire-multi"
  * release, so dropping on a real pin behaves the same whether one or several anchors are in flight. */
-function tryConnectAnchorsToTarget(
-  graph: Graph,
-  variables: Variable[],
-  functions: FunctionDef[],
-  scripts: CodeScriptDef[],
-  anchors: WireAnchor[],
-  target: PinHit,
-): boolean {
+function tryConnectAnchorsToTarget(graph: Graph, variables: Variable[], functions: FunctionDef[], scripts: CodeScriptDef[], anchors: WireAnchor[], target: PinHit): boolean {
   if (anchors.some((a) => a.nodeId === target.nodeId)) return false; // no self-loops
   const anchorIsOutput = anchors[0].pin.direction === "output";
   const targetIsOutput = target.pin.direction === "output";
-  if (
-    anchorIsOutput === targetIsOutput ||
-    !isPinTypeCompatible(anchors[0].pin, target.pin)
-  )
-    return false;
+  if (anchorIsOutput === targetIsOutput || !isPinTypeCompatible(anchors[0].pin, target.pin)) return false;
 
   for (const anchor of anchors) {
     const outputEnd = anchorIsOutput ? anchor : target;
@@ -168,33 +106,14 @@ function tryConnectAnchorsToTarget(
 /** Recomputes which nodes currently sit geometrically inside a comment box's body — called
  * fresh whenever a header-drag starts, so it picks up nodes moved into the box since it was
  * last resized, matching Unreal's "whatever's actually inside moves with it" behavior. */
-function recomputeContainment(
-  graph: Graph,
-  variables: Variable[],
-  functions: FunctionDef[],
-  scripts: CodeScriptDef[],
-  box: CommentBox,
-): void {
+function recomputeContainment(graph: Graph, variables: Variable[], functions: FunctionDef[], scripts: CodeScriptDef[], box: CommentBox): void {
   const innerBounds = {
     x: box.position.x,
     y: box.position.y + COMMENT_HEADER_HEIGHT,
     width: box.size.width,
     height: box.size.height - COMMENT_HEADER_HEIGHT,
   };
-  box.containedNodeIds = graph.nodes
-    .filter((n) =>
-      rectContains(
-        innerBounds,
-        computeNodeWorldRect(
-          n,
-          n.resolvePinDefs(variables, functions, scripts),
-          variables,
-          functions,
-          scripts,
-        ),
-      ),
-    )
-    .map((n) => n.id);
+  box.containedNodeIds = graph.nodes.filter((n) => rectContains(innerBounds, computeNodeWorldRect(n, n.resolvePinDefs(variables, functions, scripts), variables, functions, scripts))).map((n) => n.id);
 }
 
 /** The marquee's own start/current corners (in either order) as a normalized world-space rect —
@@ -212,20 +131,9 @@ function marqueeWorldRect(marquee: MarqueeSelectionState): WorldRect {
  * order) — shared by the marquee's own mousemove (so the selection updates live as the box is
  * dragged, matching Unreal/most node editors) and its mouseup (which just finalizes the same
  * computation one last time before clearing the drag). */
-function computeMarqueeSelectedNodeIds(
-  graph: Graph,
-  variables: Variable[],
-  functions: FunctionDef[],
-  scripts: CodeScriptDef[],
-  marquee: MarqueeSelectionState,
-): Set<string> {
+function computeMarqueeSelectedNodeIds(graph: Graph, variables: Variable[], functions: FunctionDef[], scripts: CodeScriptDef[], marquee: MarqueeSelectionState): Set<string> {
   const box = marqueeWorldRect(marquee);
-  const touched = graph.nodes.filter((n) =>
-    rectIntersects(
-      box,
-      computeNodeWorldRect(n, n.resolvePinDefs(variables, functions, scripts), variables, functions, scripts),
-    ),
-  );
+  const touched = graph.nodes.filter((n) => rectIntersects(box, computeNodeWorldRect(n, n.resolvePinDefs(variables, functions, scripts), variables, functions, scripts)));
   return new Set(touched.map((n) => n.id));
 }
 
@@ -233,10 +141,7 @@ function computeMarqueeSelectedNodeIds(
  * BAR (matching hitTestCommentHeader's own click/drag hot zone), not its whole body, so a marquee
  * drawn entirely inside a large comment box (to select nodes placed within it) doesn't also always
  * drag the comment box itself into the selection. */
-function computeMarqueeSelectedCommentIds(
-  graph: Graph,
-  marquee: MarqueeSelectionState,
-): Set<string> {
+function computeMarqueeSelectedCommentIds(graph: Graph, marquee: MarqueeSelectionState): Set<string> {
   const box = marqueeWorldRect(marquee);
   const touched = graph.commentBoxes.filter((commentBox) => {
     const headerRect: WorldRect = {
@@ -265,12 +170,7 @@ export interface PointerInteraction {
   shouldSuppressContextMenu: () => boolean;
 }
 
-export function setupPointerInteraction(
-  canvas: HTMLCanvasElement,
-  store: Store,
-  history: HistoryManager,
-  callbacks: PointerInteractionCallbacks,
-): PointerInteraction {
+export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store, history: HistoryManager, callbacks: PointerInteractionCallbacks): PointerInteraction {
   let drag: DragMode = { kind: "none" };
   // Tracked continuously so the "C" comment-box shortcut knows where the cursor is —
   // keydown events carry no pointer coordinates of their own.
@@ -295,36 +195,16 @@ export function setupPointerInteraction(
   let autoPanFrame: number | null = null;
 
   /** 0 outside the margin, ramping up to `maxSpeed` right at (and beyond) the edge itself. */
-  function edgePanComponent(
-    distanceFromEdge: number,
-    margin: number,
-    maxSpeed: number,
-  ): number {
+  function edgePanComponent(distanceFromEdge: number, margin: number, maxSpeed: number): number {
     if (distanceFromEdge >= margin) return 0;
     const t = 1 - Math.max(0, distanceFromEdge) / margin;
     return t * maxSpeed;
   }
 
-  function computeAutoPanDelta(
-    pos: { x: number; y: number },
-    width: number,
-    height: number,
-  ) {
+  function computeAutoPanDelta(pos: { x: number; y: number }, width: number, height: number) {
     return {
-      dx:
-        edgePanComponent(pos.x, AUTO_PAN_EDGE_MARGIN, AUTO_PAN_MAX_SPEED) -
-        edgePanComponent(
-          width - pos.x,
-          AUTO_PAN_EDGE_MARGIN,
-          AUTO_PAN_MAX_SPEED,
-        ),
-      dy:
-        edgePanComponent(pos.y, AUTO_PAN_EDGE_MARGIN, AUTO_PAN_MAX_SPEED) -
-        edgePanComponent(
-          height - pos.y,
-          AUTO_PAN_EDGE_MARGIN,
-          AUTO_PAN_MAX_SPEED,
-        ),
+      dx: edgePanComponent(pos.x, AUTO_PAN_EDGE_MARGIN, AUTO_PAN_MAX_SPEED) - edgePanComponent(width - pos.x, AUTO_PAN_EDGE_MARGIN, AUTO_PAN_MAX_SPEED),
+      dy: edgePanComponent(pos.y, AUTO_PAN_EDGE_MARGIN, AUTO_PAN_MAX_SPEED) - edgePanComponent(height - pos.y, AUTO_PAN_EDGE_MARGIN, AUTO_PAN_MAX_SPEED),
     };
   }
 
@@ -333,33 +213,19 @@ export function setupPointerInteraction(
    * under a stationary cursor instead), since both change what a fixed-world-position pin's own
    * screen position resolves to. */
   function updateWireDragPreview(): void {
-    if (
-      (drag.kind !== "wire" && drag.kind !== "wire-multi") ||
-      !store.state.wireDrag
-    )
-      return;
+    if ((drag.kind !== "wire" && drag.kind !== "wire-multi") || !store.state.wireDrag) return;
     const graph = getEditingGraph(store.state);
     const { camera } = store.state;
     const variables = getVisibleVariablesForState(store.state);
     const functions = store.state.rootGraph.functions;
     const scripts = store.state.rootGraph.scripts;
-    const geometries = computeAllNodeGeometries(
-      graph,
-      camera,
-      variables,
-      functions,
-      scripts,
-    );
+    const geometries = computeAllNodeGeometries(graph, camera, variables, functions, scripts);
 
     if (drag.kind === "wire") {
-      const anchorScreen = geometries.get(drag.anchor.nodeId)?.pinScreen[
-        drag.anchor.pinId
-      ];
+      const anchorScreen = geometries.get(drag.anchor.nodeId)?.pinScreen[drag.anchor.pinId];
       if (anchorScreen) store.state.wireDrag.fromScreens = [anchorScreen];
     } else {
-      store.state.wireDrag.fromScreens = drag.anchors
-        .map((a) => geometries.get(a.nodeId)?.pinScreen[a.pinId])
-        .filter((p): p is { x: number; y: number } => !!p);
+      store.state.wireDrag.fromScreens = drag.anchors.map((a) => geometries.get(a.nodeId)?.pinScreen[a.pinId]).filter((p): p is { x: number; y: number } => !!p);
     }
     store.state.wireDrag.toScreen = lastMouseScreenPos;
   }
@@ -373,19 +239,14 @@ export function setupPointerInteraction(
     const graph = getEditingGraph(store.state);
     const { camera } = store.state;
     const { startWorld, initialPositions } = drag;
-    const worldPos = camera.screenToWorld(
-      lastMouseScreenPos.x,
-      lastMouseScreenPos.y,
-    );
+    const worldPos = camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y);
     const dx = worldPos.x - startWorld.x;
     const dy = worldPos.y - startWorld.y;
     for (const [nodeId, initial] of initialPositions) {
       const node = graph.nodes.find((n) => n.id === nodeId);
       if (node) {
         const next = { x: initial.x + dx, y: initial.y + dy };
-        const snapped = store.state.snapToGrid
-          ? snapPositionToGrid(next)
-          : next;
+        const snapped = store.state.snapToGrid ? snapPositionToGrid(next) : next;
         node.position.x = snapped.x;
         node.position.y = snapped.y;
       }
@@ -403,20 +264,11 @@ export function setupPointerInteraction(
     const graph = getEditingGraph(store.state);
     const { camera } = store.state;
     const marquee = store.state.marqueeSelection;
-    marquee.currentWorld = camera.screenToWorld(
-      lastMouseScreenPos.x,
-      lastMouseScreenPos.y,
-    );
+    marquee.currentWorld = camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y);
     const variables = getVisibleVariablesForState(store.state);
     const functions = store.state.rootGraph.functions;
     const scripts = store.state.rootGraph.scripts;
-    store.state.selectedNodeIds = computeMarqueeSelectedNodeIds(
-      graph,
-      variables,
-      functions,
-      scripts,
-      marquee,
-    );
+    store.state.selectedNodeIds = computeMarqueeSelectedNodeIds(graph, variables, functions, scripts, marquee);
     store.state.selectedCommentIds = computeMarqueeSelectedCommentIds(graph, marquee);
   }
 
@@ -425,19 +277,9 @@ export function setupPointerInteraction(
     const tick = () => {
       autoPanFrame = null;
       // Drag ended — stop rescheduling.
-      if (
-        drag.kind !== "wire" &&
-        drag.kind !== "wire-multi" &&
-        drag.kind !== "nodes" &&
-        drag.kind !== "marquee"
-      )
-        return;
+      if (drag.kind !== "wire" && drag.kind !== "wire-multi" && drag.kind !== "nodes" && drag.kind !== "marquee") return;
       const rect = canvas.getBoundingClientRect();
-      const { dx, dy } = computeAutoPanDelta(
-        lastMouseScreenPos,
-        rect.width,
-        rect.height,
-      );
+      const { dx, dy } = computeAutoPanDelta(lastMouseScreenPos, rect.width, rect.height);
       if (dx !== 0 || dy !== 0) {
         store.state.camera.pan(dx, dy);
         if (drag.kind === "nodes") updateNodeDragPositions();
@@ -492,13 +334,7 @@ export function setupPointerInteraction(
     const functions = store.state.rootGraph.functions;
     const scripts = store.state.rootGraph.scripts;
     const pos = screenPos(e);
-    const geometries = computeAllNodeGeometries(
-      graph,
-      camera,
-      variables,
-      functions,
-      scripts,
-    );
+    const geometries = computeAllNodeGeometries(graph, camera, variables, functions, scripts);
 
     const addButtonHit = hitTestNodeAddButton(graph, geometries, pos.x, pos.y);
     if (addButtonHit) {
@@ -513,11 +349,7 @@ export function setupPointerInteraction(
 
     const pinHit = hitTestPin(graph, geometries, pos.x, pos.y);
     if (pinHit) {
-      const touching = connectionsTouchingPin(
-        graph,
-        pinHit.nodeId,
-        pinHit.pinId,
-      );
+      const touching = connectionsTouchingPin(graph, pinHit.nodeId, pinHit.pinId);
 
       if ((e.ctrlKey || e.metaKey) && touching.length > 0) {
         // Ctrl+drag off a pin that already has connections picks up ALL of them at once: each
@@ -525,14 +357,11 @@ export function setupPointerInteraction(
         // opposite direction), so dropping them on one new pin — or picking one new node — rewires
         // every one of them there in a single motion, instead of just this one pin's own wire.
         const anchors: WireAnchor[] = touching.map((conn) => {
-          const otherIsFromEnd =
-            conn.toNode === pinHit.nodeId && conn.toPin === pinHit.pinId;
+          const otherIsFromEnd = conn.toNode === pinHit.nodeId && conn.toPin === pinHit.pinId;
           const otherNodeId = otherIsFromEnd ? conn.fromNode : conn.toNode;
           const otherPinId = otherIsFromEnd ? conn.fromPin : conn.toPin;
           const otherNode = graph.nodes.find((n) => n.id === otherNodeId)!;
-          const otherPinDef = otherNode
-            .resolvePinDefs(variables, functions, scripts)
-            .find((p) => p.id === otherPinId)!;
+          const otherPinDef = otherNode.resolvePinDefs(variables, functions, scripts).find((p) => p.id === otherPinId)!;
           return { nodeId: otherNodeId, pinId: otherPinId, pin: otherPinDef };
         });
         for (const conn of touching) {
@@ -541,9 +370,7 @@ export function setupPointerInteraction(
 
         drag = { kind: "wire-multi", anchors };
         store.state.wireDrag = {
-          fromScreens: anchors
-            .map((a) => geometries.get(a.nodeId)?.pinScreen[a.pinId])
-            .filter((p): p is { x: number; y: number } => !!p),
+          fromScreens: anchors.map((a) => geometries.get(a.nodeId)?.pinScreen[a.pinId]).filter((p): p is { x: number; y: number } => !!p),
           toScreen: pos,
           pinType: anchors[0].pin.type,
           anchorDirection: anchors[0].pin.direction,
@@ -562,24 +389,11 @@ export function setupPointerInteraction(
       // Grabbing a connected input pin picks up the existing wire: detach it and
       // keep dragging from its upstream output, mirroring Unreal's pin-grab behavior.
       if (pinHit.pin.direction === "input") {
-        const existing = findConnectionToInput(
-          graph,
-          pinHit.nodeId,
-          pinHit.pinId,
-        );
+        const existing = findConnectionToInput(graph, pinHit.nodeId, pinHit.pinId);
         if (existing) {
           const fromNode = graph.nodes.find((n) => n.id === existing.fromNode)!;
-          const fromPinDef = fromNode
-            .resolvePinDefs(variables, functions, scripts)
-            .find((p) => p.id === existing.fromPin)!;
-          disconnectPin(
-            graph,
-            variables,
-            functions,
-            pinHit.nodeId,
-            pinHit.pinId,
-            scripts,
-          );
+          const fromPinDef = fromNode.resolvePinDefs(variables, functions, scripts).find((p) => p.id === existing.fromPin)!;
+          disconnectPin(graph, variables, functions, pinHit.nodeId, pinHit.pinId, scripts);
           anchor = {
             nodeId: fromNode.id,
             pinId: fromPinDef.id,
@@ -655,14 +469,8 @@ export function setupPointerInteraction(
       // once here so the whole drag can derive the new rect from just this plus the live cursor
       // position (see the mousemove handler below), regardless of which corner was grabbed.
       const anchor = {
-        x:
-          resizeHit.corner === "nw" || resizeHit.corner === "sw"
-            ? box.position.x + box.size.width
-            : box.position.x,
-        y:
-          resizeHit.corner === "nw" || resizeHit.corner === "ne"
-            ? box.position.y + box.size.height
-            : box.position.y,
+        x: resizeHit.corner === "nw" || resizeHit.corner === "sw" ? box.position.x + box.size.width : box.position.x,
+        y: resizeHit.corner === "nw" || resizeHit.corner === "ne" ? box.position.y + box.size.height : box.position.y,
       };
       // Resizing always targets just the one grabbed box, even if it's part of a larger
       // multi-selection — there's no meaningful "resize several boxes at once" gesture here.
@@ -751,13 +559,7 @@ export function setupPointerInteraction(
     const functions = store.state.rootGraph.functions;
     const scripts = store.state.rootGraph.scripts;
     const pos = screenPos(e);
-    const geometries = computeAllNodeGeometries(
-      graph,
-      camera,
-      variables,
-      functions,
-      scripts,
-    );
+    const geometries = computeAllNodeGeometries(graph, camera, variables, functions, scripts);
 
     const nodeHit = hitTestNode(graph, geometries, pos.x, pos.y);
     if (!nodeHit) return;
@@ -773,10 +575,7 @@ export function setupPointerInteraction(
     // Entry (the function's inputs, as its own output pins) or Return (the function's outputs, as
     // its own input pins) — jump to that function's Inputs/Outputs in the sidebar Details panel,
     // same as double-clicking a Get/Set Variable node jumps to its variable below.
-    if (
-      (node.type === "function.entry" || node.type === "function.return") &&
-      node.functionId
-    ) {
+    if ((node.type === "function.entry" || node.type === "function.return") && node.functionId) {
       store.state.sidebarSelection = {
         kind: "function",
         functionId: node.functionId,
@@ -815,20 +614,8 @@ export function setupPointerInteraction(
     // the whole drag, rather than flickering back to the default cursor mid-resize). The diagonal
     // matches the corner: "nw"/"se" run top-left-to-bottom-right, "ne"/"sw" the other way.
     if (drag.kind === "none" || drag.kind === "comment-resize") {
-      const corner =
-        drag.kind === "comment-resize"
-          ? drag.corner
-          : hitTestCommentResizeHandle(
-              getEditingGraph(store.state),
-              store.state.camera,
-              lastMouseScreenPos.x,
-              lastMouseScreenPos.y,
-            )?.corner;
-      canvas.style.cursor = corner
-        ? corner === "nw" || corner === "se"
-          ? "nwse-resize"
-          : "nesw-resize"
-        : "";
+      const corner = drag.kind === "comment-resize" ? drag.corner : hitTestCommentResizeHandle(getEditingGraph(store.state), store.state.camera, lastMouseScreenPos.x, lastMouseScreenPos.y)?.corner;
+      canvas.style.cursor = corner ? (corner === "nw" || corner === "se" ? "nwse-resize" : "nesw-resize") : "";
     }
 
     if (drag.kind === "none") return;
@@ -929,26 +716,11 @@ export function setupPointerInteraction(
       const functions = store.state.rootGraph.functions;
       const scripts = store.state.rootGraph.scripts;
       const pos = screenPos(e);
-      const geometries = computeAllNodeGeometries(
-        graph,
-        camera,
-        variables,
-        functions,
-        scripts,
-      );
+      const geometries = computeAllNodeGeometries(graph, camera, variables, functions, scripts);
       const targetHit = hitTestPin(graph, geometries, pos.x, pos.y);
       const anchors = drag.kind === "wire" ? [drag.anchor] : drag.anchors;
 
-      const connected = targetHit
-        ? tryConnectAnchorsToTarget(
-            graph,
-            variables,
-            functions,
-            scripts,
-            anchors,
-            targetHit,
-          )
-        : false;
+      const connected = targetHit ? tryConnectAnchorsToTarget(graph, variables, functions, scripts, anchors, targetHit) : false;
 
       store.state.wireDrag = null;
       drag = { kind: "none" };
@@ -962,13 +734,7 @@ export function setupPointerInteraction(
       const { commentId } = drag;
       const box = graph.commentBoxes.find((b) => b.id === commentId);
       if (box) {
-        recomputeContainment(
-          graph,
-          getVisibleVariablesForState(store.state),
-          store.state.rootGraph.functions,
-          store.state.rootGraph.scripts,
-          box,
-        );
+        recomputeContainment(graph, getVisibleVariablesForState(store.state), store.state.rootGraph.functions, store.state.rootGraph.scripts, box);
       }
       drag = { kind: "none" };
       store.notify();
@@ -1000,11 +766,7 @@ export function setupPointerInteraction(
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      store.state.camera.zoomAt(
-        e.clientX - rect.left,
-        e.clientY - rect.top,
-        factor,
-      );
+      store.state.camera.zoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
       store.notify();
     },
     { passive: false },
@@ -1068,35 +830,19 @@ export function setupPointerInteraction(
       // treating THAT as "copy the selection" would silently break ordinary graph-node copying.
       const selection = window.getSelection();
       const logPanel = document.getElementById("log-panel");
-      const copyingLogText =
-        !!selection &&
-        !selection.isCollapsed &&
-        selection.toString().length > 0 &&
-        !!logPanel &&
-        !!selection.anchorNode &&
-        logPanel.contains(selection.anchorNode);
+      const copyingLogText = !!selection && !selection.isCollapsed && selection.toString().length > 0 && !!logPanel && !!selection.anchorNode && logPanel.contains(selection.anchorNode);
       if (copyingLogText) return;
 
       e.preventDefault();
       const { selectedNodeIds, sidebarSelection } = store.state;
       if (selectedNodeIds.size > 0) {
-        const { nodes, connections } = cloneNodesForClipboard(
-          graph,
-          selectedNodeIds,
-        );
+        const { nodes, connections } = cloneNodesForClipboard(graph, selectedNodeIds);
         if (nodes.length > 0) {
-          navigator.clipboard
-            .writeText(serializeNodesClipboardPayload(nodes, connections))
-            .catch(() => {});
+          navigator.clipboard.writeText(serializeNodesClipboardPayload(nodes, connections)).catch(() => {});
         }
       } else if (sidebarSelection?.kind === "variable") {
-        const variable = getVisibleVariablesForState(store.state).find(
-          (v) => v.id === sidebarSelection.variableId,
-        );
-        if (variable)
-          navigator.clipboard
-            .writeText(serializeVariableClipboardPayload(variable))
-            .catch(() => {});
+        const variable = getVisibleVariablesForState(store.state).find((v) => v.id === sidebarSelection.variableId);
+        if (variable) navigator.clipboard.writeText(serializeVariableClipboardPayload(variable)).catch(() => {});
       }
       return;
     }
@@ -1117,8 +863,7 @@ export function setupPointerInteraction(
             const isFunctionBody = store.state.activeFunctionId !== null;
             const seenEventTypes = new Set<string>();
             const placeableNodes = payload.nodes.filter((n) => {
-              if (!pasteGraph.canPlaceNodeType(n.type, isFunctionBody))
-                return false;
+              if (!pasteGraph.canPlaceNodeType(n.type, isFunctionBody)) return false;
               if (getNodeDef(n.type).eventTrigger) {
                 if (seenEventTypes.has(n.type)) return false;
                 seenEventTypes.add(n.type);
@@ -1127,18 +872,9 @@ export function setupPointerInteraction(
             });
             const placeablePayload = { ...payload, nodes: placeableNodes };
 
-            const rawTarget = store.state.camera.screenToWorld(
-              lastMouseScreenPos.x,
-              lastMouseScreenPos.y,
-            );
-            const targetTopLeft = store.state.snapToGrid
-              ? snapPositionToGrid(rawTarget)
-              : rawTarget;
-            const newIds = pasteNodesIntoGraph(
-              pasteGraph,
-              placeablePayload,
-              targetTopLeft,
-            );
+            const rawTarget = store.state.camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y);
+            const targetTopLeft = store.state.snapToGrid ? snapPositionToGrid(rawTarget) : rawTarget;
+            const newIds = pasteNodesIntoGraph(pasteGraph, placeablePayload, targetTopLeft);
             if (newIds.length > 0) {
               store.state.selectedNodeIds = new Set(newIds);
               store.state.selectedCommentIds = new Set();
@@ -1146,10 +882,7 @@ export function setupPointerInteraction(
               store.notify();
             }
           } else {
-            const newVariable = pasteVariableIntoGraph(
-              pasteGraph,
-              payload.variable,
-            );
+            const newVariable = pasteVariableIntoGraph(pasteGraph, payload.variable);
             store.state.sidebarSelection = {
               kind: "variable",
               variableId: newVariable.id,
@@ -1172,15 +905,7 @@ export function setupPointerInteraction(
         const rects = [...selectedNodeIds]
           .map((id) => graph.nodes.find((n) => n.id === id))
           .filter((n): n is NonNullable<typeof n> => !!n)
-          .map((n) =>
-            computeNodeWorldRect(
-              n,
-              n.resolvePinDefs(variables, functions, scripts),
-              variables,
-              functions,
-              scripts,
-            ),
-          );
+          .map((n) => computeNodeWorldRect(n, n.resolvePinDefs(variables, functions, scripts), variables, functions, scripts));
 
         const minX = Math.min(...rects.map((r) => r.x));
         const minY = Math.min(...rects.map((r) => r.y));
@@ -1205,10 +930,7 @@ export function setupPointerInteraction(
         store.notify();
       } else {
         // Nothing selected: drop a default-sized empty box at the cursor.
-        const worldPos = camera.screenToWorld(
-          lastMouseScreenPos.x,
-          lastMouseScreenPos.y,
-        );
+        const worldPos = camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y);
         const box: CommentBox = {
           id: nextId("comment"),
           text: "Comment",

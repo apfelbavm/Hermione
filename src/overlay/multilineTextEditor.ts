@@ -5,11 +5,7 @@
  * viewport (fixed) coordinates, same convention as rowContextMenu.ts — dismissed via Escape (cancel,
  * discarding edits) or the Save button; clicking outside also cancels, matching the other floating
  * panels in this app. */
-export function openMultilineTextEditor(
-  screenPos: { x: number; y: number },
-  currentValue: string,
-  onCommit: (value: string) => void,
-): void {
+export function openMultilineTextEditor(screenPos: { x: number; y: number }, currentValue: string, onCommit: (value: string) => void): void {
   const panel = document.createElement("div");
   panel.className = "multiline-text-editor";
   panel.style.left = `${screenPos.x}px`;

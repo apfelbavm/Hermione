@@ -30,9 +30,7 @@ registerNode({
   // container/keyType are forwarded too so a container variable's Get pin wires exactly like the
   // variable itself (see isPinTypeCompatible) — the value flows through untouched either way, since
   // executor.ts/codegen.ts only ever branch on type !== "exec".
-  derivePins: (variable) => [
-    { id: "value", label: "", type: variable.type, direction: "output", container: variable.container, keyType: variable.keyType },
-  ],
+  derivePins: (variable) => [{ id: "value", label: "", type: variable.type, direction: "output", container: variable.container, keyType: variable.keyType }],
   evaluate: ({ node, ctx }) => ({
     value: node.variableId ? getVariableValue(ctx, node.variableId) : undefined,
   }),
@@ -65,8 +63,5 @@ registerNode({
     if (node.variableId) setVariableValue(ctx, node.variableId, inputs.value);
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ node, inputs, graph, compileFrom }) => [
-    `rt.state[${JSON.stringify(node.variableId)}] = ${inputs.value}; /* ${variableName(graph, node.variableId)} */`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, graph, compileFrom }) => [`rt.state[${JSON.stringify(node.variableId)}] = ${inputs.value}; /* ${variableName(graph, node.variableId)} */`, ...compileFrom("exec-out")],
 });

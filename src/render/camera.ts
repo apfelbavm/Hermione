@@ -45,12 +45,7 @@ export class Camera {
    * MIN_ZOOM/MAX_ZOOM every other zoom interaction respects. When the rect is too large to fit even
    * at MIN_ZOOM, centering it would still crop most of it either way — pinning its top-left corner
    * to the viewport's top-left instead at least keeps a consistent, predictable starting point. */
-  frameRect(
-    rect: { x: number; y: number; width: number; height: number },
-    viewportWidth: number,
-    viewportHeight: number,
-    paddingPx: number = 60,
-  ): void {
+  frameRect(rect: { x: number; y: number; width: number; height: number }, viewportWidth: number, viewportHeight: number, paddingPx: number = 60): void {
     const availableWidth = Math.max(1, viewportWidth - paddingPx * 2);
     const availableHeight = Math.max(1, viewportHeight - paddingPx * 2);
     const fitZoom = Math.min(availableWidth / Math.max(1, rect.width), availableHeight / Math.max(1, rect.height));

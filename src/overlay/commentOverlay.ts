@@ -105,9 +105,7 @@ function createCommentEntry(commentId: string, store: Store, canvas: HTMLCanvasE
       if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) <= DRAG_THRESHOLD_PX) return;
       settled = true;
       cleanup();
-      canvas.dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window, clientX: startX, clientY: startY, button }),
-      );
+      canvas.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window, clientX: startX, clientY: startY, button }));
     }
 
     function onUp(): void {

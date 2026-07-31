@@ -28,10 +28,7 @@ export interface MarqueeSelectionState {
  * bottom of the sidebar (Unreal-style: click an item in a list, its details show below). Distinct
  * from activeFunctionId/openFunctionTabs (which tab is open on the canvas) — clicking a function's
  * name does both, but they can diverge (e.g. switching tabs via the graph-tab strip). */
-export type SidebarSelection =
-  | { kind: "variable"; variableId: string }
-  | { kind: "function"; functionId: string }
-  | { kind: "script"; scriptId: string };
+export type SidebarSelection = { kind: "variable"; variableId: string } | { kind: "function"; functionId: string } | { kind: "script"; scriptId: string };
 
 export interface AppState {
   /** Always the true whole program — what Run/Compile/Save/Load and the Functions/global
@@ -66,9 +63,7 @@ export interface AppState {
 /** The graph currently open for editing on the canvas — the root graph, or a function's body. */
 export function getEditingGraph(state: AppState): Graph {
   if (!state.activeFunctionId) return state.rootGraph;
-  const fn = state.rootGraph.functions.find(
-    (f) => f.id === state.activeFunctionId,
-  );
+  const fn = state.rootGraph.functions.find((f) => f.id === state.activeFunctionId);
   return fn ? fn.body : state.rootGraph;
 }
 
@@ -87,10 +82,7 @@ export function closeFunctionTab(state: AppState, functionId: string): void {
   if (index === -1) return;
   state.openFunctionTabs.splice(index, 1);
   if (state.activeFunctionId === functionId) {
-    state.activeFunctionId =
-      state.openFunctionTabs[index] ??
-      state.openFunctionTabs[index - 1] ??
-      null;
+    state.activeFunctionId = state.openFunctionTabs[index] ?? state.openFunctionTabs[index - 1] ?? null;
   }
 }
 
@@ -116,8 +108,7 @@ export function closeScriptTab(state: AppState, scriptId: string): void {
   if (index === -1) return;
   state.openScriptTabs.splice(index, 1);
   if (state.activeLowerTabId === scriptId) {
-    state.activeLowerTabId =
-      state.openScriptTabs[index] ?? state.openScriptTabs[index - 1] ?? null;
+    state.activeLowerTabId = state.openScriptTabs[index] ?? state.openScriptTabs[index - 1] ?? null;
   }
 }
 

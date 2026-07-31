@@ -1,15 +1,7 @@
 import { cloneDefaultValue } from "./graphMutations";
 import { NodeInstance } from "./nodeInstance";
 import { getNodeDef } from "./registry";
-import type {
-  CodeScriptDef,
-  CommentBox,
-  Connection,
-  FunctionDef,
-  Pin,
-  PinType,
-  Variable,
-} from "./types";
+import type { CodeScriptDef, CommentBox, Connection, FunctionDef, Pin, PinType, Variable } from "./types";
 
 export class Graph {
   id: string;
@@ -57,12 +49,7 @@ export class Graph {
     return !this.nodes.some((n) => n.type === type);
   }
 
-  removeConnection(
-    variables: Variable[],
-    functions: FunctionDef[],
-    connectionId: string,
-    scripts: CodeScriptDef[] = [],
-  ): void {
+  removeConnection(variables: Variable[], functions: FunctionDef[], connectionId: string, scripts: CodeScriptDef[] = []): void {
     const conn = this.connections.find((c) => c.id === connectionId);
     if (!conn) return;
     this.connections = this.connections.filter((c) => c.id !== connectionId);
@@ -72,16 +59,10 @@ export class Graph {
     if (toPin) {
       // An exec input pin may still have OTHER incoming wires after this one is removed —
       // only clear connectionId/restore the literal default once none remain.
-      const remaining = this.connections.find(
-        (c) => c.toNode === conn.toNode && c.toPin === conn.toPin,
-      );
+      const remaining = this.connections.find((c) => c.toNode === conn.toNode && c.toPin === conn.toPin);
       toPin.connectionId = remaining?.id;
       if (!remaining) {
-        const pinDef = toNode
-          ? toNode
-              .resolvePinDefs(variables, functions, scripts)
-              .find((p) => p.id === conn.toPin)
-          : undefined;
+        const pinDef = toNode ? toNode.resolvePinDefs(variables, functions, scripts).find((p) => p.id === conn.toPin) : undefined;
         toPin.value = cloneDefaultValue(pinDef?.defaultValue);
       }
     }
@@ -95,18 +76,11 @@ export class Graph {
    * from the now-current (post-patch) pin defs — deriveInstancePins reads the still-intact `node.pins`
    * keys for arity (e.g. how many Make Array entries existed) before they're replaced, so entry COUNT
    * survives a type change even though each entry's stored value resets to the new type's default. */
-  changeNodeElementType(
-    variables: Variable[],
-    functions: FunctionDef[],
-    nodeId: string,
-    patch: { elementType?: PinType; mapKeyType?: PinType },
-  ): void {
+  changeNodeElementType(variables: Variable[], functions: FunctionDef[], nodeId: string, patch: { elementType?: PinType; mapKeyType?: PinType }): void {
     const node = this.nodes.find((n) => n.id === nodeId);
     if (!node) return;
 
-    for (const conn of this.connections.filter(
-      (c) => c.fromNode === nodeId || c.toNode === nodeId,
-    )) {
+    for (const conn of this.connections.filter((c) => c.fromNode === nodeId || c.toNode === nodeId)) {
       this.removeConnection(variables, functions, conn.id);
     }
 
@@ -115,10 +89,7 @@ export class Graph {
 
     const pins: Record<string, Pin> = {};
     for (const def of node.resolvePinDefs(variables, functions)) {
-      pins[def.id] =
-        def.direction === "input"
-          ? { value: cloneDefaultValue(def.defaultValue) }
-          : {};
+      pins[def.id] = def.direction === "input" ? { value: cloneDefaultValue(def.defaultValue) } : {};
     }
     node.pins = pins;
   }
@@ -134,12 +105,7 @@ export class Graph {
    * "silently starved," since that consumer never executes at all. Without this exemption, disabling
    * a loop would be blocked in virtually every real graph, since wiring index/element/key/value into
    * the loop body is the entire point of using one. */
-  hasConnectedDataOutput(
-    nodeId: string,
-    variables: Variable[],
-    functions: FunctionDef[],
-    scripts: CodeScriptDef[] = [],
-  ): boolean {
+  hasConnectedDataOutput(nodeId: string, variables: Variable[], functions: FunctionDef[], scripts: CodeScriptDef[] = []): boolean {
     const node = this.nodes.find((n) => n.id === nodeId);
     if (!node) return false;
     if (getNodeDef(node.type).disabledNextExec) return false;
@@ -149,9 +115,7 @@ export class Graph {
         .filter((p) => p.direction === "output" && p.type !== "exec")
         .map((p) => p.id),
     );
-    return this.connections.some(
-      (c) => c.fromNode === nodeId && dataOutputIds.has(c.fromPin),
-    );
+    return this.connections.some((c) => c.fromNode === nodeId && dataOutputIds.has(c.fromPin));
   }
 
   /** Entry and Return nodes are structural — a function body must always be able to receive its
@@ -159,17 +123,9 @@ export class Graph {
    * even by the user's own Delete key). Callers that legitimately clean up OTHER node types bound to
    * a variable/function (removeVariable, removeFunctionDef) never target these types, so this guard
    * doesn't interfere with them. */
-  static UNDELETABLE_NODE_TYPES = new Set([
-    "function.entry",
-    "function.return",
-  ]);
+  static UNDELETABLE_NODE_TYPES = new Set(["function.entry", "function.return"]);
 
-  removeNode(
-    variables: Variable[],
-    functions: FunctionDef[],
-    nodeId: string,
-    scripts: CodeScriptDef[] = [],
-  ): void {
+  removeNode(variables: Variable[], functions: FunctionDef[], nodeId: string, scripts: CodeScriptDef[] = []): void {
     const node = this.nodes.find((n) => n.id === nodeId);
     if (!node || Graph.UNDELETABLE_NODE_TYPES.has(node.type)) return;
 
@@ -178,9 +134,7 @@ export class Graph {
     // restored to a literal default — a raw filter would leave that pin's connectionId dangling and
     // its value stuck at whatever it was mid-connection (undefined, surfacing as a stray "null"),
     // never falling back to a real default the way an explicit disconnect already does.
-    for (const conn of this.connections.filter(
-      (c) => c.fromNode === nodeId || c.toNode === nodeId,
-    )) {
+    for (const conn of this.connections.filter((c) => c.fromNode === nodeId || c.toNode === nodeId)) {
       this.removeConnection(variables, functions, conn.id, scripts);
     }
 

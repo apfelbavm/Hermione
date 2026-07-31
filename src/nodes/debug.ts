@@ -2,12 +2,7 @@ import { XMLParser, XMLValidator } from "fast-xml-parser";
 import XMLBuilder from "fast-xml-builder";
 import * as Papa from "papaparse";
 import { registerNode } from "../engine/registry";
-import {
-  XML_BUILDER_IMPORT_LINE,
-  XML_IMPORT_LINE,
-  XML_PARSE_OPTIONS_LITERAL,
-  XML_PRETTY_BUILD_OPTIONS_LITERAL,
-} from "./dataFormatHelpers";
+import { XML_BUILDER_IMPORT_LINE, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, XML_PRETTY_BUILD_OPTIONS_LITERAL } from "./dataFormatHelpers";
 
 registerNode({
   type: "debug.print",
@@ -23,10 +18,7 @@ registerNode({
     ctx.log(String(inputs.message ?? ""));
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ inputs, compileFrom }) => [
-    `rt.log(String(${inputs.message}));`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ inputs, compileFrom }) => [`rt.log(String(${inputs.message}));`, ...compileFrom("exec-out")],
 });
 
 const FORMATS = ["text", "json", "xml", "csv"];
@@ -68,13 +60,7 @@ function formatForLog(message, format) {
 }
 `;
 
-const formatForLog: (message: string, format: string) => string = new Function(
-  "XMLParser",
-  "XMLValidator",
-  "XMLBuilder",
-  "Papa",
-  `${FORMAT_FOR_LOG_SOURCE}\nreturn formatForLog;`,
-)(XMLParser, XMLValidator, XMLBuilder, Papa);
+const formatForLog: (message: string, format: string) => string = new Function("XMLParser", "XMLValidator", "XMLBuilder", "Papa", `${FORMAT_FOR_LOG_SOURCE}\nreturn formatForLog;`)(XMLParser, XMLValidator, XMLBuilder, Papa);
 
 registerNode({
   type: "debug.printFormatted",
@@ -91,10 +77,7 @@ registerNode({
     ctx.log(formatForLog(String(inputs.message ?? ""), String(inputs.format ?? FORMATS[0])));
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ inputs, compileFrom }) => [
-    `rt.log(formatForLog(String(${inputs.message}), String(${inputs.format})));`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ inputs, compileFrom }) => [`rt.log(formatForLog(String(${inputs.message}), String(${inputs.format})));`, ...compileFrom("exec-out")],
   compileImports: [XML_IMPORT_LINE, XML_BUILDER_IMPORT_LINE, 'import * as Papa from "papaparse";'],
   compileHelpers: { formatForLog: FORMAT_FOR_LOG_SOURCE },
 });

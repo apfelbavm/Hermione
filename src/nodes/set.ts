@@ -121,10 +121,7 @@ registerNode({
     },
     setOutPin("number"),
   ],
-  deriveInstancePins: (node) => [
-    ...makeSetEntryPins(node),
-    setOutPin(elementTypeOf(node)),
-  ],
+  deriveInstancePins: (node) => [...makeSetEntryPins(node), setOutPin(elementTypeOf(node))],
   addInstancePinEntry: (node) => {
     const suffixes = makeSetEntryIds(node).map(entrySuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -150,14 +147,8 @@ registerNode({
   description: "Returns how many unique elements are in the set.",
   group: GROUP,
   configurableElementType: {},
-  pins: [
-    setPin("number"),
-    { id: "length", label: "Length", type: "number", direction: "output" },
-  ],
-  deriveInstancePins: (node) => [
-    setPin(elementTypeOf(node)),
-    { id: "length", label: "Length", type: "number", direction: "output" },
-  ],
+  pins: [setPin("number"), { id: "length", label: "Length", type: "number", direction: "output" }],
+  deriveInstancePins: (node) => [setPin(elementTypeOf(node)), { id: "length", label: "Length", type: "number", direction: "output" }],
   evaluate: ({ inputs }) => ({ length: asArray(inputs.set).length }),
   compileEvaluate: ({ inputs }) => ({
     length: `(${compileAsArray(inputs.set)}).length`,
@@ -170,26 +161,14 @@ registerNode({
   description: "Adds a value to the set, unless it's already present.",
   group: GROUP,
   configurableElementType: {},
-  pins: [
-    setPin("number"),
-    itemPin("item", "Item", "number"),
-    setOutPin("number"),
-    { id: "added", label: "Added", type: "boolean", direction: "output" },
-  ],
+  pins: [setPin("number"), itemPin("item", "Item", "number"), setOutPin("number"), { id: "added", label: "Added", type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      setPin(t),
-      itemPin("item", "Item", t),
-      setOutPin(t),
-      { id: "added", label: "Added", type: "boolean", direction: "output" },
-    ];
+    return [setPin(t), itemPin("item", "Item", t), setOutPin(t), { id: "added", label: "Added", type: "boolean", direction: "output" }];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.set);
-    const exists = arr.some(
-      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
-    );
+    const exists = arr.some((v) => JSON.stringify(v) === JSON.stringify(inputs.item));
     return {
       result: exists ? arr.slice() : [...arr, inputs.item],
       added: !exists,
@@ -210,30 +189,16 @@ registerNode({
   description: "Removes a value from the set if it is present.",
   group: GROUP,
   configurableElementType: {},
-  pins: [
-    setPin("number"),
-    itemPin("item", "Item", "number"),
-    setOutPin("number"),
-    { id: "removed", label: "Removed", type: "boolean", direction: "output" },
-  ],
+  pins: [setPin("number"), itemPin("item", "Item", "number"), setOutPin("number"), { id: "removed", label: "Removed", type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      setPin(t),
-      itemPin("item", "Item", t),
-      setOutPin(t),
-      { id: "removed", label: "Removed", type: "boolean", direction: "output" },
-    ];
+    return [setPin(t), itemPin("item", "Item", t), setOutPin(t), { id: "removed", label: "Removed", type: "boolean", direction: "output" }];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.set);
-    const index = arr.findIndex(
-      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
-    );
+    const index = arr.findIndex((v) => JSON.stringify(v) === JSON.stringify(inputs.item));
     const removed = index !== -1;
-    const result = removed
-      ? [...arr.slice(0, index), ...arr.slice(index + 1)]
-      : arr.slice();
+    const result = removed ? [...arr.slice(0, index), ...arr.slice(index + 1)] : arr.slice();
     return { result, removed };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -263,11 +228,7 @@ registerNode({
   description: "True if the set already contains this value.",
   group: GROUP,
   configurableElementType: {},
-  pins: [
-    setPin("number"),
-    itemPin("item", "Item", "number"),
-    { id: "contains", label: "Contains", type: "boolean", direction: "output" },
-  ],
+  pins: [setPin("number"), itemPin("item", "Item", "number"), { id: "contains", label: "Contains", type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
     return [
@@ -282,9 +243,7 @@ registerNode({
     ];
   },
   evaluate: ({ inputs }) => ({
-    contains: asArray(inputs.set).some(
-      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
-    ),
+    contains: asArray(inputs.set).some((v) => JSON.stringify(v) === JSON.stringify(inputs.item)),
   }),
   compileEvaluate: ({ inputs }) => ({
     contains: `(${compileAsArray(inputs.set)}).some((v) => ${jsonEq("v", inputs.item)})`,
@@ -297,14 +256,8 @@ registerNode({
   description: "True if the set has no elements.",
   group: GROUP,
   configurableElementType: {},
-  pins: [
-    setPin("number"),
-    { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" },
-  ],
-  deriveInstancePins: (node) => [
-    setPin(elementTypeOf(node)),
-    { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" },
-  ],
+  pins: [setPin("number"), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
+  deriveInstancePins: (node) => [setPin(elementTypeOf(node)), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
   evaluate: ({ inputs }) => ({ isEmpty: asArray(inputs.set).length === 0 }),
   compileEvaluate: ({ inputs }) => ({
     isEmpty: `((${compileAsArray(inputs.set)}).length === 0)`,
@@ -352,26 +305,16 @@ registerNode({
   description: "Combines two sets, keeping every distinct element from both.",
   group: GROUP,
   configurableElementType: {},
-  pins: [
-    { ...setPin("number"), id: "a", label: "Set A" },
-    { ...setPin("number"), id: "b", label: "Set B" },
-    setOutPin("number"),
-  ],
+  pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      { ...setPin(t), id: "a", label: "Set A" },
-      { ...setPin(t), id: "b", label: "Set B" },
-      setOutPin(t),
-    ];
+    return [{ ...setPin(t), id: "a", label: "Set A" }, { ...setPin(t), id: "b", label: "Set B" }, setOutPin(t)];
   },
   evaluate: ({ inputs }) => ({
     result: dedupe([...asArray(inputs.a), ...asArray(inputs.b)]),
   }),
   compileEvaluate: ({ inputs }) => ({
-    result: compileDedupe(
-      `[...${compileAsArray(inputs.a)}, ...${compileAsArray(inputs.b)}]`,
-    ),
+    result: compileDedupe(`[...${compileAsArray(inputs.a)}, ...${compileAsArray(inputs.b)}]`),
   }),
 });
 
@@ -381,26 +324,16 @@ registerNode({
   description: "Returns only the elements present in both sets.",
   group: GROUP,
   configurableElementType: {},
-  pins: [
-    { ...setPin("number"), id: "a", label: "Set A" },
-    { ...setPin("number"), id: "b", label: "Set B" },
-    setOutPin("number"),
-  ],
+  pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      { ...setPin(t), id: "a", label: "Set A" },
-      { ...setPin(t), id: "b", label: "Set B" },
-      setOutPin(t),
-    ];
+    return [{ ...setPin(t), id: "a", label: "Set A" }, { ...setPin(t), id: "b", label: "Set B" }, setOutPin(t)];
   },
   evaluate: ({ inputs }) => {
     const a = asArray(inputs.a);
     const b = asArray(inputs.b);
     return {
-      result: a.filter((v) =>
-        b.some((bv) => JSON.stringify(bv) === JSON.stringify(v)),
-      ),
+      result: a.filter((v) => b.some((bv) => JSON.stringify(bv) === JSON.stringify(v))),
     };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -414,26 +347,16 @@ registerNode({
   description: "Returns elements in the first set that aren't in the second.",
   group: GROUP,
   configurableElementType: {},
-  pins: [
-    { ...setPin("number"), id: "a", label: "Set A" },
-    { ...setPin("number"), id: "b", label: "Set B" },
-    setOutPin("number"),
-  ],
+  pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      { ...setPin(t), id: "a", label: "Set A" },
-      { ...setPin(t), id: "b", label: "Set B" },
-      setOutPin(t),
-    ];
+    return [{ ...setPin(t), id: "a", label: "Set A" }, { ...setPin(t), id: "b", label: "Set B" }, setOutPin(t)];
   },
   evaluate: ({ inputs }) => {
     const a = asArray(inputs.a);
     const b = asArray(inputs.b);
     return {
-      result: a.filter(
-        (v) => !b.some((bv) => JSON.stringify(bv) === JSON.stringify(v)),
-      ),
+      result: a.filter((v) => !b.some((bv) => JSON.stringify(bv) === JSON.stringify(v))),
     };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -488,9 +411,7 @@ registerNode({
   execute: async ({ node, inputs, ctx }) => {
     const arr = asArray(inputs.set);
     if (arr.length > MAX_SET_FOR_EACH_ITERATIONS) {
-      throw new Error(
-        `Set For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_SET_FOR_EACH_ITERATIONS} limit.`,
-      );
+      throw new Error(`Set For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_SET_FOR_EACH_ITERATIONS} limit.`);
     }
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
     for (let i = 0; i < arr.length; i++) {

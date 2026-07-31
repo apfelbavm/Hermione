@@ -50,14 +50,9 @@ export function isPinTypeCompatible(a: PinTypeShape, b: PinTypeShape): boolean {
 }
 
 /** Node defs with at least one pin of the opposite direction compatible with the given pin shape. */
-export function findCompatibleNodeDefs(
-  pin: PinTypeShape,
-  pinDirection: "input" | "output",
-): NodeDef[] {
+export function findCompatibleNodeDefs(pin: PinTypeShape, pinDirection: "input" | "output"): NodeDef[] {
   const wantDirection = pinDirection === "output" ? "input" : "output";
-  return allNodeDefs().filter((def) =>
-    def.pins.some((p) => p.direction === wantDirection && isPinTypeCompatible(p, pin)),
-  );
+  return allNodeDefs().filter((def) => def.pins.some((p) => p.direction === wantDirection && isPinTypeCompatible(p, pin)));
 }
 
 /** The first segment of a dot-separated group path, e.g. "Math" for "Math.Comparison" — used

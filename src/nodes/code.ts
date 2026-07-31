@@ -58,10 +58,7 @@ function deriveScriptPins(script: CodeScriptDef) {
   ];
 }
 
-type RunFunction = (
-  log: (message: string) => void,
-  inputs: Record<string, unknown>,
-) => unknown;
+type RunFunction = (log: (message: string) => void, inputs: Record<string, unknown>) => unknown;
 
 // Caches the PARSED factory (the `new Function` call itself — the expensive part), not its result —
 // each execute() call still invokes the factory fresh, re-running the script's top-level statements

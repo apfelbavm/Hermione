@@ -31,10 +31,7 @@ registerNode({
     return { nextExec: "exec-out" };
   },
   compileHelpers: { delay: DELAY_HELPER_SOURCE },
-  compileExecute: ({ inputs, compileFrom }) => [
-    `await delay(Number(${inputs.duration}));`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ inputs, compileFrom }) => [`await delay(Number(${inputs.duration}));`, ...compileFrom("exec-out")],
 });
 
 registerNode({
@@ -55,13 +52,7 @@ registerNode({
     { id: "false", label: "False", type: "exec", direction: "output" },
   ],
   execute: ({ inputs }) => ({ nextExec: inputs.condition ? "true" : "false" }),
-  compileExecute: ({ inputs, compileFrom }) => [
-    `if (${inputs.condition}) {`,
-    ...indent(compileFrom("true")),
-    `} else {`,
-    ...indent(compileFrom("false")),
-    `}`,
-  ],
+  compileExecute: ({ inputs, compileFrom }) => [`if (${inputs.condition}) {`, ...indent(compileFrom("true")), `} else {`, ...indent(compileFrom("false")), `}`],
 });
 
 registerNode({
@@ -78,13 +69,7 @@ registerNode({
   execute: ({ inputs }) => ({
     nextExec: inputs.object === undefined || inputs.object === null ? "invalid" : "valid",
   }),
-  compileExecute: ({ inputs, compileFrom }) => [
-    `if (${inputs.object} !== undefined && ${inputs.object} !== null) {`,
-    ...indent(compileFrom("valid")),
-    `} else {`,
-    ...indent(compileFrom("invalid")),
-    `}`,
-  ],
+  compileExecute: ({ inputs, compileFrom }) => [`if (${inputs.object} !== undefined && ${inputs.object} !== null) {`, ...indent(compileFrom("valid")), `} else {`, ...indent(compileFrom("invalid")), `}`],
 });
 
 // A runaway Start/End (typo'd or wired to the wrong value) shouldn't be able to hang the whole
@@ -139,9 +124,7 @@ registerNode({
     const end = Math.round(Number(inputs.end ?? 0));
 
     if (end - start + 1 > MAX_FOR_LOOP_ITERATIONS) {
-      throw new Error(
-        `For Loop (${node.id}) would run ${end - start + 1} iterations, over the ${MAX_FOR_LOOP_ITERATIONS} limit — check its Start/End.`,
-      );
+      throw new Error(`For Loop (${node.id}) would run ${end - start + 1} iterations, over the ${MAX_FOR_LOOP_ITERATIONS} limit — check its Start/End.`);
     }
 
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
@@ -211,10 +194,7 @@ registerNode({
       direction: "output",
     },
   ],
-  deriveInstancePins: (node) => [
-    { id: "exec-in", label: "", type: "exec", direction: "input" },
-    ...sequenceThenPinDefs(node),
-  ],
+  deriveInstancePins: (node) => [{ id: "exec-in", label: "", type: "exec", direction: "input" }, ...sequenceThenPinDefs(node)],
   addInstancePinEntry: (node) => {
     const suffixes = sequenceThenIds(node).map(thenSuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -301,11 +281,7 @@ registerNode({
     },
     { id: "completed", label: "Completed", type: "exec", direction: "output" },
   ],
-  deriveInstancePins: (node) => [
-    { id: "exec-in", label: "", type: "exec", direction: "input" },
-    ...parallelBranchPinDefs(node),
-    { id: "completed", label: "Completed", type: "exec", direction: "output" },
-  ],
+  deriveInstancePins: (node) => [{ id: "exec-in", label: "", type: "exec", direction: "input" }, ...parallelBranchPinDefs(node), { id: "completed", label: "Completed", type: "exec", direction: "output" }],
   addInstancePinEntry: (node) => {
     const suffixes = parallelBranchIds(node).map(branchSuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -320,13 +296,7 @@ registerNode({
   latentBodyPins: (node) => parallelBranchIds(node),
   execute: async ({ node, ctx }) => {
     const branchIds = parallelBranchIds(node);
-    await Promise.all(
-      branchIds.flatMap((branchId) =>
-        connectionsFrom(ctx.graph, node.id, branchId).map((conn) =>
-          runExecFrom(conn.toNode, conn.toPin, ctx),
-        ),
-      ),
-    );
+    await Promise.all(branchIds.flatMap((branchId) => connectionsFrom(ctx.graph, node.id, branchId).map((conn) => runExecFrom(conn.toNode, conn.toPin, ctx))));
     return { nextExec: "completed" };
   },
   // Compiles to a native `await Promise.all([...])` wrapping one async IIFE per branch — the same
@@ -335,16 +305,7 @@ registerNode({
   // a compiled Delay), so the compiled output genuinely interleaves branches at runtime rather than
   // just simulating it inside the editor.
   compileExecute: ({ node, compileFrom }) => {
-    const branchBlocks = parallelBranchIds(node).map((branchId) => [
-      `(async () => {`,
-      ...indent(compileFrom(branchId)),
-      `})(),`,
-    ]);
-    return [
-      `await Promise.all([`,
-      ...indent(branchBlocks.flat()),
-      `]);`,
-      ...compileFrom("completed"),
-    ];
+    const branchBlocks = parallelBranchIds(node).map((branchId) => [`(async () => {`, ...indent(compileFrom(branchId)), `})(),`]);
+    return [`await Promise.all([`, ...indent(branchBlocks.flat()), `]);`, ...compileFrom("completed")];
   },
 });

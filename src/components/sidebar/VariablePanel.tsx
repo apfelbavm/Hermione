@@ -43,17 +43,7 @@ function ContainerIcon({ container, color, title }: { container: PinContainer; c
  * Get/Set choice at the drop point (see AppShell.tsx's canvas drop handler). Generalized over
  * `getGraph` so the same component drives both the always-visible global Variables panel (bound to
  * the root graph) and the Local Variables panel (bound to whichever function's body is open). */
-export function VariablePanel({
-  id,
-  title,
-  store,
-  getGraph,
-}: {
-  id?: string;
-  title: string;
-  store: Store;
-  getGraph: () => Graph;
-}) {
+export function VariablePanel({ id, title, store, getGraph }: { id?: string; title: string; store: Store; getGraph: () => Graph }) {
   useStoreRevision(store);
   const [editingId, setEditingId] = useState<string | null>(null);
   const graph = getGraph();
@@ -107,11 +97,7 @@ export function VariablePanel({
             {...rowDragHandlers(variable.id)}
           >
             {variable.container && variable.container !== "single" ? (
-              <ContainerIcon
-                container={variable.container}
-                color={Colors.PIN_COLORS[variable.type]}
-                title={`${variable.container} of ${variable.type}`}
-              />
+              <ContainerIcon container={variable.container} color={Colors.PIN_COLORS[variable.type]} title={`${variable.container} of ${variable.type}`} />
             ) : (
               <span className="variable-type-dot" style={{ backgroundColor: Colors.PIN_COLORS[variable.type] }} title={variable.type} />
             )}

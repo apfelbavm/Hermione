@@ -13,10 +13,7 @@ export function deleteSavedGraph(): void {
   localStorage.removeItem(LOCAL_STORAGE_KEY);
 }
 
-export function downloadGraphAsFile(
-  graph: Graph,
-  filename: string = `${graph.name || "graph"}.json`,
-): void {
+export function downloadGraphAsFile(graph: Graph, filename: string = `${graph.name || "graph"}.json`): void {
   const blob = new Blob([serializeGraph(graph)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

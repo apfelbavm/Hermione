@@ -82,11 +82,7 @@ export function setupNodeHoverTooltip(canvas: HTMLCanvasElement, store: Store): 
 
     const pinHit = hitTestPin(graph, geometries, pos.x, pos.y);
     const nodeHit = pinHit ? null : hitTestNode(graph, geometries, pos.x, pos.y);
-    const target: HoverTarget = pinHit
-      ? { kind: "pin", nodeId: pinHit.nodeId, pinId: pinHit.pinId }
-      : nodeHit
-        ? { kind: "node", nodeId: nodeHit.nodeId }
-        : null;
+    const target: HoverTarget = pinHit ? { kind: "pin", nodeId: pinHit.nodeId, pinId: pinHit.pinId } : nodeHit ? { kind: "node", nodeId: nodeHit.nodeId } : null;
 
     if (sameTarget(target, hovered)) {
       if (target) moveTooltip(lastScreenPos); // still resting on the same target — follow the cursor

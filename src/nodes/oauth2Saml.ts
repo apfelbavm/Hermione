@@ -89,14 +89,7 @@ interface Oauth2SamlResult {
   [key: string]: unknown;
 }
 
-const oauth2SamlExchange: (
-  idpUrl: string,
-  tokenServiceUrl: string,
-  clientId: string,
-  userId: string,
-  companyId: string,
-  privateKey: string,
-) => Promise<Oauth2SamlResult> = new Function(`${OAUTH2_SAML_EXCHANGE_SOURCE}\nreturn oauth2SamlExchange;`)();
+const oauth2SamlExchange: (idpUrl: string, tokenServiceUrl: string, clientId: string, userId: string, companyId: string, privateKey: string) => Promise<Oauth2SamlResult> = new Function(`${OAUTH2_SAML_EXCHANGE_SOURCE}\nreturn oauth2SamlExchange;`)();
 
 registerNode({
   type: "auth.oauth2Saml",
@@ -125,20 +118,10 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await oauth2SamlExchange(
-      String(inputs.idpUrl ?? ""),
-      String(inputs.tokenServiceUrl ?? ""),
-      String(inputs.clientId ?? ""),
-      String(inputs.userId ?? ""),
-      String(inputs.companyId ?? ""),
-      String(inputs.privateKey ?? ""),
-    );
+    const result = await oauth2SamlExchange(String(inputs.idpUrl ?? ""), String(inputs.tokenServiceUrl ?? ""), String(inputs.clientId ?? ""), String(inputs.userId ?? ""), String(inputs.companyId ?? ""), String(inputs.privateKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await oauth2SamlExchange(${inputs.idpUrl}, ${inputs.tokenServiceUrl}, ${inputs.clientId}, ${inputs.userId}, ${inputs.companyId}, ${inputs.privateKey});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await oauth2SamlExchange(${inputs.idpUrl}, ${inputs.tokenServiceUrl}, ${inputs.clientId}, ${inputs.userId}, ${inputs.companyId}, ${inputs.privateKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {

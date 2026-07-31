@@ -1,17 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  addFunctionInput,
-  addFunctionOutput,
-  DEFAULT_VALUE_BY_TYPE,
-  moveFunctionEntry,
-  nextId,
-  removeFunctionInput,
-  removeFunctionOutput,
-  updateFunctionInput,
-  updateFunctionOutput,
-} from "../../engine/graphMutations";
+import { addFunctionInput, addFunctionOutput, DEFAULT_VALUE_BY_TYPE, moveFunctionEntry, nextId, removeFunctionInput, removeFunctionOutput, updateFunctionInput, updateFunctionOutput } from "../../engine/graphMutations";
 import type { FunctionDef, PinSignatureEntry, PinType } from "../../engine/types";
 import { FUNCTION_IO_ENTRY_DRAG_MIME } from "../../overlay/dragTypes";
 import { openRowContextMenu } from "../../overlay/rowContextMenu";
@@ -30,15 +20,7 @@ import { useRowDragReorder } from "./useRowDragReorder";
  * existing one. (A Return node instance is placed by right-clicking inside the function's body
  * graph, not from here — a function body can hold several.) Hidden entirely while no function is
  * open for editing. */
-export function FunctionIoPanel({
-  store,
-  kind,
-  getActiveFunction,
-}: {
-  store: Store;
-  kind: "input" | "output";
-  getActiveFunction: () => FunctionDef | null;
-}) {
+export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Store; kind: "input" | "output"; getActiveFunction: () => FunctionDef | null }) {
   useStoreRevision(store);
   const [editingId, setEditingId] = useState<string | null>(null);
   const fn = getActiveFunction();
@@ -75,12 +57,7 @@ export function FunctionIoPanel({
   }
 
   return (
-    <CollapsibleSection
-      id={kind === "input" ? "inputs-section" : "outputs-section"}
-      title={kind === "input" ? "Inputs" : "Outputs"}
-      empty={entries.length === 0}
-      onAdd={handleAdd}
-    >
+    <CollapsibleSection id={kind === "input" ? "inputs-section" : "outputs-section"} title={kind === "input" ? "Inputs" : "Outputs"} empty={entries.length === 0} onAdd={handleAdd}>
       {entries.map((entry) => {
         const isEditing = editingId === entry.id;
 

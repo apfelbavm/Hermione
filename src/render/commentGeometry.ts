@@ -38,12 +38,7 @@ export interface WorldRect {
 }
 
 export function rectContains(outer: WorldRect, inner: WorldRect): boolean {
-  return (
-    inner.x >= outer.x &&
-    inner.y >= outer.y &&
-    inner.x + inner.width <= outer.x + outer.width &&
-    inner.y + inner.height <= outer.y + outer.height
-  );
+  return inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height;
 }
 
 /** True if the two rects overlap at all (touching counts) — unlike rectContains, neither has to

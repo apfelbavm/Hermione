@@ -2,10 +2,7 @@ import { Graph } from "../engine/graph";
 import { PinDef } from "../engine/types";
 import { bezierControlPoints, sampleBezier } from "./bezier";
 import type { Camera } from "./camera";
-import {
-  computeCommentScreenRect,
-  COMMENT_RESIZE_HANDLE_SCREEN_SIZE,
-} from "./commentGeometry";
+import { computeCommentScreenRect, COMMENT_RESIZE_HANDLE_SCREEN_SIZE } from "./commentGeometry";
 import type { NodeScreenGeometry } from "./nodeGeometry";
 
 export interface PinHit {
@@ -30,22 +27,12 @@ export interface NodeAddButtonHit {
 /** Hit-tests the "+" add-entry affordance drawn on a node with NodeDef.addInstancePinEntry (see
  * NodeScreenGeometry.addButtonScreen) — checked ahead of hitTestNode so clicking it doesn't also
  * start a node drag. */
-export function hitTestNodeAddButton(
-  graph: Graph,
-  geometries: ReadonlyMap<string, NodeScreenGeometry>,
-  screenX: number,
-  screenY: number,
-): NodeAddButtonHit | null {
+export function hitTestNodeAddButton(graph: Graph, geometries: ReadonlyMap<string, NodeScreenGeometry>, screenX: number, screenY: number): NodeAddButtonHit | null {
   for (let i = graph.nodes.length - 1; i >= 0; i--) {
     const node = graph.nodes[i];
     const rect = geometries.get(node.id)?.addButtonScreen;
     if (!rect) continue;
-    if (
-      screenX >= rect.x &&
-      screenX <= rect.x + rect.width &&
-      screenY >= rect.y &&
-      screenY <= rect.y + rect.height
-    ) {
+    if (screenX >= rect.x && screenX <= rect.x + rect.width && screenY >= rect.y && screenY <= rect.y + rect.height) {
       return { kind: "node-add-button", nodeId: node.id };
     }
   }
@@ -54,12 +41,7 @@ export function hitTestNodeAddButton(
 
 const PIN_HIT_RADIUS = 9;
 
-export function hitTestPin(
-  graph: Graph,
-  geometries: ReadonlyMap<string, NodeScreenGeometry>,
-  screenX: number,
-  screenY: number,
-): PinHit | null {
+export function hitTestPin(graph: Graph, geometries: ReadonlyMap<string, NodeScreenGeometry>, screenX: number, screenY: number): PinHit | null {
   for (const node of graph.nodes) {
     const geo = geometries.get(node.id);
     if (!geo) continue;
@@ -102,12 +84,7 @@ export interface CommentHeaderHit {
   commentId: string;
 }
 
-export function hitTestCommentResizeHandle(
-  graph: Graph,
-  camera: Camera,
-  screenX: number,
-  screenY: number,
-): CommentResizeHit | null {
+export function hitTestCommentResizeHandle(graph: Graph, camera: Camera, screenX: number, screenY: number): CommentResizeHit | null {
   for (let i = graph.commentBoxes.length - 1; i >= 0; i--) {
     const box = graph.commentBoxes[i];
     const rect = computeCommentScreenRect(box, camera);
@@ -119,12 +96,7 @@ export function hitTestCommentResizeHandle(
       { corner: "se", x: rect.screenX + rect.width, y: rect.screenY + rect.height },
     ];
     for (const c of corners) {
-      if (
-        screenX >= c.x - hs &&
-        screenX <= c.x + hs &&
-        screenY >= c.y - hs &&
-        screenY <= c.y + hs
-      ) {
+      if (screenX >= c.x - hs && screenX <= c.x + hs && screenY >= c.y - hs && screenY <= c.y + hs) {
         return { kind: "comment-resize", commentId: box.id, corner: c.corner };
       }
     }
@@ -132,43 +104,23 @@ export function hitTestCommentResizeHandle(
   return null;
 }
 
-export function hitTestCommentHeader(
-  graph: Graph,
-  camera: Camera,
-  screenX: number,
-  screenY: number,
-): CommentHeaderHit | null {
+export function hitTestCommentHeader(graph: Graph, camera: Camera, screenX: number, screenY: number): CommentHeaderHit | null {
   for (let i = graph.commentBoxes.length - 1; i >= 0; i--) {
     const box = graph.commentBoxes[i];
     const rect = computeCommentScreenRect(box, camera);
-    if (
-      screenX >= rect.screenX &&
-      screenX <= rect.screenX + rect.width &&
-      screenY >= rect.screenY &&
-      screenY <= rect.screenY + rect.headerHeight
-    ) {
+    if (screenX >= rect.screenX && screenX <= rect.screenX + rect.width && screenY >= rect.screenY && screenY <= rect.screenY + rect.headerHeight) {
       return { kind: "comment-header", commentId: box.id };
     }
   }
   return null;
 }
 
-export function hitTestNode(
-  graph: Graph,
-  geometries: ReadonlyMap<string, NodeScreenGeometry>,
-  screenX: number,
-  screenY: number,
-): NodeHit | null {
+export function hitTestNode(graph: Graph, geometries: ReadonlyMap<string, NodeScreenGeometry>, screenX: number, screenY: number): NodeHit | null {
   for (let i = graph.nodes.length - 1; i >= 0; i--) {
     const node = graph.nodes[i];
     const geo = geometries.get(node.id);
     if (!geo) continue;
-    if (
-      screenX >= geo.screenX &&
-      screenX <= geo.screenX + geo.width &&
-      screenY >= geo.screenY &&
-      screenY <= geo.screenY + geo.height
-    ) {
+    if (screenX >= geo.screenX && screenX <= geo.screenX + geo.width && screenY >= geo.screenY && screenY <= geo.screenY + geo.height) {
       return { kind: "node", nodeId: node.id };
     }
   }
@@ -182,21 +134,11 @@ export interface WireHit {
 
 const WIRE_HIT_DISTANCE = 6;
 
-function distanceToSegment(
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): number {
+function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax;
   const dy = by - ay;
   const lengthSq = dx * dx + dy * dy;
-  const t =
-    lengthSq === 0
-      ? 0
-      : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
+  const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
   const closestX = ax + t * dx;
   const closestY = ay + t * dy;
   return Math.hypot(px - closestX, py - closestY);
@@ -206,13 +148,7 @@ function distanceToSegment(
  * bezier curve drawWires.ts renders (see bezier.ts) into a polyline and finds the closest one
  * within WIRE_HIT_DISTANCE screen pixels, scaled by zoom so the click tolerance feels consistent at
  * any zoom level. */
-export function hitTestWire(
-  graph: Graph,
-  geometries: ReadonlyMap<string, NodeScreenGeometry>,
-  camera: Camera,
-  screenX: number,
-  screenY: number,
-): WireHit | null {
+export function hitTestWire(graph: Graph, geometries: ReadonlyMap<string, NodeScreenGeometry>, camera: Camera, screenX: number, screenY: number): WireHit | null {
   const tolerance = WIRE_HIT_DISTANCE * camera.zoom;
   for (let i = graph.connections.length - 1; i >= 0; i--) {
     const conn = graph.connections[i];
@@ -223,18 +159,9 @@ export function hitTestWire(
     const to = toGeo.pinScreen[conn.toPin];
     if (!from || !to) continue;
 
-    const points = sampleBezier(
-      bezierControlPoints(from.x, from.y, to.x, to.y),
-    );
+    const points = sampleBezier(bezierControlPoints(from.x, from.y, to.x, to.y));
     for (let j = 0; j < points.length - 1; j++) {
-      const d = distanceToSegment(
-        screenX,
-        screenY,
-        points[j].x,
-        points[j].y,
-        points[j + 1].x,
-        points[j + 1].y,
-      );
+      const d = distanceToSegment(screenX, screenY, points[j].x, points[j].y, points[j + 1].x, points[j + 1].y);
       if (d <= tolerance) return { kind: "wire", connectionId: conn.id };
     }
   }

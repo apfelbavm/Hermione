@@ -8,15 +8,7 @@ import { attachHoverTooltip } from "../../overlay/tooltip";
  * createEditableNameInput; the settled-ref guard exists for the same reason it did there — Escape
  * calls .blur() itself to trigger commit-time cleanup, and the guard stops that from ALSO running
  * the commit path. */
-export function EditableNameInput({
-  name,
-  onCommit,
-  onCancel,
-}: {
-  name: string;
-  onCommit: (newName: string) => void;
-  onCancel: () => void;
-}) {
+export function EditableNameInput({ name, onCommit, onCancel }: { name: string; onCommit: (newName: string) => void; onCancel: () => void }) {
   const settledRef = useRef(false);
   return (
     <input

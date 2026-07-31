@@ -70,14 +70,7 @@ interface HttpRequestResult {
   [key: string]: unknown;
 }
 
-const httpRequestExecute: (
-  url: string,
-  method: string,
-  headersJson: string,
-  auth: { header?: unknown; value?: unknown } | null | undefined,
-  body: string,
-  timeoutMs: number,
-) => Promise<HttpRequestResult> = new Function(`${HTTP_REQUEST_EXECUTE_SOURCE}\nreturn httpRequestExecute;`)();
+const httpRequestExecute: (url: string, method: string, headersJson: string, auth: { header?: unknown; value?: unknown } | null | undefined, body: string, timeoutMs: number) => Promise<HttpRequestResult> = new Function(`${HTTP_REQUEST_EXECUTE_SOURCE}\nreturn httpRequestExecute;`)();
 
 registerNode({
   type: "http.request",
@@ -114,20 +107,10 @@ registerNode({
   // node, same single-exec-out convention as Delay/Send Email rather than inventing separate
   // success/failure exec paths.
   execute: async ({ inputs }) => {
-    const result = await httpRequestExecute(
-      String(inputs.url ?? ""),
-      String(inputs.method ?? "GET"),
-      String(inputs.headers ?? ""),
-      inputs.auth as { header?: unknown; value?: unknown } | null | undefined,
-      String(inputs.body ?? ""),
-      Number(inputs.timeoutMs ?? 0),
-    );
+    const result = await httpRequestExecute(String(inputs.url ?? ""), String(inputs.method ?? "GET"), String(inputs.headers ?? ""), inputs.auth as { header?: unknown; value?: unknown } | null | undefined, String(inputs.body ?? ""), Number(inputs.timeoutMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await httpRequestExecute(${inputs.url}, ${inputs.method}, ${inputs.headers}, ${inputs.auth}, ${inputs.body}, ${inputs.timeoutMs});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await httpRequestExecute(${inputs.url}, ${inputs.method}, ${inputs.headers}, ${inputs.auth}, ${inputs.body}, ${inputs.timeoutMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {

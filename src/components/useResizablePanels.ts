@@ -13,16 +13,7 @@ import { useEffect } from "react";
  * log panel (handle on its top, growing means dragging up); +1 when target sits on the SAME side
  * the pointer coordinate increases toward, e.g. the left sidebar (handle on its right, growing
  * means dragging right, away from it). */
-function wireResizeHandle(opts: {
-  handle: HTMLElement;
-  target: HTMLElement;
-  storageKey: string;
-  min: number;
-  max: () => number;
-  getPointerPos: (e: PointerEvent) => number;
-  getSize: (rect: DOMRect) => number;
-  growSign?: 1 | -1;
-}): () => void {
+function wireResizeHandle(opts: { handle: HTMLElement; target: HTMLElement; storageKey: string; min: number; max: () => number; getPointerPos: (e: PointerEvent) => number; getSize: (rect: DOMRect) => number; growSign?: 1 | -1 }): () => void {
   const { handle, target, storageKey, min, max, getPointerPos, getSize, growSign = -1 } = opts;
 
   const stored = Number(localStorage.getItem(storageKey));

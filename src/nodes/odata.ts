@@ -126,23 +126,14 @@ interface ODataV2RequestResult {
   [key: string]: unknown;
 }
 
-const odataV2RequestExecute: (
-  baseUrl: string,
-  pageSize: number,
-  paginationType: string,
-  maxPages: number,
-  headersJson: string,
-  auth: { header?: unknown; value?: unknown } | null | undefined,
-  timeoutMs: number,
-) => Promise<ODataV2RequestResult> = new Function(
+const odataV2RequestExecute: (baseUrl: string, pageSize: number, paginationType: string, maxPages: number, headersJson: string, auth: { header?: unknown; value?: unknown } | null | undefined, timeoutMs: number) => Promise<ODataV2RequestResult> = new Function(
   `${ODATA_V2_REQUEST_EXECUTE_SOURCE}\nreturn odataV2RequestExecute;`,
 )();
 
 registerNode({
   type: "odata.v2Request",
   label: "OData V2 Request",
-  description:
-    "Fetches every page of an OData v2 GET request — client-driven $top/$skip (1000 rows per page by default) or server-driven cursor/snapshot next-link paging — and returns the combined rows.",
+  description: "Fetches every page of an OData v2 GET request — client-driven $top/$skip (1000 rows per page by default) or server-driven cursor/snapshot next-link paging — and returns the combined rows.",
   group: "Request",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -236,10 +227,7 @@ registerNode({
     );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await odataV2RequestExecute(${inputs.url}, ${inputs.pageSize}, ${inputs.paginationType}, ${inputs.maxPages}, ${inputs.headers}, ${inputs.auth}, ${inputs.timeoutMs});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await odataV2RequestExecute(${inputs.url}, ${inputs.pageSize}, ${inputs.paginationType}, ${inputs.maxPages}, ${inputs.headers}, ${inputs.auth}, ${inputs.timeoutMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {

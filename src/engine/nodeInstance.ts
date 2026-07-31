@@ -1,15 +1,6 @@
 import { cloneDefaultValue, nextId } from "./graphMutations";
 import { getNodeDef } from "./registry";
-import {
-  CodeScriptDef,
-  FunctionDef,
-  NodeDef,
-  Pin,
-  PinContainer,
-  PinDef,
-  PinType,
-  Variable,
-} from "./types";
+import { CodeScriptDef, FunctionDef, NodeDef, Pin, PinContainer, PinDef, PinType, Variable } from "./types";
 
 export class NodeInstance {
   id: string;
@@ -43,15 +34,7 @@ export class NodeInstance {
    * description) — this is specific to this one instance, e.g. "remember to reset this before prod". */
   description?: string;
 
-  constructor(
-    id: string,
-    type: string,
-    position: { x: number; y: number },
-    pins: Record<string, Pin>,
-    variableId?: string,
-    functionId?: string,
-    scriptId?: string,
-  ) {
+  constructor(id: string, type: string, position: { x: number; y: number }, pins: Record<string, Pin>, variableId?: string, functionId?: string, scriptId?: string) {
     this.id = id;
     this.type = type;
     this.position = position;
@@ -73,15 +56,7 @@ export class NodeInstance {
   static DEFAULT_ELEMENT_TYPE: PinType = "number";
   static DEFAULT_KEY_TYPE: PinType = "string";
 
-  static createNodeInstance(
-    type: string,
-    position: { x: number; y: number },
-    pinDefs: PinDef[],
-    id: string = nextId("node"),
-    variableId?: string,
-    functionId?: string,
-    scriptId?: string,
-  ): NodeInstance {
+  static createNodeInstance(type: string, position: { x: number; y: number }, pinDefs: PinDef[], id: string = nextId("node"), variableId?: string, functionId?: string, scriptId?: string): NodeInstance {
     // detailProperties are seeded here (not passed in by the caller) since every caller already
     // identifies the node purely by `type` — looking them up off the registered NodeDef keeps every
     // call site from having to remember to merge them in separately.
@@ -89,35 +64,19 @@ export class NodeInstance {
     const detailProperties = def.detailProperties ?? [];
     const pins: Record<string, Pin> = {};
     for (const entry of [...pinDefs, ...detailProperties]) {
-      pins[entry.id] =
-        entry.direction === "input"
-          ? { value: cloneDefaultValue(entry.defaultValue) }
-          : {};
+      pins[entry.id] = entry.direction === "input" ? { value: cloneDefaultValue(entry.defaultValue) } : {};
     }
-    const node = new NodeInstance(
-      id,
-      type,
-      position,
-      pins,
-      variableId,
-      functionId,
-      scriptId,
-    );
+    const node = new NodeInstance(id, type, position, pins, variableId, functionId, scriptId);
     if (def.configurableElementType) {
       node.elementType = NodeInstance.DEFAULT_ELEMENT_TYPE;
-      if (def.configurableElementType.includeKeyType)
-        node.mapKeyType = NodeInstance.DEFAULT_KEY_TYPE;
+      if (def.configurableElementType.includeKeyType) node.mapKeyType = NodeInstance.DEFAULT_KEY_TYPE;
     }
     return node;
   }
 
   /** Resolves the pin defs for a node instance, accounting for variable-derived (Get/Set) nodes,
    * function-derived (Entry/Return/Call) nodes, and script-derived (Code) nodes. */
-  resolvePinDefs(
-    variables: Variable[],
-    functions: FunctionDef[],
-    scripts: CodeScriptDef[] = [],
-  ): PinDef[] {
+  resolvePinDefs(variables: Variable[], functions: FunctionDef[], scripts: CodeScriptDef[] = []): PinDef[] {
     const def = getNodeDef(this.type);
     if (def.derivePins && this.variableId) {
       const variable = variables.find((v) => v.id === this.variableId);
@@ -141,12 +100,7 @@ export class NodeInstance {
    * title already says it), and a function.call node shows the name of the function it's bound to
    * (so the graph reads e.g. "Double", not the generic "Call Function"), matching how its pins
    * already reflect that function. */
-  resolveNodeLabel(
-    def: NodeDef,
-    variables: Variable[],
-    functions: FunctionDef[],
-    scripts: CodeScriptDef[] = [],
-  ): string {
+  resolveNodeLabel(def: NodeDef, variables: Variable[], functions: FunctionDef[], scripts: CodeScriptDef[] = []): string {
     if (this.variableId) {
       const variable = variables.find((v) => v.id === this.variableId);
       if (variable) {
@@ -183,15 +137,9 @@ export class NodeInstance {
    * must have at least one execution pin (a pure data node has no "code" to skip) and must not be an
    * event trigger (an entry point always has to be reachable). Whether disabling is CURRENTLY
    * allowed (vs. greyed out) is a separate question — see hasConnectedDataOutput. */
-  canToggleDisabled(
-    variables: Variable[],
-    functions: FunctionDef[],
-    scripts: CodeScriptDef[] = [],
-  ): boolean {
+  canToggleDisabled(variables: Variable[], functions: FunctionDef[], scripts: CodeScriptDef[] = []): boolean {
     const def = getNodeDef(this.type);
     if (def.eventTrigger) return false;
-    return this.resolvePinDefs(variables, functions, scripts).some(
-      (p) => p.type === "exec",
-    );
+    return this.resolvePinDefs(variables, functions, scripts).some((p) => p.type === "exec");
   }
 }

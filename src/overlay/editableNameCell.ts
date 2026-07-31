@@ -1,9 +1,6 @@
 /** A row's name in its normal, non-editing display state — a plain label. Right-click opens the
  * caller-provided context menu (its "Edit" entry is what actually enters edit mode). */
-export function createEditableNameLabel(
-  name: string,
-  onContextMenu: (screenPos: { x: number; y: number }) => void,
-): HTMLElement {
+export function createEditableNameLabel(name: string, onContextMenu: (screenPos: { x: number; y: number }) => void): HTMLElement {
   const span = document.createElement("span");
   span.className = "variable-name editable-name-label";
   span.textContent = name;
@@ -18,11 +15,7 @@ export function createEditableNameLabel(
 /** A row's name in edit mode — an autofocused, select-all text input. Commits on blur/Enter,
  * reverts (no rename applied) on Escape. The caller decides what "commit" actually means (e.g.
  * silently keeping the old name on a duplicate) and is responsible for re-rendering afterward. */
-export function createEditableNameInput(
-  name: string,
-  onCommit: (newName: string) => void,
-  onCancel: () => void,
-): HTMLInputElement {
+export function createEditableNameInput(name: string, onCommit: (newName: string) => void, onCancel: () => void): HTMLInputElement {
   const input = document.createElement("input");
   input.className = "typed-value-input variable-name editable-name-input";
   input.type = "text";

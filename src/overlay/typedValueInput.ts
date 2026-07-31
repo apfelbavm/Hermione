@@ -69,8 +69,7 @@ function createScalarInput(type: PinType, value: unknown, onChange: (value: unkn
 
   const input = document.createElement("input");
   input.className = "typed-value-input";
-  input.type =
-    type === "boolean" ? "checkbox" : type === "number" ? "number" : type === "date" ? "datetime-local" : "text";
+  input.type = type === "boolean" ? "checkbox" : type === "number" ? "number" : type === "date" ? "datetime-local" : "text";
   input.autocomplete = "off";
   if (type === "boolean") input.checked = Boolean(value);
   else input.value = value == null ? "" : String(value);
@@ -127,13 +126,7 @@ function createScalarInput(type: PinType, value: unknown, onChange: (value: unkn
  * "+ Add" row. Backing storage is always a plain array (Array<T> -> T[], Set<T> -> T[] deduped on
  * every edit, Map<K,V> -> {key,value}[]) — see the plan's rationale for why real Map/Set instances
  * are never used (they don't survive JSON.stringify, breaking save/load). */
-function createContainerListInput(
-  type: PinType,
-  value: unknown,
-  onChange: (value: unknown) => void,
-  container: PinContainer,
-  keyType: PinType,
-): HTMLElement {
+function createContainerListInput(type: PinType, value: unknown, onChange: (value: unknown) => void, container: PinContainer, keyType: PinType): HTMLElement {
   const list = document.createElement("div");
   list.className = "typed-value-list";
   const entries: unknown[] = Array.isArray(value) ? value.slice() : [];
@@ -162,9 +155,7 @@ function createContainerListInput(
       row.className = "typed-value-list-row";
 
       if (container === "map") {
-        const entryObj: MapEntry = isMapEntry(entry)
-          ? entry
-          : { key: DEFAULT_VALUE_BY_TYPE[keyType], value: DEFAULT_VALUE_BY_TYPE[type] };
+        const entryObj: MapEntry = isMapEntry(entry) ? entry : { key: DEFAULT_VALUE_BY_TYPE[keyType], value: DEFAULT_VALUE_BY_TYPE[type] };
         // Reads entries[index] fresh at commit time (not the entryObj snapshot captured above) —
         // editing this row's key then its value never re-renders in between (only Set dedupes
         // trigger a re-render on edit), so committing off the stale entryObj would silently
@@ -213,9 +204,7 @@ function createContainerListInput(
     addBtn.className = "typed-value-list-add";
     addBtn.textContent = "+ Add";
     addBtn.addEventListener("click", () => {
-      entries.push(
-        container === "map" ? { key: DEFAULT_VALUE_BY_TYPE[keyType], value: DEFAULT_VALUE_BY_TYPE[type] } : DEFAULT_VALUE_BY_TYPE[type],
-      );
+      entries.push(container === "map" ? { key: DEFAULT_VALUE_BY_TYPE[keyType], value: DEFAULT_VALUE_BY_TYPE[type] } : DEFAULT_VALUE_BY_TYPE[type]);
       if (container === "set") dedupeInPlace();
       commit();
       renderRows();
@@ -233,13 +222,7 @@ function createContainerListInput(
  * not per-keystroke, so a live re-render triggered elsewhere never yanks focus mid-edit. When
  * `container` is not "single", renders an expandable list editor instead (see
  * createContainerListInput) — `keyType` is only meaningful (and required in practice) for "map". */
-export function createTypedValueInput(
-  type: PinType,
-  value: unknown,
-  onChange: (value: unknown) => void,
-  container: PinContainer = "single",
-  keyType: PinType = "string",
-): HTMLElement {
+export function createTypedValueInput(type: PinType, value: unknown, onChange: (value: unknown) => void, container: PinContainer = "single", keyType: PinType = "string"): HTMLElement {
   if (container !== "single") {
     return createContainerListInput(type, value, onChange, container, keyType);
   }
@@ -250,12 +233,7 @@ export function createTypedValueInput(
  * click/Escape plumbing for both the base-type menu and the container-kind menu below, so neither
  * has to re-implement rowContextMenu.ts-style flyout wiring (that one only supports a plain string
  * label, hence this separate — but now-shared — implementation). */
-function openPickList<T>(
-  screenPos: { x: number; y: number },
-  options: readonly T[],
-  renderItem: (item: T) => Node[],
-  onPick: (item: T) => void,
-): void {
+function openPickList<T>(screenPos: { x: number; y: number }, options: readonly T[], renderItem: (item: T) => Node[], onPick: (item: T) => void): void {
   const menu = document.createElement("div");
   menu.className = "row-context-menu";
   menu.style.left = `${screenPos.x}px`;

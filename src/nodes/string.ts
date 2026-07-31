@@ -131,9 +131,7 @@ registerNode({
     { id: "result", label: "Result", type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
-    result:
-      typeof inputs.a === "string" &&
-      (inputs.a as string).toLowerCase() === (inputs.b as string).toLowerCase(),
+    result: typeof inputs.a === "string" && (inputs.a as string).toLowerCase() === (inputs.b as string).toLowerCase(),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `(typeof ${inputs.a} === "string" && ${inputs.a}.toLowerCase() === ${inputs.b}.toLowerCase())`,
@@ -207,10 +205,7 @@ registerNode({
   // Rounded here too (not just at the literal-input widget, see PinDef.integer) since a wired
   // Start/End can come from any number-producing node, not only a literal the user typed.
   evaluate: ({ inputs }) => ({
-    result: String(inputs.value ?? "").substring(
-      Math.round(Number(inputs.start ?? 0)),
-      Math.round(Number(inputs.end ?? 0)),
-    ),
+    result: String(inputs.value ?? "").substring(Math.round(Number(inputs.start ?? 0)), Math.round(Number(inputs.end ?? 0))),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `String(${inputs.value}).substring(Math.round(Number(${inputs.start})), Math.round(Number(${inputs.end})))`,
@@ -229,10 +224,7 @@ registerNode({
     { id: "result", label: "Result", type: "string", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
-    result: String(inputs.value ?? "").slice(
-      Math.round(Number(inputs.start ?? 0)),
-      Math.round(Number(inputs.end ?? 0)),
-    ),
+    result: String(inputs.value ?? "").slice(Math.round(Number(inputs.start ?? 0)), Math.round(Number(inputs.end ?? 0))),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `String(${inputs.value}).slice(Math.round(Number(${inputs.start})), Math.round(Number(${inputs.end})))`,
@@ -297,14 +289,10 @@ registerNode({
     },
     APPEND_RESULT_PIN,
   ],
-  deriveInstancePins: (node) => [
-    ...appendEntryPinDefs(node),
-    APPEND_RESULT_PIN,
-  ],
+  deriveInstancePins: (node) => [...appendEntryPinDefs(node), APPEND_RESULT_PIN],
   addInstancePinEntry: (node) => {
     const ids = appendEntryIds(node);
-    const nextSuffix =
-      ids.length === 0 ? 0 : entrySuffix(ids[ids.length - 1]) + 1;
+    const nextSuffix = ids.length === 0 ? 0 : entrySuffix(ids[ids.length - 1]) + 1;
     node.pins[`${ENTRY_PREFIX}${nextSuffix}`] = { value: "" };
   },
   evaluate: ({ node, inputs }) => ({

@@ -109,8 +109,7 @@ function createWidgetEntry(pinDef: PinDef, nodeId: string, pinId: string, store:
   const type = pinDef.type;
   const el = document.createElement("input");
   el.className = "pin-widget";
-  el.type =
-    type === "boolean" ? "checkbox" : type === "number" ? "number" : type === "date" ? "datetime-local" : "text";
+  el.type = type === "boolean" ? "checkbox" : type === "number" ? "number" : type === "date" ? "datetime-local" : "text";
   el.autocomplete = "off";
   if (pinDef.integer) el.step = "1";
   if (type === "string") el.title = 'Use the "⤢" button to edit multi-line text without losing line breaks';
@@ -192,13 +191,7 @@ function setWidgetDisplayValue(el: WidgetElement, pinDef: PinDef, value: unknown
 // ragged one, capped so it never grows into the space reserved for the node's longest output label.
 // Everything scales together with zoom — like the rest of the graph, this is a camera zooming over
 // world-space content, not a fixed screen-space UI overlay.
-function positionWidget(
-  entry: WidgetEntry,
-  pinScreenY: number,
-  geo: NodeScreenGeometry,
-  pinDef: PinDef,
-  camera: Camera,
-): void {
+function positionWidget(entry: WidgetEntry, pinScreenY: number, geo: NodeScreenGeometry, pinDef: PinDef, camera: Camera): void {
   const { el, expandButton } = entry;
   const totalWidthPx = pinWidgetWidth(pinDef) * camera.zoom;
   const rightX = geo.screenX + geo.layout.inputWidgetRightX * camera.zoom;

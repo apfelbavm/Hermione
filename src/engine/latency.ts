@@ -19,12 +19,7 @@ type VisitingFunctionIds = ReadonlySet<string>;
  *      transitively contain a latent node.
  * A node earlier in the same sequence as a latent node is NOT itself latent — same as Unreal,
  * where only the actual latent node (and any function/macro call wrapping one) gets the clock icon. */
-export function isNodeLatent(
-  node: NodeInstance,
-  graph: Graph,
-  rootGraph: Graph,
-  visitingFunctionIds: VisitingFunctionIds = new Set(),
-): boolean {
+export function isNodeLatent(node: NodeInstance, graph: Graph, rootGraph: Graph, visitingFunctionIds: VisitingFunctionIds = new Set()): boolean {
   const def = getNodeDef(node.type);
   if (def.latent) return true;
 
@@ -32,21 +27,11 @@ export function isNodeLatent(
     if (visitingFunctionIds.has(node.functionId)) return false;
     const fn = rootGraph.functions.find((f) => f.id === node.functionId);
     if (!fn) return false;
-    return isFunctionLatent(
-      fn,
-      rootGraph,
-      new Set([...visitingFunctionIds, node.functionId]),
-    );
+    return isFunctionLatent(fn, rootGraph, new Set([...visitingFunctionIds, node.functionId]));
   }
 
   if (def.latentBodyPins) {
-    return isChainLatent(
-      graph,
-      rootGraph,
-      node.id,
-      def.latentBodyPins(node),
-      visitingFunctionIds,
-    );
+    return isChainLatent(graph, rootGraph, node.id, def.latentBodyPins(node), visitingFunctionIds);
   }
 
   return false;
@@ -56,18 +41,10 @@ export function isNodeLatent(
  * startPinIds) is latent (see isNodeLatent) — used for a node's own body sub-chain(s). Walks EVERY
  * exec-out pin of each node it reaches (not just the starting pin), since a body chain can branch/
  * sequence through several nodes before looping back or ending. */
-function isChainLatent(
-  graph: Graph,
-  rootGraph: Graph,
-  startNodeId: string,
-  startPinIds: string[],
-  visitingFunctionIds: VisitingFunctionIds,
-): boolean {
+function isChainLatent(graph: Graph, rootGraph: Graph, startNodeId: string, startPinIds: string[], visitingFunctionIds: VisitingFunctionIds): boolean {
   const variables = rootGraph.getVisibleVariables(graph);
   const visitedNodeIds = new Set<string>();
-  const queue: Array<{ nodeId: string; pinId: string }> = startPinIds.map(
-    (pinId) => ({ nodeId: startNodeId, pinId }),
-  );
+  const queue: Array<{ nodeId: string; pinId: string }> = startPinIds.map((pinId) => ({ nodeId: startNodeId, pinId }));
 
   while (queue.length > 0) {
     const { nodeId, pinId } = queue.shift()!;
@@ -78,12 +55,9 @@ function isChainLatent(
 
       const nextNode = graph.nodes.find((n) => n.id === conn.toNode);
       if (!nextNode) continue;
-      if (isNodeLatent(nextNode, graph, rootGraph, visitingFunctionIds))
-        return true;
+      if (isNodeLatent(nextNode, graph, rootGraph, visitingFunctionIds)) return true;
 
-      const execOutPins = nextNode
-        .resolvePinDefs(variables, rootGraph.functions, rootGraph.scripts)
-        .filter((p) => p.direction === "output" && p.type === "exec");
+      const execOutPins = nextNode.resolvePinDefs(variables, rootGraph.functions, rootGraph.scripts).filter((p) => p.direction === "output" && p.type === "exec");
       for (const p of execOutPins) {
         queue.push({ nodeId: nextNode.id, pinId: p.id });
       }
@@ -96,12 +70,6 @@ function isChainLatent(
 /** True if any node anywhere in `fn`'s body is latent (see isNodeLatent) — a function containing
  * a latent node is itself latent from the caller's perspective, same as Unreal's macros/functions
  * containing a latent node showing the clock icon at every Call site. */
-export function isFunctionLatent(
-  fn: FunctionDef,
-  rootGraph: Graph,
-  visitingFunctionIds: VisitingFunctionIds = new Set(),
-): boolean {
-  return fn.body.nodes.some((n) =>
-    isNodeLatent(n, fn.body, rootGraph, visitingFunctionIds),
-  );
+export function isFunctionLatent(fn: FunctionDef, rootGraph: Graph, visitingFunctionIds: VisitingFunctionIds = new Set()): boolean {
+  return fn.body.nodes.some((n) => isNodeLatent(n, fn.body, rootGraph, visitingFunctionIds));
 }

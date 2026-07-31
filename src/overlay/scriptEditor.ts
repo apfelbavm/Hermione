@@ -115,10 +115,7 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
   /** Transpiles `source` and commits it into `script` — the one place that actually writes
    * CodeScriptDef.source/compiledJs, shared by the Save button below and flushDirtyScripts so
    * there's exactly one implementation of "what saving a script means" to keep in sync. */
-  async function commitScriptSource(
-    script: CodeScriptDef,
-    source: string,
-  ): Promise<{ success: boolean; error?: string }> {
+  async function commitScriptSource(script: CodeScriptDef, source: string): Promise<{ success: boolean; error?: string }> {
     const { success, outputJs, errors } = await transpileScript(source);
     script.source = source;
     if (success) {
@@ -148,12 +145,7 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
   });
 
   async function flushDirtyScripts(): Promise<void> {
-    const dirty = [...models.entries()]
-      .map(([id, model]) => ({ script: scriptById(id), model }))
-      .filter(
-        (entry): entry is { script: CodeScriptDef; model: import("monaco-editor").editor.ITextModel } =>
-          !!entry.script && entry.model.getValue() !== entry.script.source,
-      );
+    const dirty = [...models.entries()].map(([id, model]) => ({ script: scriptById(id), model })).filter((entry): entry is { script: CodeScriptDef; model: import("monaco-editor").editor.ITextModel } => !!entry.script && entry.model.getValue() !== entry.script.source);
     if (dirty.length === 0) return;
 
     await Promise.all(dirty.map(({ script, model }) => commitScriptSource(script, model.getValue())));

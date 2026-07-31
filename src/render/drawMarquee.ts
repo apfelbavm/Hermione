@@ -6,11 +6,7 @@ const MARQUEE_COLOR = "#5ad1ff";
 
 /** Draws the in-progress rubber-band selection box. Stored in world coordinates, converted to
  * screen space here (like everything else) so it stays correct if the camera zooms mid-drag. */
-export function drawMarqueeSelection(
-  ctx: CanvasRenderingContext2D,
-  camera: Camera,
-  marquee: MarqueeSelectionState,
-): void {
+export function drawMarqueeSelection(ctx: CanvasRenderingContext2D, camera: Camera, marquee: MarqueeSelectionState): void {
   const start = camera.worldToScreen(marquee.startWorld.x, marquee.startWorld.y);
   const current = camera.worldToScreen(marquee.currentWorld.x, marquee.currentWorld.y);
   const x = Math.min(start.x, current.x);

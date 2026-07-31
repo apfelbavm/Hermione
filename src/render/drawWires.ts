@@ -6,16 +6,7 @@ import type { NodeScreenGeometry } from "./nodeGeometry";
 import type { WireDragState } from "../state/store";
 import { Graph } from "../engine/graph";
 
-export function drawWires(
-  ctx: CanvasRenderingContext2D,
-  graph: Graph,
-  camera: Camera,
-  geometries: ReadonlyMap<string, NodeScreenGeometry>,
-  firedConnectionIds: ReadonlySet<string>,
-  variables: Variable[],
-  functions: FunctionDef[],
-  scripts: CodeScriptDef[] = [],
-): void {
+export function drawWires(ctx: CanvasRenderingContext2D, graph: Graph, camera: Camera, geometries: ReadonlyMap<string, NodeScreenGeometry>, firedConnectionIds: ReadonlySet<string>, variables: Variable[], functions: FunctionDef[], scripts: CodeScriptDef[] = []): void {
   for (const conn of graph.connections) {
     const fromGeo = geometries.get(conn.fromNode);
     const toGeo = geometries.get(conn.toNode);

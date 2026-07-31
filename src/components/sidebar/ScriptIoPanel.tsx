@@ -1,18 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  addScriptInput,
-  addScriptOutput,
-  DEFAULT_VALUE_BY_TYPE,
-  moveScriptInput,
-  moveScriptOutput,
-  nextId,
-  removeScriptInput,
-  removeScriptOutput,
-  updateScriptInput,
-  updateScriptOutput,
-} from "../../engine/graphMutations";
+import { addScriptInput, addScriptOutput, DEFAULT_VALUE_BY_TYPE, moveScriptInput, moveScriptOutput, nextId, removeScriptInput, removeScriptOutput, updateScriptInput, updateScriptOutput } from "../../engine/graphMutations";
 import type { CodeScriptDef, PinSignatureEntry, PinType } from "../../engine/types";
 import { SCRIPT_IO_ENTRY_DRAG_MIME } from "../../overlay/dragTypes";
 import { openRowContextMenu } from "../../overlay/rowContextMenu";
@@ -31,15 +20,7 @@ import { useRowDragReorder } from "./useRowDragReorder";
  * from whatever object `run()` returns, keyed the same way (see nodes/code.ts's
  * namedInputsFor/pinOutputsFor for the exact, inverse mapping each direction uses). Hidden entirely
  * while no script is selected. */
-export function ScriptIoPanel({
-  store,
-  kind,
-  getSelectedScript,
-}: {
-  store: Store;
-  kind: "input" | "output";
-  getSelectedScript: () => CodeScriptDef | null;
-}) {
+export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store; kind: "input" | "output"; getSelectedScript: () => CodeScriptDef | null }) {
   useStoreRevision(store);
   const [editingId, setEditingId] = useState<string | null>(null);
   const script = getSelectedScript();
@@ -77,12 +58,7 @@ export function ScriptIoPanel({
   }
 
   return (
-    <CollapsibleSection
-      id={kind === "input" ? "script-inputs-section" : "script-outputs-section"}
-      title={kind === "input" ? "Inputs" : "Outputs"}
-      empty={entries.length === 0}
-      onAdd={handleAdd}
-    >
+    <CollapsibleSection id={kind === "input" ? "script-inputs-section" : "script-outputs-section"} title={kind === "input" ? "Inputs" : "Outputs"} empty={entries.length === 0} onAdd={handleAdd}>
       {entries.map((entry) => {
         const isEditing = editingId === entry.id;
 

@@ -61,12 +61,7 @@ export class Color {
   }
 
   toHex(): string {
-    const value =
-      (((this.r & 255) << 24) |
-        ((this.g & 255) << 16) |
-        ((this.b & 255) << 8) |
-        (this.a & 255)) >>>
-      0;
+    const value = (((this.r & 255) << 24) | ((this.g & 255) << 16) | ((this.b & 255) << 8) | (this.a & 255)) >>> 0;
 
     return `#${value.toString(16).padStart(8, "0").toUpperCase()}`;
   }
