@@ -1822,6 +1822,14 @@ body.resizing {
   flex: 1 1 auto;
 }
 
+/* Only present on a production run whose "EventRun" trigger actually ran (see RunLog.executionMs's
+   own doc comment) — light grey and un-bolded so it reads as metadata about the run, not part of
+   the Flow's own name. */
+.run-row-execution-time {
+  font-weight: normal;
+  color: var(--pp-text-dim);
+}
+
 /* Only rendered by the global Logs page (app/logs/page.tsx) — the per-project one omits it since
    which project a run belongs to is already implied by the page itself. */
 .run-row-project-name {

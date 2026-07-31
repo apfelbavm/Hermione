@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 import { registerBuiltins } from "../../../../nodes";
 import { nextId } from "../../../../engine/graphMutations";
@@ -52,6 +53,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const startedAt = new Date().toISOString();
+  let executionMs: number | undefined;
   try {
     const runTrigger = deployed.manifest.triggers.find((t) => t.kind === "run");
 
@@ -76,7 +78,19 @@ export async function POST(request: Request): Promise<Response> {
         log: (message: string) => recordLogEntry(message),
       };
       const fn = compiled[runTrigger.functionName] as (rt: unknown) => Promise<void>;
-      await fn(rt);
+
+      // Measures only the compiled script's own execution (the fn(rt) call itself) — not module
+      // resolution/import above, which is run-harness overhead, not the script's own work. Recorded
+      // in a finally so a run that throws still reports how long it ran before failing; the outer
+      // catch below still records the failure itself as a log line. This is metadata ABOUT the run
+      // (see RunLog.executionMs), not something the script itself logged, so it's carried on the
+      // RunLog directly rather than pushed into `entries`.
+      const executionStartedAt = performance.now();
+      try {
+        await fn(rt);
+      } finally {
+        executionMs = performance.now() - executionStartedAt;
+      }
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -92,6 +106,7 @@ export async function POST(request: Request): Promise<Response> {
     finishedAt: new Date().toISOString(),
     entries,
     kind: "production",
+    executionMs,
   };
   db.appendRun(runLog);
 

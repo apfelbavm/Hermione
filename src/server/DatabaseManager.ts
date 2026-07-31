@@ -37,6 +37,7 @@ interface RunRow {
   finished_at: string | null;
   entries_json: string;
   kind: string;
+  execution_ms: number | null;
 }
 
 interface CredentialRow {
@@ -104,7 +105,8 @@ export class DatabaseManager {
         started_at TEXT NOT NULL,
         finished_at TEXT,
         entries_json TEXT NOT NULL,
-        kind TEXT NOT NULL DEFAULT 'simulate'
+        kind TEXT NOT NULL DEFAULT 'simulate',
+        execution_ms REAL
       );
       CREATE INDEX IF NOT EXISTS idx_runs_project_id ON runs (project_id, started_at);
 
@@ -130,6 +132,7 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_deployed_scripts_project_id ON deployed_scripts (project_id);
     `);
     this.migrateAddRunsKindColumn();
+    this.migrateAddRunsExecutionMsColumn();
     this.migrateAddDeployedScriptsVersionColumn();
   }
 
@@ -141,6 +144,15 @@ export class DatabaseManager {
     const columns = this.db.prepare("PRAGMA table_info(runs)").all() as { name: string }[];
     if (!columns.some((c) => c.name === "kind")) {
       this.db.exec("ALTER TABLE runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'simulate'");
+    }
+  }
+
+  /** `execution_ms` was added after this app's first shipped `runs` table — same reasoning as
+   * migrateAddRunsKindColumn above. */
+  private migrateAddRunsExecutionMsColumn(): void {
+    const columns = this.db.prepare("PRAGMA table_info(runs)").all() as { name: string }[];
+    if (!columns.some((c) => c.name === "execution_ms")) {
+      this.db.exec("ALTER TABLE runs ADD COLUMN execution_ms REAL");
     }
   }
 
@@ -173,6 +185,7 @@ export class DatabaseManager {
       finishedAt: row.finished_at ?? undefined,
       entries: JSON.parse(row.entries_json) as LogEntry[],
       kind: (row.kind as RunKind) || "simulate",
+      executionMs: row.execution_ms ?? undefined,
     };
   }
 
@@ -300,8 +313,8 @@ export class DatabaseManager {
   appendRun(run: RunLog): void {
     const insertAndCap = this.db.transaction((r: RunLog) => {
       this.db
-        .prepare("INSERT INTO runs (id, project_id, flow_id, flow_name, started_at, finished_at, entries_json, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(r.id, r.projectId, r.flowId, r.flowName, r.startedAt, r.finishedAt ?? null, JSON.stringify(r.entries), r.kind);
+        .prepare("INSERT INTO runs (id, project_id, flow_id, flow_name, started_at, finished_at, entries_json, kind, execution_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(r.id, r.projectId, r.flowId, r.flowName, r.startedAt, r.finishedAt ?? null, JSON.stringify(r.entries), r.kind, r.executionMs ?? null);
 
       const staleIds = this.db.prepare<[string, number], { id: string }>("SELECT id FROM runs WHERE project_id = ? ORDER BY started_at DESC LIMIT -1 OFFSET ?").all(r.projectId, MAX_RUNS_PER_PROJECT);
       if (staleIds.length > 0) {
