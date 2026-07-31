@@ -24,7 +24,11 @@ registerNode({
   compileExecute: ({ inputs, compileFrom }) => [`rt.log(String(${inputs.message}));`, ...compileFrom("exec-out")],
 });
 
-const FORMATS = ["text", "json", "xml", "csv"];
+// "text" (a LogFormat member — see debug.print's own plain always-text output, and every RunLog
+// entry that isn't printed via one of these) is deliberately NOT offered as a Format choice here:
+// it's the "no pretty-printing" fallback elsewhere, not a real formatting option a user would pick
+// on this node.
+const FORMATS = ["json", "xml", "csv"];
 
 // Pretty-prints Message before logging it, according to a chosen mimetype-ish Format, rather than
 // always dumping a single raw (often single-line, hard-to-read) string — e.g. a JSON blob gets
