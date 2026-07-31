@@ -185,6 +185,41 @@ body {
   background: var(--pp-button-bg-hover);
 }
 
+/* Restore old version page's toolbar-center controls (see VersionRestorePanel.tsx) — version
+   picker styled like the Projects/Emulate pages' dropdowns, Cancel like the plain toolbar buttons
+   above, Restore like #run-button's accent green. */
+#version-restore-controls select {
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 4px;
+  color: var(--pp-text);
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+#version-restore-controls button {
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#version-restore-controls button:hover:not(:disabled) {
+  background: var(--pp-button-bg-hover);
+}
+
+#version-restore-controls .restore-version-button {
+  background: var(--pp-accent);
+  color: #fff;
+}
+
+#version-restore-controls .restore-version-button:hover:not(:disabled) {
+  background: var(--pp-accent-hover);
+}
+
 .toolbar-toggle {
   display: flex;
   align-items: center;
@@ -338,16 +373,6 @@ textarea:disabled {
 /* Each sidebar's border sits on the edge facing the canvas — #left-sidebar is left-of-canvas so
    its own right edge borders it; #right-sidebar is right-of-canvas so its own left edge does. */
 #left-sidebar {
-  border-right: 1px solid var(--pp-border);
-}
-
-/* Restore-version page only (see RestoreVersionMarkup.tsx): its own standalone sidebar, left of the
-   graph's own #left-sidebar, so the version picker/Restore/Cancel controls stay visually separate
-   from the read-only Functions/Variables/Scripts panels. Narrower and unresizable — unlike
-   #left-sidebar/#right-sidebar, its content never needs more room than a version dropdown and two
-   buttons. */
-#restore-sidebar {
-  flex-basis: 220px;
   border-right: 1px solid var(--pp-border);
 }
 

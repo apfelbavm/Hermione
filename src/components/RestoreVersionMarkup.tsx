@@ -11,12 +11,6 @@ import { VariablePanel } from "./sidebar/VariablePanel";
 import { VersionRestorePanel } from "./sidebar/VersionRestorePanel";
 import { ThemeToggle } from "./ThemeToggle";
 
-/** Markup for the "Restore old version" page — deliberately not wrapped in PageShell (see
- * RestoreVersionShell.tsx's own comment): same bare toolbar+canvas+sidebars shape as the regular
- * graph editor (AppShellMarkup), just with the Simulate/Save/Load/Deploy toolbar controls removed
- * (none of them make sense against a read-only, not-yet-restored past version) and an extra
- * #restore-sidebar, left of the graph's own #left-sidebar, holding the version picker + Restore/
- * Cancel controls. */
 export default function RestoreVersionMarkup({
   store,
   flowName,
@@ -53,13 +47,7 @@ export default function RestoreVersionMarkup({
             {flowName ? ` — ${flowName}` : ""}
           </span>
         </div>
-        <div id="toolbar-center" />
-        <div id="toolbar-right">
-          <ThemeToggle />
-        </div>
-      </div>
-      <div id="main-area">
-        <div id="restore-sidebar" className="side-panel">
+        <div id="toolbar-center">
           <VersionRestorePanel
             versions={versions}
             selectedVersionId={selectedVersionId}
@@ -71,6 +59,11 @@ export default function RestoreVersionMarkup({
             restoring={restoring}
           />
         </div>
+        <div id="toolbar-right">
+          <ThemeToggle />
+        </div>
+      </div>
+      <div id="main-area">
         <div id="left-sidebar" className="side-panel">
           <FunctionsPanel store={store} />
           <VariablePanel id="variables-section" title="Variables" store={store} getGraph={() => store.state.rootGraph} />
