@@ -6,8 +6,9 @@ import { connectPins, insertRerouteOnConnection, nextId, removeInstancePin } fro
 import { canCollapseSelectionToFunction, collapseSelectionToFunction } from "../engine/collapseToFunction";
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { allNodeDefs, findCompatibleNodeDefs, getNodeDef, isPinTypeCompatible, topLevelGroup } from "../engine/registry";
-import type { CodeScriptDef, FunctionDef, LogFormat, NodeDef, Variable } from "../engine/types";
+import type { CodeScriptDef, FunctionDef, NodeDef, Variable } from "../engine/types";
 import { buildDemoGraph } from "../demoGraph";
+import { Graph } from "../engine/graph";
 import { Camera } from "../render/camera";
 import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGeometry";
 import { hitTestNode, hitTestPin, hitTestWire } from "../render/hitTest";
@@ -30,10 +31,10 @@ import { openNodeSearchMenu } from "../overlay/nodeSearchMenu";
 import { FUNCTION_DRAG_MIME, SCRIPT_DRAG_MIME, VARIABLE_DRAG_MIME } from "../overlay/dragTypes";
 import { openRowContextMenu, type ContextMenuItem } from "../overlay/rowContextMenu";
 import { nextAvailableName } from "../overlay/uniqueName";
-import { loadGraphFromFile } from "../persistence/load";
+import { deserializeGraph, loadGraphFromFile } from "../persistence/load";
 import { downloadGraphAsFile, serializeGraph } from "../persistence/save";
-import { deleteFlowGraph, getFlow, loadFlowGraph, saveFlowGraph } from "../persistence/projects";
-import { appendRun, type RunLog } from "../persistence/runLogs";
+import { formatLogTimestamp } from "../shared/formatLogTimestamp";
+import { deleteFlowGraph, getFlowWithGraph, saveFlowGraph } from "../client/api";
 import { downloadCompiledGraph } from "../compiler/codegen";
 import { isNodeLatent } from "../engine/latency";
 import { NodeInstance } from "../engine/nodeInstance";
@@ -80,14 +81,16 @@ async function* readServerSentEvents(response: Response): AsyncGenerator<{ event
  * executingNodeId/firedConnectionIds/log state from the server's streamed events instead of a
  * local ExecutionContext. See src/app/api/simulate/route.ts for the server side. */
 export default function AppShell({ projectId, flowId }: { projectId: string; flowId: string }) {
-  // Lazy-initialized once, on first client render — this component is only ever mounted client-side
-  // (see app/projects/[projectId]/flows/[flowId]/page.tsx's ssr:false dynamic import), so it's safe
-  // to read localStorage here. Lives in component state (not the mount effect below) so the React
-  // panel components in AppShellMarkup can receive the same `store` instance synchronously on their
-  // very first render, instead of a render pass with no store yet.
+  // Lazy-initialized once, on first client render, with a trivial placeholder graph — the real one
+  // now lives in a database reachable only through /api/projects/.../flows/.../graph (see
+  // client/api.ts's getFlowWithGraph), so it can't be read synchronously here the way localStorage
+  // once was. The mount effect below fetches it and overwrites store.state.rootGraph the moment it
+  // resolves (see the "Load this Flow's graph" section). Still lives in component state (not the
+  // effect) so the React panel components in AppShellMarkup can receive the same `store` instance
+  // synchronously on their very first render, instead of a render pass with no store yet.
   const [store] = useState(() =>
     createStore({
-      rootGraph: loadFlowGraph(flowId) ?? buildDemoGraph(),
+      rootGraph: new Graph(nextId("flow-graph"), ""),
       activeFunctionId: null,
       openFunctionTabs: [],
       openScriptTabs: [],
@@ -135,6 +138,25 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
     const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
     if (!ctx) throw new Error("Canvas 2D context unavailable");
+
+    // --- Load this Flow's graph: the lazy useState initializer above seeds a trivial placeholder
+    // (fetching is inherently async, unlike the synchronous localStorage read this replaced), so the
+    // real content swaps in the moment this resolves. `flowName` is captured here too — needed by
+    // onRunClick's POST body so the server can attribute/label the run it persists (see
+    // /api/simulate/route.ts).
+    let flowName = "Flow";
+    let cancelledLoad = false;
+    void (async () => {
+      try {
+        const { flow, graphJson } = await getFlowWithGraph(projectId, flowId);
+        if (cancelledLoad) return;
+        flowName = flow.name;
+        store.state.rootGraph = graphJson ? deserializeGraph(graphJson) : buildDemoGraph();
+        store.notify();
+      } catch (err) {
+        appendLog(`Failed to load Flow: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    })();
 
     let lastMouseScreenPos = { x: 0, y: 0 };
     let canvasRedrawScheduled = false;
@@ -547,7 +569,16 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     function appendLog(message: string): void {
       const line = document.createElement("div");
       line.className = "log-line";
-      line.textContent = message;
+      // Always two separate pieces — a timestamp (stamped the moment it's displayed, not something
+      // the user ever types) and the message itself — same convention the persisted Logs page's own
+      // entries follow (see LogEntry.timestamp there, formatted with this same helper).
+      const time = document.createElement("span");
+      time.className = "log-line-time";
+      time.textContent = formatLogTimestamp(new Date());
+      const text = document.createElement("span");
+      text.className = "log-line-message";
+      text.textContent = message;
+      line.append(time, text);
       logPanel.appendChild(line);
       logPanel.scrollTop = logPanel.scrollHeight;
     }
@@ -562,16 +593,6 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     // before that arrives (right after the fetch starts) or once the run's ended. Needed so
     // onPauseClick/onContinueClick know which server-side run (see simulationControl.ts) to target.
     let currentRunId: string | null = null;
-    // This Flow's own persisted run/log history entry for whichever Simulate run is currently in
-    // progress (see persistence/runLogs.ts) — built up as "log" SSE events arrive, then written out
-    // via appendRun() once the run ends, however it ends (finished, errored, Stopped). Distinct from
-    // currentRunId (the server's own run identifier for pause/resume) — this is the CLIENT's own
-    // record of the run for the Logs page, keyed by nothing the server needs to know about.
-    let currentRun: RunLog | null = null;
-
-    function recordLogEntry(message: string, format: LogFormat = "text"): void {
-      currentRun?.entries.push({ id: nextId("log"), message, format, timestamp: new Date().toISOString() });
-    }
 
     /** Which function's body graph contains `nodeId`, or null if it's in the root graph (or the id
      * isn't found anywhere) — functions are never nested (see Graph.functions's own doc comment),
@@ -639,7 +660,6 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       store.state.simulating = true;
       store.state.paused = false;
       currentRunId = null;
-      currentRun = { id: nextId("run"), projectId, flowId, flowName: getFlow(projectId, flowId)?.name ?? "Flow", startedAt: new Date().toISOString(), entries: [] };
       logPanel.innerHTML = "";
       store.state.firedConnectionIds = new Set();
       store.state.pinValues = new Map();
@@ -652,13 +672,12 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         const response = await fetch("/api/simulate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: serializeGraph(store.state.rootGraph),
+          body: JSON.stringify({ graph: serializeGraph(store.state.rootGraph), projectId, flowId, flowName }),
           signal: controller.signal,
         });
         if (!response.ok || !response.body) {
           const text = await response.text().catch(() => response.statusText);
           appendLog(`Simulation request failed: ${text}`);
-          recordLogEntry(`Simulation request failed: ${text}`);
           return;
         }
 
@@ -706,21 +725,16 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
               store.state.paused = false;
               store.notify();
               break;
-            case "log": {
-              const { message, format } = data as { message: string; format?: LogFormat };
-              appendLog(message);
-              recordLogEntry(message, format ?? "text");
+            case "log":
+              appendLog((data as { message: string }).message);
               break;
-            }
             case "done":
               break;
           }
         }
       } catch (err) {
         if (!controller.signal.aborted) {
-          const message = `Error: ${err instanceof Error ? err.message : String(err)}`;
-          appendLog(message);
-          recordLogEntry(message);
+          appendLog(`Error: ${err instanceof Error ? err.message : String(err)}`);
         }
       } finally {
         if (activeSimulation === controller) {
@@ -728,11 +742,6 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
           store.state.simulating = false;
           store.state.paused = false;
           currentRunId = null;
-          if (currentRun) {
-            currentRun.finishedAt = new Date().toISOString();
-            appendRun(currentRun);
-            currentRun = null;
-          }
           store.notify();
           runButton.disabled = false;
           activeSimulation = null;
@@ -778,11 +787,11 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     }
     stopButton.addEventListener("click", onStopClick);
 
-    // --- Save / Load: JSON persisted to localStorage (auto-restored on next launch); Download hands
-    // that same JSON out as a file, as a separate, explicit action ---
+    // --- Save / Load: JSON persisted to this Flow's own DB row (auto-restored on next visit);
+    // Download hands that same JSON out as a file, as a separate, explicit action ---
     async function onSaveClick(): Promise<void> {
       await scriptEditor.flushDirtyScripts();
-      saveFlowGraph(flowId, store.state.rootGraph);
+      await saveFlowGraph(projectId, flowId, serializeGraph(store.state.rootGraph));
     }
     saveButton.addEventListener("click", onSaveClick);
 
@@ -815,7 +824,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         store.state.executingNodeId = null;
         store.state.firedConnectionIds = new Set();
         store.state.pinValues = new Map();
-        saveFlowGraph(flowId, graph);
+        await saveFlowGraph(projectId, flowId, serializeGraph(graph));
         store.notify();
       } catch (err) {
         appendLog(`Failed to load graph: ${err instanceof Error ? err.message : String(err)}`);
@@ -834,8 +843,8 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     }
     compileButton.addEventListener("click", onCompileClick);
 
-    function onDeleteClick(): void {
-      deleteFlowGraph(flowId);
+    async function onDeleteClick(): Promise<void> {
+      await deleteFlowGraph(projectId, flowId);
       location.reload();
     }
     deleteButton.addEventListener("click", onDeleteClick);
@@ -860,6 +869,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     frameAllButton.addEventListener("click", onFrameAllClick);
 
     return () => {
+      cancelledLoad = true;
       activeSimulation?.abort();
       if (panAnimationFrame !== null) cancelAnimationFrame(panAnimationFrame);
       window.removeEventListener("mousemove", onWindowMouseMove);

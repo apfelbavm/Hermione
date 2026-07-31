@@ -826,6 +826,16 @@ body.resizing {
   white-space: pre-wrap;
 }
 
+.log-line-time {
+  color: #6b7078;
+  margin-right: 8px;
+  user-select: none;
+}
+
+.log-line-message {
+  color: #9aa0a8;
+}
+
 #monaco-container {
   flex: 1;
   min-height: 0;
@@ -1251,7 +1261,11 @@ body.resizing {
 }
 
 .landing-page {
-  min-height: 100vh;
+  /* height (not min-height) + its own overflow-y, since html/body are overflow: hidden globally
+     (see that rule near the top of this file) — every plain page needs to scroll internally rather
+     than relying on the page/body scrolling, or content taller than the viewport gets clipped. */
+  height: 100vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1288,7 +1302,9 @@ body.resizing {
 }
 
 .page-shell {
-  min-height: 100vh;
+  /* height (not min-height) + its own overflow-y — see .landing-page's identical comment above. */
+  height: 100vh;
+  overflow-y: auto;
   background: #1e2126;
   color: #e8e8e8;
   padding: 24px 32px 48px;
@@ -1513,6 +1529,38 @@ body.resizing {
   border-top: 1px solid #33383f;
 }
 
+.log-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.log-entry-time {
+  color: #6b7078;
+  font-size: 11px;
+  font-family: "Consolas", "Courier New", monospace;
+}
+
+.log-entry-download {
+  background: #33383f;
+  color: #e8e8e8;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.log-entry-download:hover {
+  background: #454a52;
+}
+
 .log-entry-text {
   margin: 0;
   background: #1c1f24;
@@ -1524,6 +1572,10 @@ body.resizing {
   white-space: pre-wrap;
   word-break: break-word;
   color: #d8dce2;
+  /* A single huge logged message shouldn't be able to blow out the whole page — clamp it to its
+     own scrollable box instead. */
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .log-entry-json {
@@ -1535,7 +1587,8 @@ body.resizing {
 }
 
 .log-entry-csv-wrapper {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 80vh;
   border: 1px solid #33383f;
   border-radius: 4px;
 }
@@ -1555,4 +1608,95 @@ body.resizing {
 
 .log-entry-csv tr:nth-child(odd) {
   background: #1c1f24;
+}
+
+.entity-type-tag {
+  color: #9aa0a8;
+  font-size: 11px;
+  font-weight: normal;
+}
+
+/* Credential Vault's Add/Edit dialog — a hand-rolled overlay (no dialog library in this codebase
+   yet, and this is a one-off), matching the same dark-panel language as the rest of these pages. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-box {
+  background: #24272d;
+  border: 1px solid #3d4148;
+  border-radius: 8px;
+  padding: 20px 24px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  color: #e8e8e8;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.modal-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+}
+
+.modal-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.modal-field-label {
+  font-size: 12px;
+  color: #9aa0a8;
+}
+
+.modal-field-row input,
+.modal-field-row select {
+  background: #1e2126;
+  border: 1px solid #3d4148;
+  border-radius: 4px;
+  color: #e8e8e8;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.modal-error {
+  color: #e5484d;
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.modal-actions button {
+  background: #33383f;
+  color: #e8e8e8;
+  border: none;
+  border-radius: 4px;
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.modal-actions button:last-child {
+  background: #3b8a5c;
+}
+
+.modal-actions button:hover {
+  background: #454a52;
+}
+
+.modal-actions button:last-child:hover {
+  background: #46a56d;
 }

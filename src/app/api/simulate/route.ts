@@ -3,8 +3,11 @@ import { registerBuiltins } from "../../../nodes";
 import { createExecutionContext, runExecFrom } from "../../../engine/executor";
 import { deserializeGraph } from "../../../persistence/load";
 import { checkpointSimulation, disposeSimulationRun, registerSimulationRun, requestSimulationResume } from "../../../engine/simulationControl";
-import { allGraphs } from "../../../engine/graphMutations";
+import { allGraphs, nextId } from "../../../engine/graphMutations";
 import type { Graph } from "../../../engine/graph";
+import type { LogFormat } from "../../../engine/types";
+import { getCredentialByName } from "../../../server/credentials";
+import { appendRun, type LogEntry, type RunLog } from "../../../server/runLogs";
 
 // Must run under the Node runtime (not edge) — the interpreter and node implementations
 // (node-forge/openpgp for crypto, fetch-based http/odata/oauth2 nodes, etc.) assume a Node
@@ -22,26 +25,43 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+interface SimulateRequestBody {
+  graph: string;
+  projectId: string;
+  flowId: string;
+  flowName: string;
+}
+
 /** Executes a saved graph's "On Run" entry points server-side, streaming node-start/log/exec-fire/
  * done events back as Server-Sent Events so the browser can drive the same visual highlighting the
  * old client-side interpreter did — with zero execution logic left in the browser. See the
- * "Simulate" button handler in AppShell.tsx for the client side of this. */
+ * "Simulate" button handler in AppShell.tsx for the client side of this. Also persists the run's own
+ * log output as a RunLog (see server/runLogs.ts) — this is the only place a run's logs are actually
+ * produced, so it's the natural place to record them, rather than the client reconstructing and
+ * re-posting them after the fact. */
 export async function POST(request: Request): Promise<Response> {
-  const body = await request.text();
-
-  let graph;
+  let body: SimulateRequestBody;
+  let graph: Graph;
   try {
-    graph = deserializeGraph(body);
+    body = (await request.json()) as SimulateRequestBody;
+    graph = deserializeGraph(body.graph);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: `Invalid graph: ${message}` }), {
+    return new Response(JSON.stringify({ error: `Invalid request: ${message}` }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
   }
+  const { projectId, flowId, flowName } = body;
 
   const runId = randomUUID();
   registerSimulationRun(runId);
+
+  const runLog: RunLog = { id: nextId("run"), projectId, flowId, flowName, startedAt: new Date().toISOString(), entries: [] };
+  function recordLogEntry(message: string, format: LogFormat = "text"): void {
+    const entry: LogEntry = { id: nextId("log"), message, format, timestamp: new Date().toISOString() };
+    runLog.entries.push(entry);
+  }
 
   let aborted = false;
   request.signal.addEventListener("abort", () => {
@@ -72,15 +92,23 @@ export async function POST(request: Request): Promise<Response> {
 
       const eventRoots = graph.nodes.filter((n) => n.type === "event.run");
       if (eventRoots.length === 0) {
-        send("log", { message: 'No "On Run" node in graph — nothing to run.' });
+        const message = 'No "On Run" node in graph — nothing to run.';
+        send("log", { message });
+        recordLogEntry(message);
         send("done", {});
+        runLog.finishedAt = new Date().toISOString();
+        appendRun(runLog);
         disposeSimulationRun(runId);
         controller.close();
         return;
       }
 
       const execCtx = createExecutionContext(graph, {
-        log: (message, format) => send("log", { message, format }),
+        log: (message, format) => {
+          send("log", { message, format });
+          recordLogEntry(message, format);
+        },
+        getCredential: getCredentialByName,
         onNodeStart: async (nodeId) => {
           if (aborted) throw new Error("Simulation aborted by client");
           send("node-start", { nodeId });
@@ -108,9 +136,13 @@ export async function POST(request: Request): Promise<Response> {
           await runExecFrom(root.id, "exec-out", execCtx);
         }
       } catch (err) {
-        send("log", { message: `Error: ${err instanceof Error ? err.message : String(err)}` });
+        const message = `Error: ${err instanceof Error ? err.message : String(err)}`;
+        send("log", { message });
+        recordLogEntry(message);
       } finally {
         send("done", {});
+        runLog.finishedAt = new Date().toISOString();
+        appendRun(runLog);
         disposeSimulationRun(runId);
         controller.close();
       }

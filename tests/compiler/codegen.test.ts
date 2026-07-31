@@ -24,7 +24,42 @@ beforeAll(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
+
+/** The compiled (standalone) path for auth.oauth2Saml has no Credential Vault to query — it reads
+ * a named credential's fields from env vars instead (see nodes/oauth2Saml.ts's credentialFromEnv).
+ * "TestCred" sanitizes to this exact prefix; stubs the 6 env vars a test's compiled output reads. */
+const SAML_ENV_PREFIX = "HERMIONE_CRED_TESTCRED";
+function stubSamlCredentialEnv(): void {
+  vi.stubEnv(`${SAML_ENV_PREFIX}_IDP_URL`, "https://idp.example.com/oauth/idp");
+  vi.stubEnv(`${SAML_ENV_PREFIX}_TOKEN_SERVICE_URL`, "https://idp.example.com/oauth/token");
+  vi.stubEnv(`${SAML_ENV_PREFIX}_CLIENT_ID`, "client-1");
+  vi.stubEnv(`${SAML_ENV_PREFIX}_USER_ID`, "user-1");
+  vi.stubEnv(`${SAML_ENV_PREFIX}_COMPANY_ID`, "company-1");
+  vi.stubEnv(`${SAML_ENV_PREFIX}_PRIVATE_KEY`, "pk");
+}
+
+/** The interpreter path (unlike the compiled path above) resolves "TestCred" via
+ * ExecutionContext.getCredential instead of env vars — same 6 field values either way. */
+function samlCredentialLookup(name: string) {
+  if (name !== "TestCred") return undefined;
+  return {
+    id: "cred-1",
+    name: "TestCred",
+    type: "oauth2SamlBearer" as const,
+    data: {
+      idpUrl: "https://idp.example.com/oauth/idp",
+      tokenServiceUrl: "https://idp.example.com/oauth/token",
+      clientId: "client-1",
+      userId: "user-1",
+      companyId: "company-1",
+      privateKey: "pk",
+    },
+    createdAt: "2024-01-01T00:00:00.000Z",
+    updatedAt: "2024-01-01T00:00:00.000Z",
+  };
+}
 
 /** Writes compiled source to a temp file and dynamically imports it — cache-busted so repeat compiles in one test run don't hit a stale module. */
 async function loadCompiled(code: string): Promise<Record<string, unknown>> {
@@ -547,12 +582,7 @@ describe("compileGraph", () => {
       const printTrue = addBuiltinNode(graph, "debug.print", { x: 300, y: -50 }, "printTrue");
       const printFalse = addBuiltinNode(graph, "debug.print", { x: 300, y: 50 }, "printFalse");
 
-      saml.pins.idpUrl.value = "https://idp.example.com/oauth/idp";
-      saml.pins.tokenServiceUrl.value = "https://idp.example.com/oauth/token";
-      saml.pins.clientId.value = "client-1";
-      saml.pins.userId.value = "user-1";
-      saml.pins.companyId.value = "company-1";
-      saml.pins.privateKey.value = "pk";
+      saml.pins.credentialName.value = "TestCred";
 
       connectPins(graph, graph.variables, graph.functions, {
         fromNode: start.id,
@@ -616,6 +646,7 @@ describe("compileGraph", () => {
 
     it("compiles without throwing and reads accessToken (a data output beyond a single result) into the Branch's true path", async () => {
       const graph = buildSamlGraph();
+      stubSamlCredentialEnv();
       vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) => {
@@ -632,6 +663,7 @@ describe("compileGraph", () => {
 
     it("reads the error output into the Branch's false path when the token exchange fails", async () => {
       const graph = buildSamlGraph();
+      stubSamlCredentialEnv();
       vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) => {
@@ -645,6 +677,7 @@ describe("compileGraph", () => {
 
     it("compiled output matches the interpreter's own execute() for the same graph and mocked fetch", async () => {
       const graph = buildSamlGraph();
+      stubSamlCredentialEnv();
       const fetchMock = vi.fn(async (url: string) => {
         if (url === "https://idp.example.com/oauth/idp") return new Response("signed-assertion", { status: 200 });
         return new Response(JSON.stringify({ access_token: "tok-1", expires_in: 3600 }), {
@@ -655,7 +688,7 @@ describe("compileGraph", () => {
       vi.stubGlobal("fetch", fetchMock);
 
       const interpreterLogs: string[] = [];
-      await runExecFrom("start", "exec-out", createExecutionContext(graph, { log: (m) => interpreterLogs.push(m) }));
+      await runExecFrom("start", "exec-out", createExecutionContext(graph, { log: (m) => interpreterLogs.push(m), getCredential: samlCredentialLookup }));
 
       const compiledLogs = await runCompiledSaml(graph);
       expect(compiledLogs).toEqual(interpreterLogs);
@@ -717,12 +750,8 @@ describe("compileGraph", () => {
       const req = addBuiltinNode(graph, "http.request", { x: 200, y: 0 }, "req");
       const printBody = addBuiltinNode(graph, "debug.print", { x: 300, y: 0 }, "printBody");
 
-      saml.pins.idpUrl.value = "https://idp.example.com/oauth/idp";
-      saml.pins.tokenServiceUrl.value = "https://idp.example.com/oauth/token";
-      saml.pins.clientId.value = "client-1";
-      saml.pins.userId.value = "user-1";
-      saml.pins.companyId.value = "company-1";
-      saml.pins.privateKey.value = "pk";
+      saml.pins.credentialName.value = "TestCred";
+      stubSamlCredentialEnv();
       req.pins.url.value = "https://api.example.com/protected";
       req.pins.method.value = "GET";
 

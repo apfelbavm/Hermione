@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { createFlow, deleteFlow, getProject, listFlows, renameFlow, renameProject, type FlowSummary, type ProjectSummary } from "../../../persistence/projects";
+import { createFlow, deleteFlow, getProject, listFlows, renameFlow, renameProject } from "../../../client/api";
+import type { FlowSummary, ProjectSummary } from "../../../server/projects";
 
 export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -13,41 +14,44 @@ export default function ProjectPage() {
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
   const [editingProjectName, setEditingProjectName] = useState(false);
 
-  function refresh(): void {
-    setProject(getProject(projectId) ?? null);
-    setFlows(listFlows(projectId));
+  async function refresh(): Promise<void> {
+    const [proj, flowList] = await Promise.all([getProject(projectId).catch(() => null), listFlows(projectId)]);
+    setProject(proj);
+    setFlows(flowList);
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(refresh, [projectId]);
+  useEffect(() => {
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
-  function handleCreateFlow(e: FormEvent<HTMLFormElement>): void {
+  async function handleCreateFlow(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     const name = newFlowName.trim();
     if (!name) return;
-    createFlow(projectId, name);
+    await createFlow(projectId, name);
     setNewFlowName("");
-    refresh();
+    await refresh();
   }
 
-  function handleDeleteFlow(flowId: string, name: string): void {
+  async function handleDeleteFlow(flowId: string, name: string): Promise<void> {
     if (!confirm(`Delete Flow "${name}"? This can't be undone.`)) return;
-    deleteFlow(projectId, flowId);
-    refresh();
+    await deleteFlow(projectId, flowId);
+    await refresh();
   }
 
-  function commitFlowRename(flowId: string, rawName: string): void {
+  async function commitFlowRename(flowId: string, rawName: string): Promise<void> {
     const name = rawName.trim();
-    if (name) renameFlow(projectId, flowId, name);
+    if (name) await renameFlow(projectId, flowId, name);
     setEditingFlowId(null);
-    refresh();
+    await refresh();
   }
 
-  function commitProjectRename(rawName: string): void {
+  async function commitProjectRename(rawName: string): Promise<void> {
     const name = rawName.trim();
-    if (name) renameProject(projectId, name);
+    if (name) await renameProject(projectId, name);
     setEditingProjectName(false);
-    refresh();
+    await refresh();
   }
 
   if (!project) {
@@ -75,7 +79,7 @@ export default function ProjectPage() {
             className="entity-rename-input page-title-input"
             defaultValue={project.name}
             autoFocus
-            onBlur={(e) => commitProjectRename(e.currentTarget.value)}
+            onBlur={(e) => void commitProjectRename(e.currentTarget.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
               if (e.key === "Escape") setEditingProjectName(false);
@@ -110,7 +114,7 @@ export default function ProjectPage() {
                   className="entity-rename-input"
                   defaultValue={flow.name}
                   autoFocus
-                  onBlur={(e) => commitFlowRename(flow.id, e.currentTarget.value)}
+                  onBlur={(e) => void commitFlowRename(flow.id, e.currentTarget.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") e.currentTarget.blur();
                     if (e.key === "Escape") setEditingFlowId(null);
@@ -125,7 +129,7 @@ export default function ProjectPage() {
                 <button type="button" onClick={() => setEditingFlowId(flow.id)}>
                   Rename
                 </button>
-                <button type="button" onClick={() => handleDeleteFlow(flow.id, flow.name)}>
+                <button type="button" onClick={() => void handleDeleteFlow(flow.id, flow.name)}>
                   Delete
                 </button>
               </div>

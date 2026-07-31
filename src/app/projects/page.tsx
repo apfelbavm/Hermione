@@ -2,44 +2,47 @@
 
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
-import { createProject, deleteProject, listProjects, renameProject, type ProjectSummary } from "../../persistence/projects";
+import { createProject, deleteProject, listProjects, renameProject } from "../../client/api";
+import type { ProjectSummary } from "../../server/projects";
 
-/** No SSR-unsafe localStorage read happens during render — listProjects() is only ever called
+/** No SSR-unsafe DB access happens during render — every client/api.ts call is only ever made
  * inside an effect/event handler, both client-only — so this can be a plain "use client" page
  * component, unlike the Flow editor route (see flows/[flowId]/page.tsx), which needs the heavier
- * ssr:false dynamic-import treatment because AppShell reads localStorage synchronously during its
- * very first render. */
+ * ssr:false dynamic-import treatment because AppShell reads its graph synchronously during its very
+ * first render (well, kicks off that fetch there — see that file's own comment). */
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  function refresh(): void {
-    setProjects(listProjects());
+  async function refresh(): Promise<void> {
+    setProjects(await listProjects());
   }
 
-  useEffect(refresh, []);
+  useEffect(() => {
+    void refresh();
+  }, []);
 
-  function handleCreate(e: FormEvent<HTMLFormElement>): void {
+  async function handleCreate(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     const name = newName.trim();
     if (!name) return;
-    createProject(name);
+    await createProject(name);
     setNewName("");
-    refresh();
+    await refresh();
   }
 
-  function handleDelete(id: string, name: string): void {
+  async function handleDelete(id: string, name: string): Promise<void> {
     if (!confirm(`Delete project "${name}"? This also deletes every Flow and run log inside it.`)) return;
-    deleteProject(id);
-    refresh();
+    await deleteProject(id);
+    await refresh();
   }
 
-  function commitRename(id: string, rawName: string): void {
+  async function commitRename(id: string, rawName: string): Promise<void> {
     const name = rawName.trim();
-    if (name) renameProject(id, name);
+    if (name) await renameProject(id, name);
     setEditingId(null);
-    refresh();
+    await refresh();
   }
 
   return (
@@ -68,7 +71,7 @@ export default function ProjectsPage() {
                   className="entity-rename-input"
                   defaultValue={project.name}
                   autoFocus
-                  onBlur={(e) => commitRename(project.id, e.currentTarget.value)}
+                  onBlur={(e) => void commitRename(project.id, e.currentTarget.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") e.currentTarget.blur();
                     if (e.key === "Escape") setEditingId(null);
@@ -83,7 +86,7 @@ export default function ProjectsPage() {
                 <button type="button" onClick={() => setEditingId(project.id)}>
                   Rename
                 </button>
-                <button type="button" onClick={() => handleDelete(project.id, project.name)}>
+                <button type="button" onClick={() => void handleDelete(project.id, project.name)}>
                   Delete
                 </button>
               </div>

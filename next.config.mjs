@@ -6,6 +6,9 @@ const nextConfig = {
   // non-idempotently). Re-enable once that wiring is broken up into proper per-concern components
   // with cleanup functions (tracked as the overlay -> React component sweep).
   reactStrictMode: false,
+  // better-sqlite3 (see src/server/db.ts) ships a native binary — let Node `require` it directly at
+  // runtime instead of Next trying to bundle it into the server build.
+  serverExternalPackages: ["better-sqlite3"],
 };
 
 export default nextConfig;

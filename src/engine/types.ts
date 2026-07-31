@@ -1,5 +1,6 @@
 import { Graph } from "./graph";
 import { NodeInstance } from "./nodeInstance";
+import type { CredentialRecord } from "../credentials/types";
 
 /** "enum" is a literal-only config knob (a PinDef with `options` set) — never wireable in either
  * direction, on purpose (see isPinTypeCompatible), and drawn in its own dark-green color (see
@@ -10,7 +11,7 @@ import { NodeInstance } from "./nodeInstance";
 export type PinType = "exec" | "number" | "boolean" | "string" | "object" | "date" | "enum";
 
 /** Same 4 values debug.ts's "Print (Formatted)" node resolves its own Format pin to (see FORMATS
- * there) — shared here so ExecutionContext.log and persistence/runLogs.ts's LogEntry both refer to
+ * there) — shared here so ExecutionContext.log and server/runLogs.ts's LogEntry both refer to
  * one canonical type instead of two identical unions that could quietly drift apart. */
 export type LogFormat = "text" | "json" | "xml" | "csv";
 
@@ -306,13 +307,19 @@ export interface ExecutionContext {
   /** Set only inside a function-body walk: called by function.return with its resolved input values. */
   onReturn?: (values: Record<string, unknown>) => void;
   /** `format` mirrors debug.ts's "Print (Formatted)" node's own Format pin — omitted (plain "Print")
-   * means plain text. Threaded through to the Logs page (see persistence/runLogs.ts's LogEntry,
-   * which reuses this same LogFormat type) so it can render each entry accordingly instead of just
+   * means plain text. Threaded through to the Logs page (see server/runLogs.ts's LogEntry, which
+   * reuses this same LogFormat type) so it can render each entry accordingly instead of just
    * dumping monospace text for everything. */
   log: (message: string, format?: LogFormat) => void;
   /** May return a Promise to introduce a visualization pause between exec steps; awaited by the executor. */
   onNodeStart?: (nodeId: string) => void | Promise<void>;
   onExecFire?: (connectionId: string) => void;
+  /** Looks up a Credential Vault entry by name (see src/server/credentials.ts's getCredentialByName,
+   * wired in by /api/simulate/route.ts) — only meaningful server-side, where the interpreter can
+   * actually reach the vault database; a node using this (currently just auth.oauth2Saml — see
+   * nodes/oauth2Saml.ts) has no equivalent for the COMPILED path, which instead reads the same
+   * credential's fields from environment variables at runtime (see that node's compileHelpers). */
+  getCredential?: (name: string) => CredentialRecord | undefined;
   /** Fired whenever a node's data OUTPUT pins get a fresh value — both when an exec node's own
    * execute() produces them, and when a pure/data node's evaluate() runs to satisfy some downstream
    * pin read (see executor.ts's runExecFrom/resolveDataPin) — so a client watching a live run can

@@ -16,6 +16,9 @@ dist-ssr
 .next/
 *.tsbuildinfo
 
+# SQLite database (see src/server/db.ts) — local app data, never commit
+data/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
