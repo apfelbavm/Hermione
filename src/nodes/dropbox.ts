@@ -12,6 +12,7 @@ import { i18n } from "@i18n";
 
 const ENCODING_OPTIONS = ["utf8", "base64"];
 const WRITE_MODE_OPTIONS = ["add", "overwrite"];
+const GROUP_NAME = "Request.Dropbox";
 
 function accessTokenPin() {
   return {
@@ -25,12 +26,7 @@ function accessTokenPin() {
 
 /** Shared by dropbox.authorize and dropbox.auth — both look up the same named Credential Vault
  * entry and just want at its Dropbox fields, or a clear error if the name is wrong/missing. */
-function resolveDropboxCredential(
-  ctx: ExecutionContext,
-  credentialName: string,
-):
-  | { ok: true; data: DropboxOAuth2CredentialData }
-  | { ok: false; error: string } {
+function resolveDropboxCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: DropboxOAuth2CredentialData } | { ok: false; error: string } {
   const credential = ctx.getCredential?.(credentialName);
   if (!credential)
     return {
@@ -49,7 +45,7 @@ registerNode({
   type: "dropbox.authorize",
   label: i18n.nodes.dropbox.authorize.label,
   description: i18n.nodes.dropbox.authorize.description,
-  group: "Dropbox",
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -99,10 +95,7 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(
-      ctx,
-      String(inputs.credentialName ?? ""),
-    );
+    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
@@ -115,11 +108,7 @@ registerNode({
         },
       };
     }
-    const result = await DropboxManager.exchangeAuthCode(
-      resolved.data.authCode,
-      resolved.data.appKey,
-      resolved.data.appSecret,
-    );
+    const result = await DropboxManager.exchangeAuthCode(resolved.data.authCode, resolved.data.appKey, resolved.data.appSecret);
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -128,7 +117,7 @@ registerNode({
   type: "dropbox.auth",
   label: i18n.nodes.dropbox.auth.label,
   description: i18n.nodes.dropbox.auth.description,
-  group: "Dropbox",
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -172,10 +161,7 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(
-      ctx,
-      String(inputs.credentialName ?? ""),
-    );
+    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
@@ -187,11 +173,7 @@ registerNode({
         },
       };
     }
-    const result = await DropboxManager.refreshAccessToken(
-      resolved.data.refreshToken,
-      resolved.data.appKey,
-      resolved.data.appSecret,
-    );
+    const result = await DropboxManager.refreshAccessToken(resolved.data.refreshToken, resolved.data.appKey, resolved.data.appSecret);
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -200,7 +182,7 @@ registerNode({
   type: "dropbox.upload",
   label: i18n.nodes.dropbox.upload.label,
   description: i18n.nodes.dropbox.upload.description,
-  group: "Dropbox",
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -264,13 +246,7 @@ registerNode({
   latent: true,
   execute: async ({ inputs }) => {
     const manager = new DropboxManager(String(inputs.accessToken ?? ""));
-    const result = await manager.upload(
-      String(inputs.path ?? ""),
-      String(inputs.content ?? ""),
-      inputs.encoding === "base64" ? "base64" : "utf8",
-      inputs.mode === "overwrite" ? "overwrite" : "add",
-      Boolean(inputs.autorename),
-    );
+    const result = await manager.upload(String(inputs.path ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", inputs.mode === "overwrite" ? "overwrite" : "add", Boolean(inputs.autorename));
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -279,7 +255,7 @@ registerNode({
   type: "dropbox.download",
   label: i18n.nodes.dropbox.download.label,
   description: i18n.nodes.dropbox.download.description,
-  group: "Dropbox",
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -327,10 +303,7 @@ registerNode({
   latent: true,
   execute: async ({ inputs }) => {
     const manager = new DropboxManager(String(inputs.accessToken ?? ""));
-    const result = await manager.download(
-      String(inputs.path ?? ""),
-      inputs.encoding === "base64" ? "base64" : "utf8",
-    );
+    const result = await manager.download(String(inputs.path ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -339,7 +312,7 @@ registerNode({
   type: "dropbox.listFolders",
   label: i18n.nodes.dropbox.listFolders.label,
   description: i18n.nodes.dropbox.listFolders.description,
-  group: "Dropbox",
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -387,10 +360,7 @@ registerNode({
   latent: true,
   execute: async ({ inputs }) => {
     const manager = new DropboxManager(String(inputs.accessToken ?? ""));
-    const result = await manager.listFolders(
-      String(inputs.path ?? ""),
-      Boolean(inputs.recursive),
-    );
+    const result = await manager.listFolders(String(inputs.path ?? ""), Boolean(inputs.recursive));
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -400,7 +370,7 @@ function registerRelocationNode(type: "move" | "copy" | "rename") {
     type: `dropbox.${type}`,
     label: i18n.nodes.dropbox[type].label,
     description: i18n.nodes.dropbox[type].description,
-    group: "Dropbox",
+    group: GROUP_NAME,
     colorCategory: NodeColorCategory.Integration,
     pins: [
       { id: "exec-in", label: "", type: "exec", direction: "input" },
@@ -448,11 +418,7 @@ function registerRelocationNode(type: "move" | "copy" | "rename") {
     latent: true,
     execute: async ({ inputs }) => {
       const manager = new DropboxManager(String(inputs.accessToken ?? ""));
-      const result = await manager[type](
-        String(inputs.fromPath ?? ""),
-        String(inputs.toPath ?? ""),
-        Boolean(inputs.autorename),
-      );
+      const result = await manager[type](String(inputs.fromPath ?? ""), String(inputs.toPath ?? ""), Boolean(inputs.autorename));
       return { nextExec: "exec-out", outputs: result };
     },
   });
@@ -466,7 +432,7 @@ registerNode({
   type: "dropbox.delete",
   label: i18n.nodes.dropbox.delete.label,
   description: i18n.nodes.dropbox.delete.description,
-  group: "Dropbox",
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

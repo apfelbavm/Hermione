@@ -18,7 +18,7 @@ registerNode({
   type: "auth.oauth2ClientCredentials",
   label: i18n.nodes.auth.oauth2ClientCredentials.label,
   description: i18n.nodes.auth.oauth2ClientCredentials.description,
-  group: "Auth",
+  group: "Request.Auth",
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

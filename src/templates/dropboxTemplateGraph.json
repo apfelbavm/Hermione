@@ -1,0 +1,87 @@
+{
+  "source": "hermione-graph-editor",
+  "kind": "nodes",
+  "version": 1,
+  "nodes": [
+    { "id": "start", "type": "event.run", "position": { "x": 100, "y": -40 }, "pins": { "exec-out": {} }, "disabled": false, "breakpoint": false },
+    {
+      "id": "node-11-41lkxx",
+      "type": "dropbox.auth",
+      "position": { "x": 340, "y": 280 },
+      "pins": { "exec-in": {}, "credentialName": { "value": "Dropbox" }, "exec-out": {}, "success": {}, "accessToken": {}, "expiresIn": {}, "error": {} },
+      "disabled": false,
+      "breakpoint": false
+    },
+    {
+      "id": "node-4-dt5c96",
+      "type": "flow.branch",
+      "position": { "x": 760, "y": 280 },
+      "pins": { "exec-in": { "connectionId": "conn-5-9x8z4d" }, "condition": { "connectionId": "conn-6-ngdyuq" }, "true": {}, "false": {} },
+      "disabled": false,
+      "breakpoint": false
+    },
+    {
+      "id": "node-7-ktvrnj",
+      "type": "debug.print",
+      "position": { "x": 1060, "y": 280 },
+      "pins": { "exec-in": { "connectionId": "conn-14-mr1tn0" }, "message": { "connectionId": "conn-9-n1o4pe" }, "exec-out": {} },
+      "disabled": false,
+      "breakpoint": false
+    },
+    {
+      "id": "node-10-siiljs",
+      "type": "debug.print",
+      "position": { "x": 1060, "y": 420 },
+      "pins": { "exec-in": { "connectionId": "conn-13-lkggrg" }, "message": { "connectionId": "conn-12-cg5g90" }, "exec-out": {} },
+      "disabled": false,
+      "breakpoint": false
+    },
+    {
+      "id": "node-3-xehtha",
+      "type": "dropbox.authorize",
+      "position": { "x": 340, "y": -40 },
+      "pins": { "exec-in": { "connectionId": "conn-2-yxu7ez" }, "credentialName": { "value": "Dropbox" }, "exec-out": {}, "success": {}, "accessToken": {}, "refreshToken": {}, "expiresIn": {}, "error": {} },
+      "disabled": false,
+      "breakpoint": false
+    },
+    {
+      "id": "node-6-usothz",
+      "type": "debug.print",
+      "position": { "x": 1060, "y": -40 },
+      "pins": { "exec-in": { "connectionId": "conn-11-jzdwjb" }, "message": { "connectionId": "conn-13-zzkekm" }, "exec-out": {} },
+      "disabled": false,
+      "breakpoint": false
+    },
+    {
+      "id": "node-8-gegrln",
+      "type": "flow.branch",
+      "position": { "x": 760, "y": -40 },
+      "pins": { "exec-in": { "connectionId": "conn-9-g6suee" }, "condition": { "connectionId": "conn-10-hh00bf" }, "true": {}, "false": {} },
+      "disabled": false,
+      "breakpoint": false
+    },
+    {
+      "id": "node-15-dpfeax",
+      "type": "debug.print",
+      "position": { "x": 1060, "y": 80 },
+      "pins": { "exec-in": { "connectionId": "conn-16-czq9x0" }, "message": { "connectionId": "conn-17-7pxvt6" }, "exec-out": {} },
+      "disabled": false,
+      "breakpoint": false
+    }
+  ],
+  "connections": [
+    { "id": "conn-5-9x8z4d", "fromNode": "node-11-41lkxx", "fromPin": "exec-out", "toNode": "node-4-dt5c96", "toPin": "exec-in" },
+    { "id": "conn-6-ngdyuq", "fromNode": "node-11-41lkxx", "fromPin": "success", "toNode": "node-4-dt5c96", "toPin": "condition" },
+    { "id": "conn-9-n1o4pe", "fromNode": "node-11-41lkxx", "fromPin": "accessToken", "toNode": "node-7-ktvrnj", "toPin": "message" },
+    { "id": "conn-12-cg5g90", "fromNode": "node-11-41lkxx", "fromPin": "error", "toNode": "node-10-siiljs", "toPin": "message" },
+    { "id": "conn-13-lkggrg", "fromNode": "node-4-dt5c96", "fromPin": "false", "toNode": "node-10-siiljs", "toPin": "exec-in" },
+    { "id": "conn-14-mr1tn0", "fromNode": "node-4-dt5c96", "fromPin": "true", "toNode": "node-7-ktvrnj", "toPin": "exec-in" },
+    { "id": "conn-9-g6suee", "fromNode": "node-3-xehtha", "fromPin": "exec-out", "toNode": "node-8-gegrln", "toPin": "exec-in" },
+    { "id": "conn-10-hh00bf", "fromNode": "node-3-xehtha", "fromPin": "success", "toNode": "node-8-gegrln", "toPin": "condition" },
+    { "id": "conn-11-jzdwjb", "fromNode": "node-8-gegrln", "fromPin": "true", "toNode": "node-6-usothz", "toPin": "exec-in" },
+    { "id": "conn-13-zzkekm", "fromNode": "node-3-xehtha", "fromPin": "refreshToken", "toNode": "node-6-usothz", "toPin": "message" },
+    { "id": "conn-16-czq9x0", "fromNode": "node-8-gegrln", "fromPin": "false", "toNode": "node-15-dpfeax", "toPin": "exec-in" },
+    { "id": "conn-17-7pxvt6", "fromNode": "node-3-xehtha", "fromPin": "error", "toNode": "node-15-dpfeax", "toPin": "message" },
+    { "id": "conn-2-yxu7ez", "fromNode": "start", "fromPin": "exec-out", "toNode": "node-3-xehtha", "toPin": "exec-in" }
+  ]
+}

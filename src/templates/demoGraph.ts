@@ -1,7 +1,7 @@
-import { getNodeDef } from "./engine/registry";
-import { addCommentBox, connectPins } from "./engine/graphMutations";
-import { Graph } from "./engine/graph";
-import { NodeInstance } from "./engine/nodeInstance";
+import { getNodeDef } from "../engine/registry";
+import { addCommentBox, connectPins } from "../engine/graphMutations";
+import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
 
 function addNode(graph: Graph, type: string, position: { x: number; y: number }, id: string) {
   const def = getNodeDef(type);

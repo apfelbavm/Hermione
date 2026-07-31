@@ -4,13 +4,13 @@ import { useState } from "react";
 import type { StaticImageData } from "next/image";
 import { i18n } from "@i18n";
 import { registerBuiltins } from "../nodes";
-import { buildDemoGraph } from "../demoGraph";
-import { buildDropboxTemplateGraph } from "../dropboxTemplateGraph";
+import { buildDemoGraph } from "../templates/demoGraph";
+import { buildDropboxTemplateGraph } from "../templates/dropboxTemplateGraph";
 import { Graph } from "../engine/graph";
-import { nextId } from "../engine/graphMutations";
 import { serializeGraph } from "../persistence/save";
 import dropboxTemplateImage from "../../images/templates/dropbox.webp";
 import emptyTemplateImage from "../../images/templates/empty.webp";
+import { buildEmptyTemplateIllustrationGraph } from "../templates/emptyTemplateGraph";
 
 registerBuiltins();
 
@@ -25,7 +25,8 @@ const FLOW_TEMPLATES: FlowTemplate[] = [
   {
     id: "blank",
     name: i18n.pages.project.template_blank,
-    buildGraph: () => new Graph(nextId("flow-graph"), ""),
+    // buildGraph: () => new Graph(nextId("flow-graph"), ""),
+    buildGraph: () => buildEmptyTemplateIllustrationGraph(),
     image: emptyTemplateImage,
   },
   {

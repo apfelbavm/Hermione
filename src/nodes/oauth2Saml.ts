@@ -135,7 +135,7 @@ registerNode({
   type: "auth.oauth2Saml",
   label: i18n.nodes.auth.oauth2Saml.label,
   description: i18n.nodes.auth.oauth2Saml.description,
-  group: "Auth",
+  group: "Request.Auth",
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },

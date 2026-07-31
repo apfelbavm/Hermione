@@ -28,7 +28,7 @@ registerNode({
   type: "auth.basic",
   label: i18n.nodes.auth.basic.label,
   description: i18n.nodes.auth.basic.description,
-  group: "Auth",
+  group: "Request.Auth",
   colorCategory: NodeColorCategory.Integration,
   pins: [
     {

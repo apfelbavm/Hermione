@@ -7,7 +7,7 @@ import { canCollapseSelectionToFunction, collapseSelectionToFunction } from "../
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { allNodeDefs, findCompatibleNodeDefs, getNodeDef, isPinTypeCompatible, topLevelGroup } from "../engine/registry";
 import type { CodeScriptDef, FunctionDef, NodeDef, Variable } from "../engine/types";
-import { buildDemoGraph } from "../demoGraph";
+import { buildDemoGraph } from "../templates/demoGraph";
 import { Graph } from "../engine/graph";
 import { Camera } from "../render/camera";
 import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGeometry";
