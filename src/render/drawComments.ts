@@ -30,6 +30,14 @@ export function drawComments(ctx: CanvasRenderingContext2D, graph: Graph, camera
     ctx.strokeStyle = selected ? SELECTED_BORDER : tint;
     ctx.strokeRect(rect.screenX, rect.screenY, rect.width, rect.height);
 
+    // The tinted border above reads too faintly against a white canvas, so light mode gets an
+    // extra crisp black outline on top of it.
+    if (!selected && Colors.IS_LIGHT_THEME) {
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#000000";
+      ctx.strokeRect(rect.screenX, rect.screenY, rect.width, rect.height);
+    }
+
     ctx.fillStyle = tint;
     const hs = COMMENT_RESIZE_HANDLE_SCREEN_SIZE;
     ctx.beginPath();

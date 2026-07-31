@@ -117,6 +117,9 @@ export const Colors = {
   get HEADER_SHADE_RGB(): string {
     return surface().headerShadeRgb;
   },
+  get IS_LIGHT_THEME(): boolean {
+    return currentGraphTheme() === "light";
+  },
 
   /** Converts a "#rrggbb" hex color (e.g. from a native color picker) into an rgba() string at the given alpha. */
   hexToRgba(hex: string, alpha: number): string {
