@@ -1,6 +1,7 @@
 import * as oauth from "oauth4webapi";
 import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { i18n } from "@i18n";
 
 // OAuth2 Client Credentials (RFC 6749 §4.4) — the standard app-only / service-to-service grant:
 // no user, no browser redirect, no refresh token at all. Whenever a fresh access token is needed,
@@ -15,33 +16,90 @@ const SEND_AS_OPTIONS = ["body", "basicAuthHeader"];
 
 registerNode({
   type: "auth.oauth2ClientCredentials",
-  label: "OAuth2 Client Credentials",
-  description: "Requests an access token from an OAuth2 token endpoint using the client credentials grant (client ID and secret, no user involved).",
+  label: i18n.nodes.auth.oauth2ClientCredentials.label,
+  description: i18n.nodes.auth.oauth2ClientCredentials.description,
   group: "Auth",
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "tokenServiceUrl", label: "Token Service URL", type: "string", direction: "input", defaultValue: "" },
-    { id: "clientId", label: "Client ID", type: "string", direction: "input", defaultValue: "" },
-    { id: "clientSecret", label: "Client Secret", type: "string", direction: "input", defaultValue: "" },
-    { id: "scope", label: "Scope", type: "string", direction: "input", defaultValue: "" },
+    {
+      id: "tokenServiceUrl",
+      label: i18n.nodes.auth.oauth2ClientCredentials.pin_token_service_url,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "clientId",
+      label: i18n.nodes.auth.oauth2ClientCredentials.pin_client_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "clientSecret",
+      label: i18n.nodes.auth.oauth2ClientCredentials.pin_client_secret,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "scope",
+      label: i18n.nodes.auth.oauth2ClientCredentials.pin_scope,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
     {
       id: "sendAs",
-      label: "Send As",
+      label: i18n.nodes.auth.oauth2ClientCredentials.pin_send_as,
       type: "string",
       direction: "input",
       defaultValue: SEND_AS_OPTIONS[0],
       options: SEND_AS_OPTIONS,
     },
-    { id: "exec-out", label: "Completed", type: "exec", direction: "output" },
-    { id: "success", label: "Success", type: "boolean", direction: "output" },
-    { id: "auth", label: "Auth", type: "object", direction: "output" },
-    { id: "accessToken", label: "Access Token", type: "string", direction: "output" },
-    { id: "expiresIn", label: "Expires In (s)", type: "number", direction: "output" },
-    // 0 means no response was ever received at all (network failure) — same convention http.request
-    // itself uses, rather than overloading 0 with any real HTTP status meaning.
-    { id: "status", label: "Status", type: "number", direction: "output" },
-    { id: "error", label: "Error", type: "string", direction: "output" },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "auth",
+      label: i18n.nodes.__shared.pin_auth,
+      type: "object",
+      direction: "output",
+    },
+    {
+      id: "accessToken",
+      label: i18n.nodes.auth.oauth2ClientCredentials.pin_access_token,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "expiresIn",
+      label: i18n.nodes.auth.oauth2ClientCredentials.pin_expires_in,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "status",
+      label: i18n.nodes.__shared.pin_status,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
   ],
   latent: true,
   execute: async ({ inputs }) => {
@@ -54,21 +112,39 @@ registerNode({
     // issuer/token_endpoint both point at the same URL: this node talks straight to a known token
     // endpoint rather than performing full OIDC discovery, so there's no separate issuer identity
     // to distinguish from it.
-    const as: oauth.AuthorizationServer = { issuer: tokenUrl, token_endpoint: tokenUrl };
+    const as: oauth.AuthorizationServer = {
+      issuer: tokenUrl,
+      token_endpoint: tokenUrl,
+    };
     const client: oauth.Client = { client_id: clientId };
-    const clientAuth = sendAs === "basicAuthHeader" ? oauth.ClientSecretBasic(clientSecret) : oauth.ClientSecretPost(clientSecret);
+    const clientAuth =
+      sendAs === "basicAuthHeader"
+        ? oauth.ClientSecretBasic(clientSecret)
+        : oauth.ClientSecretPost(clientSecret);
 
     let status = 0;
     try {
-      const response = await oauth.clientCredentialsGrantRequest(as, client, clientAuth, new URLSearchParams(scope ? { scope } : {}));
+      const response = await oauth.clientCredentialsGrantRequest(
+        as,
+        client,
+        clientAuth,
+        new URLSearchParams(scope ? { scope } : {}),
+      );
       status = response.status;
 
-      const result = await oauth.processClientCredentialsResponse(as, client, response);
+      const result = await oauth.processClientCredentialsResponse(
+        as,
+        client,
+        response,
+      );
       return {
         nextExec: "exec-out",
         outputs: {
           success: true,
-          auth: { header: "Authorization", value: `Bearer ${result.access_token}` },
+          auth: {
+            header: "Authorization",
+            value: `Bearer ${result.access_token}`,
+          },
           accessToken: result.access_token,
           expiresIn: Number(result.expires_in ?? 0),
           status,
@@ -76,13 +152,28 @@ registerNode({
         },
       };
     } catch (err) {
-      if (err instanceof oauth.ResponseBodyError || err instanceof oauth.WWWAuthenticateChallengeError) {
+      if (
+        err instanceof oauth.ResponseBodyError ||
+        err instanceof oauth.WWWAuthenticateChallengeError
+      ) {
         status = err.status;
       }
-      const message = err instanceof oauth.ResponseBodyError ? err.error_description || err.error : err instanceof Error ? err.message : String(err);
+      const message =
+        err instanceof oauth.ResponseBodyError
+          ? err.error_description || err.error
+          : err instanceof Error
+            ? err.message
+            : String(err);
       return {
         nextExec: "exec-out",
-        outputs: { success: false, auth: null, accessToken: "", expiresIn: 0, status, error: message },
+        outputs: {
+          success: false,
+          auth: null,
+          accessToken: "",
+          expiresIn: 0,
+          status,
+          error: message,
+        },
       };
     }
   },

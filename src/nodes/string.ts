@@ -2,22 +2,28 @@ import { NodeInstance } from "../engine/nodeInstance";
 import { registerNode } from "../engine/registry";
 import { NodeColorCategory } from "../engine/types";
 import type { PinDef } from "../engine/types";
+import { i18n } from "@i18n";
 
 registerNode({
   type: "string.fromNumber",
-  label: "To String (Number)",
-  description: "Converts a number to its text representation.",
+  label: i18n.nodes.string.fromNumber.label,
+  description: i18n.nodes.string.fromNumber.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
     {
       id: "value",
-      label: "Value",
+      label: i18n.nodes.__shared.pin_value,
       type: "number",
       direction: "input",
       defaultValue: 0,
     },
-    { id: "result", label: "Result", type: "string", direction: "output" },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "string",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({ result: String(Number(inputs.value ?? 0)) }),
   compileEvaluate: ({ inputs }) => ({
@@ -27,19 +33,24 @@ registerNode({
 
 registerNode({
   type: "string.fromBoolean",
-  label: "To String (Boolean)",
-  description: "Converts a boolean to its text representation.",
+  label: i18n.nodes.string.fromBoolean.label,
+  description: i18n.nodes.string.fromBoolean.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
     {
       id: "value",
-      label: "Value",
+      label: i18n.nodes.__shared.pin_value,
       type: "boolean",
       direction: "input",
       defaultValue: false,
     },
-    { id: "result", label: "Result", type: "string", direction: "output" },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "string",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
     result: String(Boolean(inputs.value ?? false)),
@@ -51,16 +62,29 @@ registerNode({
 
 registerNode({
   type: "string.fromDate",
-  label: "To String (Date)",
-  description: "Converts a date to an ISO 8601 text string.",
+  label: i18n.nodes.string.fromDate.label,
+  description: i18n.nodes.string.fromDate.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
-    { id: "value", label: "Value", type: "date", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "string", direction: "output" },
+    {
+      id: "value",
+      label: i18n.nodes.__shared.pin_value,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "string",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
-    result: new Date((inputs.value || 0) as number | string | Date).toISOString(),
+    result: new Date(
+      (inputs.value || 0) as number | string | Date,
+    ).toISOString(),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `new Date(${inputs.value} || 0).toISOString()`,
@@ -69,13 +93,23 @@ registerNode({
 
 registerNode({
   type: "string.fromJson",
-  label: "To String (JSON)",
-  description: "Converts a value to its JSON text representation.",
+  label: i18n.nodes.string.fromJson.label,
+  description: i18n.nodes.string.fromJson.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
-    { id: "value", label: "Value", type: "object", direction: "input" },
-    { id: "result", label: "Result", type: "string", direction: "output" },
+    {
+      id: "value",
+      label: i18n.nodes.__shared.pin_value,
+      type: "object",
+      direction: "input",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "string",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({ result: JSON.stringify(inputs.value ?? null) }),
   compileEvaluate: ({ inputs }) => ({
@@ -85,26 +119,31 @@ registerNode({
 
 registerNode({
   type: "string.equalCaseSensitive",
-  label: "Equal ( == ) case-sensitive",
-  description: "True if two strings are exactly equal, case-sensitive.",
+  label: i18n.nodes.string.equalCaseSensitive.label,
+  description: i18n.nodes.string.equalCaseSensitive.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
     {
       id: "a",
-      label: "A",
+      label: i18n.nodes.__shared.pin_a,
       type: "string",
       direction: "input",
       defaultValue: "",
     },
     {
       id: "b",
-      label: "B",
+      label: i18n.nodes.__shared.pin_b,
       type: "string",
       direction: "input",
       defaultValue: "",
     },
-    { id: "result", label: "Result", type: "boolean", direction: "output" },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
     result: typeof inputs.a === "string" && inputs.a === inputs.b,
@@ -116,29 +155,36 @@ registerNode({
 
 registerNode({
   type: "string.equalCaseInsensitive",
-  label: "Equal ( == ) case-insensitive",
-  description: "True if two strings are equal, ignoring letter case.",
+  label: i18n.nodes.string.equalCaseInsensitive.label,
+  description: i18n.nodes.string.equalCaseInsensitive.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
     {
       id: "a",
-      label: "A",
+      label: i18n.nodes.__shared.pin_a,
       type: "string",
       direction: "input",
       defaultValue: "",
     },
     {
       id: "b",
-      label: "B",
+      label: i18n.nodes.__shared.pin_b,
       type: "string",
       direction: "input",
       defaultValue: "",
     },
-    { id: "result", label: "Result", type: "boolean", direction: "output" },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
-    result: typeof inputs.a === "string" && (inputs.a as string).toLowerCase() === (inputs.b as string).toLowerCase(),
+    result:
+      typeof inputs.a === "string" &&
+      (inputs.a as string).toLowerCase() === (inputs.b as string).toLowerCase(),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `(typeof ${inputs.a} === "string" && ${inputs.a}.toLowerCase() === ${inputs.b}.toLowerCase())`,
@@ -147,13 +193,24 @@ registerNode({
 
 registerNode({
   type: "string.length",
-  label: "Length",
-  description: "Returns how many characters are in the string.",
+  label: i18n.nodes.string.length.label,
+  description: i18n.nodes.string.length.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
-    { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "number", direction: "output" },
+    {
+      id: "value",
+      label: i18n.nodes.__shared.pin_value,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "number",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({ result: String(inputs.value ?? "").length }),
   compileEvaluate: ({ inputs }) => ({
@@ -163,18 +220,44 @@ registerNode({
 
 registerNode({
   type: "string.replace",
-  label: "Replace",
-  description: "Replaces only the first occurrence of a substring with another string.",
+  label: i18n.nodes.string.replace.label,
+  description: i18n.nodes.string.replace.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
-    { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
-    { id: "search", label: "Search", type: "string", direction: "input", defaultValue: "" },
-    { id: "replacement", label: "Replacement", type: "string", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "string", direction: "output" },
+    {
+      id: "value",
+      label: i18n.nodes.__shared.pin_value,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "search",
+      label: i18n.nodes.string.replace.pin_search,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "replacement",
+      label: i18n.nodes.string.replace.pin_replacement,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "string",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
-    result: String(inputs.value ?? "").replace(String(inputs.search ?? ""), String(inputs.replacement ?? "")),
+    result: String(inputs.value ?? "").replace(
+      String(inputs.search ?? ""),
+      String(inputs.replacement ?? ""),
+    ),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `String(${inputs.value}).replace(String(${inputs.search}), String(${inputs.replacement}))`,
@@ -183,18 +266,44 @@ registerNode({
 
 registerNode({
   type: "string.replaceAll",
-  label: "Replace All",
-  description: "Replaces every occurrence of a substring with another string.",
+  label: i18n.nodes.string.replaceAll.label,
+  description: i18n.nodes.string.replaceAll.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
-    { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
-    { id: "search", label: "Search", type: "string", direction: "input", defaultValue: "" },
-    { id: "replacement", label: "Replacement", type: "string", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "string", direction: "output" },
+    {
+      id: "value",
+      label: i18n.nodes.__shared.pin_value,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "search",
+      label: i18n.nodes.string.replaceAll.pin_search,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "replacement",
+      label: i18n.nodes.string.replaceAll.pin_replacement,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "string",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
-    result: String(inputs.value ?? "").replaceAll(String(inputs.search ?? ""), String(inputs.replacement ?? "")),
+    result: String(inputs.value ?? "").replaceAll(
+      String(inputs.search ?? ""),
+      String(inputs.replacement ?? ""),
+    ),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `String(${inputs.value}).replaceAll(String(${inputs.search}), String(${inputs.replacement}))`,
@@ -203,20 +312,48 @@ registerNode({
 
 registerNode({
   type: "string.substring",
-  label: "Substring",
-  description: "Returns the characters between Start and End (order-independent, clamped to the string's bounds).",
+  label: i18n.nodes.string.substring.label,
+  description: i18n.nodes.string.substring.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
-    { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
-    { id: "start", label: "Start", type: "number", direction: "input", defaultValue: 0, integer: true },
-    { id: "end", label: "End", type: "number", direction: "input", defaultValue: 0, integer: true },
-    { id: "result", label: "Result", type: "string", direction: "output" },
+    {
+      id: "value",
+      label: i18n.nodes.__shared.pin_value,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "start",
+      label: i18n.nodes.__shared.pin_start,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+      integer: true,
+    },
+    {
+      id: "end",
+      label: i18n.nodes.__shared.pin_end,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+      integer: true,
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "string",
+      direction: "output",
+    },
   ],
   // Rounded here too (not just at the literal-input widget, see PinDef.integer) since a wired
   // Start/End can come from any number-producing node, not only a literal the user typed.
   evaluate: ({ inputs }) => ({
-    result: String(inputs.value ?? "").substring(Math.round(Number(inputs.start ?? 0)), Math.round(Number(inputs.end ?? 0))),
+    result: String(inputs.value ?? "").substring(
+      Math.round(Number(inputs.start ?? 0)),
+      Math.round(Number(inputs.end ?? 0)),
+    ),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `String(${inputs.value}).substring(Math.round(Number(${inputs.start})), Math.round(Number(${inputs.end})))`,
@@ -225,18 +362,46 @@ registerNode({
 
 registerNode({
   type: "string.slice",
-  label: "Slice",
-  description: "Returns the characters between Start and End, where a negative index counts from the string's end.",
+  label: i18n.nodes.string.slice.label,
+  description: i18n.nodes.string.slice.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
-    { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
-    { id: "start", label: "Start", type: "number", direction: "input", defaultValue: 0, integer: true },
-    { id: "end", label: "End", type: "number", direction: "input", defaultValue: 0, integer: true },
-    { id: "result", label: "Result", type: "string", direction: "output" },
+    {
+      id: "value",
+      label: i18n.nodes.__shared.pin_value,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "start",
+      label: i18n.nodes.__shared.pin_start,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+      integer: true,
+    },
+    {
+      id: "end",
+      label: i18n.nodes.__shared.pin_end,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+      integer: true,
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "string",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
-    result: String(inputs.value ?? "").slice(Math.round(Number(inputs.start ?? 0)), Math.round(Number(inputs.end ?? 0))),
+    result: String(inputs.value ?? "").slice(
+      Math.round(Number(inputs.start ?? 0)),
+      Math.round(Number(inputs.end ?? 0)),
+    ),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `String(${inputs.value}).slice(Math.round(Number(${inputs.start})), Math.round(Number(${inputs.end})))`,
@@ -252,7 +417,7 @@ const MIN_APPEND_ENTRIES = 1;
 
 const APPEND_RESULT_PIN: PinDef = {
   id: "result",
-  label: "Result",
+  label: i18n.nodes.__shared.pin_result,
   type: "string",
   direction: "output",
 };
@@ -271,7 +436,7 @@ function appendEntryPinDefs(node: NodeInstance): PinDef[] {
   const ids = appendEntryIds(node);
   return ids.map((id, i) => ({
     id,
-    label: `String ${i + 1}`,
+    label: `${i18n.nodes.string.append.pin_string} ${i + 1}`,
     type: "string",
     direction: "input",
     defaultValue: "",
@@ -281,31 +446,35 @@ function appendEntryPinDefs(node: NodeInstance): PinDef[] {
 
 registerNode({
   type: "string.append",
-  label: "Append String",
-  description: "Concatenates all of its string inputs into one result.",
+  label: i18n.nodes.string.append.label,
+  description: i18n.nodes.string.append.description,
   group: "String",
   colorCategory: NodeColorCategory.String,
   pins: [
     {
       id: `${ENTRY_PREFIX}0`,
-      label: "String 1",
+      label: i18n.nodes.string.append.pin_string_1,
       type: "string",
       direction: "input",
       defaultValue: "",
     },
     {
       id: `${ENTRY_PREFIX}1`,
-      label: "String 2",
+      label: i18n.nodes.string.append.pin_string_2,
       type: "string",
       direction: "input",
       defaultValue: "",
     },
     APPEND_RESULT_PIN,
   ],
-  deriveInstancePins: (node) => [...appendEntryPinDefs(node), APPEND_RESULT_PIN],
+  deriveInstancePins: (node) => [
+    ...appendEntryPinDefs(node),
+    APPEND_RESULT_PIN,
+  ],
   addInstancePinEntry: (node) => {
     const ids = appendEntryIds(node);
-    const nextSuffix = ids.length === 0 ? 0 : entrySuffix(ids[ids.length - 1]) + 1;
+    const nextSuffix =
+      ids.length === 0 ? 0 : entrySuffix(ids[ids.length - 1]) + 1;
     node.pins[`${ENTRY_PREFIX}${nextSuffix}`] = { value: "" };
   },
   evaluate: ({ node, inputs }) => ({

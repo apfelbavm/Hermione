@@ -4,24 +4,39 @@ import * as Papa from "papaparse";
 import { registerNode } from "../engine/registry";
 import { NodeColorCategory } from "../engine/types";
 import type { LogFormat } from "../engine/types";
-import { XML_BUILDER_IMPORT_LINE, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, XML_PRETTY_BUILD_OPTIONS_LITERAL } from "./dataFormatHelpers";
+import {
+  XML_BUILDER_IMPORT_LINE,
+  XML_IMPORT_LINE,
+  XML_PARSE_OPTIONS_LITERAL,
+  XML_PRETTY_BUILD_OPTIONS_LITERAL,
+} from "./dataFormatHelpers";
+import { i18n } from "@i18n";
 
 registerNode({
   type: "debug.print",
-  label: "Print",
-  description: "Logs a text message to the console for debugging.",
+  label: i18n.nodes.debug.print.label,
+  description: i18n.nodes.debug.print.description,
   group: "Debug",
   colorCategory: NodeColorCategory.Debug,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "message", label: "Message", type: "string", direction: "input", defaultValue: "" },
+    {
+      id: "message",
+      label: i18n.nodes.debug.print.pin_message,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
   execute: ({ inputs, ctx }) => {
     ctx.log(String(inputs.message ?? ""));
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ inputs, compileFrom }) => [`rt.log(String(${inputs.message}));`, ...compileFrom("exec-out")],
+  compileExecute: ({ inputs, compileFrom }) => [
+    `rt.log(String(${inputs.message}));`,
+    ...compileFrom("exec-out"),
+  ],
 });
 
 // "text" (a LogFormat member — see debug.print's own plain always-text output, and every RunLog
@@ -67,18 +82,37 @@ function formatForLog(message, format) {
 }
 `;
 
-const formatForLog: (message: string, format: string) => string = new Function("XMLParser", "XMLValidator", "XMLBuilder", "Papa", `${FORMAT_FOR_LOG_SOURCE}\nreturn formatForLog;`)(XMLParser, XMLValidator, XMLBuilder, Papa);
+const formatForLog: (message: string, format: string) => string = new Function(
+  "XMLParser",
+  "XMLValidator",
+  "XMLBuilder",
+  "Papa",
+  `${FORMAT_FOR_LOG_SOURCE}\nreturn formatForLog;`,
+)(XMLParser, XMLValidator, XMLBuilder, Papa);
 
 registerNode({
   type: "debug.printFormatted",
-  label: "Print (Formatted)",
-  description: "Logs a message pretty-printed according to a chosen format.",
+  label: i18n.nodes.debug.printFormatted.label,
+  description: i18n.nodes.debug.printFormatted.description,
   group: "Debug",
   colorCategory: NodeColorCategory.Debug,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "message", label: "Message", type: "string", direction: "input", defaultValue: "" },
-    { id: "format", label: "Format", type: "string", direction: "input", defaultValue: FORMATS[0], options: FORMATS },
+    {
+      id: "message",
+      label: i18n.nodes.debug.printFormatted.pin_message,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "format",
+      label: i18n.nodes.debug.printFormatted.pin_format,
+      type: "string",
+      direction: "input",
+      defaultValue: FORMATS[0],
+      options: FORMATS,
+    },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
   execute: ({ inputs, ctx }) => {
@@ -86,7 +120,14 @@ registerNode({
     ctx.log(formatForLog(String(inputs.message ?? ""), format), format);
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ inputs, compileFrom }) => [`rt.log(formatForLog(String(${inputs.message}), String(${inputs.format})));`, ...compileFrom("exec-out")],
-  compileImports: [XML_IMPORT_LINE, XML_BUILDER_IMPORT_LINE, 'import * as Papa from "papaparse";'],
+  compileExecute: ({ inputs, compileFrom }) => [
+    `rt.log(formatForLog(String(${inputs.message}), String(${inputs.format})));`,
+    ...compileFrom("exec-out"),
+  ],
+  compileImports: [
+    XML_IMPORT_LINE,
+    XML_BUILDER_IMPORT_LINE,
+    'import * as Papa from "papaparse";',
+  ],
   compileHelpers: { formatForLog: FORMAT_FOR_LOG_SOURCE },
 });

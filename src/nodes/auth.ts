@@ -1,5 +1,6 @@
 import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { i18n } from "@i18n";
 
 // Every "connection" node that needs to authenticate (HTTP Request today, others later) takes the
 // SAME shape of value on its "Auth" input pin: a plain { header, value } object — the exact header
@@ -19,25 +20,48 @@ import { registerNode } from "../engine/registry";
  * plain `btoa` this uses both here and in the compiled/codegen output below) — fine for the
  * overwhelmingly common case of ASCII usernames/passwords. Exported since oauth2AuthCode.ts's
  * "client_secret_basic" sendAs option needs the exact same client_id:client_secret encoding. */
-export function basicAuthHeaderValue(username: string, password: string): string {
+export function basicAuthHeaderValue(
+  username: string,
+  password: string,
+): string {
   return `Basic ${btoa(`${username}:${password}`)}`;
 }
 
 registerNode({
   type: "auth.basic",
-  label: "Basic Auth",
-  description: "Builds an HTTP Basic Auth header value from a username and password.",
+  label: i18n.nodes.auth.basic.label,
+  description: i18n.nodes.auth.basic.description,
   group: "Auth",
   colorCategory: NodeColorCategory.Integration,
   pins: [
-    { id: "username", label: "Username", type: "string", direction: "input", defaultValue: "" },
-    { id: "password", label: "Password", type: "string", direction: "input", defaultValue: "" },
-    { id: "auth", label: "Auth", type: "object", direction: "output" },
+    {
+      id: "username",
+      label: i18n.nodes.auth.basic.pin_username,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "password",
+      label: i18n.nodes.auth.basic.pin_password,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "auth",
+      label: i18n.nodes.__shared.pin_auth,
+      type: "object",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
     auth: {
       header: "Authorization",
-      value: basicAuthHeaderValue(String(inputs.username ?? ""), String(inputs.password ?? "")),
+      value: basicAuthHeaderValue(
+        String(inputs.username ?? ""),
+        String(inputs.password ?? ""),
+      ),
     },
   }),
   compileEvaluate: ({ inputs }) => ({

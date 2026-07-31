@@ -1,6 +1,7 @@
 import { runFunctionCall } from "../engine/executor";
 import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { i18n } from "@i18n";
 
 // Compiler support (compileExecute/compileEvaluate) for these three node types is intentionally
 // out of scope for now — interpreter + editor first. Compiling a graph containing one throws the
@@ -8,8 +9,8 @@ import { registerNode } from "../engine/registry";
 
 registerNode({
   type: "function.entry",
-  label: "Entry",
-  description: "Starts a function's body and outputs its call's input arguments.",
+  label: i18n.nodes.function.entry.label,
+  description: i18n.nodes.function.entry.description,
   group: "Functions",
   colorCategory: NodeColorCategory.Integration,
   pins: [], // real pins are derived per-instance from the owning FunctionDef's inputs
@@ -30,8 +31,8 @@ registerNode({
 
 registerNode({
   type: "function.return",
-  label: "Return",
-  description: "Ends a function's body, sending its output values back to the caller.",
+  label: i18n.nodes.function.return.label,
+  description: i18n.nodes.function.return.description,
   group: "Functions",
   colorCategory: NodeColorCategory.Integration,
   pins: [], // real pins are derived per-instance from the owning FunctionDef's outputs
@@ -56,8 +57,8 @@ registerNode({
 
 registerNode({
   type: "function.call",
-  label: "Call Function",
-  description: "Invokes a user-defined function with the given arguments.",
+  label: i18n.nodes.function.call.label,
+  description: i18n.nodes.function.call.description,
   group: "Functions",
   colorCategory: NodeColorCategory.Integration,
   pins: [], // real pins are derived per-instance from the target FunctionDef's full signature

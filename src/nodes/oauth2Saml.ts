@@ -2,6 +2,7 @@ import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
 import { compileResultVar } from "../engine/compileUtils";
 import type { Oauth2SamlBearerCredentialData } from "../credentials/types";
+import { i18n } from "@i18n";
 
 // SAML 2.0 Bearer Assertion exchange (RFC 7522 grant type) — but the assertion itself is NOT built
 // or signed locally. This matches systems (e.g. SAP SuccessFactors-style integrations) where
@@ -117,50 +118,123 @@ interface Oauth2SamlResult {
   [key: string]: unknown;
 }
 
-const oauth2SamlExchange: (idpUrl: string, tokenServiceUrl: string, clientId: string, userId: string, companyId: string, privateKey: string) => Promise<Oauth2SamlResult> = new Function(`${OAUTH2_SAML_EXCHANGE_SOURCE}\nreturn oauth2SamlExchange;`)();
+const oauth2SamlExchange: (
+  idpUrl: string,
+  tokenServiceUrl: string,
+  clientId: string,
+  userId: string,
+  companyId: string,
+  privateKey: string,
+) => Promise<Oauth2SamlResult> = new Function(
+  `${OAUTH2_SAML_EXCHANGE_SOURCE}\nreturn oauth2SamlExchange;`,
+)();
 
 function failResult(error: string): Oauth2SamlResult {
-  return { success: false, auth: null, accessToken: "", expiresIn: 0, status: 0, error };
+  return {
+    success: false,
+    auth: null,
+    accessToken: "",
+    expiresIn: 0,
+    status: 0,
+    error,
+  };
 }
 
 registerNode({
   type: "auth.oauth2Saml",
-  label: "OAuth2 SAML Bearer",
-  description: "Fetches a signed SAML assertion from an IdP endpoint, then exchanges it for an OAuth2 access token from a token endpoint, using a named Credential Vault entry.",
+  label: i18n.nodes.auth.oauth2Saml.label,
+  description: i18n.nodes.auth.oauth2Saml.description,
   group: "Auth",
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "credentialName", label: "Credential Name", type: "string", direction: "input", defaultValue: "" },
-    { id: "exec-out", label: "Completed", type: "exec", direction: "output" },
-    { id: "success", label: "Success", type: "boolean", direction: "output" },
-    // Same { header, value } shape auth.basic/auth.oauth2ClientCredentials produce, so it plugs
-    // into http.request's Auth pin identically.
-    { id: "auth", label: "Auth", type: "object", direction: "output" },
-    { id: "accessToken", label: "Access Token", type: "string", direction: "output" },
-    { id: "expiresIn", label: "Expires In (s)", type: "number", direction: "output" },
-    // The token exchange leg's HTTP status. 0 means a request never got a response at all
-    // (network failure on either leg, or the credential itself couldn't be resolved) — same
-    // convention http.request itself uses.
-    { id: "status", label: "Status", type: "number", direction: "output" },
-    { id: "error", label: "Error", type: "string", direction: "output" },
+    {
+      id: "credentialName",
+      label: i18n.nodes.auth.oauth2Saml.pin_credential_name,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "auth",
+      label: i18n.nodes.__shared.pin_auth,
+      type: "object",
+      direction: "output",
+    },
+    {
+      id: "accessToken",
+      label: i18n.nodes.auth.oauth2Saml.pin_access_token,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "expiresIn",
+      label: i18n.nodes.auth.oauth2Saml.pin_expires_in,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "status",
+      label: i18n.nodes.__shared.pin_status,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const credentialName = String(inputs.credentialName ?? "");
     const credential = ctx.getCredential?.(credentialName);
     if (!credential) {
-      return { nextExec: "exec-out", outputs: failResult(`Credential "${credentialName}" not found in the vault`) };
+      return {
+        nextExec: "exec-out",
+        outputs: failResult(
+          `Credential "${credentialName}" not found in the vault`,
+        ),
+      };
     }
     if (credential.type !== "oauth2SamlBearer") {
-      return { nextExec: "exec-out", outputs: failResult(`Credential "${credentialName}" is not an OAuth2 SAML Bearer credential`) };
+      return {
+        nextExec: "exec-out",
+        outputs: failResult(
+          `Credential "${credentialName}" is not an OAuth2 SAML Bearer credential`,
+        ),
+      };
     }
 
     const data = credential.data as Oauth2SamlBearerCredentialData;
-    const result = await oauth2SamlExchange(data.idpUrl, data.tokenServiceUrl, data.clientId, data.userId, data.companyId, data.privateKey);
+    const result = await oauth2SamlExchange(
+      data.idpUrl,
+      data.tokenServiceUrl,
+      data.clientId,
+      data.userId,
+      data.companyId,
+      data.privateKey,
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)}_cred = credentialFromEnv(${inputs.credentialName});`, `const ${compileResultVar(node.id)} = await oauth2SamlExchange(${compileResultVar(node.id)}_cred.idpUrl, ${compileResultVar(node.id)}_cred.tokenServiceUrl, ${compileResultVar(node.id)}_cred.clientId, ${compileResultVar(node.id)}_cred.userId, ${compileResultVar(node.id)}_cred.companyId, ${compileResultVar(node.id)}_cred.privateKey);`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)}_cred = credentialFromEnv(${inputs.credentialName});`,
+    `const ${compileResultVar(node.id)} = await oauth2SamlExchange(${compileResultVar(node.id)}_cred.idpUrl, ${compileResultVar(node.id)}_cred.tokenServiceUrl, ${compileResultVar(node.id)}_cred.clientId, ${compileResultVar(node.id)}_cred.userId, ${compileResultVar(node.id)}_cred.companyId, ${compileResultVar(node.id)}_cred.privateKey);`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -172,5 +246,8 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileHelpers: { oauth2SamlExchange: OAUTH2_SAML_EXCHANGE_SOURCE, credentialFromEnv: CREDENTIAL_FROM_ENV_SOURCE },
+  compileHelpers: {
+    oauth2SamlExchange: OAUTH2_SAML_EXCHANGE_SOURCE,
+    credentialFromEnv: CREDENTIAL_FROM_ENV_SOURCE,
+  },
 });

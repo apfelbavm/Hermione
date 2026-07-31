@@ -4,6 +4,7 @@ import { runExecFrom } from "../engine/executor";
 import { connectionsFrom } from "../engine/graphQueries";
 import type { PinDef } from "../engine/types";
 import { NodeInstance } from "../engine/nodeInstance";
+import { i18n } from "@i18n";
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -11,19 +12,24 @@ function wait(ms: number): Promise<void> {
 
 registerNode({
   type: "flow.delay",
-  label: "Delay",
-  description: "Pauses the exec chain for a given duration in milliseconds.",
+  label: i18n.nodes.flow.delay.label,
+  description: i18n.nodes.flow.delay.description,
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     {
       id: "duration",
-      label: "Duration (ms)",
+      label: i18n.nodes.flow.delay.pin_duration,
       type: "number",
       direction: "input",
       defaultValue: 500,
     },
-    { id: "exec-out", label: "Completed", type: "exec", direction: "output" },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
   ],
   latent: true,
   execute: async ({ inputs }) => {
@@ -31,45 +37,89 @@ registerNode({
     return { nextExec: "exec-out" };
   },
   compileHelpers: { delay: DELAY_HELPER_SOURCE },
-  compileExecute: ({ inputs, compileFrom }) => [`await delay(Number(${inputs.duration}));`, ...compileFrom("exec-out")],
+  compileExecute: ({ inputs, compileFrom }) => [
+    `await delay(Number(${inputs.duration}));`,
+    ...compileFrom("exec-out"),
+  ],
 });
 
 registerNode({
   type: "flow.branch",
-  label: "Branch",
-  description: "Routes execution to True or False based on a condition.",
+  label: i18n.nodes.flow.branch.label,
+  description: i18n.nodes.flow.branch.description,
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     {
       id: "condition",
-      label: "Condition",
+      label: i18n.nodes.flow.branch.pin_condition,
       type: "boolean",
       direction: "input",
       defaultValue: false,
     },
-    { id: "true", label: "True", type: "exec", direction: "output" },
-    { id: "false", label: "False", type: "exec", direction: "output" },
+    {
+      id: "true",
+      label: i18n.nodes.flow.branch.pin_true,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "false",
+      label: i18n.nodes.flow.branch.pin_false,
+      type: "exec",
+      direction: "output",
+    },
   ],
   execute: ({ inputs }) => ({ nextExec: inputs.condition ? "true" : "false" }),
-  compileExecute: ({ inputs, compileFrom }) => [`if (${inputs.condition}) {`, ...indent(compileFrom("true")), `} else {`, ...indent(compileFrom("false")), `}`],
+  compileExecute: ({ inputs, compileFrom }) => [
+    `if (${inputs.condition}) {`,
+    ...indent(compileFrom("true")),
+    `} else {`,
+    ...indent(compileFrom("false")),
+    `}`,
+  ],
 });
 
 registerNode({
   type: "flow.isValid",
-  label: "Is Valid",
-  description: "Routes execution to Is Valid or Is Not Valid based on whether the object is null/undefined.",
+  label: i18n.nodes.flow.isValid.label,
+  description: i18n.nodes.flow.isValid.description,
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "object", label: "Object", type: "object", direction: "input", defaultValue: null },
-    { id: "valid", label: "Is Valid", type: "exec", direction: "output" },
-    { id: "invalid", label: "Is Not Valid", type: "exec", direction: "output" },
+    {
+      id: "object",
+      label: i18n.nodes.flow.isValid.pin_object,
+      type: "object",
+      direction: "input",
+      defaultValue: null,
+    },
+    {
+      id: "valid",
+      label: i18n.nodes.flow.isValid.pin_valid,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "invalid",
+      label: i18n.nodes.flow.isValid.pin_invalid,
+      type: "exec",
+      direction: "output",
+    },
   ],
   execute: ({ inputs }) => ({
-    nextExec: inputs.object === undefined || inputs.object === null ? "invalid" : "valid",
+    nextExec:
+      inputs.object === undefined || inputs.object === null
+        ? "invalid"
+        : "valid",
   }),
-  compileExecute: ({ inputs, compileFrom }) => [`if (${inputs.object} !== undefined && ${inputs.object} !== null) {`, ...indent(compileFrom("valid")), `} else {`, ...indent(compileFrom("invalid")), `}`],
+  compileExecute: ({ inputs, compileFrom }) => [
+    `if (${inputs.object} !== undefined && ${inputs.object} !== null) {`,
+    ...indent(compileFrom("valid")),
+    `} else {`,
+    ...indent(compileFrom("invalid")),
+    `}`,
+  ],
 });
 
 // A runaway Start/End (typo'd or wired to the wrong value) shouldn't be able to hang the whole
@@ -78,14 +128,14 @@ const MAX_FOR_LOOP_ITERATIONS = 100_000;
 
 registerNode({
   type: "flow.forLoop",
-  label: "For Loop",
-  description: "Runs its Loop Body once for each index from Start to End.",
+  label: i18n.nodes.flow.forLoop.label,
+  description: i18n.nodes.flow.forLoop.description,
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     {
       id: "start",
-      label: "Start",
+      label: i18n.nodes.__shared.pin_start,
       type: "number",
       direction: "input",
       defaultValue: 0,
@@ -93,15 +143,30 @@ registerNode({
     },
     {
       id: "end",
-      label: "End",
+      label: i18n.nodes.__shared.pin_end,
       type: "number",
       direction: "input",
       defaultValue: 0,
       integer: true,
     },
-    { id: "loop-body", label: "Loop Body", type: "exec", direction: "output" },
-    { id: "index", label: "Index", type: "number", direction: "output" },
-    { id: "completed", label: "Completed", type: "exec", direction: "output" },
+    {
+      id: "loop-body",
+      label: i18n.nodes.__shared.pin_loop_body,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "index",
+      label: i18n.nodes.__shared.pin_index,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "completed",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
   ],
   // Disabled must skip straight to "completed" — never firing "loop-body" — rather than the
   // generic disabled behavior of firing every exec-out pin (which would run the body once, an
@@ -124,7 +189,9 @@ registerNode({
     const end = Math.round(Number(inputs.end ?? 0));
 
     if (end - start + 1 > MAX_FOR_LOOP_ITERATIONS) {
-      throw new Error(`For Loop (${node.id}) would run ${end - start + 1} iterations, over the ${MAX_FOR_LOOP_ITERATIONS} limit — check its Start/End.`);
+      throw new Error(
+        `For Loop (${node.id}) would run ${end - start + 1} iterations, over the ${MAX_FOR_LOOP_ITERATIONS} limit — check its Start/End.`,
+      );
     }
 
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
@@ -167,7 +234,7 @@ function sequenceThenPinDefs(node: NodeInstance): PinDef[] {
   const ids = sequenceThenIds(node);
   return ids.map((id, i) => ({
     id,
-    label: `Then ${i}`,
+    label: `${i18n.nodes.flow.sequence.pin_then} ${i}`,
     type: "exec" as const,
     direction: "output" as const,
     removable: ids.length > MIN_SEQUENCE_ENTRIES,
@@ -176,25 +243,28 @@ function sequenceThenPinDefs(node: NodeInstance): PinDef[] {
 
 registerNode({
   type: "flow.sequence",
-  label: "Sequence",
-  description: "Runs each Then branch to completion, one after another.",
+  label: i18n.nodes.flow.sequence.label,
+  description: i18n.nodes.flow.sequence.description,
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     {
       id: `${THEN_PREFIX}0`,
-      label: "Then 0",
+      label: `${i18n.nodes.flow.sequence.pin_then} 0`,
       type: "exec",
       direction: "output",
     },
     {
       id: `${THEN_PREFIX}1`,
-      label: "Then 1",
+      label: `${i18n.nodes.flow.sequence.pin_then} 1`,
       type: "exec",
       direction: "output",
     },
   ],
-  deriveInstancePins: (node) => [{ id: "exec-in", label: "", type: "exec", direction: "input" }, ...sequenceThenPinDefs(node)],
+  deriveInstancePins: (node) => [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    ...sequenceThenPinDefs(node),
+  ],
   addInstancePinEntry: (node) => {
     const suffixes = sequenceThenIds(node).map(thenSuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -253,7 +323,7 @@ function parallelBranchPinDefs(node: NodeInstance): PinDef[] {
   const ids = parallelBranchIds(node);
   return ids.map((id, i) => ({
     id,
-    label: `Branch ${i}`,
+    label: `${i18n.nodes.flow.parallel.pin_branch} ${i}`,
     type: "exec" as const,
     direction: "output" as const,
     removable: ids.length > MIN_PARALLEL_BRANCHES,
@@ -262,26 +332,40 @@ function parallelBranchPinDefs(node: NodeInstance): PinDef[] {
 
 registerNode({
   type: "flow.parallel",
-  label: "Parallel",
-  description: "Runs all branches at once and continues once every branch finishes.",
+  label: i18n.nodes.flow.parallel.label,
+  description: i18n.nodes.flow.parallel.description,
   group: "Flow Control",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     {
       id: `${BRANCH_PREFIX}0`,
-      label: "Branch 0",
+      label: `${i18n.nodes.flow.parallel.pin_branch} 0`,
       type: "exec",
       direction: "output",
     },
     {
       id: `${BRANCH_PREFIX}1`,
-      label: "Branch 1",
+      label: `${i18n.nodes.flow.parallel.pin_branch} 1`,
       type: "exec",
       direction: "output",
     },
-    { id: "completed", label: "Completed", type: "exec", direction: "output" },
+    {
+      id: "completed",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
   ],
-  deriveInstancePins: (node) => [{ id: "exec-in", label: "", type: "exec", direction: "input" }, ...parallelBranchPinDefs(node), { id: "completed", label: "Completed", type: "exec", direction: "output" }],
+  deriveInstancePins: (node) => [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    ...parallelBranchPinDefs(node),
+    {
+      id: "completed",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+  ],
   addInstancePinEntry: (node) => {
     const suffixes = parallelBranchIds(node).map(branchSuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -296,7 +380,13 @@ registerNode({
   latentBodyPins: (node) => parallelBranchIds(node),
   execute: async ({ node, ctx }) => {
     const branchIds = parallelBranchIds(node);
-    await Promise.all(branchIds.flatMap((branchId) => connectionsFrom(ctx.graph, node.id, branchId).map((conn) => runExecFrom(conn.toNode, conn.toPin, ctx))));
+    await Promise.all(
+      branchIds.flatMap((branchId) =>
+        connectionsFrom(ctx.graph, node.id, branchId).map((conn) =>
+          runExecFrom(conn.toNode, conn.toPin, ctx),
+        ),
+      ),
+    );
     return { nextExec: "completed" };
   },
   // Compiles to a native `await Promise.all([...])` wrapping one async IIFE per branch — the same
@@ -305,7 +395,16 @@ registerNode({
   // a compiled Delay), so the compiled output genuinely interleaves branches at runtime rather than
   // just simulating it inside the editor.
   compileExecute: ({ node, compileFrom }) => {
-    const branchBlocks = parallelBranchIds(node).map((branchId) => [`(async () => {`, ...indent(compileFrom(branchId)), `})(),`]);
-    return [`await Promise.all([`, ...indent(branchBlocks.flat()), `]);`, ...compileFrom("completed")];
+    const branchBlocks = parallelBranchIds(node).map((branchId) => [
+      `(async () => {`,
+      ...indent(compileFrom(branchId)),
+      `})(),`,
+    ]);
+    return [
+      `await Promise.all([`,
+      ...indent(branchBlocks.flat()),
+      `]);`,
+      ...compileFrom("completed"),
+    ];
   },
 });

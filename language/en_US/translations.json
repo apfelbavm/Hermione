@@ -163,5 +163,617 @@
       "edit": "Edit",
       "edit_script": "Edit Script"
     }
+  },
+  "nodes": {
+    "__shared": {
+      "pin_a": "A",
+      "pin_auth": "Auth",
+      "pin_auto_detect": "Auto-Detect Settings",
+      "pin_b": "B",
+      "pin_completed": "Completed",
+      "pin_contains": "Contains",
+      "pin_csv": "CSV",
+      "pin_delimiter": "Delimiter",
+      "pin_end": "End",
+      "pin_error": "Error",
+      "pin_index": "Index",
+      "pin_item": "Item",
+      "pin_json": "JSON",
+      "pin_length": "Length",
+      "pin_loop_body": "Loop Body",
+      "pin_plaintext": "Plaintext",
+      "pin_private_key": "Private Key",
+      "pin_removed": "Removed",
+      "pin_result": "Result",
+      "pin_start": "Start",
+      "pin_status": "Status",
+      "pin_success": "Success",
+      "pin_timeout": "Timeout (ms)",
+      "pin_value": "Value",
+      "pin_xml": "XML"
+    },
+    "array": {
+      "group": "Container.Array",
+      "pin_array_in": "Array",
+      "pin_result": "Array",
+      "pin_element": "Element",
+      "make": {
+        "label": "Make Array",
+        "description": "Builds a new array from the given elements, in order."
+      },
+      "length": {
+        "label": "Array Length",
+        "description": "Returns how many elements are in the array."
+      },
+      "get": {
+        "label": "Array Get",
+        "description": "Returns the element at an index, and whether it existed.",
+        "pin_found": "Found"
+      },
+      "set": {
+        "label": "Array Set",
+        "description": "Replaces the element at an index, if the index is in bounds."
+      },
+      "add": {
+        "label": "Array Add",
+        "description": "Appends a value to the end of the array."
+      },
+      "append": {
+        "label": "Array Append",
+        "description": "Concatenates two arrays into one, keeping order and duplicates.",
+        "pin_array_a": "Array A",
+        "pin_array_b": "Array B"
+      },
+      "insert": {
+        "label": "Array Insert",
+        "description": "Inserts a value at an index, shifting later elements over."
+      },
+      "removeAt": {
+        "label": "Array Remove At",
+        "description": "Removes the element at an index, if the index is in bounds."
+      },
+      "removeItem": {
+        "label": "Array Remove Item",
+        "description": "Removes the first element that matches a given value."
+      },
+      "clear": {
+        "label": "Array Clear",
+        "description": "Returns an empty array, discarding all elements."
+      },
+      "contains": {
+        "label": "Array Contains",
+        "description": "True if the array contains this value anywhere."
+      },
+      "findIndex": {
+        "label": "Array Find Index",
+        "description": "Returns the index of the first matching element, or -1."
+      },
+      "isEmpty": {
+        "label": "Array Is Empty",
+        "description": "True if the array has no elements.",
+        "pin_is_empty": "Is Empty"
+      },
+      "reverse": {
+        "label": "Array Reverse",
+        "description": "Returns a copy of the array with elements in reverse order."
+      },
+      "forEach": {
+        "label": "Array For Each",
+        "description": "Runs the loop body once for each array element, in order."
+      }
+    },
+    "auth": {
+      "basic": {
+        "label": "Basic Auth",
+        "description": "Builds an HTTP Basic Auth header value from a username and password.",
+        "pin_username": "Username",
+        "pin_password": "Password"
+      },
+      "oauth2ClientCredentials": {
+        "label": "OAuth2 Client Credentials",
+        "description": "Requests an access token from an OAuth2 token endpoint using the client credentials grant (client ID and secret, no user involved).",
+        "pin_token_service_url": "Token Service URL",
+        "pin_client_id": "Client ID",
+        "pin_client_secret": "Client Secret",
+        "pin_scope": "Scope",
+        "pin_send_as": "Send As",
+        "pin_access_token": "Access Token",
+        "pin_expires_in": "Expires In (s)"
+      },
+      "oauth2Saml": {
+        "label": "OAuth2 SAML Bearer",
+        "description": "Fetches a signed SAML assertion from an IdP endpoint, then exchanges it for an OAuth2 access token from a token endpoint, using a named Credential Vault entry.",
+        "pin_credential_name": "Credential Name",
+        "pin_access_token": "Access Token",
+        "pin_expires_in": "Expires In (s)"
+      }
+    },
+    "boolean": {
+      "not": {
+        "label": "Not",
+        "description": "Inverts a boolean value — true becomes false and false becomes true."
+      }
+    },
+    "code": {
+      "label": "Code",
+      "description": "Runs a user-authored TypeScript script node."
+    },
+    "crypto": {
+      "pgpEncrypt": {
+        "label": "PGP Encrypt",
+        "description": "Encrypts text for a recipient using their armored OpenPGP public key.",
+        "pin_public_key": "Public Key",
+        "pin_symmetric_algorithm": "Symmetric Algorithm",
+        "pin_compression": "Compression",
+        "pin_use_aead": "Use AEAD",
+        "pin_aead_algorithm": "AEAD Algorithm",
+        "pin_show_version": "Show Version Comment",
+        "pin_version_comment": "Version Comment",
+        "pin_show_comment": "Show Comment",
+        "pin_comment": "Comment",
+        "pin_encrypted": "Encrypted"
+      },
+      "pgpDecrypt": {
+        "label": "PGP Decrypt",
+        "description": "Decrypts an armored OpenPGP message using the recipient's armored private key.",
+        "pin_encrypted": "Encrypted",
+        "pin_passphrase": "Passphrase",
+        "pin_allow_unauthenticated": "Allow Unauthenticated Messages",
+        "pin_min_rsa_bits": "Minimum RSA Key Size"
+      },
+      "pkcs7Encrypt": {
+        "label": "PKCS7 Encrypt",
+        "description": "Encrypts text into a PKCS#7/CMS EnvelopedData structure (PEM) for a recipient's certificate.",
+        "pin_recipient_cert": "Recipient Certificate",
+        "pin_cipher_algorithm": "Cipher Algorithm",
+        "pin_enveloped_data": "Enveloped Data"
+      },
+      "pkcs7Decrypt": {
+        "label": "PKCS7 Decrypt",
+        "description": "Decrypts a PKCS#7/CMS EnvelopedData structure (PEM) using the recipient's private key.",
+        "pin_enveloped_data": "Enveloped Data"
+      }
+    },
+    "csv": {
+      "toJson": {
+        "label": "CSV to JSON",
+        "description": "Parses a CSV string into a JSON object, wrapping the rows under configurable root/row tags.",
+        "pin_root_tag": "Root Tag",
+        "pin_row_tag": "Row Tag"
+      },
+      "toCsv": {
+        "label": "JSON to CSV",
+        "description": "Converts a JSON object's tabular rows into a delimited CSV string."
+      },
+      "toXml": {
+        "label": "CSV to XML",
+        "description": "Parses a CSV string and converts it into an XML string with configurable root/row tags.",
+        "pin_root_tag": "Root Tag",
+        "pin_row_tag": "Row Tag"
+      }
+    },
+    "date": {
+      "now": {
+        "label": "Now",
+        "description": "Returns the current date and time as a Date."
+      },
+      "fromString": {
+        "label": "To Date (String)",
+        "description": "Parses a text string into a Date."
+      },
+      "fromNumber": {
+        "label": "To Date (Number)",
+        "description": "Converts a number of milliseconds since epoch into a Date."
+      },
+      "subtract": {
+        "label": "Subtract ( - )",
+        "description": "Returns the difference between two dates in milliseconds."
+      },
+      "equal": {
+        "label": "Equal ( == )",
+        "description": "True if two dates represent the same moment in time."
+      },
+      "unequal": {
+        "label": "Unequal ( != )",
+        "description": "True if two dates do not represent the same moment in time."
+      },
+      "greaterThan": {
+        "label": "Greater than ( > )",
+        "description": "True if date A is later than date B."
+      },
+      "greaterEqual": {
+        "label": "Greater equal ( >= )",
+        "description": "True if date A is later than or the same as date B."
+      },
+      "lessThan": {
+        "label": "Less than ( < )",
+        "description": "True if date A is earlier than date B."
+      },
+      "lessEqual": {
+        "label": "Less equal ( <= )",
+        "description": "True if date A is earlier than or the same as date B."
+      }
+    },
+    "debug": {
+      "print": {
+        "label": "Print",
+        "description": "Logs a text message to the console for debugging.",
+        "pin_message": "Message"
+      },
+      "printFormatted": {
+        "label": "Print (Formatted)",
+        "description": "Logs a message pretty-printed according to a chosen format.",
+        "pin_message": "Message",
+        "pin_format": "Format"
+      }
+    },
+    "event": {
+      "start": {
+        "label": "On Start",
+        "description": "Fires once when the graph starts running."
+      },
+      "interval": {
+        "label": "On Interval",
+        "description": "Fires repeatedly on a configurable interval, in milliseconds.",
+        "pin_interval_ms": "Interval (ms)"
+      },
+      "run": {
+        "label": "On Run",
+        "description": "Fires when the editor's own Run button is pressed."
+      }
+    },
+    "flow": {
+      "delay": {
+        "label": "Delay",
+        "description": "Pauses the exec chain for a given duration in milliseconds.",
+        "pin_duration": "Duration (ms)"
+      },
+      "branch": {
+        "label": "Branch",
+        "description": "Routes execution to True or False based on a condition.",
+        "pin_condition": "Condition",
+        "pin_true": "True",
+        "pin_false": "False"
+      },
+      "isValid": {
+        "label": "Is Valid",
+        "description": "Routes execution to Is Valid or Is Not Valid based on whether the object is null/undefined.",
+        "pin_object": "Object",
+        "pin_valid": "Is Valid",
+        "pin_invalid": "Is Not Valid"
+      },
+      "forLoop": {
+        "label": "For Loop",
+        "description": "Runs its Loop Body once for each index from Start to End."
+      },
+      "sequence": {
+        "label": "Sequence",
+        "description": "Runs each Then branch to completion, one after another.",
+        "pin_then": "Then",
+        "pin_then_0": "Then 0",
+        "pin_then_1": "Then 1"
+      },
+      "parallel": {
+        "label": "Parallel",
+        "description": "Runs all branches at once and continues once every branch finishes.",
+        "pin_branch": "Branch",
+        "pin_branch_0": "Branch 0",
+        "pin_branch_1": "Branch 1"
+      }
+    },
+    "function": {
+      "entry": {
+        "label": "Entry",
+        "description": "Starts a function's body and outputs its call's input arguments."
+      },
+      "return": {
+        "label": "Return",
+        "description": "Ends a function's body, sending its output values back to the caller."
+      },
+      "call": {
+        "label": "Call Function",
+        "description": "Invokes a user-defined function with the given arguments."
+      }
+    },
+    "http": {
+      "request": {
+        "label": "HTTP Request",
+        "description": "Sends an HTTP request with a chosen method, headers, optional auth, and body, returning the response status, body, and headers.",
+        "pin_method": "Method",
+        "pin_url": "URL",
+        "pin_headers": "Headers (JSON)",
+        "pin_body": "Body",
+        "pin_response_body": "Response Body",
+        "pin_response_headers": "Response Headers"
+      }
+    },
+    "map": {
+      "group": "Container.Map",
+      "pin_map": "Map",
+      "pin_result": "Map",
+      "pin_key": "Key",
+      "make": {
+        "label": "Make Map",
+        "description": "Builds a new map from the given key-value pairs.",
+        "pin_key_n": "Key",
+        "pin_value_n": "Value"
+      },
+      "length": {
+        "label": "Map Length",
+        "description": "Returns how many key-value pairs are in the map."
+      },
+      "set": {
+        "label": "Map Add",
+        "description": "Sets the value for a key, adding it or overwriting the existing one."
+      },
+      "remove": {
+        "label": "Map Remove",
+        "description": "Removes the entry for a key, if one exists."
+      },
+      "clear": {
+        "label": "Map Clear",
+        "description": "Returns an empty map, discarding all entries."
+      },
+      "containsKey": {
+        "label": "Map Contains Key",
+        "description": "True if the map has an entry stored under this key."
+      },
+      "find": {
+        "label": "Map Find",
+        "description": "Returns the value stored under a key, and whether it was found.",
+        "pin_found": "Found"
+      },
+      "keys": {
+        "label": "Map Keys",
+        "description": "Returns an array of every key currently in the map.",
+        "pin_keys": "Keys"
+      },
+      "values": {
+        "label": "Map Values",
+        "description": "Returns an array of every value currently in the map.",
+        "pin_values": "Values"
+      },
+      "isEmpty": {
+        "label": "Map Is Empty",
+        "description": "True if the map has no entries.",
+        "pin_is_empty": "Is Empty"
+      },
+      "forEach": {
+        "label": "Map For Each",
+        "description": "Runs the loop body once for each key-value pair in the map."
+      }
+    },
+    "math": {
+      "group_arithmetic": "Math.Arithmetic",
+      "group_comparison": "Math.Comparison",
+      "add": {
+        "label": "Add ( + )",
+        "description": "Adds two numbers together."
+      },
+      "subtract": {
+        "label": "Subtract ( - )",
+        "description": "Subtracts B from A."
+      },
+      "multiply": {
+        "label": "Multiply ( * )",
+        "description": "Multiplies two numbers together."
+      },
+      "divide": {
+        "label": "Divide ( / )",
+        "description": "Divides A by B."
+      },
+      "greaterThan": {
+        "label": "Greater than ( > )",
+        "description": "True if A is greater than B."
+      },
+      "greaterEqual": {
+        "label": "Greater equal ( >= )",
+        "description": "True if A is greater than or equal to B."
+      },
+      "lessThan": {
+        "label": "Less than ( < )",
+        "description": "True if A is less than B."
+      },
+      "lessEqual": {
+        "label": "Less equal ( <= )",
+        "description": "True if A is less than or equal to B."
+      },
+      "equal": {
+        "label": "Equal ( == )",
+        "description": "True if A and B are numerically equal."
+      },
+      "unequal": {
+        "label": "Unequal ( != )",
+        "description": "True if A and B are not numerically equal."
+      }
+    },
+    "odata": {
+      "v2Request": {
+        "label": "OData V2 Request",
+        "description": "Fetches every page of an OData v2 GET request — client-driven $top/$skip (1000 rows per page by default) or server-driven cursor/snapshot next-link paging — and returns the combined rows.",
+        "pin_url": "URL",
+        "pin_page_size": "Page Size",
+        "pin_pagination_type": "Pagination Type",
+        "pin_max_pages": "Max Pages",
+        "pin_headers": "Headers (JSON)",
+        "pin_rows": "Rows",
+        "pin_page_count": "Page Count"
+      }
+    },
+    "reroute": {
+      "data": {
+        "label": "Reroute",
+        "description": "Bends a wire's path on the canvas with no effect on behavior."
+      },
+      "exec": {
+        "label": "Reroute",
+        "description": "Bends an exec wire's path on the canvas with no effect on behavior."
+      }
+    },
+    "set": {
+      "group": "Container.Set",
+      "pin_set_in": "Set",
+      "pin_result": "Set",
+      "pin_element": "Element",
+      "make": {
+        "label": "Make Set",
+        "description": "Builds a new set from the given elements, dropping duplicates."
+      },
+      "length": {
+        "label": "Set Length",
+        "description": "Returns how many unique elements are in the set."
+      },
+      "add": {
+        "label": "Set Add",
+        "description": "Adds a value to the set, unless it's already present.",
+        "pin_added": "Added"
+      },
+      "remove": {
+        "label": "Set Remove",
+        "description": "Removes a value from the set if it is present."
+      },
+      "clear": {
+        "label": "Set Clear",
+        "description": "Returns an empty set, discarding all elements."
+      },
+      "contains": {
+        "label": "Set Contains",
+        "description": "True if the set already contains this value."
+      },
+      "isEmpty": {
+        "label": "Set Is Empty",
+        "description": "True if the set has no elements.",
+        "pin_is_empty": "Is Empty"
+      },
+      "toArray": {
+        "label": "Set To Array",
+        "description": "Converts the set's elements into an ordinary array.",
+        "pin_array": "Array"
+      },
+      "union": {
+        "label": "Set Union",
+        "description": "Combines two sets, keeping every distinct element from both.",
+        "pin_set_a": "Set A",
+        "pin_set_b": "Set B"
+      },
+      "intersection": {
+        "label": "Set Intersection",
+        "description": "Returns only the elements present in both sets.",
+        "pin_set_a": "Set A",
+        "pin_set_b": "Set B"
+      },
+      "difference": {
+        "label": "Set Difference",
+        "description": "Returns elements in the first set that aren't in the second.",
+        "pin_set_a": "Set A",
+        "pin_set_b": "Set B"
+      },
+      "forEach": {
+        "label": "Set For Each",
+        "description": "Runs the loop body once for each element in the set."
+      }
+    },
+    "sftp": {
+      "upload": {
+        "label": "SFTP Upload",
+        "description": "Uploads a file to an SFTP server, with reconnect handling and configurable existing-file behavior. Compiled output only — see this node's own tooltip note below.",
+        "pin_host": "Host",
+        "pin_port": "Port",
+        "pin_username": "Username",
+        "pin_password": "Password",
+        "pin_passphrase": "Passphrase",
+        "pin_file_path": "File Path",
+        "pin_content": "Content",
+        "pin_encoding": "Encoding",
+        "pin_create_directory": "Create Directory",
+        "pin_existing_file": "Existing File",
+        "pin_prevent_traversal": "Prevent Directory Traversal",
+        "pin_max_reconnect": "Max Reconnect Attempts",
+        "pin_reconnect_delay": "Reconnect Delay (ms)",
+        "pin_skipped": "Skipped",
+        "pin_attempts": "Attempts"
+      }
+    },
+    "string": {
+      "fromNumber": {
+        "label": "To String (Number)",
+        "description": "Converts a number to its text representation."
+      },
+      "fromBoolean": {
+        "label": "To String (Boolean)",
+        "description": "Converts a boolean to its text representation."
+      },
+      "fromDate": {
+        "label": "To String (Date)",
+        "description": "Converts a date to an ISO 8601 text string."
+      },
+      "fromJson": {
+        "label": "To String (JSON)",
+        "description": "Converts a value to its JSON text representation."
+      },
+      "equalCaseSensitive": {
+        "label": "Equal ( == ) case-sensitive",
+        "description": "True if two strings are exactly equal, case-sensitive."
+      },
+      "equalCaseInsensitive": {
+        "label": "Equal ( == ) case-insensitive",
+        "description": "True if two strings are equal, ignoring letter case."
+      },
+      "length": {
+        "label": "Length",
+        "description": "Returns how many characters are in the string."
+      },
+      "replace": {
+        "label": "Replace",
+        "description": "Replaces only the first occurrence of a substring with another string.",
+        "pin_search": "Search",
+        "pin_replacement": "Replacement"
+      },
+      "replaceAll": {
+        "label": "Replace All",
+        "description": "Replaces every occurrence of a substring with another string.",
+        "pin_search": "Search",
+        "pin_replacement": "Replacement"
+      },
+      "substring": {
+        "label": "Substring",
+        "description": "Returns the characters between Start and End (order-independent, clamped to the string's bounds)."
+      },
+      "slice": {
+        "label": "Slice",
+        "description": "Returns the characters between Start and End, where a negative index counts from the string's end."
+      },
+      "append": {
+        "label": "Append String",
+        "description": "Concatenates all of its string inputs into one result.",
+        "pin_string": "String",
+        "pin_string_1": "String 1",
+        "pin_string_2": "String 2"
+      }
+    },
+    "variable": {
+      "get": {
+        "label": "Get Variable",
+        "description": "Reads the bound variable's current value."
+      },
+      "set": {
+        "label": "Set Variable",
+        "description": "Writes a new value to the bound variable."
+      }
+    },
+    "xml": {
+      "toJson": {
+        "label": "XML to JSON",
+        "description": "Parses an XML string into a JSON object, failing safely with success:false on invalid XML."
+      },
+      "fromJson": {
+        "label": "JSON to XML",
+        "description": "Builds an XML string from a JSON object."
+      },
+      "toCsv": {
+        "label": "XML to CSV",
+        "description": "Parses an XML string's tabular rows and converts them into a delimited CSV string."
+      }
+    }
   }
 }

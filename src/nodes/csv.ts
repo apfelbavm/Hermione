@@ -1,5 +1,11 @@
 import { registerNode } from "../engine/registry";
-import { csvToObjects, extractTabularRows, jsonValueToXml, objectsToCsv } from "./dataFormatHelpers";
+import {
+  csvToObjects,
+  extractTabularRows,
+  jsonValueToXml,
+  objectsToCsv,
+} from "./dataFormatHelpers";
+import { i18n } from "@i18n";
 
 // CSV <-> JSON, backed by PapaParse (see dataFormatHelpers.ts). Both nodes are latent (exec, not
 // pure) rather than a plain data node: a large file (thousands of rows x hundreds of columns) is
@@ -22,26 +28,66 @@ import { csvToObjects, extractTabularRows, jsonValueToXml, objectsToCsv } from "
 // and feeding in xml.toJson's output instead — both still work.
 registerNode({
   type: "csv.toJson",
-  label: "CSV to JSON",
-  description: "Parses a CSV string into a JSON object, wrapping the rows under configurable root/row tags.",
+  label: i18n.nodes.csv.toJson.label,
+  description: i18n.nodes.csv.toJson.description,
   group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "csv", label: "CSV", type: "string", direction: "input", defaultValue: "" },
-    { id: "delimiter", label: "Delimiter", type: "string", direction: "input", defaultValue: "," },
-    { id: "rootTag", label: "Root Tag", type: "string", direction: "input", defaultValue: "rows" },
-    { id: "rowTag", label: "Row Tag", type: "string", direction: "input", defaultValue: "row" },
+    {
+      id: "csv",
+      label: i18n.nodes.__shared.pin_csv,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "delimiter",
+      label: i18n.nodes.__shared.pin_delimiter,
+      type: "string",
+      direction: "input",
+      defaultValue: ",",
+    },
+    {
+      id: "rootTag",
+      label: i18n.nodes.csv.toJson.pin_root_tag,
+      type: "string",
+      direction: "input",
+      defaultValue: "rows",
+    },
+    {
+      id: "rowTag",
+      label: i18n.nodes.csv.toJson.pin_row_tag,
+      type: "string",
+      direction: "input",
+      defaultValue: "row",
+    },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
-    { id: "json", label: "JSON", type: "object", direction: "output" },
-    { id: "success", label: "Success", type: "boolean", direction: "output" },
+    {
+      id: "json",
+      label: i18n.nodes.__shared.pin_json,
+      type: "object",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   latent: true,
   execute: async ({ inputs }) => {
     try {
-      const rows = await csvToObjects(String(inputs.csv ?? ""), String(inputs.delimiter ?? ","));
+      const rows = await csvToObjects(
+        String(inputs.csv ?? ""),
+        String(inputs.delimiter ?? ","),
+      );
       const rootTag = String(inputs.rootTag ?? "").trim() || "rows";
       const rowTag = String(inputs.rowTag ?? "").trim() || "row";
-      return { nextExec: "exec-out", outputs: { json: { [rootTag]: { [rowTag]: rows } }, success: true } };
+      return {
+        nextExec: "exec-out",
+        outputs: { json: { [rootTag]: { [rowTag]: rows } }, success: true },
+      };
     } catch {
       return { nextExec: "exec-out", outputs: { json: null, success: false } };
     }
@@ -50,16 +96,38 @@ registerNode({
 
 registerNode({
   type: "json.toCsv",
-  label: "JSON to CSV",
-  description: "Converts a JSON object's tabular rows into a delimited CSV string.",
+  label: i18n.nodes.csv.toCsv.label,
+  description: i18n.nodes.csv.toCsv.description,
   group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "json", label: "JSON", type: "object", direction: "input", defaultValue: null },
-    { id: "delimiter", label: "Delimiter", type: "string", direction: "input", defaultValue: "," },
+    {
+      id: "json",
+      label: i18n.nodes.__shared.pin_json,
+      type: "object",
+      direction: "input",
+      defaultValue: null,
+    },
+    {
+      id: "delimiter",
+      label: i18n.nodes.__shared.pin_delimiter,
+      type: "string",
+      direction: "input",
+      defaultValue: ",",
+    },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
-    { id: "csv", label: "CSV", type: "string", direction: "output" },
-    { id: "success", label: "Success", type: "boolean", direction: "output" },
+    {
+      id: "csv",
+      label: i18n.nodes.__shared.pin_csv,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   latent: true,
   execute: async ({ inputs }) => {
@@ -78,26 +146,69 @@ registerNode({
 // has no XML element name of its own to be built under. (Same wrapping csv.toJson now does, above.)
 registerNode({
   type: "csv.toXml",
-  label: "CSV to XML",
-  description: "Parses a CSV string and converts it into an XML string with configurable root/row tags.",
+  label: i18n.nodes.csv.toXml.label,
+  description: i18n.nodes.csv.toXml.description,
   group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "csv", label: "CSV", type: "string", direction: "input", defaultValue: "" },
-    { id: "delimiter", label: "Delimiter", type: "string", direction: "input", defaultValue: "," },
-    { id: "rootTag", label: "Root Tag", type: "string", direction: "input", defaultValue: "rows" },
-    { id: "rowTag", label: "Row Tag", type: "string", direction: "input", defaultValue: "row" },
+    {
+      id: "csv",
+      label: i18n.nodes.__shared.pin_csv,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "delimiter",
+      label: i18n.nodes.__shared.pin_delimiter,
+      type: "string",
+      direction: "input",
+      defaultValue: ",",
+    },
+    {
+      id: "rootTag",
+      label: i18n.nodes.csv.toXml.pin_root_tag,
+      type: "string",
+      direction: "input",
+      defaultValue: "rows",
+    },
+    {
+      id: "rowTag",
+      label: i18n.nodes.csv.toXml.pin_row_tag,
+      type: "string",
+      direction: "input",
+      defaultValue: "row",
+    },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
-    { id: "xml", label: "XML", type: "string", direction: "output" },
-    { id: "success", label: "Success", type: "boolean", direction: "output" },
+    {
+      id: "xml",
+      label: i18n.nodes.__shared.pin_xml,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   latent: true,
   execute: async ({ inputs }) => {
     try {
-      const rows = await csvToObjects(String(inputs.csv ?? ""), String(inputs.delimiter ?? ","));
+      const rows = await csvToObjects(
+        String(inputs.csv ?? ""),
+        String(inputs.delimiter ?? ","),
+      );
       const rootTag = String(inputs.rootTag ?? "").trim() || "rows";
       const rowTag = String(inputs.rowTag ?? "").trim() || "row";
-      return { nextExec: "exec-out", outputs: { xml: jsonValueToXml({ [rootTag]: { [rowTag]: rows } }), success: true } };
+      return {
+        nextExec: "exec-out",
+        outputs: {
+          xml: jsonValueToXml({ [rootTag]: { [rowTag]: rows } }),
+          success: true,
+        },
+      };
     } catch {
       return { nextExec: "exec-out", outputs: { xml: "", success: false } };
     }

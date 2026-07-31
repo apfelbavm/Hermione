@@ -1,5 +1,6 @@
 import { registerNode } from "../engine/registry";
 import { compileResultVar } from "../engine/compileUtils";
+import { i18n } from "@i18n";
 
 const EXISTING_FILE_MODES = ["Overwrite", "Append", "Fail", "Ignore"];
 
@@ -92,55 +93,101 @@ async function sftpUploadExecute(host, rawPort, username, password, privateKey, 
 
 registerNode({
   type: "sftp.upload",
-  label: "SFTP Upload",
-  description: "Uploads a file to an SFTP server, with reconnect handling and configurable existing-file behavior. Compiled output only — see this node's own tooltip note below.",
+  label: i18n.nodes.sftp.upload.label,
+  description: i18n.nodes.sftp.upload.description,
   group: "Request",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "host", label: "Host", type: "string", direction: "input", defaultValue: "" },
-    { id: "port", label: "Port", type: "number", direction: "input", defaultValue: 22, integer: true },
-    { id: "username", label: "Username", type: "string", direction: "input", defaultValue: "" },
-    { id: "password", label: "Password", type: "string", direction: "input", defaultValue: "" },
     {
-      id: "privateKey",
-      label: "Private Key",
+      id: "host",
+      label: i18n.nodes.sftp.upload.pin_host,
       type: "string",
       direction: "input",
       defaultValue: "",
     },
-    { id: "passphrase", label: "Passphrase", type: "string", direction: "input", defaultValue: "" },
-    { id: "filePath", label: "File Path", type: "string", direction: "input", defaultValue: "" },
-    { id: "content", label: "Content", type: "string", direction: "input", defaultValue: "" },
+    {
+      id: "port",
+      label: i18n.nodes.sftp.upload.pin_port,
+      type: "number",
+      direction: "input",
+      defaultValue: 22,
+      integer: true,
+    },
+    {
+      id: "username",
+      label: i18n.nodes.sftp.upload.pin_username,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "password",
+      label: i18n.nodes.sftp.upload.pin_password,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "privateKey",
+      label: i18n.nodes.__shared.pin_private_key,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "passphrase",
+      label: i18n.nodes.sftp.upload.pin_passphrase,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "filePath",
+      label: i18n.nodes.sftp.upload.pin_file_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "content",
+      label: i18n.nodes.sftp.upload.pin_content,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
     {
       id: "encoding",
-      label: "Encoding",
+      label: i18n.nodes.sftp.upload.pin_encoding,
       type: "string",
       direction: "input",
       defaultValue: "utf8",
       options: ["utf8", "base64"],
     },
-    { id: "createDirectory", label: "Create Directory", type: "boolean", direction: "input", defaultValue: true },
+    {
+      id: "createDirectory",
+      label: i18n.nodes.sftp.upload.pin_create_directory,
+      type: "boolean",
+      direction: "input",
+      defaultValue: true,
+    },
     {
       id: "existingFileMode",
-      label: "Existing File",
+      label: i18n.nodes.sftp.upload.pin_existing_file,
       type: "string",
       direction: "input",
       defaultValue: EXISTING_FILE_MODES[0],
       options: EXISTING_FILE_MODES,
     },
-    // On by default: File Path routinely gets built (in part or whole) from upstream data the
-    // graph doesn't fully control — a "../../etc/passwd"-style segment slipped in there would
-    // otherwise let a write escape wherever the caller actually intended it to land.
     {
       id: "preventDirectoryTraversal",
-      label: "Prevent Directory Traversal",
+      label: i18n.nodes.sftp.upload.pin_prevent_traversal,
       type: "boolean",
       direction: "input",
       defaultValue: true,
     },
     {
       id: "maxReconnectAttempts",
-      label: "Max Reconnect Attempts",
+      label: i18n.nodes.sftp.upload.pin_max_reconnect,
       type: "number",
       direction: "input",
       defaultValue: 3,
@@ -148,20 +195,50 @@ registerNode({
     },
     {
       id: "reconnectDelayMs",
-      label: "Reconnect Delay (ms)",
+      label: i18n.nodes.sftp.upload.pin_reconnect_delay,
       type: "number",
       direction: "input",
       defaultValue: 1000,
       integer: true,
     },
-    { id: "timeoutMs", label: "Timeout (ms)", type: "number", direction: "input", defaultValue: 10000, integer: true },
-    { id: "exec-out", label: "Completed", type: "exec", direction: "output" },
-    { id: "success", label: "Success", type: "boolean", direction: "output" },
-    // True only when Existing File is "Ignore" AND the file already existed, so a caller can tell
-    // "skipped on purpose" apart from "actually uploaded" without both collapsing into one boolean.
-    { id: "skipped", label: "Skipped", type: "boolean", direction: "output" },
-    { id: "attempts", label: "Attempts", type: "number", direction: "output" },
-    { id: "error", label: "Error", type: "string", direction: "output" },
+    {
+      id: "timeoutMs",
+      label: i18n.nodes.__shared.pin_timeout,
+      type: "number",
+      direction: "input",
+      defaultValue: 10000,
+      integer: true,
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "skipped",
+      label: i18n.nodes.sftp.upload.pin_skipped,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "attempts",
+      label: i18n.nodes.sftp.upload.pin_attempts,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
   ],
   latent: true,
   // Always fails, honestly and immediately — see this file's own header comment for why a real
@@ -173,7 +250,8 @@ registerNode({
       success: false,
       skipped: false,
       attempts: 0,
-      error: 'SFTP Upload only runs in the compiled output (under Node.js) — the in-browser "Run" button has no way to open a real SSH/SFTP connection. Compile this graph and run the generated script to actually upload.',
+      error:
+        'SFTP Upload only runs in the compiled output (under Node.js) — the in-browser "Run" button has no way to open a real SSH/SFTP connection. Compile this graph and run the generated script to actually upload.',
     },
   }),
   compileExecute: ({ node, inputs, compileFrom }) => [

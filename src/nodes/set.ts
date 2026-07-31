@@ -5,13 +5,14 @@ import { runExecFrom } from "../engine/executor";
 import { NodeColorCategory } from "../engine/types";
 import type { PinDef, PinType } from "../engine/types";
 import { NodeInstance } from "../engine/nodeInstance";
+import { i18n } from "@i18n";
 
 // Sibling of array.ts — same pure-dataflow philosophy (see that file's header comment), just for
 // Set<T>. Backed by a plain deduped array (see the plan's rationale: no real ES Set instance, since
 // those don't survive JSON.stringify/parse and would break save/load) — uniqueness is enforced by
 // every node here rather than by the storage type itself.
 
-const GROUP = "Container.Set";
+const GROUP = i18n.nodes.set.group;
 
 function elementTypeOf(node: NodeInstance): PinType {
   return node.elementType ?? "number";
@@ -46,7 +47,11 @@ function compileDedupe(expr: string): string {
   return `(() => { const seen = new Set(); const out = []; for (const v of (${expr})) { const k = JSON.stringify(v); if (!seen.has(k)) { seen.add(k); out.push(v); } } return out; })()`;
 }
 
-function setPin(elementType: PinType, id = "set", label = "Set"): PinDef {
+function setPin(
+  elementType: PinType,
+  id = "set",
+  label = i18n.nodes.set.pin_set_in,
+): PinDef {
   return {
     id,
     label,
@@ -57,7 +62,10 @@ function setPin(elementType: PinType, id = "set", label = "Set"): PinDef {
   };
 }
 
-function setOutPin(elementType: PinType, label = "Set"): PinDef {
+function setOutPin(
+  elementType: PinType,
+  label = i18n.nodes.set.pin_result,
+): PinDef {
   return {
     id: "result",
     label,
@@ -97,7 +105,7 @@ function makeSetEntryPins(node: NodeInstance): PinDef[] {
   const elementType = elementTypeOf(node);
   return makeSetEntryIds(node).map((id, i) => ({
     id,
-    label: `Element ${i + 1}`,
+    label: `${i18n.nodes.set.pin_element} ${i + 1}`,
     type: elementType,
     direction: "input" as const,
     defaultValue: DEFAULT_VALUE_BY_TYPE[elementType],
@@ -107,15 +115,15 @@ function makeSetEntryPins(node: NodeInstance): PinDef[] {
 
 registerNode({
   type: "set.make",
-  label: "Make Set",
-  description: "Builds a new set from the given elements, dropping duplicates.",
+  label: i18n.nodes.set.make.label,
+  description: i18n.nodes.set.make.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [
     {
       id: `${ENTRY_PREFIX}0`,
-      label: "Element 1",
+      label: `${i18n.nodes.set.pin_element} 1`,
       type: "number",
       direction: "input",
       defaultValue: 0,
@@ -123,7 +131,10 @@ registerNode({
     },
     setOutPin("number"),
   ],
-  deriveInstancePins: (node) => [...makeSetEntryPins(node), setOutPin(elementTypeOf(node))],
+  deriveInstancePins: (node) => [
+    ...makeSetEntryPins(node),
+    setOutPin(elementTypeOf(node)),
+  ],
   addInstancePinEntry: (node) => {
     const suffixes = makeSetEntryIds(node).map(entrySuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -145,13 +156,29 @@ registerNode({
 
 registerNode({
   type: "set.length",
-  label: "Set Length",
-  description: "Returns how many unique elements are in the set.",
+  label: i18n.nodes.set.length.label,
+  description: i18n.nodes.set.length.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [setPin("number"), { id: "length", label: "Length", type: "number", direction: "output" }],
-  deriveInstancePins: (node) => [setPin(elementTypeOf(node)), { id: "length", label: "Length", type: "number", direction: "output" }],
+  pins: [
+    setPin("number"),
+    {
+      id: "length",
+      label: i18n.nodes.__shared.pin_length,
+      type: "number",
+      direction: "output",
+    },
+  ],
+  deriveInstancePins: (node) => [
+    setPin(elementTypeOf(node)),
+    {
+      id: "length",
+      label: i18n.nodes.__shared.pin_length,
+      type: "number",
+      direction: "output",
+    },
+  ],
   evaluate: ({ inputs }) => ({ length: asArray(inputs.set).length }),
   compileEvaluate: ({ inputs }) => ({
     length: `(${compileAsArray(inputs.set)}).length`,
@@ -160,19 +187,41 @@ registerNode({
 
 registerNode({
   type: "set.add",
-  label: "Set Add",
-  description: "Adds a value to the set, unless it's already present.",
+  label: i18n.nodes.set.add.label,
+  description: i18n.nodes.set.add.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [setPin("number"), itemPin("item", "Item", "number"), setOutPin("number"), { id: "added", label: "Added", type: "boolean", direction: "output" }],
+  pins: [
+    setPin("number"),
+    itemPin("item", i18n.nodes.__shared.pin_item, "number"),
+    setOutPin("number"),
+    {
+      id: "added",
+      label: i18n.nodes.set.add.pin_added,
+      type: "boolean",
+      direction: "output",
+    },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [setPin(t), itemPin("item", "Item", t), setOutPin(t), { id: "added", label: "Added", type: "boolean", direction: "output" }];
+    return [
+      setPin(t),
+      itemPin("item", i18n.nodes.__shared.pin_item, t),
+      setOutPin(t),
+      {
+        id: "added",
+        label: i18n.nodes.set.add.pin_added,
+        type: "boolean",
+        direction: "output",
+      },
+    ];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.set);
-    const exists = arr.some((v) => JSON.stringify(v) === JSON.stringify(inputs.item));
+    const exists = arr.some(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    );
     return {
       result: exists ? arr.slice() : [...arr, inputs.item],
       added: !exists,
@@ -189,21 +238,45 @@ registerNode({
 
 registerNode({
   type: "set.remove",
-  label: "Set Remove",
-  description: "Removes a value from the set if it is present.",
+  label: i18n.nodes.set.remove.label,
+  description: i18n.nodes.set.remove.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [setPin("number"), itemPin("item", "Item", "number"), setOutPin("number"), { id: "removed", label: "Removed", type: "boolean", direction: "output" }],
+  pins: [
+    setPin("number"),
+    itemPin("item", i18n.nodes.__shared.pin_item, "number"),
+    setOutPin("number"),
+    {
+      id: "removed",
+      label: i18n.nodes.__shared.pin_removed,
+      type: "boolean",
+      direction: "output",
+    },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [setPin(t), itemPin("item", "Item", t), setOutPin(t), { id: "removed", label: "Removed", type: "boolean", direction: "output" }];
+    return [
+      setPin(t),
+      itemPin("item", i18n.nodes.__shared.pin_item, t),
+      setOutPin(t),
+      {
+        id: "removed",
+        label: i18n.nodes.__shared.pin_removed,
+        type: "boolean",
+        direction: "output",
+      },
+    ];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.set);
-    const index = arr.findIndex((v) => JSON.stringify(v) === JSON.stringify(inputs.item));
+    const index = arr.findIndex(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    );
     const removed = index !== -1;
-    const result = removed ? [...arr.slice(0, index), ...arr.slice(index + 1)] : arr.slice();
+    const result = removed
+      ? [...arr.slice(0, index), ...arr.slice(index + 1)]
+      : arr.slice();
     return { result, removed };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -214,8 +287,8 @@ registerNode({
 
 registerNode({
   type: "set.clear",
-  label: "Set Clear",
-  description: "Returns an empty set, discarding all elements.",
+  label: i18n.nodes.set.clear.label,
+  description: i18n.nodes.set.clear.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
@@ -230,27 +303,38 @@ registerNode({
 
 registerNode({
   type: "set.contains",
-  label: "Set Contains",
-  description: "True if the set already contains this value.",
+  label: i18n.nodes.set.contains.label,
+  description: i18n.nodes.set.contains.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [setPin("number"), itemPin("item", "Item", "number"), { id: "contains", label: "Contains", type: "boolean", direction: "output" }],
+  pins: [
+    setPin("number"),
+    itemPin("item", i18n.nodes.__shared.pin_item, "number"),
+    {
+      id: "contains",
+      label: i18n.nodes.__shared.pin_contains,
+      type: "boolean",
+      direction: "output",
+    },
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
     return [
       setPin(t),
-      itemPin("item", "Item", t),
+      itemPin("item", i18n.nodes.__shared.pin_item, t),
       {
         id: "contains",
-        label: "Contains",
+        label: i18n.nodes.__shared.pin_contains,
         type: "boolean",
         direction: "output",
       },
     ];
   },
   evaluate: ({ inputs }) => ({
-    contains: asArray(inputs.set).some((v) => JSON.stringify(v) === JSON.stringify(inputs.item)),
+    contains: asArray(inputs.set).some(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    ),
   }),
   compileEvaluate: ({ inputs }) => ({
     contains: `(${compileAsArray(inputs.set)}).some((v) => ${jsonEq("v", inputs.item)})`,
@@ -259,13 +343,29 @@ registerNode({
 
 registerNode({
   type: "set.isEmpty",
-  label: "Set Is Empty",
-  description: "True if the set has no elements.",
+  label: i18n.nodes.set.isEmpty.label,
+  description: i18n.nodes.set.isEmpty.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [setPin("number"), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
-  deriveInstancePins: (node) => [setPin(elementTypeOf(node)), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
+  pins: [
+    setPin("number"),
+    {
+      id: "isEmpty",
+      label: i18n.nodes.set.isEmpty.pin_is_empty,
+      type: "boolean",
+      direction: "output",
+    },
+  ],
+  deriveInstancePins: (node) => [
+    setPin(elementTypeOf(node)),
+    {
+      id: "isEmpty",
+      label: i18n.nodes.set.isEmpty.pin_is_empty,
+      type: "boolean",
+      direction: "output",
+    },
+  ],
   evaluate: ({ inputs }) => ({ isEmpty: asArray(inputs.set).length === 0 }),
   compileEvaluate: ({ inputs }) => ({
     isEmpty: `((${compileAsArray(inputs.set)}).length === 0)`,
@@ -274,8 +374,8 @@ registerNode({
 
 registerNode({
   type: "set.toArray",
-  label: "Set To Array",
-  description: "Converts the set's elements into an ordinary array.",
+  label: i18n.nodes.set.toArray.label,
+  description: i18n.nodes.set.toArray.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
@@ -283,7 +383,7 @@ registerNode({
     setPin("number"),
     {
       id: "result",
-      label: "Array",
+      label: i18n.nodes.set.toArray.pin_array,
       type: "number",
       direction: "output",
       container: "array",
@@ -295,7 +395,7 @@ registerNode({
       setPin(t),
       {
         id: "result",
-        label: "Array",
+        label: i18n.nodes.set.toArray.pin_array,
         type: t,
         direction: "output",
         container: "array" as const,
@@ -310,41 +410,69 @@ registerNode({
 
 registerNode({
   type: "set.union",
-  label: "Set Union",
-  description: "Combines two sets, keeping every distinct element from both.",
+  label: i18n.nodes.set.union.label,
+  description: i18n.nodes.set.union.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
+  pins: [
+    { ...setPin("number"), id: "a", label: i18n.nodes.set.union.pin_set_a },
+    { ...setPin("number"), id: "b", label: i18n.nodes.set.union.pin_set_b },
+    setOutPin("number"),
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: "Set A" }, { ...setPin(t), id: "b", label: "Set B" }, setOutPin(t)];
+    return [
+      { ...setPin(t), id: "a", label: i18n.nodes.set.union.pin_set_a },
+      { ...setPin(t), id: "b", label: i18n.nodes.set.union.pin_set_b },
+      setOutPin(t),
+    ];
   },
   evaluate: ({ inputs }) => ({
     result: dedupe([...asArray(inputs.a), ...asArray(inputs.b)]),
   }),
   compileEvaluate: ({ inputs }) => ({
-    result: compileDedupe(`[...${compileAsArray(inputs.a)}, ...${compileAsArray(inputs.b)}]`),
+    result: compileDedupe(
+      `[...${compileAsArray(inputs.a)}, ...${compileAsArray(inputs.b)}]`,
+    ),
   }),
 });
 
 registerNode({
   type: "set.intersection",
-  label: "Set Intersection",
-  description: "Returns only the elements present in both sets.",
+  label: i18n.nodes.set.intersection.label,
+  description: i18n.nodes.set.intersection.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
+  pins: [
+    {
+      ...setPin("number"),
+      id: "a",
+      label: i18n.nodes.set.intersection.pin_set_a,
+    },
+    {
+      ...setPin("number"),
+      id: "b",
+      label: i18n.nodes.set.intersection.pin_set_b,
+    },
+    setOutPin("number"),
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: "Set A" }, { ...setPin(t), id: "b", label: "Set B" }, setOutPin(t)];
+    return [
+      { ...setPin(t), id: "a", label: i18n.nodes.set.intersection.pin_set_a },
+      { ...setPin(t), id: "b", label: i18n.nodes.set.intersection.pin_set_b },
+      setOutPin(t),
+    ];
   },
   evaluate: ({ inputs }) => {
     const a = asArray(inputs.a);
     const b = asArray(inputs.b);
     return {
-      result: a.filter((v) => b.some((bv) => JSON.stringify(bv) === JSON.stringify(v))),
+      result: a.filter((v) =>
+        b.some((bv) => JSON.stringify(bv) === JSON.stringify(v)),
+      ),
     };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -354,21 +482,39 @@ registerNode({
 
 registerNode({
   type: "set.difference",
-  label: "Set Difference",
-  description: "Returns elements in the first set that aren't in the second.",
+  label: i18n.nodes.set.difference.label,
+  description: i18n.nodes.set.difference.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [{ ...setPin("number"), id: "a", label: "Set A" }, { ...setPin("number"), id: "b", label: "Set B" }, setOutPin("number")],
+  pins: [
+    {
+      ...setPin("number"),
+      id: "a",
+      label: i18n.nodes.set.difference.pin_set_a,
+    },
+    {
+      ...setPin("number"),
+      id: "b",
+      label: i18n.nodes.set.difference.pin_set_b,
+    },
+    setOutPin("number"),
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: "Set A" }, { ...setPin(t), id: "b", label: "Set B" }, setOutPin(t)];
+    return [
+      { ...setPin(t), id: "a", label: i18n.nodes.set.difference.pin_set_a },
+      { ...setPin(t), id: "b", label: i18n.nodes.set.difference.pin_set_b },
+      setOutPin(t),
+    ];
   },
   evaluate: ({ inputs }) => {
     const a = asArray(inputs.a);
     const b = asArray(inputs.b);
     return {
-      result: a.filter((v) => !b.some((bv) => JSON.stringify(bv) === JSON.stringify(v))),
+      result: a.filter(
+        (v) => !b.some((bv) => JSON.stringify(bv) === JSON.stringify(v)),
+      ),
     };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -382,18 +528,38 @@ const MAX_SET_FOR_EACH_ITERATIONS = 100_000;
 
 registerNode({
   type: "set.forEach",
-  label: "Set For Each",
-  description: "Runs the loop body once for each element in the set.",
+  label: i18n.nodes.set.forEach.label,
+  description: i18n.nodes.set.forEach.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     setPin("number"),
-    { id: "loop-body", label: "Loop Body", type: "exec", direction: "output" },
-    { id: "element", label: "Element", type: "number", direction: "output" },
-    { id: "index", label: "Index", type: "number", direction: "output" },
-    { id: "completed", label: "Completed", type: "exec", direction: "output" },
+    {
+      id: "loop-body",
+      label: i18n.nodes.__shared.pin_loop_body,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "element",
+      label: i18n.nodes.set.pin_element,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "index",
+      label: i18n.nodes.__shared.pin_index,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "completed",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
@@ -402,15 +568,25 @@ registerNode({
       setPin(t),
       {
         id: "loop-body",
-        label: "Loop Body",
+        label: i18n.nodes.__shared.pin_loop_body,
         type: "exec",
         direction: "output",
       },
-      { id: "element", label: "Element", type: t, direction: "output" },
-      { id: "index", label: "Index", type: "number", direction: "output" },
+      {
+        id: "element",
+        label: i18n.nodes.set.pin_element,
+        type: t,
+        direction: "output",
+      },
+      {
+        id: "index",
+        label: i18n.nodes.__shared.pin_index,
+        type: "number",
+        direction: "output",
+      },
       {
         id: "completed",
-        label: "Completed",
+        label: i18n.nodes.__shared.pin_completed,
         type: "exec",
         direction: "output",
       },
@@ -424,7 +600,9 @@ registerNode({
   execute: async ({ node, inputs, ctx }) => {
     const arr = asArray(inputs.set);
     if (arr.length > MAX_SET_FOR_EACH_ITERATIONS) {
-      throw new Error(`Set For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_SET_FOR_EACH_ITERATIONS} limit.`);
+      throw new Error(
+        `Set For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_SET_FOR_EACH_ITERATIONS} limit.`,
+      );
     }
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
     for (let i = 0; i < arr.length; i++) {

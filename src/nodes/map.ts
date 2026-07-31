@@ -5,6 +5,7 @@ import { runExecFrom } from "../engine/executor";
 import { NodeColorCategory } from "../engine/types";
 import type { PinDef, PinType } from "../engine/types";
 import { NodeInstance } from "../engine/nodeInstance";
+import { i18n } from "@i18n";
 
 // Sibling of array.ts/set.ts — same pure-dataflow philosophy (see array.ts's header comment), just
 // for Map<K,V>. Backed by a plain array of {key,value} entries (see the plan's rationale: no real
@@ -13,7 +14,7 @@ import { NodeInstance } from "../engine/nodeInstance";
 // AND a key type (NodeInstance.mapKeyType) configured per instance — see
 // NodeDef.configurableElementType's includeKeyType flag.
 
-const GROUP = "Container.Map";
+const GROUP = i18n.nodes.map.group;
 
 interface MapEntry {
   key: unknown;
@@ -40,7 +41,12 @@ function jsonEq(aExpr: string, bExpr: string): string {
   return `(JSON.stringify(${aExpr}) === JSON.stringify(${bExpr}))`;
 }
 
-function mapPin(valueType: PinType, keyType: PinType, id = "map", label = "Map"): PinDef {
+function mapPin(
+  valueType: PinType,
+  keyType: PinType,
+  id = "map",
+  label = i18n.nodes.map.pin_map,
+): PinDef {
   return {
     id,
     label,
@@ -52,7 +58,11 @@ function mapPin(valueType: PinType, keyType: PinType, id = "map", label = "Map")
   };
 }
 
-function mapOutPin(valueType: PinType, keyType: PinType, label = "Map"): PinDef {
+function mapOutPin(
+  valueType: PinType,
+  keyType: PinType,
+  label = i18n.nodes.map.pin_result,
+): PinDef {
   return {
     id: "result",
     label,
@@ -63,7 +73,11 @@ function mapOutPin(valueType: PinType, keyType: PinType, label = "Map"): PinDef 
   };
 }
 
-function keyPin(keyType: PinType, id = "key", label = "Key"): PinDef {
+function keyPin(
+  keyType: PinType,
+  id = "key",
+  label = i18n.nodes.map.pin_key,
+): PinDef {
   return {
     id,
     label,
@@ -73,13 +87,19 @@ function keyPin(keyType: PinType, id = "key", label = "Key"): PinDef {
   };
 }
 
-function valuePin(valueType: PinType, id: string, label: string, direction: "input" | "output" = "input"): PinDef {
+function valuePin(
+  valueType: PinType,
+  id: string,
+  label: string,
+  direction: "input" | "output" = "input",
+): PinDef {
   return {
     id,
     label,
     type: valueType,
     direction,
-    defaultValue: direction === "input" ? DEFAULT_VALUE_BY_TYPE[valueType] : undefined,
+    defaultValue:
+      direction === "input" ? DEFAULT_VALUE_BY_TYPE[valueType] : undefined,
   };
 }
 
@@ -109,14 +129,14 @@ function makeMapEntryPins(node: NodeInstance): PinDef[] {
   makeMapEntrySuffixes(node).forEach((i, position) => {
     pins.push({
       id: `${KEY_PREFIX}${i}`,
-      label: `Key ${position + 1}`,
+      label: `${i18n.nodes.map.make.pin_key_n} ${position + 1}`,
       type: keyType,
       direction: "input",
       defaultValue: DEFAULT_VALUE_BY_TYPE[keyType],
     });
     pins.push({
       id: `${VALUE_PREFIX}${i}`,
-      label: `Value ${position + 1}`,
+      label: `${i18n.nodes.map.make.pin_value_n} ${position + 1}`,
       type: valueType,
       direction: "input",
       defaultValue: DEFAULT_VALUE_BY_TYPE[valueType],
@@ -128,22 +148,22 @@ function makeMapEntryPins(node: NodeInstance): PinDef[] {
 
 registerNode({
   type: "map.make",
-  label: "Make Map",
-  description: "Builds a new map from the given key-value pairs.",
+  label: i18n.nodes.map.make.label,
+  description: i18n.nodes.map.make.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [
     {
       id: `${KEY_PREFIX}0`,
-      label: "Key 1",
+      label: `${i18n.nodes.map.make.pin_key_n} 1`,
       type: "string",
       direction: "input",
       defaultValue: "",
     },
     {
       id: `${VALUE_PREFIX}0`,
-      label: "Value 1",
+      label: `${i18n.nodes.map.make.pin_value_n} 1`,
       type: "number",
       direction: "input",
       defaultValue: 0,
@@ -151,7 +171,10 @@ registerNode({
     },
     mapOutPin("number", "string"),
   ],
-  deriveInstancePins: (node) => [...makeMapEntryPins(node), mapOutPin(valueTypeOf(node), keyTypeOf(node))],
+  deriveInstancePins: (node) => [
+    ...makeMapEntryPins(node),
+    mapOutPin(valueTypeOf(node), keyTypeOf(node)),
+  ],
   addInstancePinEntry: (node) => {
     const suffixes = makeMapEntrySuffixes(node);
     const next = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -174,20 +197,39 @@ registerNode({
   }),
   compileEvaluate: ({ node, inputs }) => ({
     result: `[${makeMapEntrySuffixes(node)
-      .map((i) => `{ key: ${inputs[`${KEY_PREFIX}${i}`]}, value: ${inputs[`${VALUE_PREFIX}${i}`]} }`)
+      .map(
+        (i) =>
+          `{ key: ${inputs[`${KEY_PREFIX}${i}`]}, value: ${inputs[`${VALUE_PREFIX}${i}`]} }`,
+      )
       .join(", ")}]`,
   }),
 });
 
 registerNode({
   type: "map.length",
-  label: "Map Length",
-  description: "Returns how many key-value pairs are in the map.",
+  label: i18n.nodes.map.length.label,
+  description: i18n.nodes.map.length.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), { id: "length", label: "Length", type: "number", direction: "output" }],
-  deriveInstancePins: (node) => [mapPin(valueTypeOf(node), keyTypeOf(node)), { id: "length", label: "Length", type: "number", direction: "output" }],
+  pins: [
+    mapPin("number", "string"),
+    {
+      id: "length",
+      label: i18n.nodes.__shared.pin_length,
+      type: "number",
+      direction: "output",
+    },
+  ],
+  deriveInstancePins: (node) => [
+    mapPin(valueTypeOf(node), keyTypeOf(node)),
+    {
+      id: "length",
+      label: i18n.nodes.__shared.pin_length,
+      type: "number",
+      direction: "output",
+    },
+  ],
   evaluate: ({ inputs }) => ({ length: asEntries(inputs.map).length }),
   compileEvaluate: ({ inputs }) => ({
     length: `(${compileAsEntries(inputs.map)}).length`,
@@ -196,20 +238,32 @@ registerNode({
 
 registerNode({
   type: "map.set",
-  label: "Map Add",
-  description: "Sets the value for a key, adding it or overwriting the existing one.",
+  label: i18n.nodes.map.set.label,
+  description: i18n.nodes.map.set.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), keyPin("string"), valuePin("number", "value", "Value"), mapOutPin("number", "string")],
+  pins: [
+    mapPin("number", "string"),
+    keyPin("string"),
+    valuePin("number", "value", "Value"),
+    mapOutPin("number", "string"),
+  ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
     const k = keyTypeOf(node);
-    return [mapPin(v, k), keyPin(k), valuePin(v, "value", "Value"), mapOutPin(v, k)];
+    return [
+      mapPin(v, k),
+      keyPin(k),
+      valuePin(v, "value", "Value"),
+      mapOutPin(v, k),
+    ];
   },
   evaluate: ({ inputs }) => {
     const entries = asEntries(inputs.map).slice();
-    const index = entries.findIndex((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key));
+    const index = entries.findIndex(
+      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
+    );
     if (index !== -1) entries[index] = { key: inputs.key, value: inputs.value };
     else entries.push({ key: inputs.key, value: inputs.value });
     return { result: entries };
@@ -221,22 +275,46 @@ registerNode({
 
 registerNode({
   type: "map.remove",
-  label: "Map Remove",
-  description: "Removes the entry for a key, if one exists.",
+  label: i18n.nodes.map.remove.label,
+  description: i18n.nodes.map.remove.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), keyPin("string"), mapOutPin("number", "string"), { id: "removed", label: "Removed", type: "boolean", direction: "output" }],
+  pins: [
+    mapPin("number", "string"),
+    keyPin("string"),
+    mapOutPin("number", "string"),
+    {
+      id: "removed",
+      label: i18n.nodes.__shared.pin_removed,
+      type: "boolean",
+      direction: "output",
+    },
+  ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
     const k = keyTypeOf(node);
-    return [mapPin(v, k), keyPin(k), mapOutPin(v, k), { id: "removed", label: "Removed", type: "boolean", direction: "output" }];
+    return [
+      mapPin(v, k),
+      keyPin(k),
+      mapOutPin(v, k),
+      {
+        id: "removed",
+        label: i18n.nodes.__shared.pin_removed,
+        type: "boolean",
+        direction: "output",
+      },
+    ];
   },
   evaluate: ({ inputs }) => {
     const entries = asEntries(inputs.map);
-    const index = entries.findIndex((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key));
+    const index = entries.findIndex(
+      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
+    );
     const removed = index !== -1;
-    const result = removed ? [...entries.slice(0, index), ...entries.slice(index + 1)] : entries.slice();
+    const result = removed
+      ? [...entries.slice(0, index), ...entries.slice(index + 1)]
+      : entries.slice();
     return { result, removed };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -247,25 +325,37 @@ registerNode({
 
 registerNode({
   type: "map.clear",
-  label: "Map Clear",
-  description: "Returns an empty map, discarding all entries.",
+  label: i18n.nodes.map.clear.label,
+  description: i18n.nodes.map.clear.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), mapOutPin("number", "string")],
-  deriveInstancePins: (node) => [mapPin(valueTypeOf(node), keyTypeOf(node)), mapOutPin(valueTypeOf(node), keyTypeOf(node))],
+  deriveInstancePins: (node) => [
+    mapPin(valueTypeOf(node), keyTypeOf(node)),
+    mapOutPin(valueTypeOf(node), keyTypeOf(node)),
+  ],
   evaluate: () => ({ result: [] }),
   compileEvaluate: () => ({ result: "[]" }),
 });
 
 registerNode({
   type: "map.containsKey",
-  label: "Map Contains Key",
-  description: "True if the map has an entry stored under this key.",
+  label: i18n.nodes.map.containsKey.label,
+  description: i18n.nodes.map.containsKey.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), keyPin("string"), { id: "contains", label: "Contains", type: "boolean", direction: "output" }],
+  pins: [
+    mapPin("number", "string"),
+    keyPin("string"),
+    {
+      id: "contains",
+      label: i18n.nodes.__shared.pin_contains,
+      type: "boolean",
+      direction: "output",
+    },
+  ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
     const k = keyTypeOf(node);
@@ -274,14 +364,16 @@ registerNode({
       keyPin(k),
       {
         id: "contains",
-        label: "Contains",
+        label: i18n.nodes.__shared.pin_contains,
         type: "boolean",
         direction: "output",
       },
     ];
   },
   evaluate: ({ inputs }) => ({
-    contains: asEntries(inputs.map).some((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key)),
+    contains: asEntries(inputs.map).some(
+      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
+    ),
   }),
   compileEvaluate: ({ inputs }) => ({
     contains: `(${compileAsEntries(inputs.map)}).some((e) => ${jsonEq("e.key", inputs.key)})`,
@@ -290,19 +382,41 @@ registerNode({
 
 registerNode({
   type: "map.find",
-  label: "Map Find",
-  description: "Returns the value stored under a key, and whether it was found.",
+  label: i18n.nodes.map.find.label,
+  description: i18n.nodes.map.find.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), keyPin("string"), valuePin("number", "value", "Value", "output"), { id: "found", label: "Found", type: "boolean", direction: "output" }],
+  pins: [
+    mapPin("number", "string"),
+    keyPin("string"),
+    valuePin("number", "value", "Value", "output"),
+    {
+      id: "found",
+      label: i18n.nodes.map.find.pin_found,
+      type: "boolean",
+      direction: "output",
+    },
+  ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
     const k = keyTypeOf(node);
-    return [mapPin(v, k), keyPin(k), valuePin(v, "value", "Value", "output"), { id: "found", label: "Found", type: "boolean", direction: "output" }];
+    return [
+      mapPin(v, k),
+      keyPin(k),
+      valuePin(v, "value", "Value", "output"),
+      {
+        id: "found",
+        label: i18n.nodes.map.find.pin_found,
+        type: "boolean",
+        direction: "output",
+      },
+    ];
   },
   evaluate: ({ node, inputs }) => {
-    const entry = asEntries(inputs.map).find((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key));
+    const entry = asEntries(inputs.map).find(
+      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
+    );
     return {
       value: entry ? entry.value : DEFAULT_VALUE_BY_TYPE[valueTypeOf(node)],
       found: !!entry,
@@ -319,8 +433,8 @@ registerNode({
 
 registerNode({
   type: "map.keys",
-  label: "Map Keys",
-  description: "Returns an array of every key currently in the map.",
+  label: i18n.nodes.map.keys.label,
+  description: i18n.nodes.map.keys.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
@@ -328,7 +442,7 @@ registerNode({
     mapPin("number", "string"),
     {
       id: "result",
-      label: "Keys",
+      label: i18n.nodes.map.keys.pin_keys,
       type: "string",
       direction: "output",
       container: "array",
@@ -341,7 +455,7 @@ registerNode({
       mapPin(v, k),
       {
         id: "result",
-        label: "Keys",
+        label: i18n.nodes.map.keys.pin_keys,
         type: k,
         direction: "output",
         container: "array" as const,
@@ -358,8 +472,8 @@ registerNode({
 
 registerNode({
   type: "map.values",
-  label: "Map Values",
-  description: "Returns an array of every value currently in the map.",
+  label: i18n.nodes.map.values.label,
+  description: i18n.nodes.map.values.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
@@ -367,7 +481,7 @@ registerNode({
     mapPin("number", "string"),
     {
       id: "result",
-      label: "Values",
+      label: i18n.nodes.map.values.pin_values,
       type: "number",
       direction: "output",
       container: "array",
@@ -380,7 +494,7 @@ registerNode({
       mapPin(v, k),
       {
         id: "result",
-        label: "Values",
+        label: i18n.nodes.map.values.pin_values,
         type: v,
         direction: "output",
         container: "array" as const,
@@ -397,13 +511,29 @@ registerNode({
 
 registerNode({
   type: "map.isEmpty",
-  label: "Map Is Empty",
-  description: "True if the map has no entries.",
+  label: i18n.nodes.map.isEmpty.label,
+  description: i18n.nodes.map.isEmpty.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
-  pins: [mapPin("number", "string"), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
-  deriveInstancePins: (node) => [mapPin(valueTypeOf(node), keyTypeOf(node)), { id: "isEmpty", label: "Is Empty", type: "boolean", direction: "output" }],
+  pins: [
+    mapPin("number", "string"),
+    {
+      id: "isEmpty",
+      label: i18n.nodes.map.isEmpty.pin_is_empty,
+      type: "boolean",
+      direction: "output",
+    },
+  ],
+  deriveInstancePins: (node) => [
+    mapPin(valueTypeOf(node), keyTypeOf(node)),
+    {
+      id: "isEmpty",
+      label: i18n.nodes.map.isEmpty.pin_is_empty,
+      type: "boolean",
+      direction: "output",
+    },
+  ],
   evaluate: ({ inputs }) => ({ isEmpty: asEntries(inputs.map).length === 0 }),
   compileEvaluate: ({ inputs }) => ({
     isEmpty: `((${compileAsEntries(inputs.map)}).length === 0)`,
@@ -416,18 +546,33 @@ const MAX_MAP_FOR_EACH_ITERATIONS = 100_000;
 
 registerNode({
   type: "map.forEach",
-  label: "Map For Each",
-  description: "Runs the loop body once for each key-value pair in the map.",
+  label: i18n.nodes.map.forEach.label,
+  description: i18n.nodes.map.forEach.description,
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     mapPin("number", "string"),
-    { id: "loop-body", label: "Loop Body", type: "exec", direction: "output" },
-    { id: "key", label: "Key", type: "string", direction: "output" },
+    {
+      id: "loop-body",
+      label: i18n.nodes.__shared.pin_loop_body,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "key",
+      label: i18n.nodes.map.pin_key,
+      type: "string",
+      direction: "output",
+    },
     valuePin("number", "value", "Value", "output"),
-    { id: "completed", label: "Completed", type: "exec", direction: "output" },
+    {
+      id: "completed",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
   ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
@@ -437,15 +582,20 @@ registerNode({
       mapPin(v, k),
       {
         id: "loop-body",
-        label: "Loop Body",
+        label: i18n.nodes.__shared.pin_loop_body,
         type: "exec",
         direction: "output",
       },
-      { id: "key", label: "Key", type: k, direction: "output" },
+      {
+        id: "key",
+        label: i18n.nodes.map.pin_key,
+        type: k,
+        direction: "output",
+      },
       valuePin(v, "value", "Value", "output"),
       {
         id: "completed",
-        label: "Completed",
+        label: i18n.nodes.__shared.pin_completed,
         type: "exec",
         direction: "output",
       },
@@ -459,7 +609,9 @@ registerNode({
   execute: async ({ node, inputs, ctx }) => {
     const entries = asEntries(inputs.map);
     if (entries.length > MAX_MAP_FOR_EACH_ITERATIONS) {
-      throw new Error(`Map For Each (${node.id}) would run ${entries.length} iterations, over the ${MAX_MAP_FOR_EACH_ITERATIONS} limit.`);
+      throw new Error(
+        `Map For Each (${node.id}) would run ${entries.length} iterations, over the ${MAX_MAP_FOR_EACH_ITERATIONS} limit.`,
+      );
     }
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
     for (const entry of entries) {

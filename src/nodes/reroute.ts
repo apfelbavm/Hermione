@@ -1,6 +1,7 @@
 import { NodeInstance } from "../engine/nodeInstance";
 import { registerNode } from "../engine/registry";
 import type { PinDef, PinType } from "../engine/types";
+import { i18n } from "@i18n";
 
 // Unreal-style "reroute"/"knot" nodes — purely organizational, no logic of their own: whatever
 // flows into "in" comes back out of "out" unchanged. Two variants because exec isn't a
@@ -19,7 +20,11 @@ function rerouteElementType(node: NodeInstance): PinType {
   return node.elementType ?? "object";
 }
 
-function reroutePinDef(node: NodeInstance, id: string, direction: "input" | "output"): PinDef {
+function reroutePinDef(
+  node: NodeInstance,
+  id: string,
+  direction: "input" | "output",
+): PinDef {
   return {
     id,
     label: "",
@@ -32,23 +37,26 @@ function reroutePinDef(node: NodeInstance, id: string, direction: "input" | "out
 
 registerNode({
   type: "core.reroute",
-  label: "Reroute",
-  description: "Bends a wire's path on the canvas with no effect on behavior.",
+  label: i18n.nodes.reroute.data.label,
+  description: i18n.nodes.reroute.data.description,
   group: "Internal",
   compact: true,
   pins: [
     { id: "in", label: "", type: "object", direction: "input" },
     { id: "out", label: "", type: "object", direction: "output" },
   ],
-  deriveInstancePins: (node) => [reroutePinDef(node, "in", "input"), reroutePinDef(node, "out", "output")],
+  deriveInstancePins: (node) => [
+    reroutePinDef(node, "in", "input"),
+    reroutePinDef(node, "out", "output"),
+  ],
   evaluate: ({ inputs }) => ({ out: inputs.in }),
   compileEvaluate: ({ inputs }) => ({ out: inputs.in }),
 });
 
 registerNode({
   type: "core.rerouteExec",
-  label: "Reroute",
-  description: "Bends an exec wire's path on the canvas with no effect on behavior.",
+  label: i18n.nodes.reroute.exec.label,
+  description: i18n.nodes.reroute.exec.description,
   group: "Internal",
   compact: true,
   pins: [

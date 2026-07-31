@@ -1,5 +1,6 @@
 import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { i18n } from "@i18n";
 
 /** Normalizes a "date" pin's runtime value into a Date instance to operate on — a real Date
  * instance when wired from another date node, or whatever its literal `datetime-local` widget
@@ -12,11 +13,18 @@ function toDate(value: unknown): Date {
 
 registerNode({
   type: "date.now",
-  label: "Now",
-  description: "Returns the current date and time as a Date.",
+  label: i18n.nodes.date.now.label,
+  description: i18n.nodes.date.now.description,
   group: "Date",
   colorCategory: NodeColorCategory.Date,
-  pins: [{ id: "result", label: "Result", type: "date", direction: "output" }],
+  pins: [
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "date",
+      direction: "output",
+    },
+  ],
   evaluate: () => ({ result: new Date() }),
   compileEvaluate: () => ({
     result: `new Date()`,
@@ -25,13 +33,24 @@ registerNode({
 
 registerNode({
   type: "date.fromString",
-  label: "To Date (String)",
-  description: "Parses a text string into a Date.",
+  label: i18n.nodes.date.fromString.label,
+  description: i18n.nodes.date.fromString.description,
   group: "Date",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    { id: "value", label: "Value", type: "string", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "date", direction: "output" },
+    {
+      id: "value",
+      label: i18n.nodes.__shared.pin_value,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "date",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({ result: new Date(String(inputs.value ?? "")) }),
   compileEvaluate: ({ inputs }) => ({
@@ -41,13 +60,24 @@ registerNode({
 
 registerNode({
   type: "date.fromNumber",
-  label: "To Date (Number)",
-  description: "Converts a number of milliseconds since epoch into a Date.",
+  label: i18n.nodes.date.fromNumber.label,
+  description: i18n.nodes.date.fromNumber.description,
   group: "Date",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    { id: "value", label: "Value", type: "number", direction: "input", defaultValue: 0 },
-    { id: "result", label: "Result", type: "date", direction: "output" },
+    {
+      id: "value",
+      label: i18n.nodes.__shared.pin_value,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "date",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({ result: new Date(Number(inputs.value || 0)) }),
   compileEvaluate: ({ inputs }) => ({
@@ -57,14 +87,31 @@ registerNode({
 
 registerNode({
   type: "date.subtract",
-  label: "Subtract ( - )",
-  description: "Returns the difference between two dates in milliseconds.",
+  label: i18n.nodes.date.subtract.label,
+  description: i18n.nodes.date.subtract.description,
   group: "Date",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
-    { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "number", direction: "output" },
+    {
+      id: "a",
+      label: i18n.nodes.__shared.pin_a,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "b",
+      label: i18n.nodes.__shared.pin_b,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "number",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() - toDate(inputs.b).getTime(),
@@ -76,14 +123,31 @@ registerNode({
 
 registerNode({
   type: "date.equal",
-  label: "Equal ( == )",
-  description: "True if two dates represent the same moment in time.",
+  label: i18n.nodes.date.equal.label,
+  description: i18n.nodes.date.equal.description,
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
-    { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "boolean", direction: "output" },
+    {
+      id: "a",
+      label: i18n.nodes.__shared.pin_a,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "b",
+      label: i18n.nodes.__shared.pin_b,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() === toDate(inputs.b).getTime(),
@@ -95,14 +159,31 @@ registerNode({
 
 registerNode({
   type: "date.unequal",
-  label: "Unequal ( != )",
-  description: "True if two dates do not represent the same moment in time.",
+  label: i18n.nodes.date.unequal.label,
+  description: i18n.nodes.date.unequal.description,
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
-    { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "boolean", direction: "output" },
+    {
+      id: "a",
+      label: i18n.nodes.__shared.pin_a,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "b",
+      label: i18n.nodes.__shared.pin_b,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() !== toDate(inputs.b).getTime(),
@@ -114,14 +195,31 @@ registerNode({
 
 registerNode({
   type: "date.greaterThan",
-  label: "Greater than ( > )",
-  description: "True if date A is later than date B.",
+  label: i18n.nodes.date.greaterThan.label,
+  description: i18n.nodes.date.greaterThan.description,
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
-    { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "boolean", direction: "output" },
+    {
+      id: "a",
+      label: i18n.nodes.__shared.pin_a,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "b",
+      label: i18n.nodes.__shared.pin_b,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() > toDate(inputs.b).getTime(),
@@ -133,14 +231,31 @@ registerNode({
 
 registerNode({
   type: "date.greaterEqual",
-  label: "Greater equal ( >= )",
-  description: "True if date A is later than or the same as date B.",
+  label: i18n.nodes.date.greaterEqual.label,
+  description: i18n.nodes.date.greaterEqual.description,
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
-    { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "boolean", direction: "output" },
+    {
+      id: "a",
+      label: i18n.nodes.__shared.pin_a,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "b",
+      label: i18n.nodes.__shared.pin_b,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() >= toDate(inputs.b).getTime(),
@@ -152,14 +267,31 @@ registerNode({
 
 registerNode({
   type: "date.lessThan",
-  label: "Less than ( < )",
-  description: "True if date A is earlier than date B.",
+  label: i18n.nodes.date.lessThan.label,
+  description: i18n.nodes.date.lessThan.description,
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
-    { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "boolean", direction: "output" },
+    {
+      id: "a",
+      label: i18n.nodes.__shared.pin_a,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "b",
+      label: i18n.nodes.__shared.pin_b,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() < toDate(inputs.b).getTime(),
@@ -171,14 +303,31 @@ registerNode({
 
 registerNode({
   type: "date.lessEqual",
-  label: "Less equal ( <= )",
-  description: "True if date A is earlier than or the same as date B.",
+  label: i18n.nodes.date.lessEqual.label,
+  description: i18n.nodes.date.lessEqual.description,
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    { id: "a", label: "A", type: "date", direction: "input", defaultValue: "" },
-    { id: "b", label: "B", type: "date", direction: "input", defaultValue: "" },
-    { id: "result", label: "Result", type: "boolean", direction: "output" },
+    {
+      id: "a",
+      label: i18n.nodes.__shared.pin_a,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "b",
+      label: i18n.nodes.__shared.pin_b,
+      type: "date",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() <= toDate(inputs.b).getTime(),

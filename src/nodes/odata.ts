@@ -1,5 +1,6 @@
 import { registerNode } from "../engine/registry";
 import { compileResultVar } from "../engine/compileUtils";
+import { i18n } from "@i18n";
 
 const PAGINATION_TYPES = ["Client", "Server"];
 
@@ -126,29 +127,35 @@ interface ODataV2RequestResult {
   [key: string]: unknown;
 }
 
-const odataV2RequestExecute: (baseUrl: string, pageSize: number, paginationType: string, maxPages: number, headersJson: string, auth: { header?: unknown; value?: unknown } | null | undefined, timeoutMs: number) => Promise<ODataV2RequestResult> = new Function(
+const odataV2RequestExecute: (
+  baseUrl: string,
+  pageSize: number,
+  paginationType: string,
+  maxPages: number,
+  headersJson: string,
+  auth: { header?: unknown; value?: unknown } | null | undefined,
+  timeoutMs: number,
+) => Promise<ODataV2RequestResult> = new Function(
   `${ODATA_V2_REQUEST_EXECUTE_SOURCE}\nreturn odataV2RequestExecute;`,
 )();
 
 registerNode({
   type: "odata.v2Request",
-  label: "OData V2 Request",
-  description: "Fetches every page of an OData v2 GET request — client-driven $top/$skip (1000 rows per page by default) or server-driven cursor/snapshot next-link paging — and returns the combined rows.",
+  label: i18n.nodes.odata.v2Request.label,
+  description: i18n.nodes.odata.v2Request.description,
   group: "Request",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     {
       id: "url",
-      label: "URL",
+      label: i18n.nodes.odata.v2Request.pin_url,
       type: "string",
       direction: "input",
       defaultValue: "",
     },
-    // 1000 rows/page by default — a common OData v2 server-side default/cap (e.g. SuccessFactors),
-    // so a freshly-dropped node's out-of-the-box behavior already matches what most servers allow.
     {
       id: "pageSize",
-      label: "Page Size",
+      label: i18n.nodes.odata.v2Request.pin_page_size,
       type: "number",
       direction: "input",
       defaultValue: 1000,
@@ -156,7 +163,7 @@ registerNode({
     },
     {
       id: "paginationType",
-      label: "Pagination Type",
+      label: i18n.nodes.odata.v2Request.pin_pagination_type,
       type: "string",
       direction: "input",
       defaultValue: PAGINATION_TYPES[0],
@@ -164,7 +171,7 @@ registerNode({
     },
     {
       id: "maxPages",
-      label: "Max Pages",
+      label: i18n.nodes.odata.v2Request.pin_max_pages,
       type: "number",
       direction: "input",
       defaultValue: 50,
@@ -172,44 +179,63 @@ registerNode({
     },
     {
       id: "headers",
-      label: "Headers (JSON)",
+      label: i18n.nodes.odata.v2Request.pin_headers,
       type: "string",
       direction: "input",
       defaultValue: "{}",
     },
-    // Same { header, value } convention as http.request's own Auth pin — see auth.ts.
     {
       id: "auth",
-      label: "Auth",
+      label: i18n.nodes.__shared.pin_auth,
       type: "object",
       direction: "input",
       defaultValue: null,
     },
     {
       id: "timeoutMs",
-      label: "Timeout (ms)",
+      label: i18n.nodes.__shared.pin_timeout,
       type: "number",
       direction: "input",
       defaultValue: 10000,
       integer: true,
     },
-    { id: "exec-out", label: "Completed", type: "exec", direction: "output" },
-    { id: "success", label: "Success", type: "boolean", direction: "output" },
-    { id: "status", label: "Status", type: "number", direction: "output" },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "status",
+      label: i18n.nodes.__shared.pin_status,
+      type: "number",
+      direction: "output",
+    },
     {
       id: "rows",
-      label: "Rows",
+      label: i18n.nodes.odata.v2Request.pin_rows,
       type: "object",
       container: "array",
       direction: "output",
     },
     {
       id: "pageCount",
-      label: "Page Count",
+      label: i18n.nodes.odata.v2Request.pin_page_count,
       type: "number",
       direction: "output",
     },
-    { id: "error", label: "Error", type: "string", direction: "output" },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
   ],
   latent: true,
   // Fires exec-out exactly once, whether every page fetched cleanly or a later page failed midway
@@ -227,7 +253,10 @@ registerNode({
     );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await odataV2RequestExecute(${inputs.url}, ${inputs.pageSize}, ${inputs.paginationType}, ${inputs.maxPages}, ${inputs.headers}, ${inputs.auth}, ${inputs.timeoutMs});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await odataV2RequestExecute(${inputs.url}, ${inputs.pageSize}, ${inputs.paginationType}, ${inputs.maxPages}, ${inputs.headers}, ${inputs.auth}, ${inputs.timeoutMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {

@@ -1,7 +1,16 @@
 import { registerNode } from "../engine/registry";
 import { compileResultVar } from "../engine/compileUtils";
+import { i18n } from "@i18n";
 
-const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+const HTTP_METHODS = [
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "HEAD",
+  "OPTIONS",
+];
 
 // Written ONCE as a plain-JS source string, derived via `new Function` for the interpreter's own use
 // and embedded verbatim as this node's compileHelpers entry for the compiled path — same reasoning
@@ -70,36 +79,104 @@ interface HttpRequestResult {
   [key: string]: unknown;
 }
 
-const httpRequestExecute: (url: string, method: string, headersJson: string, auth: { header?: unknown; value?: unknown } | null | undefined, body: string, timeoutMs: number) => Promise<HttpRequestResult> = new Function(`${HTTP_REQUEST_EXECUTE_SOURCE}\nreturn httpRequestExecute;`)();
+const httpRequestExecute: (
+  url: string,
+  method: string,
+  headersJson: string,
+  auth: { header?: unknown; value?: unknown } | null | undefined,
+  body: string,
+  timeoutMs: number,
+) => Promise<HttpRequestResult> = new Function(
+  `${HTTP_REQUEST_EXECUTE_SOURCE}\nreturn httpRequestExecute;`,
+)();
 
 registerNode({
   type: "http.request",
-  label: "HTTP Request",
-  description: "Sends an HTTP request with a chosen method, headers, optional auth, and body, returning the response status, body, and headers.",
+  label: i18n.nodes.http.request.label,
+  description: i18n.nodes.http.request.description,
   group: "Request",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     {
       id: "method",
-      label: "Method",
+      label: i18n.nodes.http.request.pin_method,
       type: "string",
       direction: "input",
       defaultValue: "GET",
       options: HTTP_METHODS,
     },
-    { id: "url", label: "URL", type: "string", direction: "input", defaultValue: "" },
-    { id: "headers", label: "Headers (JSON)", type: "string", direction: "input", defaultValue: "{}" },
-    // A plain { header, value } object — see auth.ts for why this is a separate node's output
-    // rather than baked-in credential pins here, and how it composes with an object Variable.
-    { id: "auth", label: "Auth", type: "object", direction: "input", defaultValue: null },
-    { id: "body", label: "Body", type: "string", direction: "input", defaultValue: "" },
-    { id: "timeoutMs", label: "Timeout (ms)", type: "number", direction: "input", defaultValue: 10000, integer: true },
-    { id: "exec-out", label: "Completed", type: "exec", direction: "output" },
-    { id: "success", label: "Success", type: "boolean", direction: "output" },
-    { id: "status", label: "Status", type: "number", direction: "output" },
-    { id: "responseBody", label: "Response Body", type: "string", direction: "output" },
-    { id: "responseHeaders", label: "Response Headers", type: "string", direction: "output" },
-    { id: "error", label: "Error", type: "string", direction: "output" },
+    {
+      id: "url",
+      label: i18n.nodes.http.request.pin_url,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "headers",
+      label: i18n.nodes.http.request.pin_headers,
+      type: "string",
+      direction: "input",
+      defaultValue: "{}",
+    },
+    {
+      id: "auth",
+      label: i18n.nodes.__shared.pin_auth,
+      type: "object",
+      direction: "input",
+      defaultValue: null,
+    },
+    {
+      id: "body",
+      label: i18n.nodes.http.request.pin_body,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "timeoutMs",
+      label: i18n.nodes.__shared.pin_timeout,
+      type: "number",
+      direction: "input",
+      defaultValue: 10000,
+      integer: true,
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "status",
+      label: i18n.nodes.__shared.pin_status,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "responseBody",
+      label: i18n.nodes.http.request.pin_response_body,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "responseHeaders",
+      label: i18n.nodes.http.request.pin_response_headers,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
   ],
   latent: true,
   // Fires exec-out exactly once, on both success AND failure (network error, timeout, bad JSON
@@ -107,10 +184,20 @@ registerNode({
   // node, same single-exec-out convention as Delay/Send Email rather than inventing separate
   // success/failure exec paths.
   execute: async ({ inputs }) => {
-    const result = await httpRequestExecute(String(inputs.url ?? ""), String(inputs.method ?? "GET"), String(inputs.headers ?? ""), inputs.auth as { header?: unknown; value?: unknown } | null | undefined, String(inputs.body ?? ""), Number(inputs.timeoutMs ?? 0));
+    const result = await httpRequestExecute(
+      String(inputs.url ?? ""),
+      String(inputs.method ?? "GET"),
+      String(inputs.headers ?? ""),
+      inputs.auth as { header?: unknown; value?: unknown } | null | undefined,
+      String(inputs.body ?? ""),
+      Number(inputs.timeoutMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await httpRequestExecute(${inputs.url}, ${inputs.method}, ${inputs.headers}, ${inputs.auth}, ${inputs.body}, ${inputs.timeoutMs});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await httpRequestExecute(${inputs.url}, ${inputs.method}, ${inputs.headers}, ${inputs.auth}, ${inputs.body}, ${inputs.timeoutMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {

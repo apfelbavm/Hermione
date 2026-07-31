@@ -53,13 +53,21 @@ export const XML_BUILD_OPTIONS = {
 /** Same shape as XML_BUILD_OPTIONS but indented — used only for human-facing pretty-printing (see
  * debug.ts's Print (Formatted) node), never for xml.fromJson's actual conversion output, since a
  * conversion node's output is meant to be re-parsed by another tool, not read by a person. */
-export const XML_PRETTY_BUILD_OPTIONS = { ...XML_BUILD_OPTIONS, format: true, indentBy: "  " } as const;
+export const XML_PRETTY_BUILD_OPTIONS = {
+  ...XML_BUILD_OPTIONS,
+  format: true,
+  indentBy: "  ",
+} as const;
 
 export const XML_PARSE_OPTIONS_LITERAL = JSON.stringify(XML_PARSE_OPTIONS);
 export const XML_BUILD_OPTIONS_LITERAL = JSON.stringify(XML_BUILD_OPTIONS);
-export const XML_PRETTY_BUILD_OPTIONS_LITERAL = JSON.stringify(XML_PRETTY_BUILD_OPTIONS);
-export const XML_IMPORT_LINE = 'import { XMLParser, XMLValidator } from "fast-xml-parser";';
-export const XML_BUILDER_IMPORT_LINE = 'import XMLBuilder from "fast-xml-builder";';
+export const XML_PRETTY_BUILD_OPTIONS_LITERAL = JSON.stringify(
+  XML_PRETTY_BUILD_OPTIONS,
+);
+export const XML_IMPORT_LINE =
+  'import { XMLParser, XMLValidator } from "fast-xml-parser";';
+export const XML_BUILDER_IMPORT_LINE =
+  'import XMLBuilder from "fast-xml-builder";';
 
 export function xmlToJsonValue(xml: string): unknown {
   const validation = XMLValidator.validate(xml);
@@ -84,7 +92,10 @@ export function jsonValueToXml(value: unknown): string {
 // csv.toXml stay latent/exec nodes (matching http.request/the OAuth2 nodes) because a large file's
 // parse/write time is itself still slow enough to warrant the clock icon, not because these
 // functions internally yield the way the previous implementation did.
-export async function csvToObjects(csv: string, delimiter = ","): Promise<Record<string, string>[]> {
+export async function csvToObjects(
+  csv: string,
+  delimiter = ",",
+): Promise<Record<string, string>[]> {
   const result = Papa.parse<Record<string, string>>(csv, {
     header: true,
     delimiter: (delimiter && delimiter[0]) || ",",
@@ -93,8 +104,12 @@ export async function csvToObjects(csv: string, delimiter = ","): Promise<Record
   return result.data;
 }
 
-export async function objectsToCsv(objects: unknown[], delimiter = ","): Promise<string> {
-  if (!Array.isArray(objects)) throw new Error("Expected a JSON array of objects");
+export async function objectsToCsv(
+  objects: unknown[],
+  delimiter = ",",
+): Promise<string> {
+  if (!Array.isArray(objects))
+    throw new Error("Expected a JSON array of objects");
   // PapaParse's own default behavior only takes the FIRST object's keys as the header, silently
   // dropping any key a later object introduces — computing the header ourselves (in first-seen
   // order across every object) and passing it explicitly is what makes a ragged array of objects
@@ -112,7 +127,10 @@ export async function objectsToCsv(objects: unknown[], delimiter = ","): Promise
       }
     }
   }
-  return Papa.unparse({ fields, data: objects as Record<string, unknown>[] }, { delimiter: (delimiter && delimiter[0]) || "," });
+  return Papa.unparse(
+    { fields, data: objects as Record<string, unknown>[] },
+    { delimiter: (delimiter && delimiter[0]) || "," },
+  );
 }
 
 // Tabular-rows bridge — looks for something CSV-shaped inside a single wrapped JSON object (either
@@ -129,12 +147,21 @@ export async function objectsToCsv(objects: unknown[], delimiter = ","): Promise
 // shared-source/new Function pattern above) since it's only ever called by the interpreter now —
 // neither xml.toCsv nor json.toCsv has a compileExecute (see their own comments), so there's no
 // compiled-path consumer to keep in sync with.
-export function extractTabularRows(parsedRoot: unknown): Record<string, unknown>[] {
-  const isFlatRow = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v) && Object.values(v).every((x) => x === null || typeof x !== "object");
+export function extractTabularRows(
+  parsedRoot: unknown,
+): Record<string, unknown>[] {
+  const isFlatRow = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" &&
+    v !== null &&
+    !Array.isArray(v) &&
+    Object.values(v).every((x) => x === null || typeof x !== "object");
 
   const asRows = (v: unknown): Record<string, unknown>[] | null => {
     if (!Array.isArray(v)) return null;
-    if (!v.every(isFlatRow)) throw new Error("Expected every repeated element to be a flat record of scalar columns");
+    if (!v.every(isFlatRow))
+      throw new Error(
+        "Expected every repeated element to be a flat record of scalar columns",
+      );
     return v;
   };
 
@@ -149,5 +176,7 @@ export function extractTabularRows(parsedRoot: unknown): Record<string, unknown>
       if (rows) return rows;
     }
   }
-  throw new Error("Could not find a repeated element or flat record to convert to CSV rows");
+  throw new Error(
+    "Could not find a repeated element or flat record to convert to CSV rows",
+  );
 }

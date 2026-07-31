@@ -1,15 +1,41 @@
 import { registerNode } from "../engine/registry";
-import { XML_BUILDER_IMPORT_LINE, XML_BUILD_OPTIONS_LITERAL, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, extractTabularRows, jsonValueToXml, objectsToCsv, xmlToJsonValue } from "./dataFormatHelpers";
+import { i18n } from "@i18n";
+import {
+  XML_BUILDER_IMPORT_LINE,
+  XML_BUILD_OPTIONS_LITERAL,
+  XML_IMPORT_LINE,
+  XML_PARSE_OPTIONS_LITERAL,
+  extractTabularRows,
+  jsonValueToXml,
+  objectsToCsv,
+  xmlToJsonValue,
+} from "./dataFormatHelpers";
 
 registerNode({
   type: "xml.toJson",
-  label: "XML to JSON",
-  description: "Parses an XML string into a JSON object, failing safely with success:false on invalid XML.",
+  label: i18n.nodes.xml.toJson.label,
+  description: i18n.nodes.xml.toJson.description,
   group: "Conversion",
   pins: [
-    { id: "xml", label: "XML", type: "string", direction: "input", defaultValue: "" },
-    { id: "json", label: "JSON", type: "object", direction: "output" },
-    { id: "success", label: "Success", type: "boolean", direction: "output" },
+    {
+      id: "xml",
+      label: i18n.nodes.__shared.pin_xml,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "json",
+      label: i18n.nodes.__shared.pin_json,
+      type: "object",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => {
     try {
@@ -22,7 +48,10 @@ registerNode({
     // Both output expressions independently re-run the same try/parse IIFE — duplicated work, but
     // the same tradeoff array.ts's own multi-output pure nodes already accept, since compileEvaluate
     // has no way to compute a shared intermediate once and hand it to two output-pin expressions.
-    const attempt = `(() => { try { const __v = XMLValidator.validate(${inputs.xml}); if (__v !== true) throw new Error(__v.err.msg); ` + `return { json: new XMLParser(${XML_PARSE_OPTIONS_LITERAL}).parse(${inputs.xml}), success: true }; } ` + `catch { return { json: null, success: false }; } })()`;
+    const attempt =
+      `(() => { try { const __v = XMLValidator.validate(${inputs.xml}); if (__v !== true) throw new Error(__v.err.msg); ` +
+      `return { json: new XMLParser(${XML_PARSE_OPTIONS_LITERAL}).parse(${inputs.xml}), success: true }; } ` +
+      `catch { return { json: null, success: false }; } })()`;
     return { json: `${attempt}.json`, success: `${attempt}.success` };
   },
   compileImports: [XML_IMPORT_LINE],
@@ -30,13 +59,29 @@ registerNode({
 
 registerNode({
   type: "xml.fromJson",
-  label: "JSON to XML",
-  description: "Builds an XML string from a JSON object.",
+  label: i18n.nodes.xml.fromJson.label,
+  description: i18n.nodes.xml.fromJson.description,
   group: "Conversion",
   pins: [
-    { id: "json", label: "JSON", type: "object", direction: "input", defaultValue: null },
-    { id: "xml", label: "XML", type: "string", direction: "output" },
-    { id: "success", label: "Success", type: "boolean", direction: "output" },
+    {
+      id: "json",
+      label: i18n.nodes.__shared.pin_json,
+      type: "object",
+      direction: "input",
+      defaultValue: null,
+    },
+    {
+      id: "xml",
+      label: i18n.nodes.__shared.pin_xml,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   evaluate: ({ inputs }) => {
     try {
@@ -46,7 +91,9 @@ registerNode({
     }
   },
   compileEvaluate: ({ inputs }) => {
-    const attempt = `(() => { try { return { xml: new XMLBuilder(${XML_BUILD_OPTIONS_LITERAL}).build(${inputs.json}), success: true }; } ` + `catch { return { xml: "", success: false }; } })()`;
+    const attempt =
+      `(() => { try { return { xml: new XMLBuilder(${XML_BUILD_OPTIONS_LITERAL}).build(${inputs.json}), success: true }; } ` +
+      `catch { return { xml: "", success: false }; } })()`;
     return { xml: `${attempt}.xml`, success: `${attempt}.success` };
   },
   compileImports: [XML_BUILDER_IMPORT_LINE],
@@ -54,16 +101,38 @@ registerNode({
 
 registerNode({
   type: "xml.toCsv",
-  label: "XML to CSV",
-  description: "Parses an XML string's tabular rows and converts them into a delimited CSV string.",
+  label: i18n.nodes.xml.toCsv.label,
+  description: i18n.nodes.xml.toCsv.description,
   group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "xml", label: "XML", type: "string", direction: "input", defaultValue: "" },
-    { id: "delimiter", label: "Delimiter", type: "string", direction: "input", defaultValue: "," },
+    {
+      id: "xml",
+      label: i18n.nodes.__shared.pin_xml,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "delimiter",
+      label: i18n.nodes.__shared.pin_delimiter,
+      type: "string",
+      direction: "input",
+      defaultValue: ",",
+    },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
-    { id: "csv", label: "CSV", type: "string", direction: "output" },
-    { id: "success", label: "Success", type: "boolean", direction: "output" },
+    {
+      id: "csv",
+      label: i18n.nodes.__shared.pin_csv,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
   ],
   // Latent (exec, not pure): converting to CSV means writing out potentially thousands of rows via
   // PapaParse's objectsToCsv (see dataFormatHelpers.ts), slow enough for a large file to visibly

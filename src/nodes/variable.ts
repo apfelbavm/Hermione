@@ -1,19 +1,28 @@
 import { registerNode } from "../engine/registry";
 import { NodeColorCategory } from "../engine/types";
 import type { ExecutionContext } from "../engine/types";
+import { i18n } from "@i18n";
 
-function variableName(graph: { variables: { id: string; name: string }[] }, variableId?: string): string {
+function variableName(
+  graph: { variables: { id: string; name: string }[] },
+  variableId?: string,
+): string {
   return graph.variables.find((v) => v.id === variableId)?.name ?? "unknown";
 }
 
 // Local variables (the current function-call frame's own) shadow globals of the same id — but since
 // ids are unique per-Variable regardless of scope, this is really just "check local first, else global."
 function getVariableValue(ctx: ExecutionContext, variableId: string): unknown {
-  if (ctx.localVariableValues?.has(variableId)) return ctx.localVariableValues.get(variableId);
+  if (ctx.localVariableValues?.has(variableId))
+    return ctx.localVariableValues.get(variableId);
   return ctx.variableValues.get(variableId);
 }
 
-function setVariableValue(ctx: ExecutionContext, variableId: string, value: unknown): void {
+function setVariableValue(
+  ctx: ExecutionContext,
+  variableId: string,
+  value: unknown,
+): void {
   if (ctx.localVariableValues?.has(variableId)) {
     ctx.localVariableValues.set(variableId, value);
   } else {
@@ -23,8 +32,8 @@ function setVariableValue(ctx: ExecutionContext, variableId: string, value: unkn
 
 registerNode({
   type: "variable.get",
-  label: "Get Variable",
-  description: "Reads the bound variable's current value.",
+  label: i18n.nodes.variable.get.label,
+  description: i18n.nodes.variable.get.description,
   group: "Variables",
   colorCategory: NodeColorCategory.Variables,
   pins: [], // real pins are derived per-instance from the bound Variable via derivePins
@@ -35,7 +44,16 @@ registerNode({
   // container/keyType are forwarded too so a container variable's Get pin wires exactly like the
   // variable itself (see isPinTypeCompatible) — the value flows through untouched either way, since
   // executor.ts/codegen.ts only ever branch on type !== "exec".
-  derivePins: (variable) => [{ id: "value", label: "", type: variable.type, direction: "output", container: variable.container, keyType: variable.keyType }],
+  derivePins: (variable) => [
+    {
+      id: "value",
+      label: "",
+      type: variable.type,
+      direction: "output",
+      container: variable.container,
+      keyType: variable.keyType,
+    },
+  ],
   evaluate: ({ node, ctx }) => ({
     value: node.variableId ? getVariableValue(ctx, node.variableId) : undefined,
   }),
@@ -46,8 +64,8 @@ registerNode({
 
 registerNode({
   type: "variable.set",
-  label: "Set Variable",
-  description: "Writes a new value to the bound variable.",
+  label: i18n.nodes.variable.set.label,
+  description: i18n.nodes.variable.set.description,
   group: "Variables",
   colorCategory: NodeColorCategory.Variables,
   pins: [],
@@ -69,5 +87,8 @@ registerNode({
     if (node.variableId) setVariableValue(ctx, node.variableId, inputs.value);
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ node, inputs, graph, compileFrom }) => [`rt.state[${JSON.stringify(node.variableId)}] = ${inputs.value}; /* ${variableName(graph, node.variableId)} */`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, graph, compileFrom }) => [
+    `rt.state[${JSON.stringify(node.variableId)}] = ${inputs.value}; /* ${variableName(graph, node.variableId)} */`,
+    ...compileFrom("exec-out"),
+  ],
 });
