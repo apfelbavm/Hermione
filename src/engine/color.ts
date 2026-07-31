@@ -71,11 +71,73 @@ export class Color {
   }
 }
 
-/** Every color constant used by the canvas renderer/overlay (was src/engine/color.ts) — plain
- * hex strings, not Color instances, so every existing `ctx.fillStyle = Colors.NODE_BORDER`-style
- * call site keeps working unchanged. */
-export namespace Colors {
-  export const PIN_COLORS: Record<PinType, string> = {
+/** Which theme the canvas renderer should currently draw in — mirrors the `data-theme` attribute
+ * ThemeToggle/the inline bootstrap script (see client/theme.ts) set on <html> for the plain pages
+ * around the editor, so a single global toggle covers both the DOM chrome (styled via style.css's
+ * `--pp-*` variables) and this canvas-drawn content (which CSS variables can't reach — a 2D canvas
+ * context has no notion of them). Defaults to "dark" outside a browser (never actually hit — this
+ * only ever runs client-side — but keeps the function total). */
+function currentGraphTheme(): "light" | "dark" {
+  if (typeof document === "undefined") return "dark";
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+}
+
+/** Surface colors (background/grid/node body/border/text) that DO follow the theme toggle — kept
+ * separate from the type/category/status colors below them, which deliberately do NOT (see each
+ * group's own comment). */
+interface SurfacePalette {
+  canvasBg: string;
+  gridLineMinor: string;
+  gridLineMajor: string;
+  nodeBodyBg: string;
+  nodeBorder: string;
+  textPrimary: string;
+  textMuted: string;
+  /** The node's own top-edge sheen (see drawNodes.ts's drawTopHighlight) — a light-from-above
+   * highlight reads as a lightening in dark mode, but would be invisible painted the same way over
+   * a light node body, so light mode gets a faint darkening (a subtle inset shadow) instead. Split
+   * into channel/alpha rather than one rgba() string so drawTopHighlight can build both its opaque
+   * and fully-transparent gradient stops from the same color, whichever theme picked it. */
+  nodeTopHighlightRgb: string;
+  nodeTopHighlightAlpha: number;
+}
+
+const DARK_SURFACE: SurfacePalette = {
+  canvasBg: "#1e2126",
+  gridLineMinor: "#2a2e35",
+  gridLineMajor: "#333842",
+  nodeBodyBg: "#121314",
+  nodeBorder: "#3d4148",
+  textPrimary: "#e8e8e8",
+  textMuted: "#9aa0a8",
+  nodeTopHighlightRgb: "255, 255, 255",
+  nodeTopHighlightAlpha: 0.3,
+};
+
+const LIGHT_SURFACE: SurfacePalette = {
+  canvasBg: "#eef0f3",
+  gridLineMinor: "#dfe2e6",
+  gridLineMajor: "#cdd2d8",
+  nodeBodyBg: "#ffffff",
+  nodeBorder: "#c9ced4",
+  textPrimary: "#1b1e22",
+  textMuted: "#5b6169",
+  nodeTopHighlightRgb: "0, 0, 0",
+  nodeTopHighlightAlpha: 0.06,
+};
+
+function surface(): SurfacePalette {
+  return currentGraphTheme() === "light" ? LIGHT_SURFACE : DARK_SURFACE;
+}
+
+/** Every color constant used by the canvas renderer/overlay (was src/engine/color.ts) — plain hex
+ * strings (or, for the handful that follow the light/dark toggle, getters resolving to one), not
+ * Color instances, so every existing `ctx.fillStyle = Colors.NODE_BORDER`-style call site keeps
+ * working unchanged regardless of which category a given constant falls into. */
+export const Colors = {
+  /** Per-pin-TYPE colors — deliberately theme-independent. A number pin is the same green whether
+   * the app is in light or dark mode; that's the whole point of color-coding by type at a glance. */
+  PIN_COLORS: {
     exec: "#f2f2f2",
     boolean: "#a5322f",
     number: "#3b8a5c",
@@ -85,53 +147,84 @@ export namespace Colors {
     // Dark olive green — distinct from "number"'s own teal-green above — matching Unreal's enum
     // pin color convention (see PinType's own doc comment for why it's a separate type at all).
     enum: "#1f6b45",
-  };
+  } as Record<PinType, string>,
 
-  export const CANVAS_BG = "#1e2126";
-  export const GRID_LINE_MINOR = "#2a2e35";
-  export const GRID_LINE_MAJOR = "#333842";
-  // The world-space x=0/y=0 origin axes (see drawGrid.ts) — deliberately plain black, heavier than
-  // even the major grid lines, so the true origin always reads as a fixed landmark on the canvas.
-  export const AXIS_LINE = "#000000";
-  export const NODE_HEADER_DEFAULT = "#78818b";
-  // Referenced by more than one NODE_HEADER_BG entry below — a plain local so those entries can
-  // never drift apart from each other.
-  const FLOW_CONTROL_BG = "#3b6b8a";
-  export const NODE_HEADER_BG: Record<string, string> = {
-    Events: "#8a3b3b",
-    "Flow Control": NODE_HEADER_DEFAULT,
-    Math: PIN_COLORS.number,
-    // Same color as a "date" pin/wire, tying the whole node category to that type visually.
-    Date: PIN_COLORS.date,
-    // Same color as a "boolean" pin/wire, tying the whole node category to that type visually.
-    Boolean: PIN_COLORS.boolean,
-    Debug: "#6b6b3b",
-    Variables: "#7a4f9b",
-    // Neither has a separate color of its own anymore — both read as the same category as Flow
-    // Control (Branch, Delay, Sequence, etc.).
-    Actions: FLOW_CONTROL_BG,
-    Auth: FLOW_CONTROL_BG,
-    // Same color as a "string" pin/wire, tying the whole node category to that type visually.
-    String: PIN_COLORS.string,
-    Collections: "#5a4a8a",
-    // Entry/Return/Call (see function.ts) — function-flow related, but a distinct concept from
-    // Flow Control itself, so a neutral grey (matching the generic fallback) rather than its own hue.
-    Functions: FLOW_CONTROL_BG,
-  };
-  export const NODE_BODY_BG = "#121314";
-  export const NODE_BORDER = "#3d4148";
-  export const NODE_BORDER_SELECTED = "#e8b339";
-  export const WIRE_COLOR_EXEC = PIN_COLORS.exec;
-  export const TEXT_PRIMARY = "#e8e8e8";
-  export const TEXT_MUTED = "#9aa0a8";
+  // The world-space x=0/y=0 origin axes (see drawGrid.ts) — deliberately plain black regardless of
+  // theme, heavier than even the major grid lines, so the true origin always reads as a fixed
+  // landmark on the canvas (reads fine against either a light or dark canvas background).
+  AXIS_LINE: "#000000",
+
+  // Node category header colors, and the state/accent colors below them (selection, execution,
+  // breakpoint, latent) — same "stays fixed so it reads consistently at a glance" reasoning as
+  // PIN_COLORS above, just for categories/status instead of pin type.
+  NODE_HEADER_DEFAULT: "#78818b",
+  NODE_BORDER_SELECTED: "#e8b339",
+
+  get NODE_HEADER_BG(): Record<string, string> {
+    const flowControlBg = "#3b6b8a";
+    return {
+      Events: "#8a3b3b",
+      "Flow Control": this.NODE_HEADER_DEFAULT,
+      Math: this.PIN_COLORS.number,
+      // Same color as a "date" pin/wire, tying the whole node category to that type visually.
+      Date: this.PIN_COLORS.date,
+      // Same color as a "boolean" pin/wire, tying the whole node category to that type visually.
+      Boolean: this.PIN_COLORS.boolean,
+      Debug: "#6b6b3b",
+      Variables: "#7a4f9b",
+      // Neither has a separate color of its own anymore — both read as the same category as Flow
+      // Control (Branch, Delay, Sequence, etc.).
+      Actions: flowControlBg,
+      Auth: flowControlBg,
+      // Same color as a "string" pin/wire, tying the whole node category to that type visually.
+      String: this.PIN_COLORS.string,
+      Collections: "#5a4a8a",
+      // Entry/Return/Call (see function.ts) — function-flow related, but a distinct concept from
+      // Flow Control itself, so a neutral grey (matching the generic fallback) rather than its own hue.
+      Functions: flowControlBg,
+    };
+  },
+
+  get WIRE_COLOR_EXEC(): string {
+    return this.PIN_COLORS.exec;
+  },
+
+  // --- Surface colors — these DO follow the light/dark toggle (see SurfacePalette above). ---
+  get CANVAS_BG(): string {
+    return surface().canvasBg;
+  },
+  get GRID_LINE_MINOR(): string {
+    return surface().gridLineMinor;
+  },
+  get GRID_LINE_MAJOR(): string {
+    return surface().gridLineMajor;
+  },
+  get NODE_BODY_BG(): string {
+    return surface().nodeBodyBg;
+  },
+  get NODE_BORDER(): string {
+    return surface().nodeBorder;
+  },
+  get TEXT_PRIMARY(): string {
+    return surface().textPrimary;
+  },
+  get TEXT_MUTED(): string {
+    return surface().textMuted;
+  },
+  get NODE_TOP_HIGHLIGHT_RGB(): string {
+    return surface().nodeTopHighlightRgb;
+  },
+  get NODE_TOP_HIGHLIGHT_ALPHA(): number {
+    return surface().nodeTopHighlightAlpha;
+  },
 
   /** Converts a "#rrggbb" hex color (e.g. from a native color picker) into an rgba() string at the given alpha. */
-  export function hexToRgba(hex: string, alpha: number): string {
+  hexToRgba(hex: string, alpha: number): string {
     const clean = hex.replace("#", "");
     const bigint = Number.parseInt(clean, 16);
     const r = (bigint >> 16) & 255;
     const g = (bigint >> 8) & 255;
     const b = bigint & 255;
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-}
+  },
+};

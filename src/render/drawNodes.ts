@@ -186,8 +186,12 @@ function drawTopHighlight(ctx: CanvasRenderingContext2D, screenX: number, screen
   ctx.roundRect(screenX, screenY, width, height, cornerRadius);
   const fadeDistance = 4 * zoom;
   const highlight = ctx.createLinearGradient(0, screenY, 0, screenY + fadeDistance);
-  highlight.addColorStop(0, "rgba(255, 255, 255, 0.3)");
-  highlight.addColorStop(1, "rgba(255, 255, 255, 0)");
+  // Follows the light/dark toggle (see Colors.NODE_TOP_HIGHLIGHT_RGB/_ALPHA's own comment) — a
+  // lightening sheen over a dark node body, a faint darkening instead over a light one (plain white
+  // would be invisible there).
+  const highlightRgb = Colors.NODE_TOP_HIGHLIGHT_RGB;
+  highlight.addColorStop(0, `rgba(${highlightRgb}, ${Colors.NODE_TOP_HIGHLIGHT_ALPHA})`);
+  highlight.addColorStop(1, `rgba(${highlightRgb}, 0)`);
   ctx.fillStyle = highlight;
   ctx.fill();
 }

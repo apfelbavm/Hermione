@@ -13,13 +13,15 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0;
 }
 
-/* Theme variables for the plain pages around the Flow editor (Home/Projects/Project/Logs/
-   Credential Vault — see that whole section further down) — light is the default (:root), dark is
-   an override activated by [data-theme="dark"] on <html> (see components/ThemeToggle.tsx and the
-   inline bootstrap script in app/layout.tsx that sets it before first paint). The Flow editor
-   itself never references any `--pp-*` variable — its own colors (toolbar, sidebar, canvas/pin
-   colors in engine/color.ts) stay the fixed dark palette they've always been, regardless of this
-   toggle, by design (see the task this was introduced for: "except for the actual flow editor"). */
+/* One global set of theme variables, shared by every page including the Flow editor's own DOM
+   chrome (toolbar/sidebar/panels/menus/etc. below) — light is the default (:root), dark is an
+   override activated by [data-theme="dark"] on <html> (see components/ThemeToggle.tsx and the
+   inline bootstrap script in app/layout.tsx that sets it before first paint). The one thing these
+   variables can't reach is the editor's own <canvas> content (node/wire/grid colors) — a 2D canvas
+   context has no notion of CSS variables — so engine/color.ts's `Colors` reads the same
+   `data-theme` attribute directly instead; see AppShell.tsx's theme-change listener, which
+   redraws the canvas when it flips. Per-pin/variable TYPE colors (Colors.PIN_COLORS) and node
+   category/status colors stay fixed across both themes on purpose (see that file). */
 :root {
   --pp-bg: #f5f6f8;
   --pp-surface: #ffffff;
@@ -42,6 +44,9 @@ input[type="number"]::-webkit-inner-spin-button {
   --pp-button-bg: #e7e9ec;
   --pp-button-bg-hover: #d7dbe0;
   --pp-modal-backdrop: rgba(15, 17, 20, 0.45);
+  /* Selected-row surface (Functions/Variables/Scripts list rows, graph tab, etc.) — distinct from
+     --pp-surface-hover since a selection needs to persist visually even while NOT hovered. */
+  --pp-selected-bg: #dceaf5;
 }
 
 :root[data-theme="dark"] {
@@ -66,6 +71,7 @@ input[type="number"]::-webkit-inner-spin-button {
   --pp-button-bg: #33383f;
   --pp-button-bg-hover: #454a52;
   --pp-modal-backdrop: rgba(0, 0, 0, 0.55);
+  --pp-selected-bg: #2f4a5e;
 }
 
 html,
@@ -74,9 +80,6 @@ body {
   height: 100%;
   overflow: hidden;
   font-family: "Segoe UI", sans-serif;
-  /* The Flow editor (#app below) always paints its own explicit dark background/text regardless of
-     this — these vars only matter for the plain pages around it (Home/Projects/Logs/Credential
-     Vault — see that section further down), which is why only they're theme-aware. */
   background: var(--pp-bg);
   color: var(--pp-text);
 }
@@ -85,14 +88,8 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  /* Explicit, hardcoded — never a --pp-* theme variable. The Flow editor stays fixed dark
-     regardless of the light/dark toggle (see style.css's --pp-* section for the plain pages that
-     DO follow it); previously this relied on inheriting the same hardcoded colors from html/body,
-     which quietly broke once those became theme-variable — any editor element without its own
-     explicit color fell through to whatever theme was active instead of staying dark. Restating
-     the color here re-anchors inheritance for the whole editor subtree. */
-  background: #1e2126;
-  color: #e8e8e8;
+  background: var(--pp-bg);
+  color: var(--pp-text);
 }
 
 /* Three-column grid (not flex) so #toolbar-center lands exactly in the bar's horizontal center
@@ -106,8 +103,8 @@ body {
   height: 40px;
   flex: 0 0 auto;
   padding: 0 12px;
-  background: #24272d;
-  border-bottom: 1px solid #33383f;
+  background: var(--pp-surface);
+  border-bottom: 1px solid var(--pp-border);
 }
 
 #toolbar-left,
@@ -143,13 +140,13 @@ body {
   align-items: center;
   gap: 8px;
   padding: 4px;
-  border: 1px solid #3d4148;
+  border: 1px solid var(--pp-border-strong);
   border-radius: 6px;
-  background: rgba(36, 39, 45, 0.6);
+  background: var(--pp-bg);
 }
 
 #run-button {
-  background: #3b8a5c;
+  background: var(--pp-accent);
   color: #fff;
   border: none;
   border-radius: 4px;
@@ -159,7 +156,7 @@ body {
 }
 
 #run-button:hover {
-  background: #46a56d;
+  background: var(--pp-accent-hover);
 }
 
 #pause-button,
@@ -170,8 +167,8 @@ body {
 #download-button,
 #compile-button,
 #delete-button {
-  background: #33383f;
-  color: #e8e8e8;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
   border: none;
   border-radius: 4px;
   padding: 6px 14px;
@@ -187,7 +184,7 @@ body {
 #download-button:hover,
 #compile-button:hover,
 #delete-button:hover {
-  background: #454a52;
+  background: var(--pp-button-bg-hover);
 }
 
 .toolbar-toggle {
@@ -195,13 +192,13 @@ body {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #e8e8e8;
+  color: var(--pp-text);
   cursor: pointer;
   user-select: none;
 }
 
 .toolbar-toggle:has(input:disabled) {
-  color: #6b7078;
+  color: var(--pp-text-dim);
   cursor: not-allowed;
 }
 
@@ -240,8 +237,8 @@ textarea:disabled {
   display: flex;
   align-items: stretch;
   flex: 0 0 auto;
-  background: #1c1f24;
-  border-bottom: 1px solid #33383f;
+  background: var(--pp-surface-alt);
+  border-bottom: 1px solid var(--pp-border);
   overflow-x: auto;
 }
 
@@ -252,27 +249,27 @@ textarea:disabled {
   flex: 0 0 auto;
   padding: 7px 12px;
   font-size: 13px;
-  color: #b8bec7;
-  border-right: 1px solid #33383f;
+  color: var(--pp-text-muted-strong);
+  border-right: 1px solid var(--pp-border);
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
 }
 
 .graph-tab:hover {
-  background: #24272d;
+  background: var(--pp-surface);
 }
 
 .graph-tab-active {
-  background: #24272d;
-  color: #e8e8e8;
-  box-shadow: inset 0 -2px 0 #3b8a5c;
+  background: var(--pp-surface);
+  color: var(--pp-text);
+  box-shadow: inset 0 -2px 0 var(--pp-accent);
 }
 
 .graph-tab-close {
   background: none;
   border: none;
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
   cursor: pointer;
   font-size: 11px;
   padding: 0 2px;
@@ -281,8 +278,8 @@ textarea:disabled {
 }
 
 .graph-tab-close:hover {
-  background: #454a52;
-  color: #e8e8e8;
+  background: var(--pp-button-bg-hover);
+  color: var(--pp-text);
 }
 
 #canvas-container {
@@ -303,9 +300,9 @@ textarea:disabled {
   align-items: center;
   gap: 10px;
   padding: 6px 10px;
-  border: 1px solid #3d4148;
+  border: 1px solid var(--pp-border-strong);
   border-radius: 6px;
-  background: rgba(36, 39, 45, 0.85);
+  background: var(--pp-surface);
 }
 
 /* Faint by default, same "reads as interactive without a permanent visual seam" idea as .resizer,
@@ -313,10 +310,10 @@ textarea:disabled {
 .canvas-hud-button {
   width: 26px;
   height: 26px;
-  border: 1px solid #3d4148;
+  border: 1px solid var(--pp-border-strong);
   border-radius: 4px;
-  background: rgba(43, 47, 54, 0.6);
-  color: #9aa0a8;
+  background: var(--pp-bg);
+  color: var(--pp-text-muted);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
@@ -326,16 +323,16 @@ textarea:disabled {
 }
 
 .canvas-hud-button:hover {
-  background: #2b2f36;
-  color: #e8e8e8;
-  border-color: #3b6b8a;
+  background: var(--pp-surface-hover-alt);
+  color: var(--pp-text);
+  border-color: var(--pp-border-accent);
 }
 
 .side-panel {
   flex: 0 0 240px;
   display: flex;
   flex-direction: column;
-  background: #24272d;
+  background: var(--pp-surface);
   overflow-y: auto;
   font-size: 13px;
 }
@@ -343,11 +340,11 @@ textarea:disabled {
 /* Each sidebar's border sits on the edge facing the canvas — #left-sidebar is left-of-canvas so
    its own right edge borders it; #right-sidebar is right-of-canvas so its own left edge does. */
 #left-sidebar {
-  border-right: 1px solid #33383f;
+  border-right: 1px solid var(--pp-border);
 }
 
 #right-sidebar {
-  border-left: 1px solid #33383f;
+  border-left: 1px solid var(--pp-border);
 }
 
 /* Drag handles for both sidebars' widths and the log panel's height — see resizablePanels.ts.
@@ -361,7 +358,7 @@ textarea:disabled {
 
 .resizer:hover,
 .resizer:active {
-  background: #3b6b8a;
+  background: var(--pp-border-accent);
 }
 
 .resizer-vertical {
@@ -384,7 +381,7 @@ body.resizing {
   display: flex;
   flex-direction: column;
   flex: 0 0 auto;
-  border-bottom: 1px solid #33383f;
+  border-bottom: 1px solid var(--pp-border);
 }
 
 /* Unreal-style Details section: the sole content of its own standalone #right-sidebar, so it just
@@ -400,7 +397,7 @@ body.resizing {
 .details-header {
   padding: 10px 12px;
   font-weight: 600;
-  border-bottom: 1px solid #33383f;
+  border-bottom: 1px solid var(--pp-border);
 }
 
 .details-content {
@@ -411,6 +408,8 @@ body.resizing {
 .details-item-name {
   padding: 10px 12px 4px;
   font-weight: 600;
+  /* Deliberately fixed gold, not a --pp-* variable — same "selection/highlight accent stays
+     consistent across themes" reasoning as engine/color.ts's NODE_BORDER_SELECTED (same color). */
   color: #e8b339;
 }
 
@@ -425,7 +424,7 @@ body.resizing {
   gap: 8px;
   padding: 10px 12px;
   font-weight: 600;
-  border-bottom: 1px solid #33383f;
+  border-bottom: 1px solid var(--pp-border);
   cursor: pointer;
   user-select: none;
 }
@@ -461,7 +460,7 @@ body.resizing {
 
 .panel-header-add {
   flex: 0 0 auto;
-  background: #3b6b8a;
+  background: var(--pp-border-accent);
   color: #fff;
   border: none;
   border-radius: 3px;
@@ -473,7 +472,7 @@ body.resizing {
 }
 
 .panel-header-add:hover {
-  background: #4a7ea0;
+  filter: brightness(1.15);
 }
 
 .panel-list {
@@ -489,13 +488,12 @@ body.resizing {
   gap: 6px;
   padding: 4px 6px;
   border-radius: 4px;
-  /* background: #1c1f24; */
 }
 
 /* Same hover background as the canvas's right-click node-search menu (.node-search-list li:hover)
  * — excluded on a row that's already selected/active so hovering it doesn't wash out that state. */
 .variable-row:hover:not(.variable-row-selected):not(.function-row-active) {
-  background: #84a1b475;
+  background: var(--pp-surface-hover-alt);
 }
 
 .variable-type-dot {
@@ -513,13 +511,13 @@ body.resizing {
 }
 
 .variable-row .variable-type {
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
   font-size: 11px;
 }
 
 .variable-row button {
-  background: #33383f;
-  color: #e8e8e8;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
   border: none;
   border-radius: 3px;
   padding: 2px 6px;
@@ -528,7 +526,7 @@ body.resizing {
 }
 
 .variable-row button:hover {
-  background: #454a52;
+  background: var(--pp-button-bg-hover);
 }
 
 .function-name {
@@ -536,8 +534,8 @@ body.resizing {
 }
 
 .function-row-active {
-  background: #2f4a5e;
-  outline: 1px solid #3b6b8a;
+  background: var(--pp-selected-bg);
+  outline: 1px solid var(--pp-border-accent);
 }
 
 .function-row-active .function-name {
@@ -546,12 +544,13 @@ body.resizing {
 }
 
 .variable-row-selected {
-  background: #2f4a5e;
-  outline: 1px solid #3b6b8a;
+  background: var(--pp-selected-bg);
+  outline: 1px solid var(--pp-border-accent);
 }
 
 /* Manual drag-to-reorder drop indicator (see variablePanel.ts) — an inset box-shadow rather than
- * a real border so it never nudges row height/layout while dragging. */
+ * a real border so it never nudges row height/layout while dragging. Fixed gold, same reasoning as
+ * .details-item-name above. */
 .variable-row-drop-above {
   box-shadow: inset 0 2px 0 0 #e8b339;
 }
@@ -567,10 +566,10 @@ body.resizing {
 .row-context-menu {
   position: fixed;
   z-index: 20;
-  background: #24272d;
-  border: 1px solid #454a52;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
   border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   min-width: 100px;
   padding: 4px;
   font-size: 13px;
@@ -580,15 +579,16 @@ body.resizing {
   padding: 6px 10px;
   border-radius: 4px;
   cursor: pointer;
-  color: #e8e8e8;
+  color: var(--pp-text);
 }
 
 .row-context-menu-item:hover {
-  background: #3b6b8a;
+  background: var(--pp-border-accent);
+  color: #fff;
 }
 
 .row-context-menu-item-disabled {
-  color: #6a7078;
+  color: var(--pp-text-dim);
   cursor: default;
 }
 
@@ -598,9 +598,9 @@ body.resizing {
 
 .typed-value-input {
   box-sizing: border-box;
-  background: #14161a;
-  border: 1px solid #454a52;
-  color: #e8e8e8;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border-strong);
+  color: var(--pp-text);
   border-radius: 3px;
   font-size: 11px;
   padding: 2px 4px;
@@ -649,9 +649,9 @@ body.resizing {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: #14161a;
-  border: 1px solid #454a52;
-  color: #e8e8e8;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border-strong);
+  color: var(--pp-text);
   border-radius: 3px;
   font: inherit;
   font-size: 11px;
@@ -661,11 +661,11 @@ body.resizing {
 }
 
 .typed-value-type-select:hover {
-  border-color: #5a6068;
+  border-color: var(--pp-border-accent);
 }
 
 .typed-value-type-caret {
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
   font-size: 9px;
 }
 
@@ -707,7 +707,7 @@ body.resizing {
 .typed-value-placeholder {
   flex: 0 0 20px;
   text-align: center;
-  color: #6a7078;
+  color: var(--pp-text-dim);
   font-size: 11px;
 }
 
@@ -732,8 +732,8 @@ body.resizing {
 
 .typed-value-list-remove {
   flex: 0 0 auto;
-  background: #33383f;
-  color: #e8e8e8;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
   border: none;
   border-radius: 3px;
   padding: 2px 6px;
@@ -742,12 +742,12 @@ body.resizing {
 }
 
 .typed-value-list-remove:hover {
-  background: #454a52;
+  background: var(--pp-button-bg-hover);
 }
 
 .typed-value-list-add {
   align-self: flex-start;
-  background: #3b6b8a;
+  background: var(--pp-border-accent);
   color: #fff;
   border: none;
   border-radius: 3px;
@@ -757,7 +757,7 @@ body.resizing {
 }
 
 .typed-value-list-add:hover {
-  background: #4a7ea0;
+  filter: brightness(1.15);
 }
 
 .variable-row input.variable-name.typed-value-input {
@@ -769,11 +769,11 @@ body.resizing {
   display: flex;
   gap: 4px;
   padding: 8px;
-  border-top: 1px solid #33383f;
+  border-top: 1px solid var(--pp-border);
 }
 
 .panel-add-row button {
-  background: #3b6b8a;
+  background: var(--pp-border-accent);
   color: #fff;
   border: none;
   border-radius: 3px;
@@ -782,7 +782,7 @@ body.resizing {
 }
 
 .panel-add-row button:hover {
-  background: #4a7ea0;
+  filter: brightness(1.15);
 }
 
 #graph-canvas {
@@ -804,7 +804,7 @@ body.resizing {
   flex: 0 0 140px;
   display: flex;
   flex-direction: column;
-  border-top: 1px solid #33383f;
+  border-top: 1px solid var(--pp-border);
   /* A flex item's default overflow:visible gives it an automatic MINIMUM size equal to its
      content's natural height, which overrides flex-shrink:0 and lets it grow past its flex-basis
      whenever the log fills up — overflow:hidden makes that automatic minimum 0, so flex-basis
@@ -820,8 +820,8 @@ body.resizing {
   display: flex;
   align-items: stretch;
   flex: 0 0 auto;
-  background: #1c1f24;
-  border-bottom: 1px solid #33383f;
+  background: var(--pp-surface-alt);
+  border-bottom: 1px solid var(--pp-border);
 }
 
 #log-tabs-dynamic {
@@ -839,22 +839,22 @@ body.resizing {
   flex: 0 0 auto;
   padding: 6px 12px;
   font-size: 12px;
-  color: #b8bec7;
-  border-right: 1px solid #33383f;
+  color: var(--pp-text-muted-strong);
+  border-right: 1px solid var(--pp-border);
   white-space: nowrap;
   cursor: pointer;
 }
 
 .log-tab-active {
-  background: #16181c;
-  color: #e8e8e8;
-  box-shadow: inset 0 -2px 0 #3b8a5c;
+  background: var(--pp-bg);
+  color: var(--pp-text);
+  box-shadow: inset 0 -2px 0 var(--pp-accent);
 }
 
 .log-tab-close {
   background: none;
   border: none;
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
   cursor: pointer;
   font-size: 11px;
   padding: 0 2px;
@@ -863,8 +863,8 @@ body.resizing {
 }
 
 .log-tab-close:hover {
-  background: #454a52;
-  color: #e8e8e8;
+  background: var(--pp-button-bg-hover);
+  color: var(--pp-text);
 }
 
 .log-save-status {
@@ -881,11 +881,11 @@ body.resizing {
 #log-panel {
   flex: 1;
   overflow-y: auto;
-  background: #16181c;
+  background: var(--pp-bg);
   padding: 6px 10px;
   font-family: "Cascadia Code", "Consolas", monospace;
   font-size: 12px;
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
 }
 
 #log-panel .log-line {
@@ -893,13 +893,13 @@ body.resizing {
 }
 
 .log-line-time {
-  color: #6b7078;
+  color: var(--pp-text-dim);
   margin-right: 8px;
   user-select: none;
 }
 
 .log-line-message {
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
 }
 
 #monaco-container {
@@ -918,10 +918,10 @@ body.resizing {
   width: 22px;
   height: 22px;
   margin: auto 8px auto 4px;
-  border: 1px solid #3d4148;
+  border: 1px solid var(--pp-border-strong);
   border-radius: 4px;
-  background: rgba(43, 47, 54, 0.75);
-  color: #9aa0a8;
+  background: var(--pp-bg);
+  color: var(--pp-text-muted);
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
@@ -931,17 +931,17 @@ body.resizing {
 }
 
 .log-clear-button:hover {
-  background: #2b2f36;
-  color: #e8e8e8;
-  border-color: #3b6b8a;
+  background: var(--pp-surface-hover-alt);
+  color: var(--pp-text);
+  border-color: var(--pp-border-accent);
 }
 
 .pin-widget {
   box-sizing: border-box;
-  background: #14161a;
-  border: 1px solid #454a52;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border-strong);
   border-radius: 3px;
-  color: #e8e8e8;
+  color: var(--pp-text);
   padding: 0 4px;
   font-family: "Segoe UI", sans-serif;
 }
@@ -962,17 +962,17 @@ body.resizing {
 
 .pin-widget-expand {
   box-sizing: border-box;
-  background: #2a2e35;
-  border: 1px solid #454a52;
+  background: var(--pp-surface-alt);
+  border: 1px solid var(--pp-border-strong);
   border-radius: 3px;
-  color: #cfd3d8;
+  color: var(--pp-text-muted-strong);
   cursor: pointer;
   padding: 0;
   line-height: 1;
 }
 
 .pin-widget-expand:hover {
-  background: #3b6b8a;
+  background: var(--pp-border-accent);
   color: #ffffff;
 }
 
@@ -982,10 +982,10 @@ body.resizing {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: #24272d;
-  border: 1px solid #454a52;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
   border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   padding: 8px;
 }
 
@@ -994,10 +994,10 @@ body.resizing {
   width: 420px;
   height: 220px;
   resize: both;
-  background: #14161a;
-  border: 1px solid #454a52;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border-strong);
   border-radius: 3px;
-  color: #e8e8e8;
+  color: var(--pp-text);
   font-family: "Cascadia Code", "Consolas", monospace;
   font-size: 12px;
   padding: 6px;
@@ -1015,21 +1015,22 @@ body.resizing {
 }
 
 .multiline-text-editor-buttons button {
-  background: #2a2e35;
-  border: 1px solid #454a52;
+  background: var(--pp-surface-alt);
+  border: 1px solid var(--pp-border-strong);
   border-radius: 4px;
-  color: #e8e8e8;
+  color: var(--pp-text);
   padding: 4px 12px;
   cursor: pointer;
 }
 
 .multiline-text-editor-buttons button:hover {
-  background: #3b6b8a;
+  background: var(--pp-border-accent);
+  color: #fff;
 }
 
 .multiline-text-editor-save {
-  background: #3b6b8a !important;
-  border-color: #4d84a8 !important;
+  background: var(--pp-border-accent) !important;
+  border-color: var(--pp-border-accent) !important;
 }
 
 .hover-tooltip {
@@ -1127,10 +1128,10 @@ body.resizing {
   width: 100%;
   min-height: 54px;
   resize: vertical;
-  background: #1c1f24;
-  border: 1px solid #33383f;
+  background: var(--pp-surface-alt);
+  border: 1px solid var(--pp-border);
   border-radius: 4px;
-  color: #e8e8e8;
+  color: var(--pp-text);
   font-family: inherit;
   font-size: 12px;
   padding: 5px 7px;
@@ -1146,10 +1147,10 @@ body.resizing {
   width: 350px;
   height: 480px;
   max-height: calc(100% - 32px);
-  background: #24272d;
-  border: 1px solid #454a52;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
   border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1159,9 +1160,9 @@ body.resizing {
 .node-search-input {
   box-sizing: border-box;
   border: none;
-  border-bottom: 1px solid #33383f;
-  background: #1c1f24;
-  color: #e8e8e8;
+  border-bottom: 1px solid var(--pp-border);
+  background: var(--pp-surface-alt);
+  color: var(--pp-text);
   padding: 8px 10px;
   font-size: 13px;
 }
@@ -1188,19 +1189,20 @@ body.resizing {
   border-radius: 4px;
   font-size: 13px;
   cursor: pointer;
-  color: #e8e8e8;
+  color: var(--pp-text);
 }
 
 .node-search-list li:hover {
-  background: #84a1b475;
+  background: var(--pp-surface-hover-alt);
 }
 
 .node-search-list li.highlighted {
-  background: #3b6b8a;
+  background: var(--pp-border-accent);
+  color: #fff;
 }
 
 .node-search-empty {
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
   cursor: default;
 }
 .node-search-empty:hover {
@@ -1230,7 +1232,7 @@ body.resizing {
 
 .node-search-group {
   font-weight: 600;
-  color: #b8bec7;
+  color: var(--pp-text-muted-strong);
 }
 
 .node-search-result {
@@ -1249,13 +1251,13 @@ body.resizing {
 .node-search-result-group {
   flex: 0 0 auto;
   font-size: 11px;
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
 }
 
 /** Separates pinned rows (e.g. "Return" inside a function body) from the regular grouped/sorted
  * list below them. */
 .node-search-pinned-divider {
-  border-bottom: 1px solid #454a52;
+  border-bottom: 1px solid var(--pp-border-strong);
 }
 
 .comment-title {
@@ -1310,11 +1312,11 @@ body.resizing {
 
 /* ---------------------------------------------------------------------------------------------
    Home / Projects / Project / Logs / Credential Vault — the plain (non-canvas) pages surrounding
-   the editor. Reuses the same dark palette as the toolbar/sidebar (#1e2126/#24272d/#33383f/#e8e8e8)
+   the editor. Uses the exact same `--pp-*` variables as the editor's own toolbar/sidebar above,
    rather than inventing a separate visual language for them. */
 
 #back-to-project-button {
-  color: #9aa0a8;
+  color: var(--pp-text-muted);
   text-decoration: none;
   font-size: 13px;
   padding: 4px 8px;
@@ -1322,8 +1324,8 @@ body.resizing {
 }
 
 #back-to-project-button:hover {
-  background: #33383f;
-  color: #e8e8e8;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
 }
 
 .page-top-header {

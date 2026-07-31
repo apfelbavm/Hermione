@@ -7,6 +7,7 @@ import { FunctionsPanel } from "./sidebar/FunctionsPanel";
 import { GraphTabs } from "./sidebar/GraphTabs";
 import { ScriptsPanel } from "./sidebar/ScriptsPanel";
 import { VariablePanel } from "./sidebar/VariablePanel";
+import { ThemeToggle } from "./ThemeToggle";
 
 /** JSX port of the old index.html body markup — most sidebar panels are now real React components
  * (see ./sidebar/*); everything not yet converted (canvas overlays, Monaco, resizers) keeps the
@@ -53,6 +54,7 @@ export default function AppShellMarkup({ store, projectId }: { store: Store; pro
             Delete
           </button>
           <input id="load-file-input" type="file" accept="application/json" style={{ display: "none" }} />
+          <ThemeToggle />
         </div>
       </div>
       <div id="main-area">

@@ -34,6 +34,7 @@ import { nextAvailableName } from "../overlay/uniqueName";
 import { deserializeGraph, loadGraphFromFile } from "../persistence/load";
 import { downloadGraphAsFile, serializeGraph } from "../persistence/save";
 import { formatLogTimestamp } from "../shared/formatLogTimestamp";
+import { THEME_CHANGE_EVENT } from "../client/theme";
 import { deleteFlowGraph, getFlowWithGraph, saveFlowGraph } from "../client/api";
 import { downloadCompiledGraph } from "../compiler/codegen";
 import { isNodeLatent } from "../engine/latency";
@@ -174,6 +175,14 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       scheduleCanvasRedraw();
     }
     window.addEventListener("mousemove", onWindowMouseMove);
+
+    // The canvas draws its own colors directly from engine/color.ts's Colors (which reads
+    // data-theme itself) rather than CSS — unlike the plain-page DOM, which just updates for free
+    // the instant the attribute changes, the canvas needs an explicit redraw kicked off here.
+    function onThemeChange(): void {
+      scheduleCanvasRedraw();
+    }
+    window.addEventListener(THEME_CHANGE_EVENT, onThemeChange);
 
     function resizeCanvas(): void {
       const dpr = window.devicePixelRatio || 1;
@@ -874,6 +883,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       if (panAnimationFrame !== null) cancelAnimationFrame(panAnimationFrame);
       window.removeEventListener("mousemove", onWindowMouseMove);
       window.removeEventListener("resize", resizeCanvas);
+      window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange);
       resizeObserver.disconnect();
       unsubscribe();
       snapToGridCheckbox.removeEventListener("change", onSnapToGridChange);

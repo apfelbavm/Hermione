@@ -1,12 +1,20 @@
-/** Client-only theme storage/detection for the plain pages around the Flow editor (see
- * style.css's `--pp-*` variables) — the editor itself never reads any of this, it stays fixed dark.
- * Kept in one place so the inline bootstrap script in app/layout.tsx (which must be a literal
- * string, not a module import, since it has to run before any JS module loads) and
- * components/ThemeToggle.tsx agree on the same storage key/logic. */
+/** Client-only theme storage/detection — one global light/dark setting shared by the plain pages
+ * around the Flow editor (see style.css's `--pp-*` variables, pure CSS) AND the editor's own canvas
+ * rendering (see engine/color.ts's `Colors`, which reads the same `data-theme` attribute directly,
+ * since a 2D canvas context has no notion of CSS variables). Kept in one place so the inline
+ * bootstrap script in app/layout.tsx (which must be a literal string, not a module import, since it
+ * has to run before any JS module loads) and components/ThemeToggle.tsx agree on the same storage
+ * key/logic. */
 
 export type Theme = "light" | "dark";
 
 const STORAGE_KEY = "hermione:theme";
+
+/** Dispatched on `window` whenever the theme actually changes (see applyTheme below) — the Flow
+ * editor's canvas doesn't otherwise know to redraw itself just because `data-theme` changed (unlike
+ * the plain pages, where CSS variables update visuals with no JS involved at all); AppShell.tsx
+ * listens for this to schedule a redraw. */
+export const THEME_CHANGE_EVENT = "hermione:theme-change";
 
 export function getStoredTheme(): Theme | null {
   const value = localStorage.getItem(STORAGE_KEY);
@@ -33,6 +41,7 @@ export function getCurrentTheme(): Theme {
 export function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem(STORAGE_KEY, theme);
+  window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
 }
 
 /** The exact same bootstrap logic as getCurrentTheme/getStoredTheme/getPreferredTheme above, but as
