@@ -139,27 +139,33 @@ export default function EmulatePage() {
       ) : projects.length === 0 ? (
         <p className="page-empty-note">No projects yet.</p>
       ) : (
-        <div className="create-row">
-          <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} disabled={running}>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
+        <div className="create-row emulate-picker-row">
+          <label className="emulate-picker-field">
+            <span className="emulate-picker-label">Project</span>
+            <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} disabled={running}>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
           {loadingScripts ? (
             <span className="page-empty-note">Loading deployed Flows…</span>
           ) : scripts.length === 0 ? (
             <span className="page-empty-note">No Flows deployed in this project yet.</span>
           ) : (
-            <select value={selectedFlowId} onChange={(e) => setSelectedFlowId(e.target.value)} disabled={running}>
-              {scripts.map((script) => (
-                <option key={script.flowId} value={script.flowId}>
-                  {script.flowName}
-                </option>
-              ))}
-            </select>
+            <label className="emulate-picker-field">
+              <span className="emulate-picker-label">Flow</span>
+              <select value={selectedFlowId} onChange={(e) => setSelectedFlowId(e.target.value)} disabled={running}>
+                {scripts.map((script) => (
+                  <option key={script.flowId} value={script.flowId}>
+                    {script.flowName}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
 
           <button type="button" onClick={() => void handleRun()} disabled={running || !selectedFlowId || loadingDetail}>
