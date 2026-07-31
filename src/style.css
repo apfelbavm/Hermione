@@ -1076,7 +1076,8 @@ body.resizing {
   background: rgba(247, 246, 243, 0.75);
   border: calc(1px * var(--zoom)) solid rgba(214, 212, 205, 0.75);
   border-radius: calc(6px * var(--zoom));
-  box-shadow: 0 calc(8px * var(--zoom)) calc(24px * var(--zoom)) rgba(0, 0, 0, 0.35);
+  box-shadow: 0 calc(8px * var(--zoom)) calc(24px * var(--zoom))
+    rgba(0, 0, 0, 0.35);
   padding: calc(6px * var(--zoom)) calc(10px * var(--zoom));
   color: #1c1c1a;
   font-size: 12px;
@@ -1104,13 +1105,15 @@ body.resizing {
 
 .node-description-bubble::before {
   transform: translateX(-50%);
-  border-width: calc(8px * var(--zoom)) calc(8px * var(--zoom)) 0 calc(8px * var(--zoom));
+  border-width: calc(8px * var(--zoom)) calc(8px * var(--zoom)) 0
+    calc(8px * var(--zoom));
   border-top-color: rgba(214, 212, 205, 0.75);
 }
 
 .node-description-bubble::after {
   transform: translateX(-50%) translateY(calc(-1px * var(--zoom)));
-  border-width: calc(7px * var(--zoom)) calc(7px * var(--zoom)) 0 calc(7px * var(--zoom));
+  border-width: calc(7px * var(--zoom)) calc(7px * var(--zoom)) 0
+    calc(7px * var(--zoom));
   border-top-color: rgba(247, 246, 243, 0.75);
 }
 
@@ -2143,14 +2146,21 @@ body.resizing {
 }
 
 /* Create Flow dialog's template picker — wider than the plain single-field modal-box since it hosts
-   a scrollable grid of 300x300 tiles below the name field (see CreateFlowDialog.tsx). */
+   a scrollable grid of 300x300 tiles below the name field (see CreateFlowDialog.tsx). Grows to fill
+   the viewport (minus a 64px margin on each side) up to a 1920px cap, rather than staying a fixed
+   width. */
 .create-flow-dialog {
-  width: 660px;
+  width: calc(100vw - 128px);
+  max-width: 1920px;
 }
 
+/* Fixed 300px tracks (not minmax/1fr) so tiles never grow past their image size; auto-fill just
+   picks how many columns fit the dialog's own width above and wraps the rest to new rows.
+   justify-content centers a short/last row instead of leaving it hugging the left edge. */
 .flow-template-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 300px);
+  justify-content: center;
   gap: 16px;
   max-height: 420px;
   overflow-y: auto;
