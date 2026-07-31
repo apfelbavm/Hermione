@@ -53,6 +53,7 @@
       "create_flow_creating": "Creating…",
       "template_blank": "Blank",
       "template_demo": "Demo",
+      "template_dropbox": "Dropbox",
       "flows_empty": "No Flows yet — create one above.",
       "flows_no_matches": "No Flows match your search.",
       "flow_rename": "Rename",
