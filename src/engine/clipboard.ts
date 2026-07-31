@@ -124,6 +124,7 @@ export function serializeVariableClipboardPayload(variable: Variable): string {
  * since these are never anything but strings/undefined. */
 function cloneOptionalFields(target: NodeInstance, source: NodeInstance): void {
   target.disabled = source.disabled;
+  target.breakpoint = source.breakpoint;
   target.elementType = source.elementType;
   target.mapKeyType = source.mapKeyType;
   target.container = source.container;

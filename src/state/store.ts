@@ -57,6 +57,10 @@ export interface AppState {
    * canvas pointer/keyboard interaction) is disabled while this is true, so the graph can't be
    * edited out from under a run in progress. */
   simulating: boolean;
+  /** True while a Simulate run is stopped at a breakpoint or the toolbar's Pause button — distinct
+   * from simulating, which stays true the whole time (see AppShell.tsx's Pause/Continue buttons and
+   * the "paused"/"resumed" SSE events from /api/simulate). Always false while !simulating. */
+  paused: boolean;
   /** Canvas HUD toggle (next to Snap to Grid): when on, the camera auto-pans to keep whichever node
    * is currently executing centered in view. */
   autoPan: boolean;

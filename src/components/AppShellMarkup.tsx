@@ -21,6 +21,12 @@ export default function AppShellMarkup({ store }: { store: Store }) {
       <div id="toolbar">
         <span id="toolbar-title">Hermione</span>
         <button id="run-button">Simulate ▶</button>
+        <button id="pause-button" style={{ display: "none" }} title="Pause the running simulation">
+          ⏸ Pause
+        </button>
+        <button id="continue-button" style={{ display: "none" }} title="Continue past the current breakpoint/pause">
+          ▶ Continue
+        </button>
         <button id="save-button">Save</button>
         <button id="load-button">Load</button>
         <button id="download-button">Download</button>

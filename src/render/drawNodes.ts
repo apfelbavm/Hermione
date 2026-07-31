@@ -93,8 +93,16 @@ export function drawNodes(
         ctx.stroke();
       }
 
-      if (latentNodeIds.has(node.id)) {
+      const isLatent = latentNodeIds.has(node.id);
+      if (isLatent) {
         drawLatentIcon(ctx, geo.screenX + geo.width, geo.screenY, 8 * camera.zoom);
+      }
+      if (node.breakpoint) {
+        // Sits right next to the latent (clock) icon when both are present, sharing its corner
+        // instead of overlapping it — otherwise takes the latent icon's own spot alone.
+        const breakpointRadius = 6 * camera.zoom;
+        const cx = isLatent ? geo.screenX + geo.width - 8 * camera.zoom * 2 - 4 * camera.zoom : geo.screenX + geo.width;
+        drawBreakpointDot(ctx, cx, geo.screenY, breakpointRadius);
       }
 
       ctx.fillStyle = Colors.TEXT_PRIMARY;
@@ -193,6 +201,19 @@ function drawLatentIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, r
   ctx.lineTo(cx, cy - r * 0.55);
   ctx.moveTo(cx, cy);
   ctx.lineTo(cx + r * 0.4, cy - r * 0.15);
+  ctx.stroke();
+}
+
+/** A small solid red dot straddling (cx, cy) — marks a node whose NodeInstance.breakpoint is set
+ * (see AppShell.tsx's "Add Breakpoint" context menu item). Deliberately plainer than
+ * drawLatentIcon's clock (no internal detail to read at a glance, just "this is a breakpoint"). */
+function drawBreakpointDot(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = "#e5484d";
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, r * 0.18);
+  ctx.strokeStyle = "#7a1f22";
   ctx.stroke();
 }
 

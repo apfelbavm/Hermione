@@ -16,6 +16,11 @@ export class NodeInstance {
    * hasConnectedDataOutput) — a disabled node's execute()/compileExecute() is never invoked, by
    * the interpreter or the compiler, and the exec chain simply doesn't continue past it. */
   disabled?: boolean;
+  /** Toggled via the canvas right-click menu (see AppShell.tsx's context menu, excluded for
+   * compact/reroute nodes — see NodeDef.compact). When simulating, execution pauses right before
+   * this node runs (see /api/simulate/route.ts), same as clicking the toolbar's Pause button, until
+   * Continue is clicked. */
+  breakpoint?: boolean;
   /** Set only for a node whose NodeDef.configurableElementType is set — see that field's doc
    * comment. Seeded by createNodeInstance, changed via changeNodeElementType. */
   elementType?: PinType;
@@ -43,6 +48,7 @@ export class NodeInstance {
     this.functionId = functionId;
     this.scriptId = scriptId;
     this.disabled = false;
+    this.breakpoint = false;
     this.elementType = undefined;
     this.mapKeyType = undefined;
     this.container = undefined;

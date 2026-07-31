@@ -1,6 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { registerBuiltins } from "../../../nodes";
 import { createExecutionContext, runExecFrom } from "../../../engine/executor";
 import { deserializeGraph } from "../../../persistence/load";
+import { checkpointSimulation, disposeSimulationRun, registerSimulationRun, requestSimulationResume } from "../../../engine/simulationControl";
+import { allGraphs } from "../../../engine/graphMutations";
+import type { Graph } from "../../../engine/graph";
 
 // Must run under the Node runtime (not edge) — the interpreter and node implementations
 // (node-forge/openpgp for crypto, fetch-based http/odata/oauth2 nodes, etc.) assume a Node
@@ -36,10 +40,25 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
+  const runId = randomUUID();
+  registerSimulationRun(runId);
+
   let aborted = false;
   request.signal.addEventListener("abort", () => {
     aborted = true;
+    requestSimulationResume(runId); // wake a paused run so it can notice `aborted` and unwind
   });
+
+  // Every graph a node could live in (root + every function body) — a node-start's nodeId might
+  // belong to a function whose tab isn't even open client-side, so breakpoint lookups have to
+  // search all of them, not just the root graph.
+  const graphsById = new Map<string, Graph>();
+  for (const g of allGraphs(graph)) {
+    for (const node of g.nodes) graphsById.set(node.id, g);
+  }
+  function findNodeById(nodeId: string) {
+    return graphsById.get(nodeId)?.nodes.find((n) => n.id === nodeId);
+  }
 
   const encoder = new TextEncoder();
 
@@ -49,10 +68,13 @@ export async function POST(request: Request): Promise<Response> {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       }
 
+      send("run-start", { runId });
+
       const eventRoots = graph.nodes.filter((n) => n.type === "event.run");
       if (eventRoots.length === 0) {
         send("log", { message: 'No "On Run" node in graph — nothing to run.' });
         send("done", {});
+        disposeSimulationRun(runId);
         controller.close();
         return;
       }
@@ -62,6 +84,14 @@ export async function POST(request: Request): Promise<Response> {
         onNodeStart: async (nodeId) => {
           if (aborted) throw new Error("Simulation aborted by client");
           send("node-start", { nodeId });
+
+          const atBreakpoint = !!findNodeById(nodeId)?.breakpoint;
+          const { willPause, ready } = checkpointSimulation(runId, atBreakpoint);
+          if (willPause) send("paused", { nodeId });
+          await ready;
+          if (aborted) throw new Error("Simulation aborted by client");
+          if (willPause) send("resumed", {});
+
           await delay(SIMULATION_STEP_DELAY_MS);
         },
         onExecFire: (connectionId) => {
@@ -78,6 +108,7 @@ export async function POST(request: Request): Promise<Response> {
         send("log", { message: `Error: ${err instanceof Error ? err.message : String(err)}` });
       } finally {
         send("done", {});
+        disposeSimulationRun(runId);
         controller.close();
       }
     },

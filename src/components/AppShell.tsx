@@ -93,6 +93,7 @@ export default function AppShell() {
       camera: new Camera(),
       snapToGrid: true,
       simulating: false,
+      paused: false,
       autoPan: true,
       selectedNodeIds: new Set(),
       selectedCommentIds: new Set(),
@@ -117,6 +118,8 @@ export default function AppShell() {
     const logSaveButton = document.getElementById("log-save-button") as HTMLButtonElement;
     const logSaveStatus = document.getElementById("log-save-status") as HTMLSpanElement;
     const runButton = document.getElementById("run-button") as HTMLButtonElement;
+    const pauseButton = document.getElementById("pause-button") as HTMLButtonElement;
+    const continueButton = document.getElementById("continue-button") as HTMLButtonElement;
     const saveButton = document.getElementById("save-button") as HTMLButtonElement;
     const loadButton = document.getElementById("load-button") as HTMLButtonElement;
     const downloadButton = document.getElementById("download-button") as HTMLButtonElement;
@@ -214,7 +217,7 @@ export default function AppShell() {
       // AppState.simulating. The run button itself is handled separately by onRunClick (it stays
       // enabled/disabled based on activeSimulation, not this flag, since aborting-and-restarting a
       // run is still allowed).
-      const { simulating } = store.state;
+      const { simulating, paused } = store.state;
       saveButton.disabled = simulating;
       loadButton.disabled = simulating;
       downloadButton.disabled = simulating;
@@ -223,6 +226,14 @@ export default function AppShell() {
       snapToGridCheckbox.disabled = simulating;
       frameAllButton.disabled = simulating;
       loadFileInput.disabled = simulating;
+
+      // Pause/Continue only exist while a run is in progress — hidden the rest of the time — and
+      // are each other's mirror image: Pause is only meaningful while actually running, Continue
+      // only while stopped at a breakpoint/manual pause.
+      pauseButton.style.display = simulating ? "" : "none";
+      continueButton.style.display = simulating ? "" : "none";
+      pauseButton.disabled = paused;
+      continueButton.disabled = !paused;
     }
 
     const unsubscribe = store.subscribe(render);
@@ -386,6 +397,18 @@ export default function AppShell() {
           });
         }
 
+        // Reroute "knots" (see NodeDef.compact) are drawn far too small to host a breakpoint dot,
+        // and don't meaningfully "execute" a step of their own — never offered a breakpoint toggle.
+        if (!getNodeDef(node.type).compact) {
+          items.push({
+            label: node.breakpoint ? "Remove Breakpoint" : "Add Breakpoint",
+            onClick: () => {
+              node.breakpoint = !node.breakpoint;
+              store.notify();
+            },
+          });
+        }
+
         items.push({
           label: "Select All (Ctrl+A)",
           onClick: () => {
@@ -527,6 +550,10 @@ export default function AppShell() {
     logClearButton.addEventListener("click", onLogClear);
 
     let activeSimulation: AbortController | null = null;
+    // The runId the currently-active simulation reported via its own "run-start" SSE event — null
+    // before that arrives (right after the fetch starts) or once the run's ended. Needed so
+    // onPauseClick/onContinueClick know which server-side run (see simulationControl.ts) to target.
+    let currentRunId: string | null = null;
 
     // --- Auto-pan: while simulating (and the auto-pan HUD toggle is on), keeps whichever node is
     // currently executing centered in view by lerping the camera towards it every frame, rather
@@ -581,6 +608,8 @@ export default function AppShell() {
 
       runButton.disabled = true;
       store.state.simulating = true;
+      store.state.paused = false;
+      currentRunId = null;
       logPanel.innerHTML = "";
       store.state.firedConnectionIds = new Set();
 
@@ -604,6 +633,9 @@ export default function AppShell() {
         for await (const { event, data } of readServerSentEvents(response)) {
           if (controller.signal.aborted) break;
           switch (event) {
+            case "run-start":
+              currentRunId = (data as { runId: string }).runId;
+              break;
             case "node-start": {
               const nodeId = (data as { nodeId: string }).nodeId;
               store.state.executingNodeId = nodeId;
@@ -613,6 +645,14 @@ export default function AppShell() {
             }
             case "exec-fire":
               store.state.firedConnectionIds.add((data as { connectionId: string }).connectionId);
+              store.notify();
+              break;
+            case "paused":
+              store.state.paused = true;
+              store.notify();
+              break;
+            case "resumed":
+              store.state.paused = false;
               store.notify();
               break;
             case "log":
@@ -630,6 +670,8 @@ export default function AppShell() {
         if (activeSimulation === controller) {
           store.state.executingNodeId = null;
           store.state.simulating = false;
+          store.state.paused = false;
+          currentRunId = null;
           store.notify();
           runButton.disabled = false;
           activeSimulation = null;
@@ -641,6 +683,29 @@ export default function AppShell() {
       }
     }
     runButton.addEventListener("click", onRunClick);
+
+    // --- Pause/Continue: POST to /api/simulate/control, targeting whichever runId the active
+    // simulation reported (see "run-start" above) — the SSE stream itself has no way to receive
+    // more input mid-flight, so this is a second, independent request (see that route's own
+    // comment). The actual paused/resumed state only ever flips off the "paused"/"resumed" SSE
+    // events the simulate stream sends back, not optimistically here, so it always reflects what
+    // the server-side run is actually doing.
+    async function postSimulationControl(action: "pause" | "resume"): Promise<void> {
+      if (!currentRunId) return;
+      await fetch("/api/simulate/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId: currentRunId, action }),
+      }).catch(() => {}); // best-effort — the run may have already ended just as this was sent
+    }
+    function onPauseClick(): void {
+      void postSimulationControl("pause");
+    }
+    function onContinueClick(): void {
+      void postSimulationControl("resume");
+    }
+    pauseButton.addEventListener("click", onPauseClick);
+    continueButton.addEventListener("click", onContinueClick);
 
     // --- Save / Load: JSON persisted to localStorage (auto-restored on next launch); Download hands
     // that same JSON out as a file, as a separate, explicit action ---
@@ -736,6 +801,8 @@ export default function AppShell() {
       canvas.removeEventListener("drop", onCanvasDrop);
       logClearButton.removeEventListener("click", onLogClear);
       runButton.removeEventListener("click", onRunClick);
+      pauseButton.removeEventListener("click", onPauseClick);
+      continueButton.removeEventListener("click", onContinueClick);
       saveButton.removeEventListener("click", onSaveClick);
       loadButton.removeEventListener("click", onLoadClick);
       downloadButton.removeEventListener("click", onDownloadClick);
