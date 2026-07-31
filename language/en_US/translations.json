@@ -321,6 +321,12 @@
         "description": "Downloads the content of a file at a path in Dropbox.",
         "pin_content": "Content"
       },
+      "listFolders": {
+        "label": "Dropbox List Folders",
+        "description": "Lists the folders under a path in Dropbox, optionally including nested subfolders.",
+        "pin_recursive": "Recursive",
+        "pin_folders": "Folders"
+      },
       "move": {
         "label": "Dropbox Move",
         "description": "Moves a file or folder from one Dropbox path to another."
