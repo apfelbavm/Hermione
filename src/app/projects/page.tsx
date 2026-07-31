@@ -1,13 +1,66 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { i18n } from "@i18n";
 import { createProject, deleteProject, listProjects, renameProject } from "../../client/api";
 import type { ProjectSummary } from "../../server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 import { useDebounce } from "../../hooks/useDebounce";
+
+/** Same "⋯" row-context-menu pattern as FlowRowMenu on the Project page (see that file's comment for
+ * why it's positioned via getBoundingClientRect rather than CSS anchoring). */
+function ProjectRowMenu({ onRename, onDelete }: { onRename: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onOutsideMouseDown(e: MouseEvent): void {
+      if (e.target instanceof Node && !wrapperRef.current?.contains(e.target)) setOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent): void {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onOutsideMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onOutsideMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  function toggle(e: React.MouseEvent<HTMLButtonElement>): void {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.right - 140 });
+    setOpen((o) => !o);
+  }
+
+  function pick(action: () => void): void {
+    setOpen(false);
+    action();
+  }
+
+  return (
+    <div className="entity-menu" ref={wrapperRef}>
+      <button type="button" className="entity-menu-button" onClick={toggle} title="More actions" aria-label="More actions">
+        ⋯
+      </button>
+      {open && pos && (
+        <div className="row-context-menu" style={{ top: pos.top, left: pos.left }}>
+          <div className="row-context-menu-item" onClick={() => pick(onRename)}>
+            {i18n.pages.projects.rename}
+          </div>
+          <div className="row-context-menu-item" onClick={() => pick(onDelete)}>
+            {i18n.pages.projects.delete}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** The "Create Project" dialog just collects a name — unlike CreateFlowDialog there's no template
  * concept for Projects, so this stays a single-field modal (same skeleton as DuplicateFlowDialog on
@@ -143,12 +196,7 @@ export default function ProjectsPage() {
                 {i18n.pages.projects.meta_updated.replace("{date}", new Date(project.updatedAt).toLocaleString())}
               </span>
               <div className="entity-actions">
-                <button type="button" onClick={() => setEditingId(project.id)}>
-                  {i18n.pages.projects.rename}
-                </button>
-                <button type="button" onClick={() => void handleDelete(project.id, project.name)}>
-                  {i18n.pages.projects.delete}
-                </button>
+                <ProjectRowMenu onRename={() => setEditingId(project.id)} onDelete={() => void handleDelete(project.id, project.name)} />
               </div>
             </li>
           ))}
