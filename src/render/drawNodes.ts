@@ -9,6 +9,9 @@ import { NODE_HEADER_HEIGHT, PIN_RADIUS } from "./layout";
 import { Graph } from "../engine/graph";
 import { NodeInstance } from "../engine/nodeInstance";
 
+const NODE_BORDER_COLOR_EXECUTING = "#5ad1ff";
+const NODE_SHADOW_COLOR = "rgba(0, 0, 0, 0.45)";
+
 /** A node bound to a Variable (Get/Set) is colored by that variable's TYPE (the same color its pin
  * would be) instead of the generic "Variables" group color — so at a glance, a graph full of
  * getters/setters reads by what KIND of data they move, not just that they're variable nodes. */
@@ -55,7 +58,7 @@ export function drawNodes(
     const isSelected = selectedNodeIds.has(node.id);
     const showStateBorder = isExecuting || isSelected;
     const borderWidth = isExecuting ? 2.5 : 2;
-    const borderColor = isExecuting ? "#5ad1ff" : Colors.NODE_BORDER_SELECTED;
+    const borderColor = isExecuting ? NODE_BORDER_COLOR_EXECUTING : Colors.NODE_BORDER_SELECTED;
 
     if (def.compact) {
       // A reroute "knot" (see NodeDef.compact) — just a small body + border, no header bar or
@@ -158,18 +161,9 @@ export function drawNodes(
   ctx.globalAlpha = 1;
 }
 
-/** Fills a node's own body silhouette (the same rounded-rect shape every caller then draws a
- * header/border/pins over) once with a drop shadow applied, via canvas's native shadow
- * properties — wrapped in save/restore so the shadow only ever applies to this one fill and
- * doesn't bleed into anything drawn after it (header, gradient, border, pins, text), which would
- * otherwise each cast their own small shadow too. Subtle by design: a slight lift off the canvas,
- * not a heavy floating-card effect. Light comes from the top-left at 45°, so the shadow it casts
- * falls toward the bottom-right — equal X/Y offsets, since a 45° direction is exactly where those
- * two agree. (drawTopHighlight below simplifies this to a top-only cue, so the two no longer
- * share an identical light angle — a deliberate simplicity-over-precision tradeoff.) */
 function drawNodeShadow(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, width: number, height: number, cornerRadius: number, zoom: number): void {
   ctx.save();
-  ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+  ctx.shadowColor = NODE_SHADOW_COLOR;
   ctx.shadowBlur = 10 * zoom;
   ctx.shadowOffsetX = 3 * zoom;
   ctx.shadowOffsetY = 3 * zoom;
@@ -180,11 +174,6 @@ function drawNodeShadow(ctx: CanvasRenderingContext2D, screenX: number, screenY:
   ctx.restore();
 }
 
-/** A soft light-from-above cue: a plain top-to-bottom gradient, white fading to transparent
- * within just a few pixels of the top edge, filled over the node's own rounded-rect shape.
- * Simpler than an actual inset-shadow simulation (no clip/shadow-offset trick needed) — a
- * gradient fill already only paints within the current path, so this reads as a thin top-lit
- * sheen at a fraction of the cost and code of clipping + casting a shadow. */
 function drawTopHighlight(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, width: number, height: number, cornerRadius: number, zoom: number): void {
   ctx.beginPath();
   ctx.roundRect(screenX, screenY, width, height, cornerRadius);
