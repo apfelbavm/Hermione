@@ -2,6 +2,11 @@ import { transpileScript } from "../engine/transpile";
 import type { CodeScriptDef } from "../engine/types";
 import type { Graph } from "../engine/graph";
 import { closeScriptTab, type Store } from "../state/store";
+import { getCurrentTheme, THEME_CHANGE_EVENT } from "../client/theme";
+
+function monacoThemeFor(theme: "light" | "dark"): string {
+  return theme === "light" ? "vs" : "vs-dark";
+}
 
 export interface ScriptEditor {
   render: () => void;
@@ -103,7 +108,13 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
       automaticLayout: true,
       minimap: { enabled: false },
       fontSize: 13,
-      theme: "vs-dark",
+      theme: monacoThemeFor(getCurrentTheme()),
+    });
+    // Monaco has no notion of this app's own theme toggle, so it needs telling explicitly whenever
+    // it changes (see client/theme.ts's own THEME_CHANGE_EVENT doc comment for why the canvas
+    // renderer needs the same treatment).
+    window.addEventListener(THEME_CHANGE_EVENT, () => {
+      monaco!.editor.setTheme(monacoThemeFor(getCurrentTheme()));
     });
   }
 

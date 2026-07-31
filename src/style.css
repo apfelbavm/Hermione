@@ -905,8 +905,8 @@ body.resizing {
 #monaco-container {
   flex: 1;
   min-height: 0;
-  background: #1e1e1e;
-  color: #9aa0a8;
+  background: var(--pp-surface);
+  color: var(--pp-text-muted);
   font-family: "Cascadia Code", "Consolas", monospace;
   font-size: 12px;
   padding: 6px 10px;
