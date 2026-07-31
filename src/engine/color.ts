@@ -121,10 +121,10 @@ const DARK_SURFACE: SurfacePalette = {
 };
 
 const LIGHT_SURFACE: SurfacePalette = {
-  canvasBg: "#eef0f3",
-  gridLineMinor: "#dfe2e6",
-  gridLineMajor: "#cdd2d8",
-  nodeBodyBg: "#ffffff",
+  canvasBg: "#ffffff",
+  gridLineMinor: "#edeff3",
+  gridLineMajor: "#dfe4eb",
+  nodeBodyBg: "#edeff5",
   nodeBorder: "#c9ced4",
   textPrimary: "#1b1e22",
   textMuted: "#5b6169",
