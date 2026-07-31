@@ -13,6 +13,7 @@ import "./sftp";
 import "./auth";
 import "./oauth2Saml";
 import "./oauth2ClientCredentials";
+import "./dropbox";
 import "./array";
 import "./set";
 import "./map";

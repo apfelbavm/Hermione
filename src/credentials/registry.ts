@@ -6,6 +6,10 @@ export interface CredentialFieldDef {
   /** Rendered as a password input (masked, not shown back in plain text once saved) — set for
    * anything genuinely secret (passwords, private keys), not for identifiers like a client id. */
   secret?: boolean;
+  /** Shown as a hover tooltip over a small "?" icon next to the field's label (see the Credential
+   * Vault dialog) — for a field whose purpose/lifetime isn't obvious from the label alone, e.g.
+   * Dropbox's one-time Authorization Code field. Omit for a field that's self-explanatory. */
+  help?: string;
 }
 
 export interface CredentialTypeDef {
@@ -39,6 +43,21 @@ registerCredentialType({
   fields: [
     { id: "username", label: "Username" },
     { id: "password", label: "Password", secret: true },
+  ],
+});
+
+registerCredentialType({
+  id: "dropboxOAuth2",
+  label: "Dropbox OAuth2",
+  fields: [
+    { id: "appKey", label: "App Key" },
+    { id: "appSecret", label: "App Secret", secret: true },
+    {
+      id: "authCode",
+      label: "Authorization Code",
+      help: "Single-use code from Dropbox's OAuth2 consent page (visit https://www.dropbox.com/oauth2/authorize?client_id=YOUR_APP_KEY&response_type=code&token_access_type=offline). Only needed once, to run the Dropbox Authorize node and obtain a Refresh Token below — it stops working after that first use, so it's safe to leave here or clear it afterward.",
+    },
+    { id: "refreshToken", label: "Refresh Token", secret: true },
   ],
 });
 

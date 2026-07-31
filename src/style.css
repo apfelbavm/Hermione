@@ -2046,6 +2046,21 @@ body.resizing {
   color: var(--pp-text-muted);
 }
 
+.modal-field-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  border-radius: 50%;
+  border: 1px solid var(--pp-border-strong);
+  font-size: 10px;
+  line-height: 1;
+  cursor: help;
+  color: var(--pp-text-muted);
+}
+
 .modal-field-row input,
 .modal-field-row select {
   background: var(--pp-bg);

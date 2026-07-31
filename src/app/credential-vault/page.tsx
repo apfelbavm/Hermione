@@ -2,22 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { i18n } from "@i18n";
-import {
-  createCredential,
-  deleteCredential,
-  getCredential,
-  listCredentials,
-  updateCredential,
-} from "../../client/api";
-import {
-  allCredentialTypeDefs,
-  getCredentialTypeDef,
-} from "../../credentials/registry";
-import type {
-  CredentialData,
-  CredentialSummary,
-  CredentialTypeId,
-} from "../../credentials/types";
+import { createCredential, deleteCredential, getCredential, listCredentials, updateCredential } from "../../client/api";
+import { allCredentialTypeDefs, getCredentialTypeDef } from "../../credentials/registry";
+import type { CredentialData, CredentialSummary, CredentialTypeId } from "../../credentials/types";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 
@@ -40,15 +27,7 @@ function blankDialogState(type: CredentialTypeId = DEFAULT_TYPE): DialogState {
   return { id: null, name: "", type, fields };
 }
 
-function CredentialDialog({
-  initial,
-  onClose,
-  onSaved,
-}: {
-  initial: DialogState;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
+function CredentialDialog({ initial, onClose, onSaved }: { initial: DialogState; onClose: () => void; onSaved: () => void }) {
   const [state, setState] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const typeDef = getCredentialTypeDef(state.type);
@@ -64,8 +43,7 @@ function CredentialDialog({
     }
     const data = { ...state.fields } as unknown as CredentialData;
     try {
-      if (state.id)
-        await updateCredential(state.id, state.name.trim(), state.type, data);
+      if (state.id) await updateCredential(state.id, state.name.trim(), state.type, data);
       else await createCredential(state.name.trim(), state.type, data);
       onSaved();
     } catch (err) {
@@ -74,38 +52,18 @@ function CredentialDialog({
   }
 
   return (
-    <div
-      className="modal-backdrop"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-    >
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
-        <h2 className="modal-title">
-          {state.id
-            ? i18n.pages.credential_vault.modal_edit_title
-            : i18n.pages.credential_vault.modal_add_title}
-        </h2>
+        <h2 className="modal-title">{state.id ? i18n.pages.credential_vault.modal_edit_title : i18n.pages.credential_vault.modal_add_title}</h2>
 
         <label className="modal-field-row">
-          <span className="modal-field-label">
-            {i18n.pages.credential_vault.modal_name_label}
-          </span>
-          <input
-            type="text"
-            value={state.name}
-            onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
-            autoFocus
-          />
+          <span className="modal-field-label">{i18n.pages.credential_vault.modal_name_label}</span>
+          <input type="text" value={state.name} onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))} autoFocus />
         </label>
 
         <label className="modal-field-row">
-          <span className="modal-field-label">
-            {i18n.pages.credential_vault.modal_type_label}
-          </span>
-          <select
-            value={state.type}
-            onChange={(e) => changeType(e.target.value as CredentialTypeId)}
-            disabled={state.id !== null}
-          >
+          <span className="modal-field-label">{i18n.pages.credential_vault.modal_type_label}</span>
+          <select value={state.type} onChange={(e) => changeType(e.target.value as CredentialTypeId)} disabled={state.id !== null}>
             {allCredentialTypeDefs().map((def) => (
               <option key={def.id} value={def.id}>
                 {def.label}
@@ -116,9 +74,17 @@ function CredentialDialog({
 
         {typeDef.fields.map((field) => (
           <label className="modal-field-row" key={field.id}>
-            <span className="modal-field-label">{field.label}</span>
+            <span className="modal-field-label">
+              {field.label}
+              {field.help && (
+                <span className="modal-field-help" title={field.help}>
+                  ?
+                </span>
+              )}
+            </span>
             <input
-              type={field.secret ? "password" : "text"}
+              // type={field.secret ? "password" : "text"}
+              type="text"
               value={state.fields[field.id] ?? ""}
               onChange={(e) =>
                 setState((s) => ({
@@ -161,9 +127,7 @@ export default function CredentialVaultPage() {
     const credential = await getCredential(id);
     const fields: Record<string, string> = {};
     for (const field of getCredentialTypeDef(credential.type).fields) {
-      fields[field.id] = String(
-        (credential.data as unknown as Record<string, unknown>)[field.id] ?? "",
-      );
+      fields[field.id] = String((credential.data as unknown as Record<string, unknown>)[field.id] ?? "");
     }
     setDialog({
       id: credential.id,
@@ -174,12 +138,7 @@ export default function CredentialVaultPage() {
   }
 
   async function handleDelete(id: string, name: string): Promise<void> {
-    if (
-      !confirm(
-        i18n.pages.credential_vault.delete_confirm.replace("{name}", name),
-      )
-    )
-      return;
+    if (!confirm(i18n.pages.credential_vault.delete_confirm.replace("{name}", name))) return;
     await deleteCredential(id);
     await refresh();
   }
@@ -202,24 +161,13 @@ export default function CredentialVaultPage() {
           {credentials.map((credential) => (
             <li key={credential.id} className="entity-row">
               <span className="entity-name">
-                {credential.name}{" "}
-                <span className="entity-type-tag">
-                  {getCredentialTypeDef(credential.type).label}
-                </span>
+                {credential.name} <span className="entity-type-tag">{getCredentialTypeDef(credential.type).label}</span>
               </span>
               <div className="entity-actions">
-                <button
-                  type="button"
-                  onClick={() => void openEditDialog(credential.id)}
-                >
+                <button type="button" onClick={() => void openEditDialog(credential.id)}>
                   {i18n.pages.credential_vault.edit}
                 </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    void handleDelete(credential.id, credential.name)
-                  }
-                >
+                <button type="button" onClick={() => void handleDelete(credential.id, credential.name)}>
                   {i18n.pages.credential_vault.delete}
                 </button>
               </div>

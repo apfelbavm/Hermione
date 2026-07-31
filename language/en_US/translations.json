@@ -288,6 +288,56 @@
         "pin_expires_in": "Expires In (s)"
       }
     },
+    "dropbox": {
+      "__shared": {
+        "pin_access_token": "Access Token",
+        "pin_path": "Path",
+        "pin_from_path": "From Path",
+        "pin_to_path": "To Path",
+        "pin_encoding": "Encoding",
+        "pin_autorename": "Autorename"
+      },
+      "authorize": {
+        "label": "Dropbox Authorize",
+        "description": "One-time setup step: reads a named Credential Vault entry's App Key/App Secret/Authorization Code and exchanges the code for a long-lived refresh token to save back into the vault. Not part of the normal per-run auth flow — see Dropbox Auth.",
+        "pin_credential_name": "Credential Name",
+        "pin_refresh_token": "Refresh Token",
+        "pin_expires_in": "Expires In (s)"
+      },
+      "auth": {
+        "label": "Dropbox Auth",
+        "description": "Exchanges a named Credential Vault entry's Dropbox app key/secret and refresh token for a fresh short-lived access token.",
+        "pin_credential_name": "Credential Name",
+        "pin_expires_in": "Expires In (s)"
+      },
+      "upload": {
+        "label": "Dropbox Upload",
+        "description": "Uploads content to a path in Dropbox.",
+        "pin_content": "Content",
+        "pin_mode": "Mode"
+      },
+      "download": {
+        "label": "Dropbox Download",
+        "description": "Downloads the content of a file at a path in Dropbox.",
+        "pin_content": "Content"
+      },
+      "move": {
+        "label": "Dropbox Move",
+        "description": "Moves a file or folder from one Dropbox path to another."
+      },
+      "copy": {
+        "label": "Dropbox Copy",
+        "description": "Copies a file or folder from one Dropbox path to another."
+      },
+      "rename": {
+        "label": "Dropbox Rename",
+        "description": "Renames a file or folder by moving it to a new path within Dropbox."
+      },
+      "delete": {
+        "label": "Dropbox Delete",
+        "description": "Deletes a file or folder at a path in Dropbox."
+      }
+    },
     "boolean": {
       "not": {
         "label": "Not",
