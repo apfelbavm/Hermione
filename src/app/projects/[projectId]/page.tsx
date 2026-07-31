@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { i18n } from "@i18n";
-import { createFlow, deleteFlow, getFlowWithGraph, getProject, listFlows, renameFlow, renameProject, saveFlowGraph, saveNewFlowVersion } from "../../../client/api";
+import { createFlow, deleteFlow, getFlowWithGraph, getProject, listFlows, renameFlow, saveFlowGraph, saveNewFlowVersion } from "../../../client/api";
 import type { FlowSummary, ProjectSummary } from "../../../server/models";
 import { PageShell } from "../../../components/PageHeader";
 import { Breadcrumbs } from "../../../components/Breadcrumbs";
@@ -141,7 +141,6 @@ export default function ProjectPage() {
   const debouncedSearchTerm = useDebounce(searchTerm, 150);
   const [showCreateFlowDialog, setShowCreateFlowDialog] = useState(false);
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
-  const [editingProjectName, setEditingProjectName] = useState(false);
   const [duplicatingFlow, setDuplicatingFlow] = useState<FlowSummary | null>(null);
   const visibleFlows = flows.filter((flow) => flow.name.toLowerCase().includes(debouncedSearchTerm.trim().toLowerCase()));
 
@@ -191,13 +190,6 @@ export default function ProjectPage() {
     await refresh();
   }
 
-  async function commitProjectRename(rawName: string): Promise<void> {
-    const name = rawName.trim();
-    if (name) await renameProject(projectId, name);
-    setEditingProjectName(false);
-    await refresh();
-  }
-
   if (!project) {
     return (
       <PageShell>
@@ -210,24 +202,7 @@ export default function ProjectPage() {
   return (
     <PageShell>
       <Breadcrumbs items={[{ label: i18n.pages.projects.title, href: "/projects" }, { label: project.name }]} />
-      {editingProjectName ? (
-        <input
-          type="text"
-          className="entity-rename-input page-title-input"
-          defaultValue={project.name}
-          autoFocus
-          onBlur={(e) => void commitProjectRename(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
-            if (e.key === "Escape") setEditingProjectName(false);
-          }}
-        />
-      ) : (
-        <h1 className="page-title-editable" title={i18n.pages.project.title_rename_hint} onClick={() => setEditingProjectName(true)}>
-          {i18n.pages.project.title_prefix}
-          {project.name}
-        </h1>
-      )}
+      <h1>"{project.name}" Flows</h1>
 
       <Link href={`/projects/${projectId}/logs`} className="logs-link">
         {i18n.pages.project.view_logs}

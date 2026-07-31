@@ -42,8 +42,6 @@
     },
     "project": {
       "not_found": "Project not found",
-      "title_prefix": "Project: ",
-      "title_rename_hint": "Click to rename",
       "view_logs": "View Logs",
       "flows_heading": "Flows",
       "search_flows_placeholder": "Search Flows…",

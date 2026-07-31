@@ -1619,19 +1619,6 @@ body.resizing {
   margin: 0;
 }
 
-.page-title-editable {
-  cursor: pointer;
-}
-
-.page-title-editable:hover {
-  text-decoration: underline dotted;
-}
-
-.page-title-input {
-  font-size: 22px;
-  font-weight: 600;
-}
-
 .back-link {
   display: inline-flex;
   align-items: center;
