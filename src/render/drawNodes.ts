@@ -30,6 +30,7 @@ export function drawNodes(
   functions: FunctionDef[],
   scripts: CodeScriptDef[] = [],
   latentNodeIds: ReadonlySet<string> = new Set(),
+  simulating: boolean = false,
 ): void {
   // Text scales with zoom too — a camera zooming over world-space content, same as everything else.
   ctx.font = `${13 * camera.zoom}px Segoe UI, sans-serif`;
@@ -40,14 +41,16 @@ export function drawNodes(
     const geo = geometries.get(node.id);
     if (!geo) continue;
 
-    // Dimmed rather than hidden — its wires stay visible too (drawWires.ts doesn't check this),
-    // so it's clear at a glance both that it's disabled and what it would otherwise still connect to.
-    ctx.globalAlpha = node.disabled ? 0.45 : 1;
-
     // The plain resting-state border is gone entirely (shadow + top-left highlight carry the
     // node's edge on their own now) — but selection/execution feedback is functional, not just
     // decorative chrome, so THAT still draws a ring, only for the two states that need one.
     const isExecuting = executingNodeId === node.id;
+
+    // Dimmed rather than hidden — its wires stay visible too (drawWires.ts doesn't check this), so
+    // it's clear at a glance both that it's disabled/backgrounded and what it would otherwise still
+    // connect to. While a Simulate run is in progress, every node but the one currently executing
+    // dims to 75% opacity, so the active node reads as the obvious focal point.
+    ctx.globalAlpha = node.disabled ? 0.45 : simulating && !isExecuting ? 0.75 : 1;
     const isSelected = selectedNodeIds.has(node.id);
     const showStateBorder = isExecuting || isSelected;
     const borderWidth = isExecuting ? 2.5 : 2;

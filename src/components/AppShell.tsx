@@ -195,7 +195,7 @@ export default function AppShell() {
       drawWires(ctx, graph, camera, geometries, firedConnectionIds, variables, functions, scripts);
       if (wireDrag) drawWireDragPreview(ctx, wireDrag);
       const latentNodeIds = new Set(graph.nodes.filter((n) => isNodeLatent(n, graph, store.state.rootGraph)).map((n) => n.id));
-      drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, variables, functions, scripts, latentNodeIds);
+      drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, variables, functions, scripts, latentNodeIds, store.state.simulating);
       if (marqueeSelection) drawMarqueeSelection(ctx, camera, marqueeSelection);
       if (store.state.simulating) drawSimulatingLabel(ctx, width, height);
       else drawMouseCoordinates(ctx, camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y), width, height);
