@@ -10,6 +10,7 @@ import { Graph } from "../engine/graph";
 import { nextId } from "../engine/graphMutations";
 import { serializeGraph } from "../persistence/save";
 import dropboxTemplateImage from "../../images/templates/dropbox.webp";
+import emptyTemplateImage from "../../images/templates/empty.webp";
 
 registerBuiltins();
 
@@ -25,6 +26,7 @@ const FLOW_TEMPLATES: FlowTemplate[] = [
     id: "blank",
     name: i18n.pages.project.template_blank,
     buildGraph: () => new Graph(nextId("flow-graph"), ""),
+    image: emptyTemplateImage,
   },
   {
     id: "demo",

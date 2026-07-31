@@ -2192,6 +2192,7 @@ body.resizing {
   max-width: 100%;
   border: 1px solid var(--pp-border-strong);
   border-radius: 6px;
+  border-bottom: 5px solid #c542a0;
   background: var(--pp-bg);
   display: flex;
   align-items: center;

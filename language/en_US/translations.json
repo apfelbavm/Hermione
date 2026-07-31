@@ -51,7 +51,7 @@
       "create_flow_title": "Create Flow",
       "create_flow_name_required": "Name is required",
       "create_flow_creating": "Creating…",
-      "template_blank": "Blank",
+      "template_blank": "Empty",
       "template_demo": "Demo",
       "template_dropbox": "Dropbox",
       "flows_empty": "No Flows yet — create one above.",
