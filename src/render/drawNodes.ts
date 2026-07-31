@@ -71,16 +71,24 @@ export function drawNodes(
     } else {
       drawNodeShadow(ctx, geo.screenX, geo.screenY, geo.width, geo.height, 6 * camera.zoom, camera.zoom);
 
+      // A headerOnly node (see NodeDef.headerOnly, e.g. Get Variable) has no body below the header
+      // at all — geo.height already equals the header's own height for one — so its header gets
+      // fully rounded corners like the rest of the node would, instead of just the top two.
       const headerHeight = NODE_HEADER_HEIGHT * camera.zoom;
+      const headerCorners = def.headerOnly ? 6 * camera.zoom : [6 * camera.zoom, 6 * camera.zoom, 0, 0];
       ctx.beginPath();
-      ctx.roundRect(geo.screenX, geo.screenY, geo.width, headerHeight, [6 * camera.zoom, 6 * camera.zoom, 0, 0]);
+      ctx.roundRect(geo.screenX, geo.screenY, geo.width, headerHeight, headerCorners);
       ctx.fillStyle = resolveNodeHeaderColor(node, def, variables);
       ctx.fill();
       // A left-to-right black falloff over the header's own color — same path, no beginPath()
       // needed (fill() doesn't clear it) — reads as a subtle depth/sheen rather than a flat block.
+      // Never fades all the way to fully clear, unlike a plain sheen would: an output pin sits right
+      // at the header's own right edge (see layout.ts's headerOnly pin positioning), often the same
+      // color as a node bound to a Variable's own header (see resolveNodeHeaderColor) — a lingering
+      // bit of darkening there keeps the pin visible against its own header instead of blending in.
       const headerShade = ctx.createLinearGradient(geo.screenX, 0, geo.screenX + geo.width, 0);
       headerShade.addColorStop(0, "rgba(0, 0, 0, 0.75)");
-      headerShade.addColorStop(1, "rgba(0, 0, 0, 0)");
+      headerShade.addColorStop(1, "rgba(0, 0, 0, 0.35)");
       ctx.fillStyle = headerShade;
       ctx.fill();
 

@@ -187,6 +187,14 @@ export interface NodeDef {
    * box (see layout.ts's computeNodeLayout and drawNodes.ts). Currently only core.reroute/
    * core.rerouteExec (see reroute.ts) use this. */
   compact?: boolean;
+  /** Shrinks the node's whole body down to just its header/title bar — no separate pin-row area
+   * below it — with its pin(s) drawn vertically centered within that header instead of below it
+   * (see layout.ts's computeNodeLayout and drawNodes.ts). Unlike `compact` (reroute's borderless
+   * "knot" look), the header/title bar, its gradient, and the node's border/selection ring are all
+   * still drawn normally — just at the header's own height. Meant for a node whose title already
+   * says everything there is to say about its one pin (currently only variable.get — see
+   * nodes/variable.ts), so the pin-row space below the title would otherwise sit empty. */
+  headerOnly?: boolean;
 }
 
 export interface Pin {

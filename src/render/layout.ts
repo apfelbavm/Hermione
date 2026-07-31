@@ -80,7 +80,7 @@ export function pinWidgetWidth(pin: PinDef): number {
   return 90;
 }
 
-export function computeNodeLayout(label: string, pinDefs: PinDef[], options?: { showAddButton?: boolean; compact?: boolean }): NodeLayout {
+export function computeNodeLayout(label: string, pinDefs: PinDef[], options?: { showAddButton?: boolean; compact?: boolean; headerOnly?: boolean }): NodeLayout {
   if (options?.compact) {
     const size = COMPACT_NODE_SIZE;
     const pins: PinLayout[] = pinDefs.map((pin) => ({
@@ -96,7 +96,8 @@ export function computeNodeLayout(label: string, pinDefs: PinDef[], options?: { 
   const showAddButton = options?.showAddButton ?? false;
   const inputRows = inputs.length + (showAddButton ? 1 : 0);
   const rows = Math.max(inputRows, outputs.length, 1);
-  const height = NODE_HEADER_HEIGHT + rows * PIN_ROW_HEIGHT + 10;
+  const headerOnly = options?.headerOnly ?? false;
+  const height = headerOnly ? NODE_HEADER_HEIGHT : NODE_HEADER_HEIGHT + rows * PIN_ROW_HEIGHT + 10;
 
   const outputLabelMaxWidth = outputs.reduce((max, p) => Math.max(max, textWidth(p.label)), 0);
   const rightReserve = outputs.length > 0 ? PIN_LABEL_GAP + outputLabelMaxWidth + WIDGET_OUTPUT_GAP : PIN_MARGIN;
@@ -118,11 +119,11 @@ export function computeNodeLayout(label: string, pinDefs: PinDef[], options?: { 
     pins.push({
       pin,
       x: PIN_INSET_X,
-      y: NODE_HEADER_HEIGHT + i * PIN_ROW_HEIGHT + PIN_ROW_HEIGHT / 2,
+      y: headerOnly ? NODE_HEADER_HEIGHT / 2 : NODE_HEADER_HEIGHT + i * PIN_ROW_HEIGHT + PIN_ROW_HEIGHT / 2,
     });
   });
   outputs.forEach((pin, i) => {
-    pins.push({ pin, x: width - PIN_INSET_X, y: NODE_HEADER_HEIGHT + i * PIN_ROW_HEIGHT + PIN_ROW_HEIGHT / 2 });
+    pins.push({ pin, x: width - PIN_INSET_X, y: headerOnly ? NODE_HEADER_HEIGHT / 2 : NODE_HEADER_HEIGHT + i * PIN_ROW_HEIGHT + PIN_ROW_HEIGHT / 2 });
   });
 
   const addButton: NodeAddButtonLayout | undefined = showAddButton

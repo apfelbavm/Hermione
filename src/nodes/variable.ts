@@ -26,6 +26,9 @@ registerNode({
   description: "Reads the bound variable's current value.",
   group: "Variables",
   pins: [], // real pins are derived per-instance from the bound Variable via derivePins
+  // Just its one unlabeled output pin — no separate pin-row space needed below the title, which
+  // already names the variable (see headerOnly's own doc comment).
+  headerOnly: true,
   // Unlabeled — the node's own title already shows the variable's name (see resolveNodeLabel).
   // container/keyType are forwarded too so a container variable's Get pin wires exactly like the
   // variable itself (see isPinTypeCompatible) — the value flows through untouched either way, since
