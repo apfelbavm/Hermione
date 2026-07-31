@@ -310,7 +310,8 @@
         "pin_from_path": "From Path",
         "pin_to_path": "To Path",
         "pin_encoding": "Encoding",
-        "pin_autorename": "Autorename"
+        "pin_autorename": "Autorename",
+        "pin_link": "Link"
       },
       "authorize": {
         "label": "Dropbox Authorize",
@@ -357,6 +358,93 @@
       "delete": {
         "label": "Dropbox Delete",
         "description": "Deletes a file or folder at a path in Dropbox."
+      },
+      "createFolder": {
+        "label": "Dropbox Create Folder",
+        "description": "Creates a new folder at a path in Dropbox."
+      },
+      "getMetadata": {
+        "label": "Dropbox Get Metadata",
+        "description": "Fetches metadata (size, content hash, last modified) for a file or folder at a path in Dropbox, without downloading its content.",
+        "pin_is_folder": "Is Folder",
+        "pin_size": "Size (bytes)",
+        "pin_content_hash": "Content Hash",
+        "pin_server_modified": "Server Modified"
+      },
+      "search": {
+        "label": "Dropbox Search",
+        "description": "Searches file and folder names/content across Dropbox (or under a given path) for a query.",
+        "pin_query": "Query",
+        "pin_max_results": "Max Results",
+        "pin_paths": "Paths"
+      },
+      "listRevisions": {
+        "label": "Dropbox List Revisions",
+        "description": "Lists the historical revisions of a file at a path in Dropbox.",
+        "pin_limit": "Limit",
+        "pin_revisions": "Revisions"
+      },
+      "restore": {
+        "label": "Dropbox Restore",
+        "description": "Restores a file at a path in Dropbox to a previous revision.",
+        "pin_rev": "Revision"
+      },
+      "permanentlyDelete": {
+        "label": "Dropbox Permanently Delete",
+        "description": "Permanently deletes a file or folder at a path in Dropbox, bypassing the trash."
+      },
+      "getTemporaryLink": {
+        "label": "Dropbox Get Temporary Link",
+        "description": "Gets a temporary direct-download link for a file at a path in Dropbox."
+      },
+      "getTemporaryUploadLink": {
+        "label": "Dropbox Get Temporary Upload Link",
+        "description": "Gets a temporary link that can be used to upload directly to a path in Dropbox without proxying the bytes through this server.",
+        "pin_duration_seconds": "Duration (s)"
+      },
+      "moveBatch": {
+        "label": "Dropbox Move Batch",
+        "description": "Moves multiple files or folders from one Dropbox path to another in a single batch."
+      },
+      "copyBatch": {
+        "label": "Dropbox Copy Batch",
+        "description": "Copies multiple files or folders from one Dropbox path to another in a single batch."
+      },
+      "deleteBatch": {
+        "label": "Dropbox Delete Batch",
+        "description": "Deletes multiple files or folders at once in Dropbox."
+      },
+      "createSharedLink": {
+        "label": "Dropbox Create Shared Link",
+        "description": "Creates a public shared link for a file or folder at a path in Dropbox."
+      },
+      "listSharedLinks": {
+        "label": "Dropbox List Shared Links",
+        "description": "Lists the shared links for a path (or the whole account, if empty) in Dropbox.",
+        "pin_urls": "URLs"
+      },
+      "shareFolder": {
+        "label": "Dropbox Share Folder",
+        "description": "Converts a folder at a path in Dropbox into a shared folder.",
+        "pin_shared_folder_id": "Shared Folder ID"
+      },
+      "addFolderMember": {
+        "label": "Dropbox Add Folder Member",
+        "description": "Invites a member by email to an existing shared folder in Dropbox.",
+        "pin_email": "Email",
+        "pin_access_level": "Access Level"
+      },
+      "getCurrentAccount": {
+        "label": "Dropbox Get Current Account",
+        "description": "Fetches the account ID, name and email of the Dropbox account an access token belongs to.",
+        "pin_account_id": "Account ID",
+        "pin_name": "Name"
+      },
+      "getSpaceUsage": {
+        "label": "Dropbox Get Space Usage",
+        "description": "Fetches the used and allocated storage space (bytes) for a Dropbox account.",
+        "pin_used": "Used (bytes)",
+        "pin_allocated": "Allocated (bytes)"
       }
     },
     "boolean": {

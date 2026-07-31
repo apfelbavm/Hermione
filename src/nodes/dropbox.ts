@@ -4,6 +4,8 @@ import { DropboxManager } from "../lib/dropboxManager";
 import type { DropboxOAuth2CredentialData } from "../credentials/types";
 import { i18n } from "@i18n";
 
+const ACCESS_LEVEL_OPTIONS = ["editor", "viewer"];
+
 // Every operation below is a thin pin-wiring shim over DropboxManager (src/lib/dropboxManager.ts),
 // which owns the actual SDK calls and error normalization — this file only ever translates pins to
 // method arguments and method results back to pins. Interpreter-only for now (no compileExecute/
@@ -467,6 +469,858 @@ registerNode({
   execute: async ({ inputs }) => {
     const manager = new DropboxManager(String(inputs.accessToken ?? ""));
     const result = await manager.delete(String(inputs.path ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.createFolder",
+  label: i18n.nodes.dropbox.createFolder.label,
+  description: i18n.nodes.dropbox.createFolder.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "path",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "autorename",
+      label: i18n.nodes.dropbox.__shared.pin_autorename,
+      type: "boolean",
+      direction: "input",
+      defaultValue: false,
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.createFolder(String(inputs.path ?? ""), Boolean(inputs.autorename));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.getMetadata",
+  label: i18n.nodes.dropbox.getMetadata.label,
+  description: i18n.nodes.dropbox.getMetadata.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "path",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "isFolder",
+      label: i18n.nodes.dropbox.getMetadata.pin_is_folder,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "size",
+      label: i18n.nodes.dropbox.getMetadata.pin_size,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "contentHash",
+      label: i18n.nodes.dropbox.getMetadata.pin_content_hash,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "serverModified",
+      label: i18n.nodes.dropbox.getMetadata.pin_server_modified,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.getMetadata(String(inputs.path ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.search",
+  label: i18n.nodes.dropbox.search.label,
+  description: i18n.nodes.dropbox.search.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "query",
+      label: i18n.nodes.dropbox.search.pin_query,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "path",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "maxResults",
+      label: i18n.nodes.dropbox.search.pin_max_results,
+      type: "number",
+      direction: "input",
+      defaultValue: 100,
+      integer: true,
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "paths",
+      label: i18n.nodes.dropbox.search.pin_paths,
+      type: "string",
+      container: "array",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.search(String(inputs.query ?? ""), String(inputs.path ?? ""), Number(inputs.maxResults ?? 100));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.listRevisions",
+  label: i18n.nodes.dropbox.listRevisions.label,
+  description: i18n.nodes.dropbox.listRevisions.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "path",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "limit",
+      label: i18n.nodes.dropbox.listRevisions.pin_limit,
+      type: "number",
+      direction: "input",
+      defaultValue: 10,
+      integer: true,
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "revisions",
+      label: i18n.nodes.dropbox.listRevisions.pin_revisions,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.listRevisions(String(inputs.path ?? ""), Number(inputs.limit ?? 10));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.restore",
+  label: i18n.nodes.dropbox.restore.label,
+  description: i18n.nodes.dropbox.restore.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "path",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "rev",
+      label: i18n.nodes.dropbox.restore.pin_rev,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.restore(String(inputs.path ?? ""), String(inputs.rev ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.permanentlyDelete",
+  label: i18n.nodes.dropbox.permanentlyDelete.label,
+  description: i18n.nodes.dropbox.permanentlyDelete.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "path",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.permanentlyDelete(String(inputs.path ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.getTemporaryLink",
+  label: i18n.nodes.dropbox.getTemporaryLink.label,
+  description: i18n.nodes.dropbox.getTemporaryLink.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "path",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "link",
+      label: i18n.nodes.dropbox.__shared.pin_link,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.getTemporaryLink(String(inputs.path ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.getTemporaryUploadLink",
+  label: i18n.nodes.dropbox.getTemporaryUploadLink.label,
+  description: i18n.nodes.dropbox.getTemporaryUploadLink.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "path",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "durationSeconds",
+      label: i18n.nodes.dropbox.getTemporaryUploadLink.pin_duration_seconds,
+      type: "number",
+      direction: "input",
+      defaultValue: 14400,
+      integer: true,
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "link",
+      label: i18n.nodes.dropbox.__shared.pin_link,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.getTemporaryUploadLink(String(inputs.path ?? ""), Number(inputs.durationSeconds ?? 14400));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+function registerRelocationBatchNode(type: "moveBatch" | "copyBatch") {
+  registerNode({
+    type: `dropbox.${type}`,
+    label: i18n.nodes.dropbox[type].label,
+    description: i18n.nodes.dropbox[type].description,
+    group: GROUP_NAME,
+    colorCategory: NodeColorCategory.Integration,
+    pins: [
+      { id: "exec-in", label: "", type: "exec", direction: "input" },
+      accessTokenPin(),
+      {
+        id: "fromPaths",
+        label: i18n.nodes.dropbox.__shared.pin_from_path,
+        type: "string",
+        container: "array",
+        direction: "input",
+      },
+      {
+        id: "toPaths",
+        label: i18n.nodes.dropbox.__shared.pin_to_path,
+        type: "string",
+        container: "array",
+        direction: "input",
+      },
+      {
+        id: "autorename",
+        label: i18n.nodes.dropbox.__shared.pin_autorename,
+        type: "boolean",
+        direction: "input",
+        defaultValue: false,
+      },
+      {
+        id: "exec-out",
+        label: i18n.nodes.__shared.pin_completed,
+        type: "exec",
+        direction: "output",
+      },
+      {
+        id: "success",
+        label: i18n.nodes.__shared.pin_success,
+        type: "boolean",
+        direction: "output",
+      },
+      {
+        id: "error",
+        label: i18n.nodes.__shared.pin_error,
+        type: "string",
+        direction: "output",
+      },
+    ],
+    latent: true,
+    execute: async ({ inputs }) => {
+      const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+      const result = await manager[type]((inputs.fromPaths as string[]) ?? [], (inputs.toPaths as string[]) ?? [], Boolean(inputs.autorename));
+      return { nextExec: "exec-out", outputs: result };
+    },
+  });
+}
+
+registerRelocationBatchNode("moveBatch");
+registerRelocationBatchNode("copyBatch");
+
+registerNode({
+  type: "dropbox.deleteBatch",
+  label: i18n.nodes.dropbox.deleteBatch.label,
+  description: i18n.nodes.dropbox.deleteBatch.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "paths",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      container: "array",
+      direction: "input",
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.deleteBatch((inputs.paths as string[]) ?? []);
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.createSharedLink",
+  label: i18n.nodes.dropbox.createSharedLink.label,
+  description: i18n.nodes.dropbox.createSharedLink.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "path",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "link",
+      label: i18n.nodes.dropbox.__shared.pin_link,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.createSharedLink(String(inputs.path ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.listSharedLinks",
+  label: i18n.nodes.dropbox.listSharedLinks.label,
+  description: i18n.nodes.dropbox.listSharedLinks.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "path",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "urls",
+      label: i18n.nodes.dropbox.listSharedLinks.pin_urls,
+      type: "string",
+      container: "array",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.listSharedLinks(String(inputs.path ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.shareFolder",
+  label: i18n.nodes.dropbox.shareFolder.label,
+  description: i18n.nodes.dropbox.shareFolder.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "path",
+      label: i18n.nodes.dropbox.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "sharedFolderId",
+      label: i18n.nodes.dropbox.shareFolder.pin_shared_folder_id,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.shareFolder(String(inputs.path ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.addFolderMember",
+  label: i18n.nodes.dropbox.addFolderMember.label,
+  description: i18n.nodes.dropbox.addFolderMember.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "sharedFolderId",
+      label: i18n.nodes.dropbox.shareFolder.pin_shared_folder_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "email",
+      label: i18n.nodes.dropbox.addFolderMember.pin_email,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "accessLevel",
+      label: i18n.nodes.dropbox.addFolderMember.pin_access_level,
+      type: "string",
+      direction: "input",
+      defaultValue: ACCESS_LEVEL_OPTIONS[0],
+      options: ACCESS_LEVEL_OPTIONS,
+    },
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.addFolderMember(String(inputs.sharedFolderId ?? ""), String(inputs.email ?? ""), String(inputs.accessLevel ?? ACCESS_LEVEL_OPTIONS[0]));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.getCurrentAccount",
+  label: i18n.nodes.dropbox.getCurrentAccount.label,
+  description: i18n.nodes.dropbox.getCurrentAccount.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "accountId",
+      label: i18n.nodes.dropbox.getCurrentAccount.pin_account_id,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "name",
+      label: i18n.nodes.dropbox.getCurrentAccount.pin_name,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "email",
+      label: i18n.nodes.dropbox.addFolderMember.pin_email,
+      type: "string",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.getCurrentAccount();
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "dropbox.getSpaceUsage",
+  label: i18n.nodes.dropbox.getSpaceUsage.label,
+  description: i18n.nodes.dropbox.getSpaceUsage.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    accessTokenPin(),
+    {
+      id: "exec-out",
+      label: i18n.nodes.__shared.pin_completed,
+      type: "exec",
+      direction: "output",
+    },
+    {
+      id: "success",
+      label: i18n.nodes.__shared.pin_success,
+      type: "boolean",
+      direction: "output",
+    },
+    {
+      id: "used",
+      label: i18n.nodes.dropbox.getSpaceUsage.pin_used,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "allocated",
+      label: i18n.nodes.dropbox.getSpaceUsage.pin_allocated,
+      type: "number",
+      direction: "output",
+    },
+    {
+      id: "error",
+      label: i18n.nodes.__shared.pin_error,
+      type: "string",
+      direction: "output",
+    },
+  ],
+  latent: true,
+  execute: async ({ inputs }) => {
+    const manager = new DropboxManager(String(inputs.accessToken ?? ""));
+    const result = await manager.getSpaceUsage();
     return { nextExec: "exec-out", outputs: result };
   },
 });
