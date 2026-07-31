@@ -85,6 +85,14 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* Explicit, hardcoded — never a --pp-* theme variable. The Flow editor stays fixed dark
+     regardless of the light/dark toggle (see style.css's --pp-* section for the plain pages that
+     DO follow it); previously this relied on inheriting the same hardcoded colors from html/body,
+     which quietly broke once those became theme-variable — any editor element without its own
+     explicit color fell through to whatever theme was active instead of staying dark. Restating
+     the color here re-anchors inheritance for the whole editor subtree. */
+  background: #1e2126;
+  color: #e8e8e8;
 }
 
 /* Three-column grid (not flex) so #toolbar-center lands exactly in the bar's horizontal center
