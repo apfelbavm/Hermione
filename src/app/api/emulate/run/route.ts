@@ -71,7 +71,7 @@ export async function POST(request: Request): Promise<Response> {
       const compiled = (await import(/* webpackIgnore: true */ url)) as Record<string, unknown>;
 
       const rt = {
-        state: (compiled.createInitialState as () => Record<string, unknown>)(),
+        state: (compiled.eventInitialize as () => Record<string, unknown>)(),
         // Unlike the interpreter's ExecutionContext.log(message, format), compiled output's rt.log
         // only ever takes one already-formatted string (see debug.ts's compileExecute, which bakes
         // formatForLog's output into the call site) — so every entry here is plain "text".

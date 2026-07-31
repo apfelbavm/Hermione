@@ -74,11 +74,11 @@ describe("compileGraph — compileImports", () => {
     expect(code).toContain('from "fast-xml-parser"');
 
     const compiled = await loadCompiledWithRealImports(code);
-    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
     const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const logs: string[] = [];
-    await trigger({ state: createInitialState(), log: (m: string) => logs.push(m) });
+    await trigger({ state: eventInitialize(), log: (m: string) => logs.push(m) });
 
     expect(logs).toHaveLength(1);
     expect(logs[0]).toBe('<user id="1">Alice</user>');

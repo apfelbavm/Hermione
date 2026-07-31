@@ -125,12 +125,12 @@ describe("compileGraph", () => {
     expect(manifest.triggers[0].kind).toBe("manual");
 
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
     const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const compiledLogs: string[] = [];
     await trigger({
-      state: createInitialState(),
+      state: eventInitialize(),
       log: (m: string) => compiledLogs.push(m),
     });
 
@@ -202,12 +202,12 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
     const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const logs: string[] = [];
     await trigger({
-      state: createInitialState(),
+      state: eventInitialize(),
       log: (m: string) => logs.push(m),
     });
 
@@ -262,11 +262,11 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
     const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     for (const condValue of [true, false]) {
-      const state = createInitialState() as Record<string, unknown>;
+      const state = eventInitialize() as Record<string, unknown>;
       state["cond"] = condValue;
       const logs: string[] = [];
       await trigger({ state, log: (m: string) => logs.push(m) });
@@ -397,12 +397,12 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
     const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const logs: string[] = [];
     await trigger({
-      state: createInitialState(),
+      state: eventInitialize(),
       log: (m: string) => logs.push(m),
     });
 
@@ -444,12 +444,12 @@ describe("compileGraph", () => {
     // only splices in the compiled chain for its disabledNextExec pin(s) (see codegen.ts).
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
     const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const logs: string[] = [];
     await trigger({
-      state: createInitialState(),
+      state: eventInitialize(),
       log: (m: string) => logs.push(m),
     });
 
@@ -510,12 +510,12 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
     const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const logs: string[] = [];
     await trigger({
-      state: createInitialState(),
+      state: eventInitialize(),
       log: (m: string) => logs.push(m),
     });
 
@@ -561,12 +561,12 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
     const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
     const logs: string[] = [];
     await trigger({
-      state: createInitialState(),
+      state: eventInitialize(),
       log: (m: string) => logs.push(m),
     });
 
@@ -633,12 +633,12 @@ describe("compileGraph", () => {
     async function runCompiledSaml(graph: Graph): Promise<string[]> {
       const { code, manifest } = compileGraph(graph);
       const compiled = await loadCompiled(code);
-      const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+      const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
       const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
       const logs: string[] = [];
       await trigger({
-        state: createInitialState(),
+        state: eventInitialize(),
         log: (m: string) => logs.push(m),
       });
       return logs;
@@ -727,7 +727,7 @@ describe("compileGraph", () => {
 
       const { code, manifest } = compileGraph(graph);
       const compiled = await loadCompiled(code);
-      const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+      const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
       const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
       vi.stubGlobal(
@@ -737,7 +737,7 @@ describe("compileGraph", () => {
 
       const logs: string[] = [];
       await trigger({
-        state: createInitialState(),
+        state: eventInitialize(),
         log: (m: string) => logs.push(m),
       });
       expect(logs).toEqual(["hello from the API"]);
@@ -789,7 +789,7 @@ describe("compileGraph", () => {
 
       const { code, manifest } = compileGraph(graph);
       const compiled = await loadCompiled(code);
-      const createInitialState = compiled.createInitialState as () => Record<string, unknown>;
+      const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
       const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
       let capturedAuthHeader: string | null = null;
@@ -810,7 +810,7 @@ describe("compileGraph", () => {
 
       const logs: string[] = [];
       await trigger({
-        state: createInitialState(),
+        state: eventInitialize(),
         log: (m: string) => logs.push(m),
       });
 

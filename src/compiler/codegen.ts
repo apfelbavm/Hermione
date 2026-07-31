@@ -223,10 +223,10 @@ export function compileGraph(graph: Graph): CompileResult {
     "",
     ...[...helpers.values()],
     "",
-    // Callers build rt = { state: createInitialState(), log } themselves and pass the SAME
+    // Callers build rt = { state: eventInitialize(), log } themselves and pass the SAME
     // rt into every exported trigger function they invoke, so variable state persists across
     // firings — mirroring how the in-editor Run button shares one ExecutionContext across roots.
-    `export function createInitialState() {`,
+    `export function eventInitialize() {`,
     `  return {`,
     stateEntries,
     `  };`,
