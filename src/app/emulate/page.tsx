@@ -128,14 +128,14 @@ export default function EmulatePage() {
 
   return (
     <PageShell contentClassName="emulate-content">
-      <Breadcrumbs items={[{ label: "Emulate" }]} />
-      <h1>Emulate</h1>
+      <Breadcrumbs items={[{ label: i18n.pages.emulate.title }]} />
+      <h1>{i18n.pages.emulate.title}</h1>
       <p className="page-empty-note">{i18n.pages.emulate.empty_note}</p>
 
       {loadingProjects ? (
-        <p className="page-empty-note">Loading projects…</p>
+        <p className="page-empty-note">{i18n.pages.emulate.loading_project}</p>
       ) : projects.length === 0 ? (
-        <p className="page-empty-note">No projects yet.</p>
+        <p className="page-empty-note">{i18n.pages.emulate.no_projects}</p>
       ) : (
         <div className="create-row emulate-picker-row">
           <label className="emulate-picker-field">
@@ -150,12 +150,12 @@ export default function EmulatePage() {
           </label>
 
           {loadingScripts ? (
-            <span className="page-empty-note">Loading deployed Flows…</span>
+            <span className="page-empty-note">{i18n.pages.emulate.loading_deployed_flows}</span>
           ) : scripts.length === 0 ? (
-            <span className="page-empty-note">No Flows deployed in this project yet.</span>
+            <span className="page-empty-note">{i18n.pages.emulate.loading_deployed_script}</span>
           ) : (
             <label className="emulate-picker-field">
-              <span className="emulate-picker-label">Flow</span>
+              <span className="emulate-picker-label">{i18n.pages.emulate.flow}</span>
               <select value={selectedFlowId} onChange={(e) => setSelectedFlowId(e.target.value)} disabled={running}>
                 {scripts.map((script) => (
                   <option key={script.flowId} value={script.flowId}>
@@ -167,7 +167,7 @@ export default function EmulatePage() {
           )}
 
           <button type="button" onClick={() => void handleRun()} disabled={running || !selectedFlowId || loadingDetail}>
-            {running ? "Running…" : "Run"}
+            {running ? i18n.pages.emulate.running : i18n.pages.emulate.run}
           </button>
         </div>
       )}
@@ -176,7 +176,7 @@ export default function EmulatePage() {
         <div className="emulate-editor-frame">
           <div className="emulate-editor-meta">
             <span>{formatLogTimestamp(scriptDetail.deployedAt)}</span>
-            <span>Version: {scriptDetail.version}</span>
+            <span>{i18n.pages.emulate.version + scriptDetail.version}</span>
           </div>
           <Editor height="100%" language="typescript" path={scriptDetail.flowId} value={scriptDetail.code} theme={monacoTheme} options={{ readOnly: true, minimap: { enabled: false }, fontSize: 13, domReadOnly: true }} />
         </div>
@@ -186,9 +186,9 @@ export default function EmulatePage() {
 
       {result && (
         <p className="page-empty-note">
-          Ran — {result.entries.length} {result.entries.length === 1 ? "entry" : "entries"}.{" "}
+          {i18n.pages.emulate.ran} {result.entries.length} {result.entries.length === 1 ? i18n.pages.emulate.entry : i18n.pages.emulate.entries}.{" "}
           <Link href="/logs" className="logs-link">
-            View in Logs →
+            {i18n.pages.emulate.view_logs}
           </Link>
         </p>
       )}

@@ -6,7 +6,20 @@
     },
     "emulate": {
       "loading_editor": "Loading editor…",
-      "empty_note": "Runs a Flow's deployed compiled output directly on this machine — the same snapshot the editor's \"Deploy\" button last persisted — instead of the editor's interpreted Simulate."
+      "empty_note": "Runs a Flow's deployed compiled output directly on this machine — the same snapshot the editor's \"Deploy\" button last persisted — instead of the editor's interpreted Simulate.",
+      "loading_project": "Loading projects…",
+      "no_projects": "No projects yet.",
+      "loading_deployed_flows": "Loading deployed Flows…",
+      "loading_deployed_script": "No Flows deployed in this project yet.",
+      "flow": "Flow",
+      "running": "Running…",
+      "run": "Run",
+      "title": "Emulate",
+      "version": "Version: ",
+      "ran": "Ran —",
+      "entry": "entry",
+      "entries": "entries",
+      "view_logs": "View in Logs →"
     }
   }
 }
