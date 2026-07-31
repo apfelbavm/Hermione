@@ -20,7 +20,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
   const [editingId, setEditingId] = useState<string | null>(null);
   const script = getSelectedScript();
   if (!script) return null;
-  const disabled = store.state.simulating;
+  const disabled = store.state.simulating || store.state.readOnly;
 
   const entries = kind === "input" ? script.inputs : script.outputs;
   const update = kind === "input" ? updateScriptInput : updateScriptOutput;

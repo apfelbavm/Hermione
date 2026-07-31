@@ -38,7 +38,10 @@ export function VariablePanel({ id, title, store, getGraph }: { id?: string; tit
   useStoreRevision(store);
   const [editingId, setEditingId] = useState<string | null>(null);
   const graph = getGraph();
-  const disabled = store.state.simulating;
+  // Selecting a variable (click, for the Details panel) stays available in read-only mode — only
+  // renaming/adding/removing/reordering (mutations) are blocked by it.
+  const viewDisabled = store.state.simulating;
+  const disabled = store.state.simulating || store.state.readOnly;
 
   function commitRename(variable: Variable, rawNewName: string): void {
     const trimmed = rawNewName.trim();
@@ -107,8 +110,9 @@ export function VariablePanel({ id, title, store, getGraph }: { id?: string; tit
               <EditableNameLabel
                 name={variable.name}
                 title={variable.name}
-                disabled={disabled}
+                disabled={viewDisabled}
                 onContextMenu={(screenPos) => {
+                  if (disabled) return; // renaming is the only action here — nothing to offer
                   openRowContextMenu(screenPos, [
                     {
                       label: i18n.components.context_menu.rename,

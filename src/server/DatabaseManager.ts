@@ -4,7 +4,7 @@ import path from "node:path";
 import { nextId } from "../engine/graphMutations";
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
 import { MAX_RUNS_PER_PROJECT } from "../shared/runLogConstants";
-import type { DeployedScript, DeployedScriptSummary, FlowSummary, LogEntry, ProjectSummary, RunKind, RunLog } from "./models";
+import type { DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, LogEntry, ProjectSummary, RunKind, RunLog } from "./models";
 import type { TriggerDescriptor } from "../compiler/codegen";
 
 const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "hermione.db");
@@ -39,6 +39,15 @@ interface RunRow {
   entries_json: string;
   kind: string;
   execution_ms: number | null;
+}
+
+interface FlowVersionRow {
+  id: string;
+  flow_id: string;
+  version: number;
+  name: string;
+  graph_json: string | null;
+  created_at: string;
 }
 
 interface CredentialRow {
@@ -193,6 +202,20 @@ export class DatabaseManager {
     };
   }
 
+  private toFlowVersionSummary(row: FlowVersionRow): FlowVersionSummary {
+    return {
+      id: row.id,
+      flowId: row.flow_id,
+      version: row.version,
+      name: row.name,
+      createdAt: row.created_at,
+    };
+  }
+
+  private toFlowVersion(row: FlowVersionRow): FlowVersion {
+    return { ...this.toFlowVersionSummary(row), graphJson: row.graph_json };
+  }
+
   private toCredentialRecord(row: CredentialRow): CredentialRecord {
     return {
       ...this.toCredentialSummary(row),
@@ -324,6 +347,40 @@ export class DatabaseManager {
       return this.getFlow(pId, fId);
     });
     return save(projectId, flowId);
+  }
+
+  /** Every archived snapshot for this Flow, newest-version-first — always strictly older than the
+   * live `flows` row's own current version, since that live row (the newest version) is never
+   * itself a row in `flow_versions` (see saveNewFlowVersion's own comment). Feeds the "Restore old
+   * version" page's version-picker dropdown, which by design never offers the current version. */
+  listFlowVersions(flowId: string): FlowVersionSummary[] {
+    const rows = this.db.prepare<[string], FlowVersionRow>("SELECT * FROM flow_versions WHERE flow_id = ? ORDER BY version DESC").all(flowId);
+    return rows.map((row) => this.toFlowVersionSummary(row));
+  }
+
+  /** One archived snapshot's full content (graph included) — feeds the "Restore old version" page's
+   * read-only graph view once the user picks a version from the dropdown. */
+  getFlowVersion(flowId: string, versionId: string): FlowVersion | undefined {
+    const row = this.db.prepare<[string, string], FlowVersionRow>("SELECT * FROM flow_versions WHERE flow_id = ? AND id = ?").get(flowId, versionId);
+    return row ? this.toFlowVersion(row) : undefined;
+  }
+
+  /** "Restore old version" — archives the Flow's CURRENT state first (same as saveNewFlowVersion,
+   * so it's never lost), then makes the picked archived version's name/graph the new live state,
+   * bumping the version number same as any other save. Nothing under `flow_versions` is ever
+   * deleted or overwritten — restoring is just another forward step, not a rewind. */
+  restoreFlowVersion(projectId: string, flowId: string, versionId: string): FlowSummary | undefined {
+    const now = new Date().toISOString();
+    const restore = this.db.transaction((pId: string, fId: string, vId: string) => {
+      const current = this.db.prepare<[string, string], FlowRow>("SELECT * FROM flows WHERE project_id = ? AND id = ?").get(pId, fId);
+      const target = this.db.prepare<[string, string], FlowVersionRow>("SELECT * FROM flow_versions WHERE flow_id = ? AND id = ?").get(fId, vId);
+      if (!current || !target) return undefined;
+      this.db.prepare("INSERT INTO flow_versions (id, flow_id, version, name, graph_json, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(nextId("flow_version"), current.id, current.version, current.name, current.graph_json, now);
+      this.db.prepare("UPDATE flows SET name = ?, graph_json = ?, version = ?, updated_at = ? WHERE project_id = ? AND id = ?").run(target.name, target.graph_json, current.version + 1, now, pId, fId);
+      this.touchProject(pId, now);
+      return this.getFlow(pId, fId);
+    });
+    return restore(projectId, flowId, versionId);
   }
 
   /** A Flow's actual graph content, stored and returned as the same opaque serializeGraph/

@@ -8,7 +8,10 @@ import { useStoreRevision } from "../../state/useStore";
 export function GraphTabs({ store }: { store: Store }) {
   useStoreRevision(store);
   const [draggingFunctionId, setDraggingFunctionId] = useState<string | null>(null);
-  const disabled = store.state.simulating;
+  const disabled = store.state.simulating || store.state.readOnly;
+  // Closing a tab is just navigation (see closeFunctionTab, state/store.ts) — unlike reordering it
+  // stays available in read-only mode, so a read-only viewer can back out of a function's graph.
+  const closeDisabled = store.state.simulating;
 
   function reorder(fromId: string, toId: string): void {
     const tabs = store.state.openFunctionTabs;
@@ -69,7 +72,7 @@ export function GraphTabs({ store }: { store: Store }) {
               type="button"
               className="graph-tab-close"
               title={i18n.components.graph_tabs.close_tab}
-              disabled={disabled}
+              disabled={closeDisabled}
               onClick={(e) => {
                 e.stopPropagation();
                 closeFunctionTab(store.state, functionId);

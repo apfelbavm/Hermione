@@ -14,7 +14,7 @@ import { ImperativeMount } from "./ImperativeMount";
 import { ScriptIoPanel } from "./ScriptIoPanel";
 
 function VariableDetails({ store, variable }: { store: Store; variable: Variable }) {
-  const disabled = store.state.simulating;
+  const disabled = store.state.simulating || store.state.readOnly;
   return (
     <div className="details-content">
       <div className="details-item-name">{variable.name}</div>
@@ -85,7 +85,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
 function NodeDetails({ store, node, properties }: { store: Store; node: NodeInstance; properties: PinDef[] }) {
   const def = getNodeDef(node.type);
   const label = node.resolveNodeLabel(def, getVisibleVariablesForState(store.state), store.state.rootGraph.functions);
-  const disabled = store.state.simulating;
+  const disabled = store.state.simulating || store.state.readOnly;
 
   return (
     <div className="details-content">
@@ -174,7 +174,7 @@ function CommentDetails({ store, comment }: { store: Store; comment: CommentBox 
             type="color"
             className="comment-color-swatch"
             defaultValue={comment.color ?? DEFAULT_COMMENT_COLOR}
-            disabled={store.state.simulating}
+            disabled={store.state.simulating || store.state.readOnly}
             onInput={(e) => {
               comment.color = e.currentTarget.value;
               store.notify();
@@ -195,7 +195,7 @@ function FunctionDescription({ store, fn }: { store: Store; fn: FunctionDef }) {
         className="details-description-input"
         placeholder={i18n.components.details_panel.function_description_placeholder}
         defaultValue={fn.description ?? ""}
-        disabled={store.state.simulating}
+        disabled={store.state.simulating || store.state.readOnly}
         onInput={(e) => {
           fn.description = e.currentTarget.value;
           store.notify();

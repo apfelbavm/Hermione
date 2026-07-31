@@ -17,7 +17,10 @@ export function FunctionsPanel({ store }: { store: Store }) {
   useStoreRevision(store);
   const [editingId, setEditingId] = useState<string | null>(null);
   const functions = store.state.rootGraph.functions;
-  const disabled = store.state.simulating;
+  // Opening a function's tab (click) and closing it (GraphTabs.tsx) stay available in read-only
+  // mode — only renaming/adding/removing/reordering (mutations) are blocked by it.
+  const viewDisabled = store.state.simulating;
+  const disabled = store.state.simulating || store.state.readOnly;
 
   function commitRename(fn: FunctionDef, rawNewName: string): void {
     const trimmed = rawNewName.trim();
@@ -74,8 +77,9 @@ export function FunctionsPanel({ store }: { store: Store }) {
                 name={fn.name}
                 className="function-name"
                 hoverTooltip={() => fn.description || "Click to open this function's graph in a tab"}
-                disabled={disabled}
+                disabled={viewDisabled}
                 onContextMenu={(screenPos) => {
+                  if (disabled) return; // renaming is the only action here — nothing to offer
                   openRowContextMenu(screenPos, [
                     {
                       label: i18n.components.context_menu.rename,

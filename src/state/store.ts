@@ -57,6 +57,12 @@ export interface AppState {
    * canvas pointer/keyboard interaction) is disabled while this is true, so the graph can't be
    * edited out from under a run in progress. */
   simulating: boolean;
+  /** True for a graph opened purely for viewing a past Flow version (see the "Restore old version"
+   * page) — blocks every mutation the same way `simulating` does (dragging/wiring/deleting nodes,
+   * renaming/adding/removing Functions/Variables/Scripts, editing pin values, Monaco edits), while
+   * still allowing selection, navigation (opening a Function tab or a Script in Monaco), and
+   * panning/zooming, since the whole point of that page is to let the user LOOK at an old version. */
+  readOnly: boolean;
   /** True while a Simulate run is stopped at a breakpoint or the toolbar's Pause button — distinct
    * from simulating, which stays true the whole time (see AppShell.tsx's Pause/Continue buttons and
    * the "paused"/"resumed" SSE events from /api/simulate). Always false while !simulating. */

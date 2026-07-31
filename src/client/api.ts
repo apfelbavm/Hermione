@@ -1,5 +1,5 @@
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
-import type { DeployedScript, DeployedScriptSummary, FlowSummary, ProjectSummary, RunLog } from "../server/models";
+import type { DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, ProjectSummary, RunLog } from "../server/models";
 
 // Browser-side counterpart to src/server/DatabaseManager.ts — every function here is a thin
 // fetch() wrapper around the API routes under src/app/api/, since the database itself
@@ -91,6 +91,26 @@ export function saveFlowGraph(projectId: string, flowId: string, graphJson: stri
   return requestJson(`/api/projects/${projectId}/flows/${flowId}/graph`, {
     method: "PUT",
     body: graphJson,
+  });
+}
+
+/** Every archived version of `flowId`, newest-first, excluding the current live version (see
+ * DatabaseManager.listFlowVersions's own comment) — feeds the "Restore old version" page's dropdown. */
+export function listFlowVersions(projectId: string, flowId: string): Promise<FlowVersionSummary[]> {
+  return requestJson(`/api/projects/${projectId}/flows/${flowId}/versions`);
+}
+
+/** One archived version's full content (graph included) — feeds the "Restore old version" page's
+ * read-only graph view once the user picks a version from the dropdown. */
+export function getFlowVersion(projectId: string, flowId: string, versionId: string): Promise<FlowVersion> {
+  return requestJson(`/api/projects/${projectId}/flows/${flowId}/versions/${versionId}`);
+}
+
+/** Makes the picked archived version the Flow's new live state (see
+ * DatabaseManager.restoreFlowVersion's own comment). */
+export function restoreFlowVersion(projectId: string, flowId: string, versionId: string): Promise<FlowSummary> {
+  return requestJson(`/api/projects/${projectId}/flows/${flowId}/versions/${versionId}/restore`, {
+    method: "POST",
   });
 }
 

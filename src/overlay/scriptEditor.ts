@@ -109,6 +109,7 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
       minimap: { enabled: false },
       fontSize: 13,
       theme: monacoThemeFor(getCurrentTheme()),
+      readOnly: store.state.readOnly,
     });
     // Monaco has no notion of this app's own theme toggle, so it needs telling explicitly whenever
     // it changes (see client/theme.ts's own THEME_CHANGE_EVENT doc comment for why the canvas
@@ -156,7 +157,16 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
   });
 
   async function flushDirtyScripts(): Promise<void> {
-    const dirty = [...models.entries()].map(([id, model]) => ({ script: scriptById(id), model })).filter((entry): entry is { script: CodeScriptDef; model: import("monaco-editor").editor.ITextModel } => !!entry.script && entry.model.getValue() !== entry.script.source);
+    const dirty = [...models.entries()]
+      .map(([id, model]) => ({ script: scriptById(id), model }))
+      .filter(
+        (
+          entry,
+        ): entry is {
+          script: CodeScriptDef;
+          model: import("monaco-editor").editor.ITextModel;
+        } => !!entry.script && entry.model.getValue() !== entry.script.source,
+      );
     if (dirty.length === 0) return;
 
     await Promise.all(dirty.map(({ script, model }) => commitScriptSource(script, model.getValue())));
@@ -221,7 +231,8 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
     }
 
     renderTabs();
-    elements.saveButton.disabled = store.state.simulating;
+    elements.saveButton.disabled = store.state.simulating || store.state.readOnly;
+    elements.saveButton.style.display = store.state.readOnly ? "none" : "";
     elements.clearButton.disabled = store.state.simulating;
 
     const activeScriptId = store.state.activeLowerTabId;
@@ -241,7 +252,7 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
 
     elements.logPanel.style.display = "none";
     elements.monacoContainer.style.display = "";
-    elements.saveButton.style.display = "";
+    elements.saveButton.style.display = store.state.readOnly ? "none" : "";
     elements.saveStatus.style.display = "";
     elements.clearButton.style.display = "none";
 
@@ -265,7 +276,9 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
       showSaveStatus("", false);
     }
 
-    editor.updateOptions({ readOnly: store.state.simulating });
+    editor.updateOptions({
+      readOnly: store.state.simulating || store.state.readOnly,
+    });
   }
 
   return { render, flushDirtyScripts };

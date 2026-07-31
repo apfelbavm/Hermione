@@ -30,3 +30,16 @@ export function drawSimulatingLabel(ctx: CanvasRenderingContext2D, canvasWidth: 
   ctx.fillText("Simulate", canvasWidth - MARGIN, canvasHeight - MARGIN);
   ctx.restore();
 }
+
+/** Replaces the mouse-coordinates readout in the same bottom-right spot while the graph is open
+ * read-only (see AppState.readOnly) — same rationale as drawSimulatingLabel. */
+export function drawReadOnlyLabel(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number): void {
+  ctx.save();
+  ctx.globalAlpha = 0.15;
+  ctx.font = `bold ${FONT_SIZE}px Segoe UI, sans-serif`;
+  ctx.fillStyle = Colors.TEXT_PRIMARY;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "bottom";
+  ctx.fillText("Read Only", canvasWidth - MARGIN, canvasHeight - MARGIN);
+  ctx.restore();
+}

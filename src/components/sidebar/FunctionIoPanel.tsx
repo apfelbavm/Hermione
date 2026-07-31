@@ -20,7 +20,7 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
   const [editingId, setEditingId] = useState<string | null>(null);
   const fn = getActiveFunction();
   if (!fn) return null;
-  const disabled = store.state.simulating;
+  const disabled = store.state.simulating || store.state.readOnly;
 
   const entries = kind === "input" ? fn.inputs : fn.outputs;
   const update = kind === "input" ? updateFunctionInput : updateFunctionOutput;

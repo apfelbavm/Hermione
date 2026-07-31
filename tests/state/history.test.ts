@@ -22,6 +22,7 @@ function createFakeStore(rootGraph: Graph): Store {
     camera: {} as AppState["camera"],
     snapToGrid: true,
     simulating: false,
+    readOnly: false,
     paused: false,
     autoPan: true,
     selectedNodeIds: new Set(),

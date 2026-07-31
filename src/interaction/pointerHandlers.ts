@@ -340,6 +340,7 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
 
     const addButtonHit = hitTestNodeAddButton(graph, geometries, pos.x, pos.y);
     if (addButtonHit) {
+      if (store.state.readOnly) return;
       const node = graph.nodes.find((n) => n.id === addButtonHit.nodeId);
       const def = node && getNodeDef(node.type);
       if (node && def?.addInstancePinEntry) {
@@ -351,6 +352,7 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
 
     const pinHit = hitTestPin(graph, geometries, pos.x, pos.y);
     if (pinHit) {
+      if (store.state.readOnly) return; // no wire dragging in read-only mode
       const touching = connectionsTouchingPin(graph, pinHit.nodeId, pinHit.pinId);
 
       if ((e.ctrlKey || e.metaKey) && touching.length > 0) {
@@ -428,7 +430,10 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
       // mousedown's own unconditional reset above already cleared sidebarSelection; setting it
       // here afterward correctly wins in detailsPanel.ts's own precedence order.
       if (node.type === "code.run" && node.scriptId) {
-        store.state.sidebarSelection = { kind: "script", scriptId: node.scriptId };
+        store.state.sidebarSelection = {
+          kind: "script",
+          scriptId: node.scriptId,
+        };
       }
 
       if (e.ctrlKey || e.metaKey) {
@@ -453,6 +458,13 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
       // else: the clicked node is already part of an existing multi-selection — keep the whole
       // selection intact so the drag below moves the whole group, Unreal-style.
 
+      if (store.state.readOnly) {
+        // Selection above already applied; just skip starting an actual drag.
+        drag = { kind: "none" };
+        store.notify();
+        return;
+      }
+
       const initialPositions = new Map<string, { x: number; y: number }>();
       for (const id of store.state.selectedNodeIds) {
         const n = graph.nodes.find((gn) => gn.id === id);
@@ -465,7 +477,7 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
     }
 
     const resizeHit = hitTestCommentResizeHandle(graph, camera, pos.x, pos.y);
-    if (resizeHit) {
+    if (resizeHit && !store.state.readOnly) {
       const box = graph.commentBoxes.find((b) => b.id === resizeHit.commentId)!;
       // The FIXED opposite corner — e.g. grabbing "nw" anchors the box's bottom-right — captured
       // once here so the whole drag can derive the new rect from just this plus the live cursor
@@ -515,6 +527,13 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
       // else: the clicked box is already part of an existing multi-selection — keep the whole
       // selection intact so the drag below moves the whole group, Unreal-style.
 
+      if (store.state.readOnly) {
+        // Selection above already applied; just skip starting an actual drag.
+        drag = { kind: "none" };
+        store.notify();
+        return;
+      }
+
       // Every selected box (not just the one grabbed) moves together — same "whole group, one
       // motion" shape as the node drag above. Containment is recomputed fresh per box (picking up
       // anything moved into it since its last resize/move) before capturing drag-start positions.
@@ -528,7 +547,11 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
         for (const nodeId of box.containedNodeIds) {
           if (initialNodePositions.has(nodeId)) continue; // already captured via another selected box
           const node = graph.nodes.find((n) => n.id === nodeId);
-          if (node) initialNodePositions.set(nodeId, { x: node.position.x, y: node.position.y });
+          if (node)
+            initialNodePositions.set(nodeId, {
+              x: node.position.x,
+              y: node.position.y,
+            });
         }
       }
       drag = {
@@ -793,6 +816,7 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
     const graph = getEditingGraph(store.state);
 
     if (e.key === "Delete" || e.key === "Backspace") {
+      if (store.state.readOnly) return;
       const { selectedNodeIds, selectedCommentIds } = store.state;
       if (selectedNodeIds.size === 0 && selectedCommentIds.size === 0) return;
       const variables = getVisibleVariablesForState(store.state);
@@ -819,6 +843,7 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
     }
 
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      if (store.state.readOnly) return;
       e.preventDefault();
       if (e.shiftKey) history.redo();
       else history.undo();
@@ -854,6 +879,7 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
     }
 
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "x") {
+      if (store.state.readOnly) return;
       // Same log-panel-text-selection carve-out as Ctrl+C above — a Ctrl+X while the user's mid-way
       // through selecting log text for the browser's own native cut should leave that alone (moot in
       // practice for our own read-only log lines, but keeps the two shortcuts' guards consistent).
@@ -885,6 +911,7 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
     }
 
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
+      if (store.state.readOnly) return;
       e.preventDefault();
       navigator.clipboard
         .readText()
@@ -932,6 +959,7 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
     }
 
     if (e.key.toLowerCase() === "c" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (store.state.readOnly) return;
       const { camera, selectedNodeIds } = store.state;
       const variables = getVisibleVariablesForState(store.state);
       const functions = store.state.rootGraph.functions;

@@ -84,7 +84,11 @@
     },
     "restore_flow_version": {
       "title": "Restore old version",
-      "placeholder": "Restoring a previous version isn't available yet — coming soon.",
+      "loading": "Loading versions…",
+      "no_versions": "No older versions saved yet — use \"Save new version\" first.",
+      "version_option": "Version {version} — {date}",
+      "restore": "Restore",
+      "restoring": "Restoring…",
       "cancel": "Cancel"
     },
     "credential_vault": {

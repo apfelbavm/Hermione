@@ -21,6 +21,21 @@ export interface FlowSummary {
   updatedAt: string;
 }
 
+/** One archived row from `flow_versions` — every one of these is strictly older than the Flow's
+ * current live version (see DatabaseManager.saveNewFlowVersion/restoreFlowVersion). Feeds the
+ * "Restore old version" page's version-picker dropdown. */
+export interface FlowVersionSummary {
+  id: string;
+  flowId: string;
+  version: number;
+  name: string;
+  createdAt: string;
+}
+
+export interface FlowVersion extends FlowVersionSummary {
+  graphJson: string | null;
+}
+
 export interface LogEntry {
   id: string;
   message: string;

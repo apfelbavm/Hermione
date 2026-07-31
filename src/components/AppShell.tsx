@@ -14,7 +14,7 @@ import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGe
 import { hitTestNode, hitTestPin, hitTestWire } from "../render/hitTest";
 import { drawComments } from "../render/drawComments";
 import { drawGrid, snapPositionToGrid } from "../render/drawGrid";
-import { drawMouseCoordinates, drawSimulatingLabel } from "../render/drawHud";
+import { drawMouseCoordinates, drawReadOnlyLabel, drawSimulatingLabel } from "../render/drawHud";
 import { drawNodes } from "../render/drawNodes";
 import { drawWires, drawWireDragPreview } from "../render/drawWires";
 import { drawMarqueeSelection } from "../render/drawMarquee";
@@ -81,6 +81,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       camera: new Camera(),
       snapToGrid: true,
       simulating: false,
+      readOnly: false,
       paused: false,
       autoPan: true,
       selectedNodeIds: new Set(),
@@ -212,6 +213,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, variables, functions, scripts, latentNodeIds, store.state.simulating);
       if (marqueeSelection) drawMarqueeSelection(ctx, camera, marqueeSelection);
       if (store.state.simulating) drawSimulatingLabel(ctx, width, height);
+      else if (store.state.readOnly) drawReadOnlyLabel(ctx, width, height);
       else drawMouseCoordinates(ctx, camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y), width, height);
       widgetSync.sync(geometries);
       commentOverlay.sync();

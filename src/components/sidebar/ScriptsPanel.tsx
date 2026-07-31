@@ -17,7 +17,10 @@ export function ScriptsPanel({ store }: { store: Store }) {
   useStoreRevision(store);
   const [editingId, setEditingId] = useState<string | null>(null);
   const scripts = store.state.rootGraph.scripts;
-  const disabled = store.state.simulating;
+  // Opening a script (click / "Edit script") stays available in read-only mode for inspection —
+  // only renaming/adding/removing/reordering (mutations) are blocked by it.
+  const viewDisabled = store.state.simulating;
+  const disabled = store.state.simulating || store.state.readOnly;
 
   function commitRename(script: CodeScriptDef, rawNewName: string): void {
     const trimmed = rawNewName.trim();
@@ -50,7 +53,7 @@ export function ScriptsPanel({ store }: { store: Store }) {
         const isSelected = store.state.sidebarSelection?.kind === "script" && store.state.sidebarSelection.scriptId === script.id;
 
         function editScript(): void {
-          if (disabled) return;
+          if (viewDisabled) return;
           openScriptTab(store.state, script.id);
           store.state.sidebarSelection = {
             kind: "script",
@@ -84,17 +87,21 @@ export function ScriptsPanel({ store }: { store: Store }) {
                 name={script.name}
                 className="function-name"
                 title="Click to open this script in the lower panel"
-                disabled={disabled}
+                disabled={viewDisabled}
                 onContextMenu={(screenPos) => {
                   openRowContextMenu(screenPos, [
                     {
                       label: i18n.components.context_menu.edit_script,
                       onClick: editScript,
                     },
-                    {
-                      label: i18n.components.context_menu.rename,
-                      onClick: () => setEditingId(script.id),
-                    },
+                    ...(disabled
+                      ? []
+                      : [
+                          {
+                            label: i18n.components.context_menu.rename,
+                            onClick: () => setEditingId(script.id),
+                          },
+                        ]),
                   ]);
                 }}
                 onClick={editScript}

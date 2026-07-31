@@ -86,11 +86,12 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
           setWidgetDisplayValue(entry.el, pinDef, pin?.value);
         }
         // These overlay widgets sit on top of the canvas but aren't reached by its own
-        // mousedown-based "locked while simulating" guard (see pointerHandlers.ts) — disabled here
-        // instead, every sync pass, so a running simulation can't have its pin literals edited out
-        // from under it.
-        entry.el.disabled = store.state.simulating;
-        if (entry.expandButton) entry.expandButton.disabled = store.state.simulating;
+        // mousedown-based "locked while simulating"/read-only guard (see pointerHandlers.ts) —
+        // disabled here instead, every sync pass, so a running simulation or a read-only graph
+        // can't have its pin literals edited out from under it.
+        const widgetsDisabled = store.state.simulating || store.state.readOnly;
+        entry.el.disabled = widgetsDisabled;
+        if (entry.expandButton) entry.expandButton.disabled = widgetsDisabled;
       }
     }
 
@@ -109,7 +110,10 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
 function createWidgetEntry(pinDef: PinDef, nodeId: string, pinId: string, store: Store): WidgetEntry {
   const signature = widgetSignature(pinDef);
   if ((pinDef.type === "string" || pinDef.type === "enum") && pinDef.options && pinDef.options.length > 0) {
-    return { el: createOptionsWidgetElement(pinDef.options, nodeId, pinId, store), signature };
+    return {
+      el: createOptionsWidgetElement(pinDef.options, nodeId, pinId, store),
+      signature,
+    };
   }
 
   const type = pinDef.type;
