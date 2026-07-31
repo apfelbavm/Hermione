@@ -57,6 +57,10 @@ export function createCommentOverlay(overlay: HTMLElement, canvas: HTMLCanvasEle
       if (document.activeElement !== entry.titleEl) {
         entry.titleEl.textContent = box.text;
       }
+      // Not reached by the canvas's own mousedown-based "locked while simulating" guard (see
+      // pointerHandlers.ts) — contentEditable is toggled directly here instead, every sync pass, so
+      // a running simulation can't have comment titles edited out from under it.
+      entry.titleEl.contentEditable = store.state.simulating ? "false" : "true";
     }
 
     for (const [id, entry] of entries) {

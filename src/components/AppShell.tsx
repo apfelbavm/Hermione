@@ -13,7 +13,7 @@ import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGe
 import { hitTestNode, hitTestPin, hitTestWire } from "../render/hitTest";
 import { drawComments } from "../render/drawComments";
 import { drawGrid, snapPositionToGrid } from "../render/drawGrid";
-import { drawMouseCoordinates } from "../render/drawHud";
+import { drawMouseCoordinates, drawSimulatingLabel } from "../render/drawHud";
 import { drawNodes } from "../render/drawNodes";
 import { drawWires, drawWireDragPreview } from "../render/drawWires";
 import { drawMarqueeSelection } from "../render/drawMarquee";
@@ -92,6 +92,8 @@ export default function AppShell() {
       activeLowerTabId: null,
       camera: new Camera(),
       snapToGrid: true,
+      simulating: false,
+      autoPan: true,
       selectedNodeIds: new Set(),
       selectedCommentIds: new Set(),
       executingNodeId: null,
@@ -121,6 +123,7 @@ export default function AppShell() {
     const compileButton = document.getElementById("compile-button") as HTMLButtonElement;
     const deleteButton = document.getElementById("delete-button") as HTMLButtonElement;
     const snapToGridCheckbox = document.getElementById("snap-to-grid-checkbox") as HTMLInputElement;
+    const autoPanCheckbox = document.getElementById("auto-pan-checkbox") as HTMLInputElement;
     const frameAllButton = document.getElementById("frame-all-button") as HTMLButtonElement;
     const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
     const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
@@ -194,7 +197,8 @@ export default function AppShell() {
       const latentNodeIds = new Set(graph.nodes.filter((n) => isNodeLatent(n, graph, store.state.rootGraph)).map((n) => n.id));
       drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, variables, functions, scripts, latentNodeIds);
       if (marqueeSelection) drawMarqueeSelection(ctx, camera, marqueeSelection);
-      drawMouseCoordinates(ctx, camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y), width, height);
+      if (store.state.simulating) drawSimulatingLabel(ctx, width, height);
+      else drawMouseCoordinates(ctx, camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y), width, height);
       widgetSync.sync(geometries);
       commentOverlay.sync();
       nodeDescriptionOverlay.sync(geometries);
@@ -204,6 +208,21 @@ export default function AppShell() {
       renderCanvas();
       scriptEditor.render();
       snapToGridCheckbox.checked = store.state.snapToGrid;
+      autoPanCheckbox.checked = store.state.autoPan;
+
+      // Every other toolbar control is disabled for the whole duration of a Simulate run — see
+      // AppState.simulating. The run button itself is handled separately by onRunClick (it stays
+      // enabled/disabled based on activeSimulation, not this flag, since aborting-and-restarting a
+      // run is still allowed).
+      const { simulating } = store.state;
+      saveButton.disabled = simulating;
+      loadButton.disabled = simulating;
+      downloadButton.disabled = simulating;
+      compileButton.disabled = simulating;
+      deleteButton.disabled = simulating;
+      snapToGridCheckbox.disabled = simulating;
+      frameAllButton.disabled = simulating;
+      loadFileInput.disabled = simulating;
     }
 
     const unsubscribe = store.subscribe(render);
@@ -276,6 +295,7 @@ export default function AppShell() {
 
     function onCanvasContextMenu(e: MouseEvent): void {
       e.preventDefault();
+      if (store.state.simulating) return;
       if (pointerInteraction.shouldSuppressContextMenu()) return;
       const rect = canvas.getBoundingClientRect();
       const screenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -445,6 +465,7 @@ export default function AppShell() {
     }
 
     function onCanvasDragOver(e: DragEvent): void {
+      if (store.state.simulating) return;
       const types = e.dataTransfer?.types;
       if (types?.includes(FUNCTION_DRAG_MIME) || types?.includes(VARIABLE_DRAG_MIME) || types?.includes(SCRIPT_DRAG_MIME)) {
         e.preventDefault();
@@ -454,6 +475,7 @@ export default function AppShell() {
     canvas.addEventListener("dragover", onCanvasDragOver);
 
     function onCanvasDrop(e: DragEvent): void {
+      if (store.state.simulating) return;
       const functionId = e.dataTransfer?.getData(FUNCTION_DRAG_MIME);
       const variableId = e.dataTransfer?.getData(VARIABLE_DRAG_MIME);
       const scriptId = e.dataTransfer?.getData(SCRIPT_DRAG_MIME);
@@ -506,12 +528,59 @@ export default function AppShell() {
 
     let activeSimulation: AbortController | null = null;
 
+    // --- Auto-pan: while simulating (and the auto-pan HUD toggle is on), keeps whichever node is
+    // currently executing centered in view by lerping the camera towards it every frame, rather
+    // than snapping — a snap would be jarring for the fast node-to-node steps a simulation run does.
+    const AUTO_PAN_LERP_PER_FRAME = 0.12;
+    let panAnimationFrame: number | null = null;
+
+    function panCameraTowardsNode(nodeId: string): void {
+      if (panAnimationFrame !== null) cancelAnimationFrame(panAnimationFrame);
+
+      function tick(): void {
+        panAnimationFrame = null;
+        if (!store.state.autoPan || store.state.executingNodeId !== nodeId) return;
+
+        const variables = getVisibleVariablesForState(store.state);
+        const functions = store.state.rootGraph.functions;
+        const scripts = store.state.rootGraph.scripts;
+        // Search every graph (root + every function body), not just the currently-open editing
+        // graph — the node executing may live in a function whose tab isn't open right now.
+        const containingGraph = [store.state.rootGraph, ...store.state.rootGraph.functions.map((f) => f.body)].find((g) => g.nodes.some((n) => n.id === nodeId));
+        const node = containingGraph?.nodes.find((n) => n.id === nodeId);
+        if (!node || !containingGraph) return;
+
+        const rect = computeNodeWorldRect(node, node.resolvePinDefs(variables, functions, scripts), variables, functions, scripts);
+        const targetCenterX = rect.x + rect.width / 2;
+        const targetCenterY = rect.y + rect.height / 2;
+        const { camera } = store.state;
+        const viewCenter = camera.screenToWorld(canvas.clientWidth / 2, canvas.clientHeight / 2);
+        const dx = targetCenterX - viewCenter.x;
+        const dy = targetCenterY - viewCenter.y;
+
+        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+          camera.x += dx * AUTO_PAN_LERP_PER_FRAME;
+          camera.y += dy * AUTO_PAN_LERP_PER_FRAME;
+          store.notify();
+          panAnimationFrame = requestAnimationFrame(tick);
+        }
+      }
+      panAnimationFrame = requestAnimationFrame(tick);
+    }
+
+    function onAutoPanChange(): void {
+      store.state.autoPan = autoPanCheckbox.checked;
+      store.notify();
+    }
+    autoPanCheckbox.addEventListener("change", onAutoPanChange);
+
     async function onRunClick(): Promise<void> {
       activeSimulation?.abort();
       const controller = new AbortController();
       activeSimulation = controller;
 
       runButton.disabled = true;
+      store.state.simulating = true;
       logPanel.innerHTML = "";
       store.state.firedConnectionIds = new Set();
 
@@ -535,10 +604,13 @@ export default function AppShell() {
         for await (const { event, data } of readServerSentEvents(response)) {
           if (controller.signal.aborted) break;
           switch (event) {
-            case "node-start":
-              store.state.executingNodeId = (data as { nodeId: string }).nodeId;
+            case "node-start": {
+              const nodeId = (data as { nodeId: string }).nodeId;
+              store.state.executingNodeId = nodeId;
               store.notify();
+              if (store.state.autoPan) panCameraTowardsNode(nodeId);
               break;
+            }
             case "exec-fire":
               store.state.firedConnectionIds.add((data as { connectionId: string }).connectionId);
               store.notify();
@@ -557,9 +629,14 @@ export default function AppShell() {
       } finally {
         if (activeSimulation === controller) {
           store.state.executingNodeId = null;
+          store.state.simulating = false;
           store.notify();
           runButton.disabled = false;
           activeSimulation = null;
+          if (panAnimationFrame !== null) {
+            cancelAnimationFrame(panAnimationFrame);
+            panAnimationFrame = null;
+          }
         }
       }
     }
@@ -647,11 +724,13 @@ export default function AppShell() {
 
     return () => {
       activeSimulation?.abort();
+      if (panAnimationFrame !== null) cancelAnimationFrame(panAnimationFrame);
       window.removeEventListener("mousemove", onWindowMouseMove);
       window.removeEventListener("resize", resizeCanvas);
       resizeObserver.disconnect();
       unsubscribe();
       snapToGridCheckbox.removeEventListener("change", onSnapToGridChange);
+      autoPanCheckbox.removeEventListener("change", onAutoPanChange);
       canvas.removeEventListener("contextmenu", onCanvasContextMenu);
       canvas.removeEventListener("dragover", onCanvasDragOver);
       canvas.removeEventListener("drop", onCanvasDrop);

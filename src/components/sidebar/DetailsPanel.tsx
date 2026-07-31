@@ -13,6 +13,7 @@ import { ImperativeMount } from "./ImperativeMount";
 import { ScriptIoPanel } from "./ScriptIoPanel";
 
 function VariableDetails({ store, variable }: { store: Store; variable: Variable }) {
+  const disabled = store.state.simulating;
   return (
     <div className="details-content">
       <div className="details-item-name">{variable.name}</div>
@@ -26,6 +27,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
               })
             }
             deps={[variable.id, variable.type]}
+            disabled={disabled}
           />
           <ImperativeMount
             build={() =>
@@ -35,6 +37,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
               })
             }
             deps={[variable.id, variable.container]}
+            disabled={disabled}
           />
           {variable.container === "map" && (
             <ImperativeMount
@@ -45,6 +48,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
                 })
               }
               deps={[variable.id, variable.keyType]}
+              disabled={disabled}
             />
           )}
         </div>
@@ -65,6 +69,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
               )
             }
             deps={[variable.id, variable.type, variable.container, variable.keyType, variable.defaultValue]}
+            disabled={disabled}
           />
         </div>
       </div>
@@ -75,6 +80,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
 function NodeDetails({ store, node, properties }: { store: Store; node: NodeInstance; properties: PinDef[] }) {
   const def = getNodeDef(node.type);
   const label = node.resolveNodeLabel(def, getVisibleVariablesForState(store.state), store.state.rootGraph.functions);
+  const disabled = store.state.simulating;
 
   return (
     <div className="details-content">
@@ -87,6 +93,7 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
             className="details-description-input"
             placeholder="Shown as a speech bubble above this node on the canvas"
             defaultValue={node.description ?? ""}
+            disabled={disabled}
             onInput={(e) => {
               node.description = e.currentTarget.value;
               store.notify();
@@ -107,6 +114,7 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
                 })
               }
               deps={[node.id, node.elementType]}
+              disabled={disabled}
             />
           </div>
         )}
@@ -124,6 +132,7 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
                 })
               }
               deps={[node.id, node.mapKeyType]}
+              disabled={disabled}
             />
           </div>
         )}
@@ -139,6 +148,7 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
                 })
               }
               deps={[node.id, prop.id, node.pins[prop.id]?.value]}
+              disabled={disabled}
             />
           </div>
         ))}
@@ -159,6 +169,7 @@ function CommentDetails({ store, comment }: { store: Store; comment: CommentBox 
             type="color"
             className="comment-color-swatch"
             defaultValue={comment.color ?? DEFAULT_COMMENT_COLOR}
+            disabled={store.state.simulating}
             onInput={(e) => {
               comment.color = e.currentTarget.value;
               store.notify();
@@ -179,6 +190,7 @@ function FunctionDescription({ store, fn }: { store: Store; fn: FunctionDef }) {
         className="details-description-input"
         placeholder="Shown as a tooltip when hovering this function"
         defaultValue={fn.description ?? ""}
+        disabled={store.state.simulating}
         onInput={(e) => {
           fn.description = e.currentTarget.value;
           store.notify();

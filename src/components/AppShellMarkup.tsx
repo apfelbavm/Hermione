@@ -50,6 +50,10 @@ export default function AppShellMarkup({ store }: { store: Store }) {
                 <input type="checkbox" id="snap-to-grid-checkbox" />
                 Snap to Grid
               </label>
+              <label id="auto-pan-toggle" className="toolbar-toggle" title="Pan the camera to follow whichever node is currently executing during a Simulate run">
+                <input type="checkbox" id="auto-pan-checkbox" />
+                Auto Pan
+              </label>
               <button id="frame-all-button" className="canvas-hud-button" title="Fit graph to view">
                 ⛶
               </button>

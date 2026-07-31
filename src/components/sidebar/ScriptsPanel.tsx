@@ -22,6 +22,7 @@ export function ScriptsPanel({ store }: { store: Store }) {
   useStoreRevision(store);
   const [editingId, setEditingId] = useState<string | null>(null);
   const scripts = store.state.rootGraph.scripts;
+  const disabled = store.state.simulating;
 
   function commitRename(script: CodeScriptDef, rawNewName: string): void {
     const trimmed = rawNewName.trim();
@@ -48,12 +49,13 @@ export function ScriptsPanel({ store }: { store: Store }) {
   }
 
   return (
-    <CollapsibleSection id="scripts-section" title="Scripts" empty={scripts.length === 0} onAdd={handleAdd}>
+    <CollapsibleSection id="scripts-section" title="Scripts" empty={scripts.length === 0} onAdd={handleAdd} disabled={disabled}>
       {scripts.map((script) => {
         const isEditing = editingId === script.id;
         const isSelected = store.state.sidebarSelection?.kind === "script" && store.state.sidebarSelection.scriptId === script.id;
 
         function editScript(): void {
+          if (disabled) return;
           openScriptTab(store.state, script.id);
           store.state.sidebarSelection = { kind: "script", scriptId: script.id };
           store.notify();
@@ -63,7 +65,7 @@ export function ScriptsPanel({ store }: { store: Store }) {
           <div
             key={script.id}
             className={"variable-row" + (isSelected ? " function-row-active" : "") + rowIndicatorClassName(script.id)}
-            draggable={!isEditing}
+            draggable={!isEditing && !disabled}
             onDragStart={(e) => {
               e.dataTransfer.setData(SCRIPT_DRAG_MIME, script.id);
               e.dataTransfer.effectAllowed = "copyMove";
@@ -84,6 +86,7 @@ export function ScriptsPanel({ store }: { store: Store }) {
                 name={script.name}
                 className="function-name"
                 title="Click to open this script in the lower panel"
+                disabled={disabled}
                 onContextMenu={(screenPos) => {
                   openRowContextMenu(screenPos, [
                     { label: "Edit Script", onClick: editScript },
@@ -95,6 +98,7 @@ export function ScriptsPanel({ store }: { store: Store }) {
             )}
             <button
               type="button"
+              disabled={disabled}
               onClick={() => {
                 closeScriptTab(store.state, script.id);
                 removeCodeScriptDef(store.state.rootGraph, script.id);

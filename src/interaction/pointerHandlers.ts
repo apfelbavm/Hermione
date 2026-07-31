@@ -304,6 +304,8 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
   canvas.addEventListener("dragstart", (e) => e.preventDefault());
 
   canvas.addEventListener("mousedown", (e) => {
+    if (store.state.simulating) return; // graph is locked for the duration of a Simulate run
+
     // Any click inside the graph view — regardless of what it hits — stands down whatever
     // Variables/Functions sidebar row was selected, so the Details panel only ever reflects
     // whichever was clicked last (see detailsPanel.ts).
@@ -553,6 +555,7 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
   });
 
   canvas.addEventListener("dblclick", (e) => {
+    if (store.state.simulating) return;
     const graph = getEditingGraph(store.state);
     const { camera } = store.state;
     const variables = getVisibleVariablesForState(store.state);
@@ -764,6 +767,7 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
     "wheel",
     (e) => {
       e.preventDefault();
+      if (store.state.simulating) return;
       const rect = canvas.getBoundingClientRect();
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
       store.state.camera.zoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
@@ -773,6 +777,8 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
   );
 
   window.addEventListener("keydown", (e) => {
+    if (store.state.simulating) return; // graph is locked for the duration of a Simulate run
+
     // Don't hijack text-field editing — covers plain <input>s, but just as importantly every
     // <textarea> (the multiline pin-value popup, and — most visibly — Monaco's own hidden
     // "inputarea" textarea it routes all keyboard input through, see scriptEditor.ts) and any

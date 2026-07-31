@@ -85,6 +85,12 @@ export function createWidgetSync(overlay: HTMLElement, store: Store): WidgetSync
         if (document.activeElement !== entry.el) {
           setWidgetDisplayValue(entry.el, pinDef, pin?.value);
         }
+        // These overlay widgets sit on top of the canvas but aren't reached by its own
+        // mousedown-based "locked while simulating" guard (see pointerHandlers.ts) — disabled here
+        // instead, every sync pass, so a running simulation can't have its pin literals edited out
+        // from under it.
+        entry.el.disabled = store.state.simulating;
+        if (entry.expandButton) entry.expandButton.disabled = store.state.simulating;
       }
     }
 

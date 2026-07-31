@@ -210,6 +210,8 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
     }
 
     renderTabs();
+    elements.saveButton.disabled = store.state.simulating;
+    elements.clearButton.disabled = store.state.simulating;
 
     const activeScriptId = store.state.activeLowerTabId;
     const activeScript = activeScriptId ? scriptById(activeScriptId) : undefined;
@@ -251,6 +253,8 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
       shownScriptId = activeScript.id;
       showSaveStatus("", false);
     }
+
+    editor.updateOptions({ readOnly: store.state.simulating });
   }
 
   return { render, flushDirtyScripts };

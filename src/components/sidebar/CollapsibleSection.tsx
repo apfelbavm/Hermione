@@ -14,6 +14,7 @@ export function CollapsibleSection({
   empty,
   onAdd,
   addButtonTitle,
+  disabled = false,
   children,
 }: {
   id?: string;
@@ -21,6 +22,9 @@ export function CollapsibleSection({
   empty: boolean;
   onAdd: () => void;
   addButtonTitle?: string;
+  /** Disables the "+" add button — e.g. while a Simulate run is in progress. Collapsing/expanding
+   * the section itself is left alone, since it doesn't touch the graph. */
+  disabled?: boolean;
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -32,6 +36,7 @@ export function CollapsibleSection({
           type="button"
           className="panel-header-add"
           title={addButtonTitle}
+          disabled={disabled}
           onClick={(e) => {
             e.stopPropagation(); // don't also toggle the section's collapse state
             setCollapsed(false);

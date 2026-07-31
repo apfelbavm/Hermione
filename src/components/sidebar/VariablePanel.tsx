@@ -47,6 +47,7 @@ export function VariablePanel({ id, title, store, getGraph }: { id?: string; tit
   useStoreRevision(store);
   const [editingId, setEditingId] = useState<string | null>(null);
   const graph = getGraph();
+  const disabled = store.state.simulating;
 
   function commitRename(variable: Variable, rawNewName: string): void {
     const trimmed = rawNewName.trim();
@@ -76,7 +77,7 @@ export function VariablePanel({ id, title, store, getGraph }: { id?: string; tit
   }
 
   return (
-    <CollapsibleSection id={id} title={title} empty={graph.variables.length === 0} onAdd={handleAdd}>
+    <CollapsibleSection id={id} title={title} empty={graph.variables.length === 0} onAdd={handleAdd} disabled={disabled}>
       {graph.variables.map((variable) => {
         const isEditing = editingId === variable.id;
         const isSelected = store.state.sidebarSelection?.kind === "variable" && store.state.sidebarSelection.variableId === variable.id;
@@ -85,7 +86,7 @@ export function VariablePanel({ id, title, store, getGraph }: { id?: string; tit
           <div
             key={variable.id}
             className={"variable-row" + (isSelected ? " variable-row-selected" : "") + rowIndicatorClassName(variable.id)}
-            draggable={!isEditing}
+            draggable={!isEditing && !disabled}
             onDragStart={(e) => {
               e.dataTransfer.setData(VARIABLE_DRAG_MIME, variable.id);
               // "copyMove" (not just "copy") — this one drag gesture serves two drop targets:
@@ -114,6 +115,7 @@ export function VariablePanel({ id, title, store, getGraph }: { id?: string; tit
               <EditableNameLabel
                 name={variable.name}
                 title={variable.name}
+                disabled={disabled}
                 onContextMenu={(screenPos) => {
                   openRowContextMenu(screenPos, [{ label: "Rename", onClick: () => setEditingId(variable.id) }]);
                 }}
@@ -125,6 +127,7 @@ export function VariablePanel({ id, title, store, getGraph }: { id?: string; tit
             )}
             <button
               type="button"
+              disabled={disabled}
               onClick={() => {
                 removeVariable(graph, store.state.rootGraph.getVisibleVariables(graph), store.state.rootGraph.functions, variable.id);
                 if (store.state.sidebarSelection?.kind === "variable" && store.state.sidebarSelection.variableId === variable.id) {

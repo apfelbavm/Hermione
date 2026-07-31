@@ -51,6 +51,15 @@ export interface AppState {
   /** Toolbar toggle: when on, nodes snap to the grid as they're moved or newly dropped/placed onto
    * the canvas. Never retroactively applied to nodes already sitting at an off-grid position. */
   snapToGrid: boolean;
+  /** True for the whole duration of a Simulate run (from click to the "done"/abort/error that ends
+   * it) — distinct from executingNodeId, which is only set while a specific node is mid-step and
+   * goes null between steps. Every other interactive control (sidebar panels, toolbar buttons,
+   * canvas pointer/keyboard interaction) is disabled while this is true, so the graph can't be
+   * edited out from under a run in progress. */
+  simulating: boolean;
+  /** Canvas HUD toggle (next to Snap to Grid): when on, the camera auto-pans to keep whichever node
+   * is currently executing centered in view. */
+  autoPan: boolean;
   selectedNodeIds: Set<string>;
   selectedCommentIds: Set<string>;
   executingNodeId: string | null;

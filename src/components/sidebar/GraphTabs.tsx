@@ -9,6 +9,7 @@ import { useStoreRevision } from "../../state/useStore";
 export function GraphTabs({ store }: { store: Store }) {
   useStoreRevision(store);
   const [draggingFunctionId, setDraggingFunctionId] = useState<string | null>(null);
+  const disabled = store.state.simulating;
 
   function reorder(fromId: string, toId: string): void {
     const tabs = store.state.openFunctionTabs;
@@ -41,7 +42,7 @@ export function GraphTabs({ store }: { store: Store }) {
           <div
             key={functionId}
             className={"graph-tab" + (store.state.activeFunctionId === functionId ? " graph-tab-active" : "")}
-            draggable
+            draggable={!disabled}
             onDragStart={(e) => {
               setDraggingFunctionId(functionId);
               e.dataTransfer.setData("text/plain", functionId);
@@ -69,6 +70,7 @@ export function GraphTabs({ store }: { store: Store }) {
               type="button"
               className="graph-tab-close"
               title="Close tab"
+              disabled={disabled}
               onClick={(e) => {
                 e.stopPropagation();
                 closeFunctionTab(store.state, functionId);

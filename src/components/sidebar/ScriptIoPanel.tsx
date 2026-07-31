@@ -25,6 +25,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
   const [editingId, setEditingId] = useState<string | null>(null);
   const script = getSelectedScript();
   if (!script) return null;
+  const disabled = store.state.simulating;
 
   const entries = kind === "input" ? script.inputs : script.outputs;
   const update = kind === "input" ? updateScriptInput : updateScriptOutput;
@@ -58,7 +59,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
   }
 
   return (
-    <CollapsibleSection id={kind === "input" ? "script-inputs-section" : "script-outputs-section"} title={kind === "input" ? "Inputs" : "Outputs"} empty={entries.length === 0} onAdd={handleAdd}>
+    <CollapsibleSection id={kind === "input" ? "script-inputs-section" : "script-outputs-section"} title={kind === "input" ? "Inputs" : "Outputs"} empty={entries.length === 0} onAdd={handleAdd} disabled={disabled}>
       {entries.map((entry) => {
         const isEditing = editingId === entry.id;
 
@@ -66,7 +67,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
           <div key={entry.id}>
             <div
               className={"variable-row" + rowIndicatorClassName(entry.id)}
-              draggable={!isEditing}
+              draggable={!isEditing && !disabled}
               onDragStart={(e) => {
                 e.dataTransfer.setData(SCRIPT_IO_ENTRY_DRAG_MIME, entry.id);
                 e.dataTransfer.effectAllowed = "move";
@@ -85,6 +86,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
               ) : (
                 <EditableNameLabel
                   name={entry.name}
+                  disabled={disabled}
                   onContextMenu={(screenPos) => {
                     openRowContextMenu(screenPos, [{ label: "Edit", onClick: () => setEditingId(entry.id) }]);
                   }}
@@ -99,6 +101,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
                   })
                 }
                 deps={[entry.id, entry.type]}
+                disabled={disabled}
               />
 
               <ImperativeMount
@@ -109,6 +112,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
                   })
                 }
                 deps={[entry.id, entry.container]}
+                disabled={disabled}
               />
 
               {entry.container === "map" && (
@@ -120,11 +124,13 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
                     })
                   }
                   deps={[entry.id, entry.keyType]}
+                  disabled={disabled}
                 />
               )}
 
               <button
                 type="button"
+                disabled={disabled}
                 onClick={() => {
                   removeEntry(store.state.rootGraph, script!, entry.id);
                   store.notify();
@@ -152,6 +158,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
                   )
                 }
                 deps={[entry.id, entry.type, entry.container, entry.keyType, entry.defaultValue]}
+                disabled={disabled}
               />
             </div>
           </div>

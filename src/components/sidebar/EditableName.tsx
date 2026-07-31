@@ -42,6 +42,7 @@ export function EditableNameLabel({
   className,
   title,
   hoverTooltip,
+  disabled = false,
   onContextMenu,
   onClick,
 }: {
@@ -51,6 +52,9 @@ export function EditableNameLabel({
   /** Wires overlay/tooltip.ts's custom delayed hover-tooltip (e.g. a function's description)
    * instead of a native `title` attribute — the two are mutually exclusive per row. */
   hoverTooltip?: () => string | undefined | null;
+  /** Suppresses both the click handler and the rename context menu — e.g. while a Simulate run is
+   * in progress. There's no native `disabled` for a `<span>`; this just skips calling the callbacks. */
+  disabled?: boolean;
   onContextMenu: (screenPos: { x: number; y: number }) => void;
   onClick?: () => void;
 }) {
@@ -67,13 +71,13 @@ export function EditableNameLabel({
   return (
     <span
       ref={ref}
-      className={"variable-name editable-name-label" + (className ? ` ${className}` : "")}
+      className={"variable-name editable-name-label" + (className ? ` ${className}` : "") + (disabled ? " editable-name-label-disabled" : "")}
       title={title}
       onContextMenu={(e) => {
         e.preventDefault();
-        onContextMenu({ x: e.clientX, y: e.clientY });
+        if (!disabled) onContextMenu({ x: e.clientX, y: e.clientY });
       }}
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
     >
       {name}
     </span>

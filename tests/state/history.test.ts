@@ -21,6 +21,8 @@ function createFakeStore(rootGraph: Graph): Store {
     activeLowerTabId: null,
     camera: {} as AppState["camera"],
     snapToGrid: true,
+    simulating: false,
+    autoPan: true,
     selectedNodeIds: new Set(),
     selectedCommentIds: new Set(),
     executingNodeId: null,

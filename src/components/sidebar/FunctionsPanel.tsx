@@ -20,6 +20,7 @@ export function FunctionsPanel({ store }: { store: Store }) {
   useStoreRevision(store);
   const [editingId, setEditingId] = useState<string | null>(null);
   const functions = store.state.rootGraph.functions;
+  const disabled = store.state.simulating;
 
   function commitRename(fn: FunctionDef, rawNewName: string): void {
     const trimmed = rawNewName.trim();
@@ -46,7 +47,7 @@ export function FunctionsPanel({ store }: { store: Store }) {
   }
 
   return (
-    <CollapsibleSection id="functions-section" title="Functions" empty={functions.length === 0} onAdd={handleAdd}>
+    <CollapsibleSection id="functions-section" title="Functions" empty={functions.length === 0} onAdd={handleAdd} disabled={disabled}>
       {functions.map((fn) => {
         const isEditing = editingId === fn.id;
         const isSelected = store.state.sidebarSelection?.kind === "function" && store.state.sidebarSelection.functionId === fn.id;
@@ -55,7 +56,7 @@ export function FunctionsPanel({ store }: { store: Store }) {
           <div
             key={fn.id}
             className={"variable-row" + (isSelected ? " function-row-active" : "") + rowIndicatorClassName(fn.id)}
-            draggable={!isEditing}
+            draggable={!isEditing && !disabled}
             onDragStart={(e) => {
               e.dataTransfer.setData(FUNCTION_DRAG_MIME, fn.id);
               e.dataTransfer.effectAllowed = "copyMove";
@@ -76,6 +77,7 @@ export function FunctionsPanel({ store }: { store: Store }) {
                 name={fn.name}
                 className="function-name"
                 hoverTooltip={() => fn.description || "Click to open this function's graph in a tab"}
+                disabled={disabled}
                 onContextMenu={(screenPos) => {
                   openRowContextMenu(screenPos, [{ label: "Rename", onClick: () => setEditingId(fn.id) }]);
                 }}
@@ -88,6 +90,7 @@ export function FunctionsPanel({ store }: { store: Store }) {
             )}
             <button
               type="button"
+              disabled={disabled}
               onClick={() => {
                 closeFunctionTab(store.state, fn.id);
                 removeFunctionDef(store.state.rootGraph, fn.id);
