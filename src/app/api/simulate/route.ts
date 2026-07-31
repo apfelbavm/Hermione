@@ -12,7 +12,7 @@ registerBuiltins();
 /** Same visualization pacing the old in-browser Run button used (see the removed
  * STEP_VISUALIZATION_DELAY_MS in main.ts) — kept server-side so every client watching a shared
  * simulation sees the same pacing, and so a fast/slow client connection can't skew it. */
-const STEP_VISUALIZATION_DELAY_MS = 150;
+const STEP_VISUALIZATION_DELAY_MS = 250;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
