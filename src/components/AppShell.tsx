@@ -121,6 +121,7 @@ export default function AppShell() {
     const runButton = document.getElementById("run-button") as HTMLButtonElement;
     const pauseButton = document.getElementById("pause-button") as HTMLButtonElement;
     const continueButton = document.getElementById("continue-button") as HTMLButtonElement;
+    const stopButton = document.getElementById("stop-button") as HTMLButtonElement;
     const saveButton = document.getElementById("save-button") as HTMLButtonElement;
     const loadButton = document.getElementById("load-button") as HTMLButtonElement;
     const downloadButton = document.getElementById("download-button") as HTMLButtonElement;
@@ -235,6 +236,10 @@ export default function AppShell() {
       continueButton.style.display = simulating ? "" : "none";
       pauseButton.disabled = paused;
       continueButton.disabled = !paused;
+
+      // Stop is the odd one out: it works whether the run is currently going or sitting paused, so
+      // — unlike Pause/Continue — it's never itself disabled while visible.
+      stopButton.style.display = simulating ? "" : "none";
     }
 
     const unsubscribe = store.subscribe(render);
@@ -739,6 +744,16 @@ export default function AppShell() {
     pauseButton.addEventListener("click", onPauseClick);
     continueButton.addEventListener("click", onContinueClick);
 
+    // --- Stop: aborts the in-flight fetch outright (same AbortController onRunClick itself aborts
+    // when Simulate is clicked again mid-run) — the request.signal "abort" listener on the server
+    // (see route.ts) wakes anything paused so it can notice and unwind, and onRunClick's own
+    // try/catch/finally resets simulating/executingNodeId/paused and re-enables the Simulate button,
+    // exactly as if the run had ended on its own.
+    function onStopClick(): void {
+      activeSimulation?.abort();
+    }
+    stopButton.addEventListener("click", onStopClick);
+
     // --- Save / Load: JSON persisted to localStorage (auto-restored on next launch); Download hands
     // that same JSON out as a file, as a separate, explicit action ---
     async function onSaveClick(): Promise<void> {
@@ -836,6 +851,7 @@ export default function AppShell() {
       runButton.removeEventListener("click", onRunClick);
       pauseButton.removeEventListener("click", onPauseClick);
       continueButton.removeEventListener("click", onContinueClick);
+      stopButton.removeEventListener("click", onStopClick);
       saveButton.removeEventListener("click", onSaveClick);
       loadButton.removeEventListener("click", onLoadClick);
       downloadButton.removeEventListener("click", onDownloadClick);

@@ -31,6 +31,9 @@ export default function AppShellMarkup({ store }: { store: Store }) {
             <button id="continue-button" style={{ display: "none" }} title="Continue past the current breakpoint/pause">
               ▶ Continue
             </button>
+            <button id="stop-button" style={{ display: "none" }} title="Stop the running simulation">
+              ■ Stop
+            </button>
           </div>
         </div>
         <div id="toolbar-right">
