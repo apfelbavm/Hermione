@@ -853,6 +853,37 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
       return;
     }
 
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "x") {
+      // Same log-panel-text-selection carve-out as Ctrl+C above — a Ctrl+X while the user's mid-way
+      // through selecting log text for the browser's own native cut should leave that alone (moot in
+      // practice for our own read-only log lines, but keeps the two shortcuts' guards consistent).
+      const selection = window.getSelection();
+      const logPanel = document.getElementById("log-panel");
+      const cuttingLogText = !!selection && !selection.isCollapsed && selection.toString().length > 0 && !!logPanel && !!selection.anchorNode && logPanel.contains(selection.anchorNode);
+      if (cuttingLogText) return;
+
+      e.preventDefault();
+      const { selectedNodeIds } = store.state;
+      if (selectedNodeIds.size === 0) return;
+
+      const { nodes, connections } = cloneNodesForClipboard(graph, selectedNodeIds);
+      if (nodes.length === 0) return; // selection was entirely undeletable nodes (Entry/Return) — nothing to cut
+      navigator.clipboard.writeText(serializeNodesClipboardPayload(nodes, connections)).catch(() => {});
+
+      const variables = getVisibleVariablesForState(store.state);
+      const functions = store.state.rootGraph.functions;
+      const scripts = store.state.rootGraph.scripts;
+      // removeNode itself refuses to remove Entry/Return (see Graph.UNDELETABLE_NODE_TYPES), so
+      // iterating the full selection here — rather than just `nodes`' own copyable ids — is safe and
+      // matches the Delete-key handler above exactly.
+      for (const nodeId of selectedNodeIds) {
+        graph.removeNode(variables, functions, nodeId, scripts);
+      }
+      store.state.selectedNodeIds = new Set();
+      store.notify();
+      return;
+    }
+
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
       e.preventDefault();
       navigator.clipboard
