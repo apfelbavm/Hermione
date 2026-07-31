@@ -49,10 +49,7 @@ export default function ProjectsPage() {
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Projects" }]} />
-      <Link href="/" className="back-link">
-        ← Back
-      </Link>
+      <Breadcrumbs items={[{ label: "Projects" }]} />
       <h1>Projects</h1>
 
       <form className="create-row" onSubmit={handleCreate}>

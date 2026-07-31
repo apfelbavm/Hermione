@@ -59,7 +59,7 @@ export default function ProjectPage() {
   if (!project) {
     return (
       <PageShell>
-        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Projects", href: "/projects" }]} />
+        <Breadcrumbs items={[{ label: "Projects", href: "/projects" }]} />
         <Link href="/projects" className="back-link">
           ← Back
         </Link>
@@ -70,7 +70,7 @@ export default function ProjectPage() {
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Projects", href: "/projects" }, { label: project.name }]} />
+      <Breadcrumbs items={[{ label: "Projects", href: "/projects" }, { label: project.name }]} />
       <Link href="/projects" className="back-link">
         ← Back
       </Link>

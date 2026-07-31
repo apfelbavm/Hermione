@@ -73,6 +73,13 @@ export function listRuns(projectId: string): Promise<RunLog[]> {
   return requestJson(`/api/projects/${projectId}/runs`);
 }
 
+/** Runs a Flow's own COMPILED output server-side (see api/localhost-deployment/run/route.ts) — used
+ * by the Localhost Deployment page, distinct from Simulate (which streams via SSE for the editor's
+ * own step-through visualization). This one just awaits the whole run and returns its RunLog. */
+export function runProductionFlow(projectId: string, flowId: string): Promise<{ run: RunLog }> {
+  return requestJson("/api/localhost-deployment/run", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ projectId, flowId }) });
+}
+
 export function listCredentials(): Promise<CredentialSummary[]> {
   return requestJson("/api/credentials");
 }

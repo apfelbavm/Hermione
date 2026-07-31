@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "../style.css";
 import { THEME_BOOTSTRAP_SCRIPT } from "../client/theme";
+import { SIDEBAR_BOOTSTRAP_SCRIPT } from "../client/sidebar";
 
 export const metadata: Metadata = {
   title: "Hermione",
@@ -19,6 +20,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             so there's no flash of the wrong theme while React hydrates. Deliberately a literal inline
             script (not a module import) since it must run standalone before any bundle loads. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
+        {/* Same reasoning as the theme bootstrap script above, for the plain-page Sidebar's
+            collapse state (see client/sidebar.ts) — avoids a layout-shift flash from expanded to
+            collapsed width while React hydrates. */}
+        <script dangerouslySetInnerHTML={{ __html: SIDEBAR_BOOTSTRAP_SCRIPT }} />
         {children}
       </body>
     </html>

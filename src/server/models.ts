@@ -26,9 +26,14 @@ export interface LogEntry {
   timestamp: string;
 }
 
-/** One Simulate run's worth of log output, grouped together. `flowName` is a snapshot taken at run
- * time (not a live join) so a run started against a Flow that's since been renamed or deleted still
- * reads sensibly in the Logs page. */
+/** "simulate" = the editor's own Simulate button (interpreted execution, see api/simulate/route.ts).
+ * "production" = a Flow's actual COMPILED output (api/localhost-deployment/run/route.ts), run the
+ * same way it would after being deployed standalone — no visual step-through, just its log output. */
+export type RunKind = "simulate" | "production";
+
+/** One run's worth of log output, grouped together — either a Simulate run or a production run (see
+ * RunKind above). `flowName` is a snapshot taken at run time (not a live join) so a run started
+ * against a Flow that's since been renamed or deleted still reads sensibly in the Logs page. */
 export interface RunLog {
   id: string;
   projectId: string;
@@ -37,4 +42,5 @@ export interface RunLog {
   startedAt: string;
   finishedAt?: string;
   entries: LogEntry[];
+  kind: RunKind;
 }

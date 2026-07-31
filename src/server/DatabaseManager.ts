@@ -4,7 +4,7 @@ import path from "node:path";
 import { nextId } from "../engine/graphMutations";
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
 import { MAX_RUNS_PER_PROJECT } from "../shared/runLogConstants";
-import type { FlowSummary, LogEntry, ProjectSummary, RunLog } from "./models";
+import type { FlowSummary, LogEntry, ProjectSummary, RunKind, RunLog } from "./models";
 
 const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "hermione.db");
 
@@ -35,6 +35,7 @@ interface RunRow {
   started_at: string;
   finished_at: string | null;
   entries_json: string;
+  kind: string;
 }
 
 interface CredentialRow {
@@ -90,7 +91,8 @@ export class DatabaseManager {
         flow_name TEXT NOT NULL,
         started_at TEXT NOT NULL,
         finished_at TEXT,
-        entries_json TEXT NOT NULL
+        entries_json TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'simulate'
       );
       CREATE INDEX IF NOT EXISTS idx_runs_project_id ON runs (project_id, started_at);
 
@@ -103,6 +105,18 @@ export class DatabaseManager {
         updated_at TEXT NOT NULL
       );
     `);
+    this.migrateAddRunsKindColumn();
+  }
+
+  /** `kind` was added after this app's first shipped `runs` table (see RunLog.kind's own doc
+   * comment) — `CREATE TABLE IF NOT EXISTS` above is a no-op against an already-existing table, so
+   * an existing on-disk DB needs this one-time ALTER TABLE to catch up. Safe to run every startup:
+   * it only actually alters the table the first time. */
+  private migrateAddRunsKindColumn(): void {
+    const columns = this.db.prepare("PRAGMA table_info(runs)").all() as { name: string }[];
+    if (!columns.some((c) => c.name === "kind")) {
+      this.db.exec("ALTER TABLE runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'simulate'");
+    }
   }
 
   // --- Row -> model mapping — the only place a snake_case column name is ever read. ---
@@ -124,6 +138,7 @@ export class DatabaseManager {
       startedAt: row.started_at,
       finishedAt: row.finished_at ?? undefined,
       entries: JSON.parse(row.entries_json) as LogEntry[],
+      kind: (row.kind as RunKind) || "simulate",
     };
   }
 
@@ -230,8 +245,8 @@ export class DatabaseManager {
   appendRun(run: RunLog): void {
     const insertAndCap = this.db.transaction((r: RunLog) => {
       this.db
-        .prepare("INSERT INTO runs (id, project_id, flow_id, flow_name, started_at, finished_at, entries_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .run(r.id, r.projectId, r.flowId, r.flowName, r.startedAt, r.finishedAt ?? null, JSON.stringify(r.entries));
+        .prepare("INSERT INTO runs (id, project_id, flow_id, flow_name, started_at, finished_at, entries_json, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(r.id, r.projectId, r.flowId, r.flowName, r.startedAt, r.finishedAt ?? null, JSON.stringify(r.entries), r.kind);
 
       const staleIds = this.db.prepare<[string, number], { id: string }>("SELECT id FROM runs WHERE project_id = ? ORDER BY started_at DESC LIMIT -1 OFFSET ?").all(r.projectId, MAX_RUNS_PER_PROJECT);
       if (staleIds.length > 0) {

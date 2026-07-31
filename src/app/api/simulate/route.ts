@@ -58,7 +58,7 @@ export async function POST(request: Request): Promise<Response> {
   const runId = randomUUID();
   registerSimulationRun(runId);
 
-  const runLog: RunLog = { id: nextId("run"), projectId, flowId, flowName, startedAt: new Date().toISOString(), entries: [] };
+  const runLog: RunLog = { id: nextId("run"), projectId, flowId, flowName, startedAt: new Date().toISOString(), entries: [], kind: "simulate" };
   function recordLogEntry(message: string, format: LogFormat = "text"): void {
     const entry: LogEntry = { id: nextId("log"), message, format, timestamp: new Date().toISOString() };
     runLog.entries.push(entry);

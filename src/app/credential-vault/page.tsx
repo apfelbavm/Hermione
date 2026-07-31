@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createCredential, deleteCredential, getCredential, listCredentials, updateCredential } from "../../client/api";
 import { allCredentialTypeDefs, getCredentialTypeDef } from "../../credentials/registry";
@@ -127,10 +126,7 @@ export default function CredentialVaultPage() {
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Credential Vault" }]} />
-      <Link href="/" className="back-link">
-        ← Back
-      </Link>
+      <Breadcrumbs items={[{ label: "Credential Vault" }]} />
       <h1>Credential Vault</h1>
 
       <div className="create-row">

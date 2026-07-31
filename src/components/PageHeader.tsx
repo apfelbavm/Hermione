@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ThemeToggle } from "./ThemeToggle";
+import { Sidebar } from "./Sidebar";
 
 /** Shared top bar for every plain page around the Flow editor (Home/Projects/Project/Logs/
  * Credential Vault) — the editor itself has its own toolbar (see AppShellMarkup.tsx) and doesn't
@@ -20,18 +21,22 @@ export function PageHeader() {
   );
 }
 
-/** Wraps every plain page's content: a full-bleed PageHeader (see above) followed by the actual
- * page body in its own scrollable, width-capped column — mirrors the Flow editor's own
- * #toolbar-then-#main-area split (AppShellMarkup.tsx), just for the plain pages around it. Replaces
- * the old pattern of each page rendering `<main className="page-shell"><PageHeader />...</main>`
- * itself, which left PageHeader inside that same width-capped column instead of stretching full
- * width. `contentClassName` is an escape hatch for Home's own extra flex/centering needs (see
- * app/page.tsx) without every other page having to carry classes it doesn't use. */
+/** Wraps every plain page's content: a full-bleed PageHeader (see above) followed by a nav Sidebar
+ * and the actual page body side by side, in its own scrollable, width-capped column — mirrors the
+ * Flow editor's own #toolbar-then-#main-area split (AppShellMarkup.tsx), just for the plain pages
+ * around it (the editor has its own sidebars and never uses this). Replaces the old pattern of each
+ * page rendering `<main className="page-shell"><PageHeader />...</main>` itself, which left
+ * PageHeader inside that same width-capped column instead of stretching full width.
+ * `contentClassName` is an escape hatch for a page's own extra flex/centering needs without every
+ * other page having to carry classes it doesn't use. */
 export function PageShell({ children, contentClassName }: { children: ReactNode; contentClassName?: string }) {
   return (
     <div className="page-frame">
       <PageHeader />
-      <main className={contentClassName ? `page-content ${contentClassName}` : "page-content"}>{children}</main>
+      <div className="page-body">
+        <Sidebar />
+        <main className={contentClassName ? `page-content ${contentClassName}` : "page-content"}>{children}</main>
+      </div>
     </div>
   );
 }

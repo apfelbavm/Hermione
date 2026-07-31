@@ -1,91 +1,11 @@
-import { HermioneMath } from "./hermioneMath";
 import { NodeColorCategory } from "./types";
 import type { PinType } from "./types";
 
-export class Color {
-  private r: number = 0;
-  private g: number = 0;
-  private b: number = 0;
-  private a: number = 255;
-
-  constructor(r: number, g: number, b: number, a: number = 255) {
-    this.r = HermioneMath.clamp(r, 0, 255);
-    this.g = HermioneMath.clamp(g, 0, 255);
-    this.b = HermioneMath.clamp(b, 0, 255);
-    this.a = HermioneMath.clamp(a, 0, 255);
-  }
-
-  getR() {
-    return this.r;
-  }
-  getG() {
-    return this.g;
-  }
-  getB() {
-    return this.b;
-  }
-  getA() {
-    return this.a;
-  }
-
-  setR(r: number) {
-    this.r = HermioneMath.clamp(r, 0, 255);
-  }
-  setG(g: number) {
-    this.g = HermioneMath.clamp(g, 0, 255);
-  }
-  setB(b: number) {
-    this.b = HermioneMath.clamp(b, 0, 255);
-  }
-  setA(a: number) {
-    this.a = HermioneMath.clamp(a, 0, 255);
-  }
-
-  static fromHex(hex: string): Color {
-    const color = new Color(0, 0, 0, 255);
-
-    const clean = hex.replace("#", "");
-
-    if (clean.length === 6) {
-      const bigint = Number.parseInt(clean, 16);
-      color.r = (bigint >> 16) & 255;
-      color.g = (bigint >> 8) & 255;
-      color.b = bigint & 255;
-    } else if (clean.length === 8) {
-      const bigint = Number.parseInt(clean, 16);
-      color.r = (bigint >> 24) & 255;
-      color.g = (bigint >> 16) & 255;
-      color.b = (bigint >> 8) & 255;
-      color.a = bigint & 255;
-    }
-    return color;
-  }
-
-  toHex(): string {
-    const value = (((this.r & 255) << 24) | ((this.g & 255) << 16) | ((this.b & 255) << 8) | (this.a & 255)) >>> 0;
-
-    return `#${value.toString(16).padStart(8, "0").toUpperCase()}`;
-  }
-
-  toString(): string {
-    return `R: ${this.r}, G: ${this.g}, B: ${this.b}, A: ${this.a})`;
-  }
-}
-
-/** Which theme the canvas renderer should currently draw in — mirrors the `data-theme` attribute
- * ThemeToggle/the inline bootstrap script (see client/theme.ts) set on <html> for the plain pages
- * around the editor, so a single global toggle covers both the DOM chrome (styled via style.css's
- * `--pp-*` variables) and this canvas-drawn content (which CSS variables can't reach — a 2D canvas
- * context has no notion of them). Defaults to "dark" outside a browser (never actually hit — this
- * only ever runs client-side — but keeps the function total). */
 function currentGraphTheme(): "light" | "dark" {
   if (typeof document === "undefined") return "dark";
   return document.documentElement.dataset.theme === "light" ? "light" : "dark";
 }
 
-/** Surface colors (background/grid/node body/border/text) that DO follow the theme toggle — kept
- * separate from the type/category/status colors below them, which deliberately do NOT (see each
- * group's own comment). */
 interface SurfacePalette {
   canvasBg: string;
   gridLineMinor: string;
@@ -94,16 +14,8 @@ interface SurfacePalette {
   nodeBorder: string;
   textPrimary: string;
   textMuted: string;
-  /** The node's own top-edge sheen (see drawNodes.ts's drawTopHighlight) — a light-from-above
-   * highlight reads as a lightening in dark mode, but would be invisible painted the same way over
-   * a light node body, so light mode gets a faint darkening (a subtle inset shadow) instead. Split
-   * into channel/alpha rather than one rgba() string so drawTopHighlight can build both its opaque
-   * and fully-transparent gradient stops from the same color, whichever theme picked it. */
   nodeTopHighlightRgb: string;
   nodeTopHighlightAlpha: number;
-  /** The node header's own left-to-right falloff (see drawNodes.ts's headerShade gradient) — a
-   * dark falloff reads as a sheen over a dark-mode header, but the same black wash looks muddy
-   * once the rest of the chrome has gone light, so light mode ramps toward white instead. */
   headerShadeRgb: string;
 }
 
@@ -122,8 +34,8 @@ const DARK_SURFACE: SurfacePalette = {
 
 const LIGHT_SURFACE: SurfacePalette = {
   canvasBg: "#ffffff",
-  gridLineMinor: "#edeff3",
-  gridLineMajor: "#dfe4eb",
+  gridLineMinor: "#edf0f5",
+  gridLineMajor: "#e7ebf1",
   nodeBodyBg: "#edeff5",
   nodeBorder: "#c9ced4",
   textPrimary: "#1b1e22",
@@ -137,15 +49,7 @@ function surface(): SurfacePalette {
   return currentGraphTheme() === "light" ? LIGHT_SURFACE : DARK_SURFACE;
 }
 
-/** Every color constant used by the canvas renderer/overlay (was src/engine/color.ts) — plain hex
- * strings (or, for the handful that follow the light/dark toggle, getters resolving to one), not
- * Color instances, so every existing `ctx.fillStyle = Colors.NODE_BORDER`-style call site keeps
- * working unchanged regardless of which category a given constant falls into. */
 export const Colors = {
-  /** Per-pin-TYPE colors — deliberately theme-independent, EXCEPT exec: an exec wire/arrow is
-   * meant to read as "the flow of control," the same visual role as body text, so it tracks
-   * TEXT_PRIMARY (near-white on dark, near-black on light) instead of a fixed hue like every other
-   * pin type below it. */
   get PIN_COLORS(): Record<PinType, string> {
     return {
       exec: surface().textPrimary,
@@ -154,33 +58,20 @@ export const Colors = {
       string: "#c542a0",
       object: "#4f9bd6",
       date: "#d6a23b",
-      // Dark olive green — distinct from "number"'s own teal-green above — matching Unreal's enum
-      // pin color convention (see PinType's own doc comment for why it's a separate type at all).
       enum: "#1f6b45",
     };
   },
 
-  // The world-space x=0/y=0 origin axes (see drawGrid.ts) — deliberately plain black regardless of
-  // theme, heavier than even the major grid lines, so the true origin always reads as a fixed
-  // landmark on the canvas (reads fine against either a light or dark canvas background).
-  AXIS_LINE: "#000000",
+  AXIS_LINE: "#111111",
 
-  // Node category header colors, and the state/accent colors below them (selection, execution,
-  // breakpoint, latent) — same "stays fixed so it reads consistently at a glance" reasoning as
-  // PIN_COLORS above, just for categories/status instead of pin type.
   NODE_HEADER_DEFAULT: "#78818b",
   NODE_BORDER_SELECTED: "#e8b339",
 
-  /** Indexed by NodeColorCategory (engine/types.ts) — each node type declares its own
-   * `colorCategory`, resolved to a color here (see drawNodes.ts's resolveNodeHeaderColor) instead
-   * of the old scheme of matching NodeDef.group's text against a lookup table. */
   get NODE_CATEGORY_COLORS(): string[] {
     const colors: string[] = [];
     colors[NodeColorCategory.Default] = this.NODE_HEADER_DEFAULT;
     colors[NodeColorCategory.Events] = "#8a3b3b";
     colors[NodeColorCategory.Integration] = "#3b6b8a";
-    // Same color as a "number"/"date"/"boolean"/"string" pin/wire, tying the whole category to
-    // that type visually.
     colors[NodeColorCategory.Math] = this.PIN_COLORS.number;
     colors[NodeColorCategory.Date] = this.PIN_COLORS.date;
     colors[NodeColorCategory.Boolean] = this.PIN_COLORS.boolean;
