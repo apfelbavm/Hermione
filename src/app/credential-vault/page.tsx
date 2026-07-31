@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { createCredential, deleteCredential, getCredential, listCredentials, updateCredential } from "../../client/api";
 import { allCredentialTypeDefs, getCredentialTypeDef } from "../../credentials/registry";
 import type { CredentialData, CredentialSummary, CredentialTypeId } from "../../credentials/types";
-import { PageHeader } from "../../components/PageHeader";
+import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 
 const DEFAULT_TYPE: CredentialTypeId = allCredentialTypeDefs()[0].id;
@@ -126,8 +126,7 @@ export default function CredentialVaultPage() {
   }
 
   return (
-    <main className="page-shell">
-      <PageHeader />
+    <PageShell>
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Credential Vault" }]} />
       <Link href="/" className="back-link">
         ← Back
@@ -172,6 +171,6 @@ export default function CredentialVaultPage() {
           }}
         />
       )}
-    </main>
+    </PageShell>
   );
 }

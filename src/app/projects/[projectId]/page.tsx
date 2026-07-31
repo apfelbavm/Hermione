@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { createFlow, deleteFlow, getProject, listFlows, renameFlow, renameProject } from "../../../client/api";
 import type { FlowSummary, ProjectSummary } from "../../../server/models";
-import { PageHeader } from "../../../components/PageHeader";
+import { PageShell } from "../../../components/PageHeader";
 import { Breadcrumbs } from "../../../components/Breadcrumbs";
 
 export default function ProjectPage() {
@@ -58,20 +58,18 @@ export default function ProjectPage() {
 
   if (!project) {
     return (
-      <main className="page-shell">
-        <PageHeader />
+      <PageShell>
         <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Projects", href: "/projects" }]} />
         <Link href="/projects" className="back-link">
           ← Back
         </Link>
         <h1>Project not found</h1>
-      </main>
+      </PageShell>
     );
   }
 
   return (
-    <main className="page-shell">
-      <PageHeader />
+    <PageShell>
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Projects", href: "/projects" }, { label: project.name }]} />
       <Link href="/projects" className="back-link">
         ← Back
@@ -139,6 +137,6 @@ export default function ProjectPage() {
           ))}
         </ul>
       )}
-    </main>
+    </PageShell>
   );
 }

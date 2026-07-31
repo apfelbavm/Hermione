@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { createProject, deleteProject, listProjects, renameProject } from "../../client/api";
 import type { ProjectSummary } from "../../server/models";
-import { PageHeader } from "../../components/PageHeader";
+import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 
 /** No SSR-unsafe DB access happens during render — every client/api.ts call is only ever made
@@ -48,8 +48,7 @@ export default function ProjectsPage() {
   }
 
   return (
-    <main className="page-shell">
-      <PageHeader />
+    <PageShell>
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Projects" }]} />
       <Link href="/" className="back-link">
         ← Back
@@ -96,6 +95,6 @@ export default function ProjectsPage() {
           ))}
         </ul>
       )}
-    </main>
+    </PageShell>
   );
 }

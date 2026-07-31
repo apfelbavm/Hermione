@@ -1328,13 +1328,62 @@ body.resizing {
   color: var(--pp-text);
 }
 
+/* Full viewport width, no max-width — same "edge-to-edge bar above a narrower scrollable body"
+   shape as AppShellMarkup.tsx's own #toolbar. Always rendered via PageShell (see PageHeader.tsx),
+   which puts this OUTSIDE .page-content's own width cap instead of inside it. Its own content
+   (title/toggle) still sits inside .page-top-header-inner below, so it lines up with the
+   breadcrumbs/back-link/body inside .page-content instead of just floating at the true viewport
+   edge on anything wider than 860px + padding. */
 .page-top-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
+  height: 40px;
+  flex: 0 0 auto;
+  background: var(--pp-surface);
   border-bottom: 1px solid var(--pp-border);
+}
+
+/* Same max-width/margin/horizontal-padding as .page-content, so this bar's title/toggle align
+   with the breadcrumbs/back-link/body below regardless of viewport width. */
+.page-top-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* The plain-page counterpart of #app: a full-height column with the full-bleed header on top and
+   the width-capped, independently-scrolling content body (.page-content) below it. */
+.page-frame {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--pp-bg);
+  color: var(--pp-text);
+}
+
+/* height (not min-height) + its own overflow-y, since html/body are overflow: hidden globally (see
+   that rule near the top of this file) — every plain page needs to scroll internally rather than
+   relying on the page/body scrolling, or content taller than the viewport gets clipped. */
+.page-content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  max-width: 860px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 24px 32px 48px;
+}
+
+/* Home's own body needs to flex/center its hero vertically (see .landing-hero) — every other page
+   just wants .page-content's plain scrolling column, so this is opt-in via PageShell's
+   contentClassName rather than baked into .page-content itself. */
+.landing-page-content {
+  display: flex;
+  flex-direction: column;
 }
 
 .page-top-header-title {
@@ -1384,22 +1433,6 @@ body.resizing {
   color: var(--pp-text-dim);
 }
 
-.landing-page {
-  /* height (not min-height) + its own overflow-y, since html/body are overflow: hidden globally
-     (see that rule near the top of this file) — every plain page needs to scroll internally rather
-     than relying on the page/body scrolling, or content taller than the viewport gets clipped. */
-  height: 100vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  background: var(--pp-bg);
-  color: var(--pp-text);
-  padding: 24px 32px;
-  max-width: 860px;
-  margin: 0 auto;
-  width: 100%;
-}
-
 .landing-hero {
   flex: 1;
   display: flex;
@@ -1433,17 +1466,6 @@ body.resizing {
 
 .landing-link:hover {
   background: var(--pp-button-bg-hover);
-}
-
-.page-shell {
-  /* height (not min-height) + its own overflow-y — see .landing-page's identical comment above. */
-  height: 100vh;
-  overflow-y: auto;
-  background: var(--pp-bg);
-  color: var(--pp-text);
-  padding: 24px 32px 48px;
-  max-width: 860px;
-  margin: 0 auto;
 }
 
 .page-header {

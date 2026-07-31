@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageHeader";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 
 /** The app's true landing page — plain server-rendered (no localStorage/canvas involved, unlike
@@ -8,8 +8,7 @@ import { Breadcrumbs } from "../components/Breadcrumbs";
  * other plain page has one, right below its own Breadcrumbs. */
 export default function HomePage() {
   return (
-    <main className="landing-page">
-      <PageHeader />
+    <PageShell contentClassName="landing-page-content">
       <Breadcrumbs items={[{ label: "Home" }]} />
       <div className="landing-hero">
         <h1 className="landing-title">Hermione</h1>
@@ -22,6 +21,6 @@ export default function HomePage() {
           </Link>
         </div>
       </div>
-    </main>
+    </PageShell>
   );
 }
