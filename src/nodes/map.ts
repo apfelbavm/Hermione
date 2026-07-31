@@ -7,13 +7,6 @@ import type { PinDef, PinType } from "../engine/types";
 import { NodeInstance } from "../engine/nodeInstance";
 import { i18n } from "@i18n";
 
-// Sibling of array.ts/set.ts — same pure-dataflow philosophy (see array.ts's header comment), just
-// for Map<K,V>. Backed by a plain array of {key,value} entries (see the plan's rationale: no real
-// ES Map instance, since those don't survive JSON.stringify/parse and would break save/load).
-// Every map node needs BOTH a value type (NodeInstance.elementType, same field array/set nodes use)
-// AND a key type (NodeInstance.mapKeyType) configured per instance — see
-// NodeDef.configurableElementType's includeKeyType flag.
-
 const GROUP = i18n.nodes.map.group;
 
 interface MapEntry {
@@ -41,12 +34,7 @@ function jsonEq(aExpr: string, bExpr: string): string {
   return `(JSON.stringify(${aExpr}) === JSON.stringify(${bExpr}))`;
 }
 
-function mapPin(
-  valueType: PinType,
-  keyType: PinType,
-  id = "map",
-  label = i18n.nodes.map.pin_map,
-): PinDef {
+function mapPin(valueType: PinType, keyType: PinType, id = "map", label = i18n.nodes.map.pin_map): PinDef {
   return {
     id,
     label,
@@ -58,11 +46,7 @@ function mapPin(
   };
 }
 
-function mapOutPin(
-  valueType: PinType,
-  keyType: PinType,
-  label = i18n.nodes.map.pin_result,
-): PinDef {
+function mapOutPin(valueType: PinType, keyType: PinType, label = i18n.nodes.map.pin_result): PinDef {
   return {
     id: "result",
     label,
@@ -73,11 +57,7 @@ function mapOutPin(
   };
 }
 
-function keyPin(
-  keyType: PinType,
-  id = "key",
-  label = i18n.nodes.map.pin_key,
-): PinDef {
+function keyPin(keyType: PinType, id = "key", label = i18n.nodes.map.pin_key): PinDef {
   return {
     id,
     label,
@@ -87,26 +67,15 @@ function keyPin(
   };
 }
 
-function valuePin(
-  valueType: PinType,
-  id: string,
-  label: string,
-  direction: "input" | "output" = "input",
-): PinDef {
+function valuePin(valueType: PinType, id: string, label: string, direction: "input" | "output" = "input"): PinDef {
   return {
     id,
     label,
     type: valueType,
     direction,
-    defaultValue:
-      direction === "input" ? DEFAULT_VALUE_BY_TYPE[valueType] : undefined,
+    defaultValue: direction === "input" ? DEFAULT_VALUE_BY_TYPE[valueType] : undefined,
   };
 }
-
-// --- Make Map: variadic KEY+VALUE PAIRS, added/removed together — see NodeDef.onInstancePinRemoved
-// (Part D of the plan): only the value-N side is individually removable via the canvas's generic
-// right-click "Delete", and removing it takes its paired key-N along with it, so an entry can never
-// be left half-deleted.
 
 const KEY_PREFIX = "key-";
 const VALUE_PREFIX = "value-";
@@ -171,10 +140,7 @@ registerNode({
     },
     mapOutPin("number", "string"),
   ],
-  deriveInstancePins: (node) => [
-    ...makeMapEntryPins(node),
-    mapOutPin(valueTypeOf(node), keyTypeOf(node)),
-  ],
+  deriveInstancePins: (node) => [...makeMapEntryPins(node), mapOutPin(valueTypeOf(node), keyTypeOf(node))],
   addInstancePinEntry: (node) => {
     const suffixes = makeMapEntrySuffixes(node);
     const next = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -197,10 +163,7 @@ registerNode({
   }),
   compileEvaluate: ({ node, inputs }) => ({
     result: `[${makeMapEntrySuffixes(node)
-      .map(
-        (i) =>
-          `{ key: ${inputs[`${KEY_PREFIX}${i}`]}, value: ${inputs[`${VALUE_PREFIX}${i}`]} }`,
-      )
+      .map((i) => `{ key: ${inputs[`${KEY_PREFIX}${i}`]}, value: ${inputs[`${VALUE_PREFIX}${i}`]} }`)
       .join(", ")}]`,
   }),
 });
@@ -243,27 +206,15 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
-  pins: [
-    mapPin("number", "string"),
-    keyPin("string"),
-    valuePin("number", "value", "Value"),
-    mapOutPin("number", "string"),
-  ],
+  pins: [mapPin("number", "string"), keyPin("string"), valuePin("number", "value", "Value"), mapOutPin("number", "string")],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
     const k = keyTypeOf(node);
-    return [
-      mapPin(v, k),
-      keyPin(k),
-      valuePin(v, "value", "Value"),
-      mapOutPin(v, k),
-    ];
+    return [mapPin(v, k), keyPin(k), valuePin(v, "value", "Value"), mapOutPin(v, k)];
   },
   evaluate: ({ inputs }) => {
     const entries = asEntries(inputs.map).slice();
-    const index = entries.findIndex(
-      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
-    );
+    const index = entries.findIndex((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key));
     if (index !== -1) entries[index] = { key: inputs.key, value: inputs.value };
     else entries.push({ key: inputs.key, value: inputs.value });
     return { result: entries };
@@ -308,13 +259,9 @@ registerNode({
   },
   evaluate: ({ inputs }) => {
     const entries = asEntries(inputs.map);
-    const index = entries.findIndex(
-      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
-    );
+    const index = entries.findIndex((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key));
     const removed = index !== -1;
-    const result = removed
-      ? [...entries.slice(0, index), ...entries.slice(index + 1)]
-      : entries.slice();
+    const result = removed ? [...entries.slice(0, index), ...entries.slice(index + 1)] : entries.slice();
     return { result, removed };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -331,10 +278,7 @@ registerNode({
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), mapOutPin("number", "string")],
-  deriveInstancePins: (node) => [
-    mapPin(valueTypeOf(node), keyTypeOf(node)),
-    mapOutPin(valueTypeOf(node), keyTypeOf(node)),
-  ],
+  deriveInstancePins: (node) => [mapPin(valueTypeOf(node), keyTypeOf(node)), mapOutPin(valueTypeOf(node), keyTypeOf(node))],
   evaluate: () => ({ result: [] }),
   compileEvaluate: () => ({ result: "[]" }),
 });
@@ -371,9 +315,7 @@ registerNode({
     ];
   },
   evaluate: ({ inputs }) => ({
-    contains: asEntries(inputs.map).some(
-      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
-    ),
+    contains: asEntries(inputs.map).some((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key)),
   }),
   compileEvaluate: ({ inputs }) => ({
     contains: `(${compileAsEntries(inputs.map)}).some((e) => ${jsonEq("e.key", inputs.key)})`,
@@ -414,9 +356,7 @@ registerNode({
     ];
   },
   evaluate: ({ node, inputs }) => {
-    const entry = asEntries(inputs.map).find(
-      (e) => JSON.stringify(e.key) === JSON.stringify(inputs.key),
-    );
+    const entry = asEntries(inputs.map).find((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key));
     return {
       value: entry ? entry.value : DEFAULT_VALUE_BY_TYPE[valueTypeOf(node)],
       found: !!entry,
@@ -540,8 +480,6 @@ registerNode({
   }),
 });
 
-// --- Map For Each: same control-flow shape as Array/Set For Each — the one exec node in this
-// file, same documented compiler gap (no compileExecute/compileEvaluate yet).
 const MAX_MAP_FOR_EACH_ITERATIONS = 100_000;
 
 registerNode({
@@ -601,17 +539,14 @@ registerNode({
       },
     ];
   },
-  // Disabled must skip straight to "completed" — never firing "loop-body" — same rationale as
-  // flow.forLoop (see its own comment and NodeDef.disabledNextExec).
+
   disabledNextExec: ["completed"],
-  // Latent only if its body is — same reasoning as flow.forLoop. See NodeDef.latentBodyPin.
+
   latentBodyPins: () => ["loop-body"],
   execute: async ({ node, inputs, ctx }) => {
     const entries = asEntries(inputs.map);
     if (entries.length > MAX_MAP_FOR_EACH_ITERATIONS) {
-      throw new Error(
-        `Map For Each (${node.id}) would run ${entries.length} iterations, over the ${MAX_MAP_FOR_EACH_ITERATIONS} limit.`,
-      );
+      throw new Error(`Map For Each (${node.id}) would run ${entries.length} iterations, over the ${MAX_MAP_FOR_EACH_ITERATIONS} limit.`);
     }
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
     for (const entry of entries) {

@@ -127,17 +127,8 @@ interface ODataV2RequestResult {
   [key: string]: unknown;
 }
 
-const odataV2RequestExecute: (
-  baseUrl: string,
-  pageSize: number,
-  paginationType: string,
-  maxPages: number,
-  headersJson: string,
-  auth: { header?: unknown; value?: unknown } | null | undefined,
-  timeoutMs: number,
-) => Promise<ODataV2RequestResult> = new Function(
-  `${ODATA_V2_REQUEST_EXECUTE_SOURCE}\nreturn odataV2RequestExecute;`,
-)();
+const odataV2RequestExecute: (baseUrl: string, pageSize: number, paginationType: string, maxPages: number, headersJson: string, auth: { header?: unknown; value?: unknown } | null | undefined, timeoutMs: number) => Promise<ODataV2RequestResult> =
+  new Function(`${ODATA_V2_REQUEST_EXECUTE_SOURCE}\nreturn odataV2RequestExecute;`)();
 
 registerNode({
   type: "odata.v2Request",

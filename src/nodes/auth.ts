@@ -20,10 +20,7 @@ import { i18n } from "@i18n";
  * plain `btoa` this uses both here and in the compiled/codegen output below) — fine for the
  * overwhelmingly common case of ASCII usernames/passwords. Exported since oauth2AuthCode.ts's
  * "client_secret_basic" sendAs option needs the exact same client_id:client_secret encoding. */
-export function basicAuthHeaderValue(
-  username: string,
-  password: string,
-): string {
+export function basicAuthHeaderValue(username: string, password: string): string {
   return `Basic ${btoa(`${username}:${password}`)}`;
 }
 
@@ -58,10 +55,7 @@ registerNode({
   evaluate: ({ inputs }) => ({
     auth: {
       header: "Authorization",
-      value: basicAuthHeaderValue(
-        String(inputs.username ?? ""),
-        String(inputs.password ?? ""),
-      ),
+      value: basicAuthHeaderValue(String(inputs.username ?? ""), String(inputs.password ?? "")),
     },
   }),
   compileEvaluate: ({ inputs }) => ({

@@ -1,31 +1,7 @@
 import { registerNode } from "../engine/registry";
-import {
-  csvToObjects,
-  extractTabularRows,
-  jsonValueToXml,
-  objectsToCsv,
-} from "./dataFormatHelpers";
+import { csvToObjects, extractTabularRows, jsonValueToXml, objectsToCsv } from "./dataFormatHelpers";
 import { i18n } from "@i18n";
 
-// CSV <-> JSON, backed by PapaParse (see dataFormatHelpers.ts). Both nodes are latent (exec, not
-// pure) rather than a plain data node: a large file (thousands of rows x hundreds of columns) is
-// slow enough to visibly freeze the tab, and PapaParse parses a plain string fully synchronously
-// (see dataFormatHelpers.ts's own comment) — so unlike the hand-rolled parser this replaced, being
-// "latent" here is purely a UI signal (the clock icon), not something that actually yields mid-call.
-// Compiler support (compileExecute) is intentionally out of scope for now, same call still made for
-// auth.oauth2ClientCredentials — these nodes have data outputs beyond a single result, which needs
-// the compiler's compileExecuteOutputs hook (see auth.oauth2Saml/http.request for the pattern once
-// something actually needs these compiled).
-//
-// csv.toJson's "json" pin is a single object, not an Array<Object>: the rows are wrapped under a
-// caller-chosen root/row tag pair, e.g. { rows: { row: [...] } } — the same convention csv.toXml
-// already used to hand rows to jsonValueToXml (a bare array has no element name of its own to be
-// built under). Wrapping here too, rather than emitting the raw array, is what lets this node's
-// output pin (container-less "object") wire directly into other single-object JSON pins like
-// xml.fromJson's "json" input — pins only connect when their container matches exactly (see
-// registry.ts's isPinTypeCompatible), so an Array<Object> output could never reach a plain object
-// input. json.toCsv (below) unwraps the same convention via extractTabularRows so the round trip —
-// and feeding in xml.toJson's output instead — both still work.
 registerNode({
   type: "csv.toJson",
   label: i18n.nodes.csv.toJson.label,
@@ -78,10 +54,7 @@ registerNode({
   latent: true,
   execute: async ({ inputs }) => {
     try {
-      const rows = await csvToObjects(
-        String(inputs.csv ?? ""),
-        String(inputs.delimiter ?? ","),
-      );
+      const rows = await csvToObjects(String(inputs.csv ?? ""), String(inputs.delimiter ?? ","));
       const rootTag = String(inputs.rootTag ?? "").trim() || "rows";
       const rowTag = String(inputs.rowTag ?? "").trim() || "row";
       return {
@@ -141,9 +114,6 @@ registerNode({
   },
 });
 
-// CSV to XML — bridges through jsonValueToXml() (see dataFormatHelpers.ts) by wrapping the parsed
-// rows under a caller-chosen root/row tag pair, e.g. { rows: { row: [...] } }, since a bare array
-// has no XML element name of its own to be built under. (Same wrapping csv.toJson now does, above.)
 registerNode({
   type: "csv.toXml",
   label: i18n.nodes.csv.toXml.label,
@@ -151,13 +121,7 @@ registerNode({
   group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    {
-      id: "csv",
-      label: i18n.nodes.__shared.pin_csv,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
+    { id: "csv", label: i18n.nodes.__shared.pin_csv, type: "string", direction: "input", defaultValue: "" },
     {
       id: "delimiter",
       label: i18n.nodes.__shared.pin_delimiter,
@@ -196,10 +160,7 @@ registerNode({
   latent: true,
   execute: async ({ inputs }) => {
     try {
-      const rows = await csvToObjects(
-        String(inputs.csv ?? ""),
-        String(inputs.delimiter ?? ","),
-      );
+      const rows = await csvToObjects(String(inputs.csv ?? ""), String(inputs.delimiter ?? ","));
       const rootTag = String(inputs.rootTag ?? "").trim() || "rows";
       const rowTag = String(inputs.rowTag ?? "").trim() || "row";
       return {

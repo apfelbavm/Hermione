@@ -37,10 +37,7 @@ registerNode({
     return { nextExec: "exec-out" };
   },
   compileHelpers: { delay: DELAY_HELPER_SOURCE },
-  compileExecute: ({ inputs, compileFrom }) => [
-    `await delay(Number(${inputs.duration}));`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ inputs, compileFrom }) => [`await delay(Number(${inputs.duration}));`, ...compileFrom("exec-out")],
 });
 
 registerNode({
@@ -71,13 +68,7 @@ registerNode({
     },
   ],
   execute: ({ inputs }) => ({ nextExec: inputs.condition ? "true" : "false" }),
-  compileExecute: ({ inputs, compileFrom }) => [
-    `if (${inputs.condition}) {`,
-    ...indent(compileFrom("true")),
-    `} else {`,
-    ...indent(compileFrom("false")),
-    `}`,
-  ],
+  compileExecute: ({ inputs, compileFrom }) => [`if (${inputs.condition}) {`, ...indent(compileFrom("true")), `} else {`, ...indent(compileFrom("false")), `}`],
 });
 
 registerNode({
@@ -108,22 +99,11 @@ registerNode({
     },
   ],
   execute: ({ inputs }) => ({
-    nextExec:
-      inputs.object === undefined || inputs.object === null
-        ? "invalid"
-        : "valid",
+    nextExec: inputs.object === undefined || inputs.object === null ? "invalid" : "valid",
   }),
-  compileExecute: ({ inputs, compileFrom }) => [
-    `if (${inputs.object} !== undefined && ${inputs.object} !== null) {`,
-    ...indent(compileFrom("valid")),
-    `} else {`,
-    ...indent(compileFrom("invalid")),
-    `}`,
-  ],
+  compileExecute: ({ inputs, compileFrom }) => [`if (${inputs.object} !== undefined && ${inputs.object} !== null) {`, ...indent(compileFrom("valid")), `} else {`, ...indent(compileFrom("invalid")), `}`],
 });
 
-// A runaway Start/End (typo'd or wired to the wrong value) shouldn't be able to hang the whole
-// tab — same philosophy as executor.ts's MAX_EXEC_STEPS/MAX_CALL_DEPTH, just for loop iterations.
 const MAX_FOR_LOOP_ITERATIONS = 100_000;
 
 registerNode({
@@ -168,30 +148,16 @@ registerNode({
       direction: "output",
     },
   ],
-  // Disabled must skip straight to "completed" — never firing "loop-body" — rather than the
-  // generic disabled behavior of firing every exec-out pin (which would run the body once, an
-  // actual loop node's body isn't a plain continuation). See NodeDef.disabledNextExec.
+
   disabledNextExec: ["completed"],
-  // For Loop isn't itself unconditionally latent (a body with no Delay/HTTP Request/etc. completes
-  // within one tick), but if its body DOES contain one, this node shows the clock icon too — same
-  // reasoning as a Function containing a latent node. See NodeDef.latentBodyPins/latency.ts.
+
   latentBodyPins: () => ["loop-body"],
-  // Runs the ENTIRE chain wired to "loop-body" to completion once per index from Start up to AND
-  // INCLUDING End, awaiting each iteration before starting the next — mirrors function.call
-  // awaiting runFunctionCall, just walking a chain in this SAME graph instead of a function's body.
-  // "index" is exposed the same way any other exec node exposes an output: written to
-  // ctx.execOutputs before each iteration's body runs, so anything wired to Loop Body can read it
-  // via the normal input-pin resolution machinery.
   execute: async ({ node, inputs, ctx }) => {
-    // Rounded here too (not just at the literal-input widget, see PinDef.integer) since a wired
-    // Start/End can come from any number-producing node, not only a literal the user typed.
     const start = Math.round(Number(inputs.start ?? 0));
     const end = Math.round(Number(inputs.end ?? 0));
 
     if (end - start + 1 > MAX_FOR_LOOP_ITERATIONS) {
-      throw new Error(
-        `For Loop (${node.id}) would run ${end - start + 1} iterations, over the ${MAX_FOR_LOOP_ITERATIONS} limit — check its Start/End.`,
-      );
+      throw new Error(`For Loop (${node.id}) would run ${end - start + 1} iterations, over the ${MAX_FOR_LOOP_ITERATIONS} limit — check its Start/End.`);
     }
 
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
@@ -204,18 +170,7 @@ registerNode({
 
     return { nextExec: "completed" };
   },
-  // Compiler support (compileExecute/compileEvaluate) is intentionally out of scope for now — same
-  // call as function.entry/return/call in function.ts. Compiling a graph containing one throws the
-  // existing "no compileExecute"/"no compileEvaluate" error, an honest failure mode until it lands.
 });
-
-// --- Sequence: Unreal-style ordered fan-out — one exec input, N exec outputs ("Then 0", "Then 1",
-// ...), expandable via the canvas "+" affordance exactly like Append String's string slots (see
-// string.ts) — the NodeInstance's own pins ARE the source of truth for how many "then-N" pins
-// exist. Each one's ENTIRE downstream chain is awaited to completion before the next starts —
-// this needs its own execute() (rather than just returning `nextExec: [...all of them]`) because
-// runExecFrom's shared FIFO queue would otherwise interleave multiple Then branches breadth-first
-// instead of running each one all the way through first, same reasoning as For Loop's body.
 
 const THEN_PREFIX = "then-";
 const MIN_SEQUENCE_ENTRIES = 1;
@@ -261,21 +216,14 @@ registerNode({
       direction: "output",
     },
   ],
-  deriveInstancePins: (node) => [
-    { id: "exec-in", label: "", type: "exec", direction: "input" },
-    ...sequenceThenPinDefs(node),
-  ],
+  deriveInstancePins: (node) => [{ id: "exec-in", label: "", type: "exec", direction: "input" }, ...sequenceThenPinDefs(node)],
   addInstancePinEntry: (node) => {
     const suffixes = sequenceThenIds(node).map(thenSuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
     node.pins[`${THEN_PREFIX}${nextSuffix}`] = {};
   },
-  // Disabled means "run none of the Then branches" — the generic disabled behavior (fire every
-  // exec-out pin) would instead run every branch once, which is exactly backwards for a node whose
-  // whole purpose IS running its branches; there's nothing else to "continue to" from a Sequence
-  // either way (it has no pin analogous to For Loop's "completed"). See NodeDef.disabledNextExec.
+
   disabledNextExec: [],
-  // Latent only if one of its branches is — same reasoning as For Loop. See NodeDef.latentBodyPins.
   latentBodyPins: (node) => sequenceThenIds(node),
   execute: async ({ node, ctx }) => {
     for (const thenId of sequenceThenIds(node)) {
@@ -285,26 +233,7 @@ registerNode({
     }
     return {};
   },
-  // Compiler support is intentionally out of scope for now — same call as For Loop/Array,Set,Map
-  // For Each (no compileExecute yet). Disabling still compiles fine regardless (see codegen.ts's
-  // disabled branch, which never needs the node's own compileExecute).
 });
-
-// --- Parallel: fan-out into N branches ("Branch 0", "Branch 1", ...) that all start at once
-// instead of Sequence's one-at-a-time ordering — kicked off together via Promise.all rather than
-// awaited one by one, so a Delay (or any other latent node) partway down one branch no longer
-// blocks the others from making progress meanwhile. Fires the fixed "Completed" pin once every
-// branch's entire chain has finished, regardless of which one took longest — same shape as
-// JS's own Promise.all, just over runExecFrom chains instead of promises directly.
-//
-// Note on shared state: every branch's runExecFrom call shares the SAME ExecutionContext (same
-// ctx.tickCache/ctx.execOutputs) rather than getting an isolated child context, exactly like
-// Sequence's branches and For Loop's body already do — a node reachable from more than one branch
-// (or wired into by two branches that reconverge downstream) can run more than once or have its
-// per-tick cache cleared mid-flight by a sibling branch, same as Unreal's own docs warn is
-// undefined behavior for parallel nodes whose branches reconverge. Not solved here; well-formed
-// graphs (branches that don't share downstream nodes) are unaffected since pure evaluate() results
-// are deterministic regardless of how many times tickCache gets cleared between reads.
 
 const BRANCH_PREFIX = "branch-";
 const MIN_PARALLEL_BRANCHES = 1;
@@ -371,40 +300,17 @@ registerNode({
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
     node.pins[`${BRANCH_PREFIX}${nextSuffix}`] = {};
   },
-  // Disabled must skip straight to "completed" — never firing any branch — same reasoning as For
-  // Loop: "completed" is a genuine continuation point distinct from the branches themselves (unlike
-  // Sequence, which has no such pin and so fires nothing at all when disabled). See
-  // NodeDef.disabledNextExec.
+
   disabledNextExec: ["completed"],
-  // Latent if ANY branch is — same reasoning as Sequence/For Loop. See NodeDef.latentBodyPins.
   latentBodyPins: (node) => parallelBranchIds(node),
   execute: async ({ node, ctx }) => {
     const branchIds = parallelBranchIds(node);
-    await Promise.all(
-      branchIds.flatMap((branchId) =>
-        connectionsFrom(ctx.graph, node.id, branchId).map((conn) =>
-          runExecFrom(conn.toNode, conn.toPin, ctx),
-        ),
-      ),
-    );
+    await Promise.all(branchIds.flatMap((branchId) => connectionsFrom(ctx.graph, node.id, branchId).map((conn) => runExecFrom(conn.toNode, conn.toPin, ctx))));
     return { nextExec: "completed" };
   },
-  // Compiles to a native `await Promise.all([...])` wrapping one async IIFE per branch — the same
-  // shape as the interpreter's own Promise.all-over-runExecFrom, one level up: each IIFE's body is
-  // that branch's own compiled statements (which may themselves contain further `await`s, e.g. from
-  // a compiled Delay), so the compiled output genuinely interleaves branches at runtime rather than
-  // just simulating it inside the editor.
+
   compileExecute: ({ node, compileFrom }) => {
-    const branchBlocks = parallelBranchIds(node).map((branchId) => [
-      `(async () => {`,
-      ...indent(compileFrom(branchId)),
-      `})(),`,
-    ]);
-    return [
-      `await Promise.all([`,
-      ...indent(branchBlocks.flat()),
-      `]);`,
-      ...compileFrom("completed"),
-    ];
+    const branchBlocks = parallelBranchIds(node).map((branchId) => [`(async () => {`, ...indent(compileFrom(branchId)), `})(),`]);
+    return [`await Promise.all([`, ...indent(branchBlocks.flat()), `]);`, ...compileFrom("completed")];
   },
 });

@@ -82,9 +82,7 @@ registerNode({
     },
   ],
   evaluate: ({ inputs }) => ({
-    result: new Date(
-      (inputs.value || 0) as number | string | Date,
-    ).toISOString(),
+    result: new Date((inputs.value || 0) as number | string | Date).toISOString(),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `new Date(${inputs.value} || 0).toISOString()`,
@@ -182,9 +180,7 @@ registerNode({
     },
   ],
   evaluate: ({ inputs }) => ({
-    result:
-      typeof inputs.a === "string" &&
-      (inputs.a as string).toLowerCase() === (inputs.b as string).toLowerCase(),
+    result: typeof inputs.a === "string" && (inputs.a as string).toLowerCase() === (inputs.b as string).toLowerCase(),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `(typeof ${inputs.a} === "string" && ${inputs.a}.toLowerCase() === ${inputs.b}.toLowerCase())`,
@@ -254,10 +250,7 @@ registerNode({
     },
   ],
   evaluate: ({ inputs }) => ({
-    result: String(inputs.value ?? "").replace(
-      String(inputs.search ?? ""),
-      String(inputs.replacement ?? ""),
-    ),
+    result: String(inputs.value ?? "").replace(String(inputs.search ?? ""), String(inputs.replacement ?? "")),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `String(${inputs.value}).replace(String(${inputs.search}), String(${inputs.replacement}))`,
@@ -300,10 +293,7 @@ registerNode({
     },
   ],
   evaluate: ({ inputs }) => ({
-    result: String(inputs.value ?? "").replaceAll(
-      String(inputs.search ?? ""),
-      String(inputs.replacement ?? ""),
-    ),
+    result: String(inputs.value ?? "").replaceAll(String(inputs.search ?? ""), String(inputs.replacement ?? "")),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `String(${inputs.value}).replaceAll(String(${inputs.search}), String(${inputs.replacement}))`,
@@ -347,13 +337,9 @@ registerNode({
       direction: "output",
     },
   ],
-  // Rounded here too (not just at the literal-input widget, see PinDef.integer) since a wired
-  // Start/End can come from any number-producing node, not only a literal the user typed.
+
   evaluate: ({ inputs }) => ({
-    result: String(inputs.value ?? "").substring(
-      Math.round(Number(inputs.start ?? 0)),
-      Math.round(Number(inputs.end ?? 0)),
-    ),
+    result: String(inputs.value ?? "").substring(Math.round(Number(inputs.start ?? 0)), Math.round(Number(inputs.end ?? 0))),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `String(${inputs.value}).substring(Math.round(Number(${inputs.start})), Math.round(Number(${inputs.end})))`,
@@ -398,19 +384,12 @@ registerNode({
     },
   ],
   evaluate: ({ inputs }) => ({
-    result: String(inputs.value ?? "").slice(
-      Math.round(Number(inputs.start ?? 0)),
-      Math.round(Number(inputs.end ?? 0)),
-    ),
+    result: String(inputs.value ?? "").slice(Math.round(Number(inputs.start ?? 0)), Math.round(Number(inputs.end ?? 0))),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `String(${inputs.value}).slice(Math.round(Number(${inputs.start})), Math.round(Number(${inputs.end})))`,
   }),
 });
-
-// --- Append String: an Unreal-style node whose number of string inputs grows/shrinks live. Each
-// entry is stored as its own "entry-<n>" pin on the NodeInstance itself (see NodeDef.deriveInstancePins
-// in types.ts) — there's no separate "entry count" field, the pins record IS the source of truth.
 
 const ENTRY_PREFIX = "entry-";
 const MIN_APPEND_ENTRIES = 1;
@@ -467,14 +446,10 @@ registerNode({
     },
     APPEND_RESULT_PIN,
   ],
-  deriveInstancePins: (node) => [
-    ...appendEntryPinDefs(node),
-    APPEND_RESULT_PIN,
-  ],
+  deriveInstancePins: (node) => [...appendEntryPinDefs(node), APPEND_RESULT_PIN],
   addInstancePinEntry: (node) => {
     const ids = appendEntryIds(node);
-    const nextSuffix =
-      ids.length === 0 ? 0 : entrySuffix(ids[ids.length - 1]) + 1;
+    const nextSuffix = ids.length === 0 ? 0 : entrySuffix(ids[ids.length - 1]) + 1;
     node.pins[`${ENTRY_PREFIX}${nextSuffix}`] = { value: "" };
   },
   evaluate: ({ node, inputs }) => ({

@@ -1,15 +1,6 @@
 import { registerNode } from "../engine/registry";
 import { i18n } from "@i18n";
-import {
-  XML_BUILDER_IMPORT_LINE,
-  XML_BUILD_OPTIONS_LITERAL,
-  XML_IMPORT_LINE,
-  XML_PARSE_OPTIONS_LITERAL,
-  extractTabularRows,
-  jsonValueToXml,
-  objectsToCsv,
-  xmlToJsonValue,
-} from "./dataFormatHelpers";
+import { XML_BUILDER_IMPORT_LINE, XML_BUILD_OPTIONS_LITERAL, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, extractTabularRows, jsonValueToXml, objectsToCsv, xmlToJsonValue } from "./dataFormatHelpers";
 
 registerNode({
   type: "xml.toJson",
@@ -45,9 +36,6 @@ registerNode({
     }
   },
   compileEvaluate: ({ inputs }) => {
-    // Both output expressions independently re-run the same try/parse IIFE — duplicated work, but
-    // the same tradeoff array.ts's own multi-output pure nodes already accept, since compileEvaluate
-    // has no way to compute a shared intermediate once and hand it to two output-pin expressions.
     const attempt =
       `(() => { try { const __v = XMLValidator.validate(${inputs.xml}); if (__v !== true) throw new Error(__v.err.msg); ` +
       `return { json: new XMLParser(${XML_PARSE_OPTIONS_LITERAL}).parse(${inputs.xml}), success: true }; } ` +
@@ -91,9 +79,7 @@ registerNode({
     }
   },
   compileEvaluate: ({ inputs }) => {
-    const attempt =
-      `(() => { try { return { xml: new XMLBuilder(${XML_BUILD_OPTIONS_LITERAL}).build(${inputs.json}), success: true }; } ` +
-      `catch { return { xml: "", success: false }; } })()`;
+    const attempt = `(() => { try { return { xml: new XMLBuilder(${XML_BUILD_OPTIONS_LITERAL}).build(${inputs.json}), success: true }; } ` + `catch { return { xml: "", success: false }; } })()`;
     return { xml: `${attempt}.xml`, success: `${attempt}.success` };
   },
   compileImports: [XML_BUILDER_IMPORT_LINE],
@@ -134,13 +120,6 @@ registerNode({
       direction: "output",
     },
   ],
-  // Latent (exec, not pure): converting to CSV means writing out potentially thousands of rows via
-  // PapaParse's objectsToCsv (see dataFormatHelpers.ts), slow enough for a large file to visibly
-  // freeze the tab if run synchronously — being "latent" here is purely a UI signal (the clock
-  // icon), since PapaParse itself doesn't yield mid-call. Compiler support (compileExecute) is
-  // intentionally out of scope for now, same call still made for auth.oauth2ClientCredentials — this
-  // node has data outputs beyond a single result, which needs the compiler's compileExecuteOutputs
-  // hook (see auth.oauth2Saml/http.request for the pattern once something actually needs this compiled).
   latent: true,
   execute: async ({ inputs }) => {
     try {

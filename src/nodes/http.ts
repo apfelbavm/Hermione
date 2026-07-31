@@ -2,21 +2,8 @@ import { registerNode } from "../engine/registry";
 import { compileResultVar } from "../engine/compileUtils";
 import { i18n } from "@i18n";
 
-const HTTP_METHODS = [
-  "GET",
-  "POST",
-  "PUT",
-  "PATCH",
-  "DELETE",
-  "HEAD",
-  "OPTIONS",
-];
+const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
-// Written ONCE as a plain-JS source string, derived via `new Function` for the interpreter's own use
-// and embedded verbatim as this node's compileHelpers entry for the compiled path — same reasoning
-// as debug.ts's formatForLog and auth.oauth2Saml's oauth2SamlExchange, so there's exactly one
-// implementation, not two hand-kept copies that could drift. No compileImports needed:
-// fetch/AbortController/URLSearchParams/JSON are all globals in both the browser and plain Node.
 const HTTP_REQUEST_EXECUTE_SOURCE = `
 async function httpRequestExecute(url, rawMethod, headersJson, auth, body, rawTimeoutMs) {
   const method = String(rawMethod ?? "GET").toUpperCase();
@@ -79,14 +66,7 @@ interface HttpRequestResult {
   [key: string]: unknown;
 }
 
-const httpRequestExecute: (
-  url: string,
-  method: string,
-  headersJson: string,
-  auth: { header?: unknown; value?: unknown } | null | undefined,
-  body: string,
-  timeoutMs: number,
-) => Promise<HttpRequestResult> = new Function(
+const httpRequestExecute: (url: string, method: string, headersJson: string, auth: { header?: unknown; value?: unknown } | null | undefined, body: string, timeoutMs: number) => Promise<HttpRequestResult> = new Function(
   `${HTTP_REQUEST_EXECUTE_SOURCE}\nreturn httpRequestExecute;`,
 )();
 
@@ -179,10 +159,7 @@ registerNode({
     },
   ],
   latent: true,
-  // Fires exec-out exactly once, on both success AND failure (network error, timeout, bad JSON
-  // headers) — callers branch off the "success"/"error" outputs themselves via an existing Branch
-  // node, same single-exec-out convention as Delay/Send Email rather than inventing separate
-  // success/failure exec paths.
+
   execute: async ({ inputs }) => {
     const result = await httpRequestExecute(
       String(inputs.url ?? ""),

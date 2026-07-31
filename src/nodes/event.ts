@@ -20,8 +20,7 @@ registerNode({
   group: "Events",
   colorCategory: NodeColorCategory.Events,
   pins: [{ id: "exec-out", label: "", type: "exec", direction: "output" }],
-  // Editable in the Details panel when this node is selected, not as a wireable pin — see
-  // NodeDef.detailProperties.
+
   detailProperties: [
     {
       id: "intervalMs",
@@ -40,8 +39,6 @@ registerNode({
   },
 });
 
-/** The only node the editor's own Run button fires (see main.ts) — distinct from On Start/On
- * Interval, which describe how a *compiled/deployed* graph gets triggered outside the editor. */
 registerNode({
   type: "event.run",
   label: i18n.nodes.event.run.label,

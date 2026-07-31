@@ -2,11 +2,6 @@ import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
 import { i18n } from "@i18n";
 
-/** Normalizes a "date" pin's runtime value into a Date instance to operate on — a real Date
- * instance when wired from another date node, or whatever its literal `datetime-local` widget
- * holds when left unconnected (an empty/unset widget is `""`, same falsy-default treatment as
- * epoch). `new Date(existingDate)` clones it exactly, so this is safe to call even when `value`
- * is already a Date. */
 function toDate(value: unknown): Date {
   return new Date((value || 0) as number | string | Date);
 }

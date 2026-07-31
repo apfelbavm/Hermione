@@ -7,8 +7,6 @@ import type { PinDef, PinType } from "../engine/types";
 import { NodeInstance } from "../engine/nodeInstance";
 import { i18n } from "@i18n";
 
-
-
 const GROUP = i18n.nodes.array.group;
 
 function elementTypeOf(node: NodeInstance): PinType {
@@ -41,10 +39,7 @@ function arrayPin(elementType: PinType, defaultValue: unknown = []): PinDef {
 // A distinct id from arrayPin's "array" — several nodes below have BOTH an array input and an
 // array output, and pin ids must be unique within one node (they key NodeInstance.pins and
 // NodeScreenGeometry.pinScreen, both flat Records regardless of direction).
-function arrayOutPin(
-  elementType: PinType,
-  label = i18n.nodes.array.pin_result,
-): PinDef {
+function arrayOutPin(elementType: PinType, label = i18n.nodes.array.pin_result): PinDef {
   return {
     id: "result",
     label,
@@ -54,35 +49,19 @@ function arrayOutPin(
   };
 }
 
-function itemPin(
-  id: string,
-  label: string,
-  elementType: PinType,
-  direction: "input" | "output" = "input",
-): PinDef {
+function itemPin(id: string, label: string, elementType: PinType, direction: "input" | "output" = "input"): PinDef {
   return {
     id,
     label,
     type: elementType,
     direction,
-    defaultValue:
-      direction === "input" ? DEFAULT_VALUE_BY_TYPE[elementType] : undefined,
+    defaultValue: direction === "input" ? DEFAULT_VALUE_BY_TYPE[elementType] : undefined,
   };
 }
 
-function indexPin(
-  id = "index",
-  label = i18n.nodes.__shared.pin_index,
-  direction: "input" | "output" = "input",
-): PinDef {
-  return direction === "input"
-    ? { id, label, type: "number", direction, defaultValue: 0, integer: true }
-    : { id, label, type: "number", direction };
+function indexPin(id = "index", label = i18n.nodes.__shared.pin_index, direction: "input" | "output" = "input"): PinDef {
+  return direction === "input" ? { id, label, type: "number", direction, defaultValue: 0, integer: true } : { id, label, type: "number", direction };
 }
-
-// --- Make Array: Unreal-style variadic constructor, one input pin per element, element type
-// configurable per instance. Storage/expansion mechanism mirrors Append String exactly (see
-// string.ts) — the NodeInstance's own pins ARE the source of truth for how many entries exist.
 
 const ENTRY_PREFIX = "entry-";
 
@@ -126,10 +105,7 @@ registerNode({
     },
     arrayOutPin("number"),
   ],
-  deriveInstancePins: (node) => [
-    ...makeArrayEntryPins(node),
-    arrayOutPin(elementTypeOf(node)),
-  ],
+  deriveInstancePins: (node) => [...makeArrayEntryPins(node), arrayOutPin(elementTypeOf(node))],
   addInstancePinEntry: (node) => {
     const suffixes = makeArrayEntryIds(node).map(entrySuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -343,11 +319,7 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      { ...arrayPin(t), id: "a", label: i18n.nodes.array.append.pin_array_a },
-      { ...arrayPin(t), id: "b", label: i18n.nodes.array.append.pin_array_b },
-      arrayOutPin(t),
-    ];
+    return [{ ...arrayPin(t), id: "a", label: i18n.nodes.array.append.pin_array_a }, { ...arrayPin(t), id: "b", label: i18n.nodes.array.append.pin_array_b }, arrayOutPin(t)];
   },
   evaluate: ({ inputs }) => ({
     result: [...asArray(inputs.a), ...asArray(inputs.b)],
@@ -364,27 +336,14 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    arrayPin("number"),
-    indexPin(),
-    itemPin("item", i18n.nodes.__shared.pin_item, "number"),
-    arrayOutPin("number"),
-  ],
+  pins: [arrayPin("number"), indexPin(), itemPin("item", i18n.nodes.__shared.pin_item, "number"), arrayOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      arrayPin(t),
-      indexPin(),
-      itemPin("item", i18n.nodes.__shared.pin_item, t),
-      arrayOutPin(t),
-    ];
+    return [arrayPin(t), indexPin(), itemPin("item", i18n.nodes.__shared.pin_item, t), arrayOutPin(t)];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
-    const index = Math.max(
-      0,
-      Math.min(arr.length, Math.trunc(Number(inputs.index ?? 0))),
-    );
+    const index = Math.max(0, Math.min(arr.length, Math.trunc(Number(inputs.index ?? 0))));
     arr.splice(index, 0, inputs.item);
     return { result: arr };
   },
@@ -475,9 +434,7 @@ registerNode({
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
-    const index = arr.findIndex(
-      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
-    );
+    const index = arr.findIndex((v) => JSON.stringify(v) === JSON.stringify(inputs.item));
     const removed = index !== -1;
     if (removed) arr.splice(index, 1);
     return { result: arr, removed };
@@ -535,9 +492,7 @@ registerNode({
     ];
   },
   evaluate: ({ inputs }) => ({
-    contains: asArray(inputs.array).some(
-      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
-    ),
+    contains: asArray(inputs.array).some((v) => JSON.stringify(v) === JSON.stringify(inputs.item)),
   }),
   compileEvaluate: ({ inputs }) => ({
     contains: `(${compileAsArray(inputs.array)}).some((v) => ${jsonEq("v", inputs.item)})`,
@@ -575,9 +530,7 @@ registerNode({
     ];
   },
   evaluate: ({ inputs }) => ({
-    index: asArray(inputs.array).findIndex(
-      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
-    ),
+    index: asArray(inputs.array).findIndex((v) => JSON.stringify(v) === JSON.stringify(inputs.item)),
   }),
   compileEvaluate: ({ inputs }) => ({
     index: `(${compileAsArray(inputs.array)}).findIndex((v) => ${jsonEq("v", inputs.item)})`,
@@ -704,9 +657,7 @@ registerNode({
   execute: async ({ node, inputs, ctx }) => {
     const arr = asArray(inputs.array);
     if (arr.length > MAX_ARRAY_FOR_EACH_ITERATIONS) {
-      throw new Error(
-        `Array For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_ARRAY_FOR_EACH_ITERATIONS} limit.`,
-      );
+      throw new Error(`Array For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_ARRAY_FOR_EACH_ITERATIONS} limit.`);
     }
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
     for (let i = 0; i < arr.length; i++) {

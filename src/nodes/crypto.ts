@@ -20,12 +20,8 @@ function errorMessage(err: unknown): string {
 // "experimentalGCM" is deliberately excluded: openpgp.js's own docs mark it non-standard/unstable,
 // not something to offer as a normal choice alongside eax/ocb/gcm.
 const PGP_SYMMETRIC_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.symmetric);
-const PGP_COMPRESSION_ALGORITHM_OPTIONS = Object.keys(
-  openpgp.enums.compression,
-);
-const PGP_AEAD_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.aead).filter(
-  (k) => k !== "experimentalGCM",
-);
+const PGP_COMPRESSION_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.compression);
+const PGP_AEAD_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.aead).filter((k) => k !== "experimentalGCM");
 
 registerNode({
   type: "crypto.pgpEncrypt",
@@ -148,23 +144,10 @@ registerNode({
       const config = inputs.autoDetectSettings
         ? undefined
         : {
-            preferredSymmetricAlgorithm:
-              openpgp.enums.symmetric[
-                String(
-                  inputs.symmetricAlgorithm,
-                ) as keyof typeof openpgp.enums.symmetric
-              ],
-            preferredCompressionAlgorithm:
-              openpgp.enums.compression[
-                String(
-                  inputs.compressionAlgorithm,
-                ) as keyof typeof openpgp.enums.compression
-              ],
+            preferredSymmetricAlgorithm: openpgp.enums.symmetric[String(inputs.symmetricAlgorithm) as keyof typeof openpgp.enums.symmetric],
+            preferredCompressionAlgorithm: openpgp.enums.compression[String(inputs.compressionAlgorithm) as keyof typeof openpgp.enums.compression],
             aeadProtect: Boolean(inputs.aeadProtect),
-            preferredAEADAlgorithm:
-              openpgp.enums.aead[
-                String(inputs.aeadAlgorithm) as keyof typeof openpgp.enums.aead
-              ],
+            preferredAEADAlgorithm: openpgp.enums.aead[String(inputs.aeadAlgorithm) as keyof typeof openpgp.enums.aead],
             showVersion: Boolean(inputs.showVersion),
             versionString: String(inputs.versionString ?? ""),
             showComment: Boolean(inputs.showComment),
@@ -304,17 +287,14 @@ registerNode({
         armoredKey: String(inputs.privateKeyArmored ?? ""),
       });
       const passphrase = String(inputs.passphrase ?? "");
-      if (passphrase)
-        privateKey = await openpgp.decryptKey({ privateKey, passphrase });
+      if (passphrase) privateKey = await openpgp.decryptKey({ privateKey, passphrase });
       const message = await openpgp.readMessage({
         armoredMessage: String(inputs.encryptedArmored ?? ""),
       });
       const config = inputs.autoDetectSettings
         ? undefined
         : {
-            allowUnauthenticatedMessages: Boolean(
-              inputs.allowUnauthenticatedMessages,
-            ),
+            allowUnauthenticatedMessages: Boolean(inputs.allowUnauthenticatedMessages),
             minRSABits: Number(inputs.minRSABits),
           };
       const { data: plaintext } = await openpgp.decrypt({
@@ -435,14 +415,10 @@ registerNode({
   ],
   execute: async ({ inputs }) => {
     try {
-      const cert = forge.pki.certificateFromPem(
-        String(inputs.recipientCertPem ?? ""),
-      );
+      const cert = forge.pki.certificateFromPem(String(inputs.recipientCertPem ?? ""));
       const p7 = forge.pkcs7.createEnvelopedData();
       p7.addRecipient(cert);
-      p7.content = forge.util.createBuffer(
-        forge.util.encodeUtf8(String(inputs.plaintext ?? "")),
-      );
+      p7.content = forge.util.createBuffer(forge.util.encodeUtf8(String(inputs.plaintext ?? "")));
       if (inputs.autoDetectSettings) {
         p7.encrypt();
       } else {
@@ -451,9 +427,7 @@ registerNode({
       }
       // @types/node-forge types messageToPem as accepting only PkcsSignedData — it works identically
       // for PkcsEnvelopedData at runtime (both just serialize via .toAsn1()); the .d.ts is just narrow.
-      const envelopedDataPem = forge.pkcs7.messageToPem(
-        p7 as unknown as forge.pkcs7.PkcsSignedData,
-      );
+      const envelopedDataPem = forge.pkcs7.messageToPem(p7 as unknown as forge.pkcs7.PkcsSignedData);
       return {
         nextExec: "exec-out",
         outputs: { envelopedDataPem, success: true, error: "" },
@@ -546,18 +520,12 @@ registerNode({
   // its own matching-certificate input to pick the right one via forge's own p7.findRecipient(cert).
   execute: async ({ inputs }) => {
     try {
-      const message = forge.pkcs7.messageFromPem(
-        String(inputs.envelopedDataPem ?? ""),
-      ) as forge.pkcs7.PkcsEnvelopedData;
-      const privateKey = forge.pki.privateKeyFromPem(
-        String(inputs.privateKeyPem ?? ""),
-      );
+      const message = forge.pkcs7.messageFromPem(String(inputs.envelopedDataPem ?? "")) as forge.pkcs7.PkcsEnvelopedData;
+      const privateKey = forge.pki.privateKeyFromPem(String(inputs.privateKeyPem ?? ""));
       const recipient = message.recipients[0];
       if (!recipient) throw new Error("Enveloped data has no recipients");
       message.decrypt(recipient, privateKey);
-      const plaintext = forge.util.decodeUtf8(
-        (message.content as forge.util.ByteStringBuffer).getBytes(),
-      );
+      const plaintext = forge.util.decodeUtf8((message.content as forge.util.ByteStringBuffer).getBytes());
       return {
         nextExec: "exec-out",
         outputs: { plaintext, success: true, error: "" },

@@ -250,8 +250,7 @@ registerNode({
       success: false,
       skipped: false,
       attempts: 0,
-      error:
-        'SFTP Upload only runs in the compiled output (under Node.js) — the in-browser "Run" button has no way to open a real SSH/SFTP connection. Compile this graph and run the generated script to actually upload.',
+      error: 'SFTP Upload only runs in the compiled output (under Node.js) — the in-browser "Run" button has no way to open a real SSH/SFTP connection. Compile this graph and run the generated script to actually upload.',
     },
   }),
   compileExecute: ({ node, inputs, compileFrom }) => [
