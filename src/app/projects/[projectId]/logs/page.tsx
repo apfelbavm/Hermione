@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { i18n } from "@i18n";
 import { getProject, listRuns } from "../../../../client/api";
 import { MAX_RUNS_PER_PROJECT } from "../../../../shared/runLogConstants";
 import type { ProjectSummary, RunLog } from "../../../../server/models";
@@ -25,14 +26,28 @@ export default function LogsPage() {
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Projects", href: "/projects" }, { label: project?.name ?? "Project", href: `/projects/${projectId}` }, { label: "Logs" }]} />
+      <Breadcrumbs
+        items={[
+          { label: i18n.pages.projects.title, href: "/projects" },
+          {
+            label: project?.name ?? i18n.pages.project_logs.project_fallback,
+            href: `/projects/${projectId}`,
+          },
+          { label: i18n.pages.logs.page_title },
+        ]}
+      />
       <Link href={`/projects/${projectId}`} className="back-link">
-        ← Back
+        {i18n.pages.project_logs.back}
       </Link>
-      <h1>Run Logs</h1>
-      <p className="page-empty-note">Showing the latest {MAX_RUNS_PER_PROJECT} runs (grouped by run — expand one to inspect its individual log entries).</p>
+      <h1>{i18n.pages.project_logs.title}</h1>
+      <p className="page-empty-note">
+        {i18n.pages.project_logs.description.replace(
+          "{max}",
+          String(MAX_RUNS_PER_PROJECT),
+        )}
+      </p>
       {runs.length === 0 ? (
-        <p className="page-empty-note">No runs yet — simulate a Flow to see its logs here.</p>
+        <p className="page-empty-note">{i18n.pages.project_logs.empty}</p>
       ) : (
         <ul className="run-list">
           {runs.map((run) => (

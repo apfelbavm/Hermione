@@ -2,15 +2,37 @@
 
 import { useEffect, useState } from "react";
 import { registerBuiltins } from "../nodes";
-import { connectPins, insertRerouteOnConnection, nextId, removeInstancePin } from "../engine/graphMutations";
-import { canCollapseSelectionToFunction, collapseSelectionToFunction } from "../engine/collapseToFunction";
+import {
+  connectPins,
+  insertRerouteOnConnection,
+  nextId,
+  removeInstancePin,
+} from "../engine/graphMutations";
+import {
+  canCollapseSelectionToFunction,
+  collapseSelectionToFunction,
+} from "../engine/collapseToFunction";
 import { connectionsTouchingPin } from "../engine/graphQueries";
-import { allNodeDefs, findCompatibleNodeDefs, getNodeDef, isPinTypeCompatible, topLevelGroup } from "../engine/registry";
-import type { CodeScriptDef, FunctionDef, NodeDef, Variable } from "../engine/types";
+import {
+  allNodeDefs,
+  findCompatibleNodeDefs,
+  getNodeDef,
+  isPinTypeCompatible,
+  topLevelGroup,
+} from "../engine/registry";
+import type {
+  CodeScriptDef,
+  FunctionDef,
+  NodeDef,
+  Variable,
+} from "../engine/types";
 import { buildDemoGraph } from "../demoGraph";
 import { Graph } from "../engine/graph";
 import { Camera } from "../render/camera";
-import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGeometry";
+import {
+  computeAllNodeGeometries,
+  computeNodeWorldRect,
+} from "../render/nodeGeometry";
 import { hitTestNode, hitTestPin, hitTestWire } from "../render/hitTest";
 import { drawComments } from "../render/drawComments";
 import { drawGrid, snapPositionToGrid } from "../render/drawGrid";
@@ -18,9 +40,19 @@ import { drawMouseCoordinates, drawSimulatingLabel } from "../render/drawHud";
 import { drawNodes } from "../render/drawNodes";
 import { drawWires, drawWireDragPreview } from "../render/drawWires";
 import { drawMarqueeSelection } from "../render/drawMarquee";
-import { createStore, getEditingGraph, getVisibleVariablesForState, openFunctionTab } from "../state/store";
+import {
+  createStore,
+  getEditingGraph,
+  getVisibleVariablesForState,
+  openFunctionTab,
+} from "../state/store";
 import { createHistoryManager } from "../state/history";
-import { selectAllCommentBoxes, selectAllNodes, setupPointerInteraction, type WireAnchor } from "../interaction/pointerHandlers";
+import {
+  selectAllCommentBoxes,
+  selectAllNodes,
+  setupPointerInteraction,
+  type WireAnchor,
+} from "../interaction/pointerHandlers";
 import { createWidgetSync } from "../overlay/widgetSync";
 import { createNodeDescriptionOverlay } from "../overlay/nodeDescriptionOverlay";
 import { setupNodeHoverTooltip } from "../overlay/nodeTooltip";
@@ -28,8 +60,15 @@ import { createCommentOverlay } from "../overlay/commentOverlay";
 import { useResizablePanels } from "./useResizablePanels";
 import { createScriptEditor } from "../overlay/scriptEditor";
 import { openNodeSearchMenu } from "../overlay/nodeSearchMenu";
-import { FUNCTION_DRAG_MIME, SCRIPT_DRAG_MIME, VARIABLE_DRAG_MIME } from "../overlay/dragTypes";
-import { openRowContextMenu, type ContextMenuItem } from "../overlay/rowContextMenu";
+import {
+  FUNCTION_DRAG_MIME,
+  SCRIPT_DRAG_MIME,
+  VARIABLE_DRAG_MIME,
+} from "../overlay/dragTypes";
+import {
+  openRowContextMenu,
+  type ContextMenuItem,
+} from "../overlay/rowContextMenu";
 import { nextAvailableName } from "../overlay/uniqueName";
 import { deserializeGraph, loadGraphFromFile } from "../persistence/load";
 import { downloadGraphAsFile, serializeGraph } from "../persistence/save";
@@ -39,6 +78,7 @@ import { deployFlow, getFlowWithGraph, saveFlowGraph } from "../client/api";
 import { isNodeLatent } from "../engine/latency";
 import { NodeInstance } from "../engine/nodeInstance";
 import AppShellMarkup from "./AppShellMarkup";
+import { i18n } from "@i18n";
 
 registerBuiltins();
 
@@ -46,7 +86,9 @@ registerBuiltins();
  * can't be read with the browser's `EventSource` (it doesn't support POST bodies), so the stream
  * is read and split by hand instead — SSE frames are separated by a blank line, with `event:`/
  * `data:` prefixed lines inside each frame. */
-async function* readServerSentEvents(response: Response): AsyncGenerator<{ event: string; data: unknown }> {
+async function* readServerSentEvents(
+  response: Response,
+): AsyncGenerator<{ event: string; data: unknown }> {
   const reader = response.body?.getReader();
   if (!reader) return;
   const decoder = new TextDecoder();
@@ -80,7 +122,13 @@ async function* readServerSentEvents(response: Response): AsyncGenerator<{ event
  * browser at all — it POSTs the graph to /api/simulate and drives the exact same
  * executingNodeId/firedConnectionIds/log state from the server's streamed events instead of a
  * local ExecutionContext. See src/app/api/simulate/route.ts for the server side. */
-export default function AppShell({ projectId, flowId }: { projectId: string; flowId: string }) {
+export default function AppShell({
+  projectId,
+  flowId,
+}: {
+  projectId: string;
+  flowId: string;
+}) {
   // Lazy-initialized once, on first client render, with a trivial placeholder graph — the real one
   // now lives in a database reachable only through /api/projects/.../flows/.../graph (see
   // client/api.ts's getFlowWithGraph), so it can't be read synchronously here the way localStorage
@@ -115,26 +163,62 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
   useEffect(() => {
     const canvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
-    const container = document.getElementById("canvas-container") as HTMLDivElement;
+    const container = document.getElementById(
+      "canvas-container",
+    ) as HTMLDivElement;
     const overlay = document.getElementById("overlay") as HTMLDivElement;
     const logPanel = document.getElementById("log-panel") as HTMLDivElement;
-    const logClearButton = document.getElementById("log-clear-button") as HTMLButtonElement;
-    const logTabsDynamic = document.getElementById("log-tabs-dynamic") as HTMLDivElement;
-    const monacoContainer = document.getElementById("monaco-container") as HTMLDivElement;
-    const logSaveButton = document.getElementById("log-save-button") as HTMLButtonElement;
-    const logSaveStatus = document.getElementById("log-save-status") as HTMLSpanElement;
-    const runButton = document.getElementById("run-button") as HTMLButtonElement;
-    const pauseButton = document.getElementById("pause-button") as HTMLButtonElement;
-    const continueButton = document.getElementById("continue-button") as HTMLButtonElement;
-    const stopButton = document.getElementById("stop-button") as HTMLButtonElement;
-    const saveButton = document.getElementById("save-button") as HTMLButtonElement;
-    const loadButton = document.getElementById("load-button") as HTMLButtonElement;
-    const downloadButton = document.getElementById("download-button") as HTMLButtonElement;
-    const deployButton = document.getElementById("deploy-button") as HTMLButtonElement;
-    const snapToGridCheckbox = document.getElementById("snap-to-grid-checkbox") as HTMLInputElement;
-    const autoPanCheckbox = document.getElementById("auto-pan-checkbox") as HTMLInputElement;
-    const frameAllButton = document.getElementById("frame-all-button") as HTMLButtonElement;
-    const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
+    const logClearButton = document.getElementById(
+      "log-clear-button",
+    ) as HTMLButtonElement;
+    const logTabsDynamic = document.getElementById(
+      "log-tabs-dynamic",
+    ) as HTMLDivElement;
+    const monacoContainer = document.getElementById(
+      "monaco-container",
+    ) as HTMLDivElement;
+    const logSaveButton = document.getElementById(
+      "log-save-button",
+    ) as HTMLButtonElement;
+    const logSaveStatus = document.getElementById(
+      "log-save-status",
+    ) as HTMLSpanElement;
+    const runButton = document.getElementById(
+      "run-button",
+    ) as HTMLButtonElement;
+    const pauseButton = document.getElementById(
+      "pause-button",
+    ) as HTMLButtonElement;
+    const continueButton = document.getElementById(
+      "continue-button",
+    ) as HTMLButtonElement;
+    const stopButton = document.getElementById(
+      "stop-button",
+    ) as HTMLButtonElement;
+    const saveButton = document.getElementById(
+      "save-button",
+    ) as HTMLButtonElement;
+    const loadButton = document.getElementById(
+      "load-button",
+    ) as HTMLButtonElement;
+    const downloadButton = document.getElementById(
+      "download-button",
+    ) as HTMLButtonElement;
+    const deployButton = document.getElementById(
+      "deploy-button",
+    ) as HTMLButtonElement;
+    const snapToGridCheckbox = document.getElementById(
+      "snap-to-grid-checkbox",
+    ) as HTMLInputElement;
+    const autoPanCheckbox = document.getElementById(
+      "auto-pan-checkbox",
+    ) as HTMLInputElement;
+    const frameAllButton = document.getElementById(
+      "frame-all-button",
+    ) as HTMLButtonElement;
+    const loadFileInput = document.getElementById(
+      "load-file-input",
+    ) as HTMLInputElement;
     const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
     if (!ctx) throw new Error("Canvas 2D context unavailable");
 
@@ -150,10 +234,15 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         const { flow, graphJson } = await getFlowWithGraph(projectId, flowId);
         if (cancelledLoad) return;
         flowName = flow.name;
-        store.state.rootGraph = graphJson ? deserializeGraph(graphJson) : buildDemoGraph();
+        store.state.rootGraph = graphJson
+          ? deserializeGraph(graphJson)
+          : buildDemoGraph();
         store.notify();
       } catch (err) {
-        appendLog(`Failed to load Flow: ${err instanceof Error ? err.message : String(err)}`);
+        appendLog(
+          i18n.components.app_shell.load_flow_failed +
+            (err instanceof Error ? err.message : String(err)),
+        );
       }
     })();
 
@@ -169,7 +258,10 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     }
     function onWindowMouseMove(e: MouseEvent): void {
       const rect = canvas.getBoundingClientRect();
-      lastMouseScreenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      lastMouseScreenPos = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
       scheduleCanvasRedraw();
     }
     window.addEventListener("mousemove", onWindowMouseMove);
@@ -217,7 +309,15 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     );
 
     function renderCanvas(): void {
-      const { camera, selectedNodeIds, selectedCommentIds, executingNodeId, firedConnectionIds, wireDrag, marqueeSelection } = store.state;
+      const {
+        camera,
+        selectedNodeIds,
+        selectedCommentIds,
+        executingNodeId,
+        firedConnectionIds,
+        wireDrag,
+        marqueeSelection,
+      } = store.state;
       const graph = getEditingGraph(store.state);
       const variables = getVisibleVariablesForState(store.state);
       const functions = store.state.rootGraph.functions;
@@ -227,14 +327,51 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
       drawGrid(ctx, camera, width, height);
       drawComments(ctx, graph, camera, selectedCommentIds);
-      const geometries = computeAllNodeGeometries(graph, camera, variables, functions, scripts);
-      drawWires(ctx, graph, camera, geometries, firedConnectionIds, variables, functions, scripts);
+      const geometries = computeAllNodeGeometries(
+        graph,
+        camera,
+        variables,
+        functions,
+        scripts,
+      );
+      drawWires(
+        ctx,
+        graph,
+        camera,
+        geometries,
+        firedConnectionIds,
+        variables,
+        functions,
+        scripts,
+      );
       if (wireDrag) drawWireDragPreview(ctx, wireDrag);
-      const latentNodeIds = new Set(graph.nodes.filter((n) => isNodeLatent(n, graph, store.state.rootGraph)).map((n) => n.id));
-      drawNodes(ctx, graph, camera, geometries, selectedNodeIds, executingNodeId, variables, functions, scripts, latentNodeIds, store.state.simulating);
+      const latentNodeIds = new Set(
+        graph.nodes
+          .filter((n) => isNodeLatent(n, graph, store.state.rootGraph))
+          .map((n) => n.id),
+      );
+      drawNodes(
+        ctx,
+        graph,
+        camera,
+        geometries,
+        selectedNodeIds,
+        executingNodeId,
+        variables,
+        functions,
+        scripts,
+        latentNodeIds,
+        store.state.simulating,
+      );
       if (marqueeSelection) drawMarqueeSelection(ctx, camera, marqueeSelection);
       if (store.state.simulating) drawSimulatingLabel(ctx, width, height);
-      else drawMouseCoordinates(ctx, camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y), width, height);
+      else
+        drawMouseCoordinates(
+          ctx,
+          camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y),
+          width,
+          height,
+        );
       widgetSync.sync(geometries);
       commentOverlay.sync();
       nodeDescriptionOverlay.sync(geometries);
@@ -284,29 +421,53 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     }
     snapToGridCheckbox.addEventListener("change", onSnapToGridChange);
 
-    function applySnapIfEnabled(worldPos: { x: number; y: number }): { x: number; y: number } {
+    function applySnapIfEnabled(worldPos: { x: number; y: number }): {
+      x: number;
+      y: number;
+    } {
       return store.state.snapToGrid ? snapPositionToGrid(worldPos) : worldPos;
     }
 
     function filterCreatableHere(defs: NodeDef[]): NodeDef[] {
       const graph = getEditingGraph(store.state);
       const isFunctionBody = store.state.activeFunctionId !== null;
-      return defs.filter((def) => topLevelGroup(def.group) !== "Internal" && graph.canPlaceNodeType(def.type, isFunctionBody));
+      return defs.filter(
+        (def) =>
+          topLevelGroup(def.group) !== "Internal" &&
+          graph.canPlaceNodeType(def.type, isFunctionBody),
+      );
     }
 
-    function createNodeAndMaybeConnect(def: NodeDef, worldPos: { x: number; y: number }, anchors: WireAnchor[] = []): void {
+    function createNodeAndMaybeConnect(
+      def: NodeDef,
+      worldPos: { x: number; y: number },
+      anchors: WireAnchor[] = [],
+    ): void {
       const graph = getEditingGraph(store.state);
-      const node = NodeInstance.createNodeInstance(def.type, applySnapIfEnabled(worldPos), def.pins);
+      const node = NodeInstance.createNodeInstance(
+        def.type,
+        applySnapIfEnabled(worldPos),
+        def.pins,
+      );
       graph.addNode(node);
 
       if (anchors.length > 0) {
-        const wantDirection = anchors[0].pin.direction === "output" ? "input" : "output";
-        const matchPin = def.pins.find((p) => p.direction === wantDirection && isPinTypeCompatible(anchors[0].pin, p));
+        const wantDirection =
+          anchors[0].pin.direction === "output" ? "input" : "output";
+        const matchPin = def.pins.find(
+          (p) =>
+            p.direction === wantDirection &&
+            isPinTypeCompatible(anchors[0].pin, p),
+        );
         if (matchPin) {
           for (const anchor of anchors) {
             const anchorIsOutput = anchor.pin.direction === "output";
-            const outputEnd = anchorIsOutput ? anchor : { nodeId: node.id, pinId: matchPin.id };
-            const inputEnd = anchorIsOutput ? { nodeId: node.id, pinId: matchPin.id } : anchor;
+            const outputEnd = anchorIsOutput
+              ? anchor
+              : { nodeId: node.id, pinId: matchPin.id };
+            const inputEnd = anchorIsOutput
+              ? { nodeId: node.id, pinId: matchPin.id }
+              : anchor;
             connectPins(
               graph,
               getVisibleVariablesForState(store.state),
@@ -329,8 +490,13 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     const pointerInteraction = setupPointerInteraction(canvas, store, history, {
       onWireDroppedInEmptySpace: (anchors, screenPos) => {
         const shared = anchors[0].pin;
-        const candidates = filterCreatableHere(findCompatibleNodeDefs(shared, shared.direction));
-        const worldPos = store.state.camera.screenToWorld(screenPos.x, screenPos.y);
+        const candidates = filterCreatableHere(
+          findCompatibleNodeDefs(shared, shared.direction),
+        );
+        const worldPos = store.state.camera.screenToWorld(
+          screenPos.x,
+          screenPos.y,
+        );
         openNodeSearchMenu(overlay, {
           screenPos,
           candidates,
@@ -351,14 +517,20 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       const variables = getVisibleVariablesForState(store.state);
       const functions = store.state.rootGraph.functions;
       const scripts = store.state.rootGraph.scripts;
-      const geometries = computeAllNodeGeometries(graph, store.state.camera, variables, functions, scripts);
+      const geometries = computeAllNodeGeometries(
+        graph,
+        store.state.camera,
+        variables,
+        functions,
+        scripts,
+      );
       const pinHit = hitTestPin(graph, geometries, screenPos.x, screenPos.y);
       if (pinHit) {
         const items: ContextMenuItem[] = [];
 
         if (pinHit.pin.removable) {
           items.push({
-            label: "Delete",
+            label: i18n.components.app_shell.ctx_delete_pin,
             onClick: () => {
               removeInstancePin(graph, pinHit.nodeId, pinHit.pinId);
               store.notify();
@@ -366,13 +538,30 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
           });
         }
 
-        const touching = connectionsTouchingPin(graph, pinHit.nodeId, pinHit.pinId);
+        const touching = connectionsTouchingPin(
+          graph,
+          pinHit.nodeId,
+          pinHit.pinId,
+        );
         for (const conn of touching) {
-          const otherIsFromEnd = conn.toNode === pinHit.nodeId && conn.toPin === pinHit.pinId;
-          const otherNode = graph.nodes.find((n) => n.id === (otherIsFromEnd ? conn.fromNode : conn.toNode));
-          const otherLabel = otherNode ? otherNode.resolveNodeLabel(getNodeDef(otherNode.type), variables, functions, scripts) : "?";
+          const otherIsFromEnd =
+            conn.toNode === pinHit.nodeId && conn.toPin === pinHit.pinId;
+          const otherNode = graph.nodes.find(
+            (n) => n.id === (otherIsFromEnd ? conn.fromNode : conn.toNode),
+          );
+          const otherLabel = otherNode
+            ? otherNode.resolveNodeLabel(
+                getNodeDef(otherNode.type),
+                variables,
+                functions,
+                scripts,
+              )
+            : "?";
           items.push({
-            label: touching.length > 1 ? `Break Connection → ${otherLabel}` : "Break Connection",
+            label:
+              touching.length > 1
+                ? `${i18n.components.app_shell.ctx_break_connection_to}${otherLabel}`
+                : i18n.components.app_shell.ctx_break_connection,
             onClick: () => {
               graph.removeConnection(variables, functions, conn.id, scripts);
               store.notify();
@@ -397,7 +586,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
         const items: ContextMenuItem[] = [
           {
-            label: "Delete (Del)",
+            label: i18n.components.app_shell.ctx_delete,
             onClick: () => {
               graph.removeNode(variables, functions, node.id, scripts);
               store.notify();
@@ -407,14 +596,29 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
         const selection = store.state.selectedNodeIds;
         items.push({
-          label: "Collapse to Function",
-          disabled: !canCollapseSelectionToFunction(store.state.rootGraph, graph, selection, variables, functions, scripts),
+          label: i18n.components.app_shell.ctx_collapse_to_function,
+          disabled: !canCollapseSelectionToFunction(
+            store.state.rootGraph,
+            graph,
+            selection,
+            variables,
+            functions,
+            scripts,
+          ),
           onClick: () => {
             const name = nextAvailableName(
               store.state.rootGraph.functions.map((f) => f.name),
               "NewFunction",
             );
-            const { callNodeId } = collapseSelectionToFunction(store.state.rootGraph, graph, selection, variables, functions, scripts, name);
+            const { callNodeId } = collapseSelectionToFunction(
+              store.state.rootGraph,
+              graph,
+              selection,
+              variables,
+              functions,
+              scripts,
+              name,
+            );
             store.state.selectedNodeIds = new Set([callNodeId]);
             store.notify();
           },
@@ -422,9 +626,18 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
         if (node.canToggleDisabled(variables, functions, scripts)) {
           const isDisabled = !!node.disabled;
-          const blocked = !isDisabled && graph.hasConnectedDataOutput(node.id, variables, functions, scripts);
+          const blocked =
+            !isDisabled &&
+            graph.hasConnectedDataOutput(
+              node.id,
+              variables,
+              functions,
+              scripts,
+            );
           items.push({
-            label: isDisabled ? "Enable" : "Disable",
+            label: isDisabled
+              ? i18n.components.app_shell.ctx_enable
+              : i18n.components.app_shell.ctx_disable,
             disabled: blocked,
             onClick: () => {
               node.disabled = !isDisabled;
@@ -437,7 +650,9 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         // and don't meaningfully "execute" a step of their own — never offered a breakpoint toggle.
         if (!getNodeDef(node.type).compact) {
           items.push({
-            label: node.breakpoint ? "Remove Breakpoint" : "Add Breakpoint",
+            label: node.breakpoint
+              ? i18n.components.app_shell.ctx_remove_breakpoint
+              : i18n.components.app_shell.ctx_add_breakpoint,
             onClick: () => {
               node.breakpoint = !node.breakpoint;
               store.notify();
@@ -446,7 +661,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         }
 
         items.push({
-          label: "Select All (Ctrl+A)",
+          label: i18n.components.app_shell.ctx_select_all,
           onClick: () => {
             store.state.selectedNodeIds = selectAllNodes(graph);
             store.state.selectedCommentIds = selectAllCommentBoxes(graph);
@@ -459,14 +674,30 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         return;
       }
 
-      const wireHit = hitTestWire(graph, geometries, store.state.camera, screenPos.x, screenPos.y);
+      const wireHit = hitTestWire(
+        graph,
+        geometries,
+        store.state.camera,
+        screenPos.x,
+        screenPos.y,
+      );
       if (wireHit) {
-        const worldPos = store.state.camera.screenToWorld(screenPos.x, screenPos.y);
+        const worldPos = store.state.camera.screenToWorld(
+          screenPos.x,
+          screenPos.y,
+        );
         openRowContextMenu({ x: e.clientX, y: e.clientY }, [
           {
-            label: "Add Reroute Node",
+            label: i18n.components.app_shell.ctx_add_reroute,
             onClick: () => {
-              insertRerouteOnConnection(graph, variables, functions, wireHit.connectionId, worldPos, scripts);
+              insertRerouteOnConnection(
+                graph,
+                variables,
+                functions,
+                wireHit.connectionId,
+                worldPos,
+                scripts,
+              );
               store.notify();
             },
           },
@@ -474,16 +705,27 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         return;
       }
 
-      const worldPos = store.state.camera.screenToWorld(screenPos.x, screenPos.y);
+      const worldPos = store.state.camera.screenToWorld(
+        screenPos.x,
+        screenPos.y,
+      );
       const activeFn = getActiveFunction();
       const returnDef = activeFn ? getNodeDef("function.return") : undefined;
 
       openNodeSearchMenu(overlay, {
         screenPos,
-        candidates: filterCreatableHere(allNodeDefs().filter((def) => !["Variables", "Functions", "Code"].includes(topLevelGroup(def.group)))),
+        candidates: filterCreatableHere(
+          allNodeDefs().filter(
+            (def) =>
+              !["Variables", "Functions", "Code"].includes(
+                topLevelGroup(def.group),
+              ),
+          ),
+        ),
         pinned: returnDef ? [returnDef] : undefined,
         onPick: (def) => {
-          if (def.type === "function.return" && activeFn) spawnReturnNodeAt(activeFn, worldPos);
+          if (def.type === "function.return" && activeFn)
+            spawnReturnNodeAt(activeFn, worldPos);
           else createNodeAndMaybeConnect(def, worldPos);
         },
         onCancel: () => {},
@@ -491,34 +733,75 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     }
     canvas.addEventListener("contextmenu", onCanvasContextMenu);
 
-    function spawnCallNodeAt(fn: FunctionDef, worldPos: { x: number; y: number }): void {
+    function spawnCallNodeAt(
+      fn: FunctionDef,
+      worldPos: { x: number; y: number },
+    ): void {
       const def = getNodeDef("function.call");
       const pinDefs = def.deriveFunctionPins!(fn);
-      const node = NodeInstance.createNodeInstance("function.call", applySnapIfEnabled(worldPos), pinDefs, undefined, undefined, fn.id);
+      const node = NodeInstance.createNodeInstance(
+        "function.call",
+        applySnapIfEnabled(worldPos),
+        pinDefs,
+        undefined,
+        undefined,
+        fn.id,
+      );
       getEditingGraph(store.state).addNode(node);
       store.notify();
     }
 
-    function spawnVariableNodeAt(type: "variable.get" | "variable.set", variable: Variable, worldPos: { x: number; y: number }): void {
+    function spawnVariableNodeAt(
+      type: "variable.get" | "variable.set",
+      variable: Variable,
+      worldPos: { x: number; y: number },
+    ): void {
       const def = getNodeDef(type);
       const pinDefs = def.derivePins!(variable);
-      const node = NodeInstance.createNodeInstance(type, applySnapIfEnabled(worldPos), pinDefs, undefined, variable.id);
+      const node = NodeInstance.createNodeInstance(
+        type,
+        applySnapIfEnabled(worldPos),
+        pinDefs,
+        undefined,
+        variable.id,
+      );
       getEditingGraph(store.state).addNode(node);
       store.notify();
     }
 
-    function spawnCodeNodeAt(script: CodeScriptDef, worldPos: { x: number; y: number }): void {
+    function spawnCodeNodeAt(
+      script: CodeScriptDef,
+      worldPos: { x: number; y: number },
+    ): void {
       const def = getNodeDef("code.run");
       const pinDefs = def.deriveScriptPins!(script);
-      const node = NodeInstance.createNodeInstance("code.run", applySnapIfEnabled(worldPos), pinDefs, undefined, undefined, undefined, script.id);
+      const node = NodeInstance.createNodeInstance(
+        "code.run",
+        applySnapIfEnabled(worldPos),
+        pinDefs,
+        undefined,
+        undefined,
+        undefined,
+        script.id,
+      );
       getEditingGraph(store.state).addNode(node);
       store.notify();
     }
 
-    function spawnReturnNodeAt(fn: FunctionDef, worldPos: { x: number; y: number }): void {
+    function spawnReturnNodeAt(
+      fn: FunctionDef,
+      worldPos: { x: number; y: number },
+    ): void {
       const def = getNodeDef("function.return");
       const pinDefs = def.deriveFunctionPins!(fn);
-      const node = NodeInstance.createNodeInstance("function.return", applySnapIfEnabled(worldPos), pinDefs, undefined, undefined, fn.id);
+      const node = NodeInstance.createNodeInstance(
+        "function.return",
+        applySnapIfEnabled(worldPos),
+        pinDefs,
+        undefined,
+        undefined,
+        fn.id,
+      );
       fn.body.addNode(node);
       store.notify();
     }
@@ -526,7 +809,11 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     function onCanvasDragOver(e: DragEvent): void {
       if (store.state.simulating) return;
       const types = e.dataTransfer?.types;
-      if (types?.includes(FUNCTION_DRAG_MIME) || types?.includes(VARIABLE_DRAG_MIME) || types?.includes(SCRIPT_DRAG_MIME)) {
+      if (
+        types?.includes(FUNCTION_DRAG_MIME) ||
+        types?.includes(VARIABLE_DRAG_MIME) ||
+        types?.includes(SCRIPT_DRAG_MIME)
+      ) {
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
       }
@@ -543,26 +830,43 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
       const rect = canvas.getBoundingClientRect();
       const screenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-      const worldPos = store.state.camera.screenToWorld(screenPos.x, screenPos.y);
+      const worldPos = store.state.camera.screenToWorld(
+        screenPos.x,
+        screenPos.y,
+      );
 
       if (functionId) {
-        const fn = store.state.rootGraph.functions.find((f) => f.id === functionId);
+        const fn = store.state.rootGraph.functions.find(
+          (f) => f.id === functionId,
+        );
         if (fn) spawnCallNodeAt(fn, worldPos);
         return;
       }
 
       if (scriptId) {
-        const script = store.state.rootGraph.scripts.find((s) => s.id === scriptId);
+        const script = store.state.rootGraph.scripts.find(
+          (s) => s.id === scriptId,
+        );
         if (script) spawnCodeNodeAt(script, worldPos);
         return;
       }
 
       if (variableId) {
-        const variable = getVisibleVariablesForState(store.state).find((v) => v.id === variableId);
+        const variable = getVisibleVariablesForState(store.state).find(
+          (v) => v.id === variableId,
+        );
         if (!variable) return;
         openRowContextMenu({ x: e.clientX, y: e.clientY }, [
-          { label: "Get", onClick: () => spawnVariableNodeAt("variable.get", variable, worldPos) },
-          { label: "Set", onClick: () => spawnVariableNodeAt("variable.set", variable, worldPos) },
+          {
+            label: i18n.components.app_shell.ctx_get,
+            onClick: () =>
+              spawnVariableNodeAt("variable.get", variable, worldPos),
+          },
+          {
+            label: i18n.components.app_shell.ctx_set,
+            onClick: () =>
+              spawnVariableNodeAt("variable.set", variable, worldPos),
+          },
         ]);
       }
     }
@@ -605,7 +909,9 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
      * so this is at most one level deep. */
     function findOwningFunctionId(nodeId: string): string | null {
       if (store.state.rootGraph.nodes.some((n) => n.id === nodeId)) return null;
-      const fn = store.state.rootGraph.functions.find((f) => f.body.nodes.some((n) => n.id === nodeId));
+      const fn = store.state.rootGraph.functions.find((f) =>
+        f.body.nodes.some((n) => n.id === nodeId),
+      );
       return fn?.id ?? null;
     }
 
@@ -620,7 +926,8 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
       function tick(): void {
         panAnimationFrame = null;
-        if (!store.state.autoPan || store.state.executingNodeId !== nodeId) return;
+        if (!store.state.autoPan || store.state.executingNodeId !== nodeId)
+          return;
 
         const variables = getVisibleVariablesForState(store.state);
         const functions = store.state.rootGraph.functions;
@@ -629,15 +936,28 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         // resolve independently (rather than trusting store.state.activeFunctionId) in case that
         // switch hasn't taken effect yet, or the user has since switched tabs away from it.
         const owningFunctionId = findOwningFunctionId(nodeId);
-        const containingGraph = owningFunctionId ? store.state.rootGraph.functions.find((f) => f.id === owningFunctionId)?.body : store.state.rootGraph;
+        const containingGraph = owningFunctionId
+          ? store.state.rootGraph.functions.find(
+              (f) => f.id === owningFunctionId,
+            )?.body
+          : store.state.rootGraph;
         const node = containingGraph?.nodes.find((n) => n.id === nodeId);
         if (!node || !containingGraph) return;
 
-        const rect = computeNodeWorldRect(node, node.resolvePinDefs(variables, functions, scripts), variables, functions, scripts);
+        const rect = computeNodeWorldRect(
+          node,
+          node.resolvePinDefs(variables, functions, scripts),
+          variables,
+          functions,
+          scripts,
+        );
         const targetCenterX = rect.x + rect.width / 2;
         const targetCenterY = rect.y + rect.height / 2;
         const { camera } = store.state;
-        const viewCenter = camera.screenToWorld(canvas.clientWidth / 2, canvas.clientHeight / 2);
+        const viewCenter = camera.screenToWorld(
+          canvas.clientWidth / 2,
+          canvas.clientHeight / 2,
+        );
         const dx = targetCenterX - viewCenter.x;
         const dy = targetCenterY - viewCenter.y;
 
@@ -678,12 +998,17 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         const response = await fetch("/api/simulate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ graph: serializeGraph(store.state.rootGraph), projectId, flowId, flowName }),
+          body: JSON.stringify({
+            graph: serializeGraph(store.state.rootGraph),
+            projectId,
+            flowId,
+            flowName,
+          }),
           signal: controller.signal,
         });
         if (!response.ok || !response.body) {
           const text = await response.text().catch(() => response.statusText);
-          appendLog(`Simulation request failed: ${text}`);
+          appendLog(i18n.components.app_shell.sim_failed + text);
           return;
         }
 
@@ -703,7 +1028,8 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
               // called function's body runs off-tab.
               const owningFunctionId = findOwningFunctionId(nodeId);
               if (owningFunctionId !== store.state.activeFunctionId) {
-                if (owningFunctionId) openFunctionTab(store.state, owningFunctionId);
+                if (owningFunctionId)
+                  openFunctionTab(store.state, owningFunctionId);
                 else store.state.activeFunctionId = null;
               }
 
@@ -712,11 +1038,16 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
               break;
             }
             case "exec-fire":
-              store.state.firedConnectionIds.add((data as { connectionId: string }).connectionId);
+              store.state.firedConnectionIds.add(
+                (data as { connectionId: string }).connectionId,
+              );
               store.notify();
               break;
             case "pin-values": {
-              const { nodeId, values } = data as { nodeId: string; values: Record<string, unknown> };
+              const { nodeId, values } = data as {
+                nodeId: string;
+                values: Record<string, unknown>;
+              };
               for (const [pinId, value] of Object.entries(values)) {
                 store.state.pinValues.set(`${nodeId}:${pinId}`, value);
               }
@@ -740,7 +1071,10 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         }
       } catch (err) {
         if (!controller.signal.aborted) {
-          appendLog(`Error: ${err instanceof Error ? err.message : String(err)}`);
+          appendLog(
+            i18n.components.app_shell.sim_error +
+              (err instanceof Error ? err.message : String(err)),
+          );
         }
       } finally {
         if (activeSimulation === controller) {
@@ -766,7 +1100,9 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     // comment). The actual paused/resumed state only ever flips off the "paused"/"resumed" SSE
     // events the simulate stream sends back, not optimistically here, so it always reflects what
     // the server-side run is actually doing.
-    async function postSimulationControl(action: "pause" | "resume"): Promise<void> {
+    async function postSimulationControl(
+      action: "pause" | "resume",
+    ): Promise<void> {
       if (!currentRunId) return;
       await fetch("/api/simulate/control", {
         method: "POST",
@@ -797,7 +1133,11 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     // Download hands that same JSON out as a file, as a separate, explicit action ---
     async function onSaveClick(): Promise<void> {
       await scriptEditor.flushDirtyScripts();
-      await saveFlowGraph(projectId, flowId, serializeGraph(store.state.rootGraph));
+      await saveFlowGraph(
+        projectId,
+        flowId,
+        serializeGraph(store.state.rootGraph),
+      );
     }
     saveButton.addEventListener("click", onSaveClick);
 
@@ -833,7 +1173,10 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         await saveFlowGraph(projectId, flowId, serializeGraph(graph));
         store.notify();
       } catch (err) {
-        appendLog(`Failed to load graph: ${err instanceof Error ? err.message : String(err)}`);
+        appendLog(
+          i18n.components.app_shell.load_graph_failed +
+            (err instanceof Error ? err.message : String(err)),
+        );
       }
     }
     loadFileInput.addEventListener("change", onLoadFileChange);
@@ -844,9 +1187,16 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     async function onCompileClick(): Promise<void> {
       await scriptEditor.flushDirtyScripts();
       try {
-        await deployFlow(projectId, flowId, serializeGraph(store.state.rootGraph));
+        await deployFlow(
+          projectId,
+          flowId,
+          serializeGraph(store.state.rootGraph),
+        );
       } catch (err) {
-        appendLog(`Deploy error: ${err instanceof Error ? err.message : String(err)}`);
+        appendLog(
+          i18n.components.app_shell.deploy_error +
+            (err instanceof Error ? err.message : String(err)),
+        );
       }
     }
     deployButton.addEventListener("click", onCompileClick);
@@ -857,7 +1207,23 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       const functions = store.state.rootGraph.functions;
       const scripts = store.state.rootGraph.scripts;
 
-      const rects = [...graph.nodes.map((n) => computeNodeWorldRect(n, n.resolvePinDefs(variables, functions, scripts), variables, functions, scripts)), ...graph.commentBoxes.map((b) => ({ x: b.position.x, y: b.position.y, width: b.size.width, height: b.size.height }))];
+      const rects = [
+        ...graph.nodes.map((n) =>
+          computeNodeWorldRect(
+            n,
+            n.resolvePinDefs(variables, functions, scripts),
+            variables,
+            functions,
+            scripts,
+          ),
+        ),
+        ...graph.commentBoxes.map((b) => ({
+          x: b.position.x,
+          y: b.position.y,
+          width: b.size.width,
+          height: b.size.height,
+        })),
+      ];
       if (rects.length === 0) return;
 
       const minX = Math.min(...rects.map((r) => r.x));
@@ -865,7 +1231,11 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       const maxX = Math.max(...rects.map((r) => r.x + r.width));
       const maxY = Math.max(...rects.map((r) => r.y + r.height));
 
-      store.state.camera.frameRect({ x: minX, y: minY, width: maxX - minX, height: maxY - minY }, canvas.clientWidth, canvas.clientHeight);
+      store.state.camera.frameRect(
+        { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
+        canvas.clientWidth,
+        canvas.clientHeight,
+      );
       store.notify();
     }
     frameAllButton.addEventListener("click", onFrameAllClick);

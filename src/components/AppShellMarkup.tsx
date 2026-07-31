@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { i18n } from "@i18n";
 import type { FunctionDef } from "../engine/types";
 import type { Store } from "../state/store";
 import { useStoreRevision } from "../state/useStore";
@@ -13,53 +14,110 @@ import { ThemeToggle } from "./ThemeToggle";
  * (see ./sidebar/*); everything not yet converted (canvas overlays, Monaco, resizers) keeps the
  * same element ids the still-imperative AppShell.tsx mount effect looks up via
  * document.getElementById, exactly as it did when this was static HTML. */
-export default function AppShellMarkup({ store, projectId }: { store: Store; projectId: string }) {
+export default function AppShellMarkup({
+  store,
+  projectId,
+}: {
+  store: Store;
+  projectId: string;
+}) {
   useStoreRevision(store);
 
-  const activeFunction: FunctionDef | null = store.state.activeFunctionId ? (store.state.rootGraph.functions.find((f) => f.id === store.state.activeFunctionId) ?? null) : null;
+  const activeFunction: FunctionDef | null = store.state.activeFunctionId
+    ? (store.state.rootGraph.functions.find(
+        (f) => f.id === store.state.activeFunctionId,
+      ) ?? null)
+    : null;
 
   return (
     <div id="app">
       <div id="toolbar">
         <div id="toolbar-left">
-          <Link href={`/projects/${projectId}`} id="back-to-project-button" title="Back to the project">
-            ← Back
+          <Link
+            href={`/projects/${projectId}`}
+            id="back-to-project-button"
+            title={i18n.components.app_shell_markup.back_title}
+          >
+            {i18n.components.app_shell_markup.back}
           </Link>
           <span id="toolbar-title">Hermione</span>
         </div>
         <div id="toolbar-center">
           <div id="simulation-controls" className="toolbar-button-group">
-            <button id="run-button">Simulate ▶</button>
-            <button id="pause-button" style={{ display: "none" }} title="Pause the running simulation">
-              ⏸ Pause
+            <button id="run-button">
+              {i18n.components.app_shell_markup.simulate}
             </button>
-            <button id="continue-button" style={{ display: "none" }} title="Continue past the current breakpoint/pause">
-              ▶ Continue
+            <button
+              id="pause-button"
+              style={{ display: "none" }}
+              title={i18n.components.app_shell_markup.pause_title}
+            >
+              {i18n.components.app_shell_markup.pause}
             </button>
-            <button id="stop-button" style={{ display: "none" }} title="Stop the running simulation">
-              ■ Stop
+            <button
+              id="continue-button"
+              style={{ display: "none" }}
+              title={i18n.components.app_shell_markup.continue_title}
+            >
+              {i18n.components.app_shell_markup.continue}
             </button>
-            <label id="auto-pan-toggle" className="toolbar-toggle" title="Pan the camera to follow whichever node is currently executing during a Simulate run">
+            <button
+              id="stop-button"
+              style={{ display: "none" }}
+              title={i18n.components.app_shell_markup.stop_title}
+            >
+              {i18n.components.app_shell_markup.stop}
+            </button>
+            <label
+              id="auto-pan-toggle"
+              className="toolbar-toggle"
+              title={i18n.components.app_shell_markup.auto_pan_title}
+            >
               <input type="checkbox" id="auto-pan-checkbox" />
-              Auto Pan
+              {i18n.components.app_shell_markup.auto_pan}
             </label>
           </div>
         </div>
         <div id="toolbar-right">
-          <button id="save-button">Save</button>
-          <button id="load-button">Load</button>
-          <button id="download-button">Download (Graph)</button>
-          <button id="deploy-button">Deploy</button>
-          <input id="load-file-input" type="file" accept="application/json" style={{ display: "none" }} />
+          <button id="save-button">
+            {i18n.components.app_shell_markup.save}
+          </button>
+          <button id="load-button">
+            {i18n.components.app_shell_markup.load}
+          </button>
+          <button id="download-button">
+            {i18n.components.app_shell_markup.download_graph}
+          </button>
+          <button id="deploy-button">
+            {i18n.components.app_shell_markup.deploy}
+          </button>
+          <input
+            id="load-file-input"
+            type="file"
+            accept="application/json"
+            style={{ display: "none" }}
+          />
           <ThemeToggle />
         </div>
       </div>
       <div id="main-area">
         <div id="left-sidebar" className="side-panel">
           <FunctionsPanel store={store} />
-          <VariablePanel id="variables-section" title="Variables" store={store} getGraph={() => store.state.rootGraph} />
+          <VariablePanel
+            id="variables-section"
+            title="Variables"
+            store={store}
+            getGraph={() => store.state.rootGraph}
+          />
           <ScriptsPanel store={store} />
-          {activeFunction && <VariablePanel id="local-variables-section" title="Local Variables" store={store} getGraph={() => activeFunction.body} />}
+          {activeFunction && (
+            <VariablePanel
+              id="local-variables-section"
+              title="Local Variables"
+              store={store}
+              getGraph={() => activeFunction.body}
+            />
+          )}
         </div>
         <div id="left-sidebar-resizer" className="resizer resizer-vertical" />
         <div id="canvas-column">
@@ -72,9 +130,13 @@ export default function AppShellMarkup({ store, projectId }: { store: Store; pro
             <div id="canvas-hud-toolbar">
               <label id="snap-to-grid-toggle" className="toolbar-toggle">
                 <input type="checkbox" id="snap-to-grid-checkbox" />
-                Snap to Grid
+                {i18n.components.app_shell_markup.snap_to_grid}
               </label>
-              <button id="frame-all-button" className="canvas-hud-button" title="Fit graph to view">
+              <button
+                id="frame-all-button"
+                className="canvas-hud-button"
+                title="Fit graph to view"
+              >
                 ⛶
               </button>
             </div>
@@ -89,11 +151,24 @@ export default function AppShellMarkup({ store, projectId }: { store: Store; pro
       <div id="log-container">
         <div id="log-tab-strip">
           <div id="log-tabs-dynamic" />
-          <span id="log-save-status" className="log-save-status" style={{ display: "none" }} />
-          <button id="log-save-button" className="log-clear-button" title="Save script" style={{ display: "none" }}>
+          <span
+            id="log-save-status"
+            className="log-save-status"
+            style={{ display: "none" }}
+          />
+          <button
+            id="log-save-button"
+            className="log-clear-button"
+            title="Save script"
+            style={{ display: "none" }}
+          >
             💾
           </button>
-          <button id="log-clear-button" className="log-clear-button" title="Clear log">
+          <button
+            id="log-clear-button"
+            className="log-clear-button"
+            title="Clear log"
+          >
             🗑
           </button>
         </div>

@@ -1,11 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { addFunctionInput, addFunctionOutput, DEFAULT_VALUE_BY_TYPE, moveFunctionEntry, nextId, removeFunctionInput, removeFunctionOutput, updateFunctionInput, updateFunctionOutput } from "../../engine/graphMutations";
-import type { FunctionDef, PinSignatureEntry, PinType } from "../../engine/types";
+import { i18n } from "@i18n";
+import {
+  addFunctionInput,
+  addFunctionOutput,
+  DEFAULT_VALUE_BY_TYPE,
+  moveFunctionEntry,
+  nextId,
+  removeFunctionInput,
+  removeFunctionOutput,
+  updateFunctionInput,
+  updateFunctionOutput,
+} from "../../engine/graphMutations";
+import type {
+  FunctionDef,
+  PinSignatureEntry,
+  PinType,
+} from "../../engine/types";
 import { FUNCTION_IO_ENTRY_DRAG_MIME } from "../../overlay/dragTypes";
 import { openRowContextMenu } from "../../overlay/rowContextMenu";
-import { createContainerSelect, createTypeSelect, createTypedValueInput } from "../../overlay/typedValueInput";
+import {
+  createContainerSelect,
+  createTypeSelect,
+  createTypedValueInput,
+} from "../../overlay/typedValueInput";
 import { nextAvailableName } from "../../overlay/uniqueName";
 import type { Store } from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
@@ -20,7 +39,15 @@ import { useRowDragReorder } from "./useRowDragReorder";
  * existing one. (A Return node instance is placed by right-clicking inside the function's body
  * graph, not from here — a function body can hold several.) Hidden entirely while no function is
  * open for editing. */
-export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Store; kind: "input" | "output"; getActiveFunction: () => FunctionDef | null }) {
+export function FunctionIoPanel({
+  store,
+  kind,
+  getActiveFunction,
+}: {
+  store: Store;
+  kind: "input" | "output";
+  getActiveFunction: () => FunctionDef | null;
+}) {
   useStoreRevision(store);
   const [editingId, setEditingId] = useState<string | null>(null);
   const fn = getActiveFunction();
@@ -29,20 +56,27 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
 
   const entries = kind === "input" ? fn.inputs : fn.outputs;
   const update = kind === "input" ? updateFunctionInput : updateFunctionOutput;
-  const removeEntry = kind === "input" ? removeFunctionInput : removeFunctionOutput;
+  const removeEntry =
+    kind === "input" ? removeFunctionInput : removeFunctionOutput;
 
   function commitRename(entry: PinSignatureEntry, rawNewName: string): void {
     const trimmed = rawNewName.trim();
-    const isDuplicate = trimmed.length === 0 || entries.some((e) => e.id !== entry.id && e.name === trimmed);
-    if (!isDuplicate) update(store.state.rootGraph, fn!, entry.id, { name: trimmed });
+    const isDuplicate =
+      trimmed.length === 0 ||
+      entries.some((e) => e.id !== entry.id && e.name === trimmed);
+    if (!isDuplicate)
+      update(store.state.rootGraph, fn!, entry.id, { name: trimmed });
     setEditingId(null);
     store.notify();
   }
 
-  const { rowDragHandlers, rowIndicatorClassName } = useRowDragReorder<string>(FUNCTION_IO_ENTRY_DRAG_MIME, (draggedId, targetId, position) => {
-    moveFunctionEntry(fn!, kind, draggedId, targetId, position);
-    store.notify();
-  });
+  const { rowDragHandlers, rowIndicatorClassName } = useRowDragReorder<string>(
+    FUNCTION_IO_ENTRY_DRAG_MIME,
+    (draggedId, targetId, position) => {
+      moveFunctionEntry(fn!, kind, draggedId, targetId, position);
+      store.notify();
+    },
+  );
 
   function handleAdd(): void {
     const name = nextAvailableName(
@@ -50,7 +84,12 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
       kind === "input" ? "NewInput" : "NewOutput",
     );
     const type: PinType = "number";
-    const entry: PinSignatureEntry = { id: nextId("io"), name, type, defaultValue: DEFAULT_VALUE_BY_TYPE[type] };
+    const entry: PinSignatureEntry = {
+      id: nextId("io"),
+      name,
+      type,
+      defaultValue: DEFAULT_VALUE_BY_TYPE[type],
+    };
     if (kind === "input") addFunctionInput(fn!, entry);
     else addFunctionOutput(fn!, entry);
     setEditingId(entry.id);
@@ -58,7 +97,13 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
   }
 
   return (
-    <CollapsibleSection id={kind === "input" ? "inputs-section" : "outputs-section"} title={kind === "input" ? "Inputs" : "Outputs"} empty={entries.length === 0} onAdd={handleAdd} disabled={disabled}>
+    <CollapsibleSection
+      id={kind === "input" ? "inputs-section" : "outputs-section"}
+      title={kind === "input" ? "Inputs" : "Outputs"}
+      empty={entries.length === 0}
+      onAdd={handleAdd}
+      disabled={disabled}
+    >
       {entries.map((entry) => {
         const isEditing = editingId === entry.id;
 
@@ -90,7 +135,12 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
                   title={entry.name}
                   disabled={disabled}
                   onContextMenu={(screenPos) => {
-                    openRowContextMenu(screenPos, [{ label: "Rename", onClick: () => setEditingId(entry.id) }]);
+                    openRowContextMenu(screenPos, [
+                      {
+                        label: i18n.components.context_menu.rename,
+                        onClick: () => setEditingId(entry.id),
+                      },
+                    ]);
                   }}
                 />
               )}
@@ -108,10 +158,15 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
 
               <ImperativeMount
                 build={() =>
-                  createContainerSelect(entry.container ?? "single", (container) => {
-                    update(store.state.rootGraph, fn!, entry.id, { container });
-                    store.notify();
-                  })
+                  createContainerSelect(
+                    entry.container ?? "single",
+                    (container) => {
+                      update(store.state.rootGraph, fn!, entry.id, {
+                        container,
+                      });
+                      store.notify();
+                    },
+                  )
                 }
                 deps={[entry.id, entry.container]}
                 disabled={disabled}
@@ -151,14 +206,22 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
                     entry.type,
                     entry.defaultValue,
                     (defaultValue) => {
-                      update(store.state.rootGraph, fn!, entry.id, { defaultValue });
+                      update(store.state.rootGraph, fn!, entry.id, {
+                        defaultValue,
+                      });
                       store.notify();
                     },
                     entry.container ?? "single",
                     entry.keyType ?? "string",
                   )
                 }
-                deps={[entry.id, entry.type, entry.container, entry.keyType, entry.defaultValue]}
+                deps={[
+                  entry.id,
+                  entry.type,
+                  entry.container,
+                  entry.keyType,
+                  entry.defaultValue,
+                ]}
                 disabled={disabled}
               />
             </div>

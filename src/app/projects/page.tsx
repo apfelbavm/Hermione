@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
-import { createProject, deleteProject, listProjects, renameProject } from "../../client/api";
+import { i18n } from "@i18n";
+import {
+  createProject,
+  deleteProject,
+  listProjects,
+  renameProject,
+} from "../../client/api";
 import type { ProjectSummary } from "../../server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
@@ -35,7 +41,8 @@ export default function ProjectsPage() {
   }
 
   async function handleDelete(id: string, name: string): Promise<void> {
-    if (!confirm(`Delete project "${name}"? This also deletes every Flow and run log inside it.`)) return;
+    if (!confirm(i18n.pages.projects.delete_confirm.replace("{name}", name)))
+      return;
     await deleteProject(id);
     await refresh();
   }
@@ -49,16 +56,21 @@ export default function ProjectsPage() {
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Projects" }]} />
-      <h1>Projects</h1>
+      <Breadcrumbs items={[{ label: i18n.pages.projects.title }]} />
+      <h1>{i18n.pages.projects.title}</h1>
 
       <form className="create-row" onSubmit={handleCreate}>
-        <input type="text" placeholder="New project name" value={newName} onChange={(e) => setNewName(e.target.value)} />
-        <button type="submit">Create Project</button>
+        <input
+          type="text"
+          placeholder={i18n.pages.projects.new_project_placeholder}
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+        />
+        <button type="submit">{i18n.pages.projects.create_project}</button>
       </form>
 
       {projects.length === 0 ? (
-        <p className="page-empty-note">No projects yet — create one above.</p>
+        <p className="page-empty-note">{i18n.pages.projects.empty}</p>
       ) : (
         <ul className="entity-list">
           {projects.map((project) => (
@@ -69,7 +81,9 @@ export default function ProjectsPage() {
                   className="entity-rename-input"
                   defaultValue={project.name}
                   autoFocus
-                  onBlur={(e) => void commitRename(project.id, e.currentTarget.value)}
+                  onBlur={(e) =>
+                    void commitRename(project.id, e.currentTarget.value)
+                  }
                   onKeyDown={(e) => {
                     if (e.key === "Enter") e.currentTarget.blur();
                     if (e.key === "Escape") setEditingId(null);
@@ -82,10 +96,13 @@ export default function ProjectsPage() {
               )}
               <div className="entity-actions">
                 <button type="button" onClick={() => setEditingId(project.id)}>
-                  Rename
+                  {i18n.pages.projects.rename}
                 </button>
-                <button type="button" onClick={() => void handleDelete(project.id, project.name)}>
-                  Delete
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(project.id, project.name)}
+                >
+                  {i18n.pages.projects.delete}
                 </button>
               </div>
             </li>

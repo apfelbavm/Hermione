@@ -3,7 +3,17 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { createFlow, deleteFlow, getFlowWithGraph, getProject, listFlows, renameFlow, renameProject, saveFlowGraph } from "../../../client/api";
+import { i18n } from "@i18n";
+import {
+  createFlow,
+  deleteFlow,
+  getFlowWithGraph,
+  getProject,
+  listFlows,
+  renameFlow,
+  renameProject,
+  saveFlowGraph,
+} from "../../../client/api";
 import type { FlowSummary, ProjectSummary } from "../../../server/models";
 import { PageShell } from "../../../components/PageHeader";
 import { Breadcrumbs } from "../../../components/Breadcrumbs";
@@ -12,7 +22,15 @@ import { Breadcrumbs } from "../../../components/Breadcrumbs";
  * in .entity-actions; folded into one menu instead as the row's action surface grows. Positioned via
  * getBoundingClientRect rather than CSS anchoring since .row-context-menu (shared with the canvas's
  * own right-click menus — see overlay/rowContextMenu.ts/style.css) is `position: fixed`. */
-function FlowRowMenu({ onRename, onDuplicate, onDelete }: { onRename: () => void; onDuplicate: () => void; onDelete: () => void }) {
+function FlowRowMenu({
+  onRename,
+  onDuplicate,
+  onDelete,
+}: {
+  onRename: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -20,7 +38,8 @@ function FlowRowMenu({ onRename, onDuplicate, onDelete }: { onRename: () => void
   useEffect(() => {
     if (!open) return;
     function onOutsideMouseDown(e: MouseEvent): void {
-      if (e.target instanceof Node && !wrapperRef.current?.contains(e.target)) setOpen(false);
+      if (e.target instanceof Node && !wrapperRef.current?.contains(e.target))
+        setOpen(false);
     }
     function onKeyDown(e: KeyboardEvent): void {
       if (e.key === "Escape") setOpen(false);
@@ -46,19 +65,31 @@ function FlowRowMenu({ onRename, onDuplicate, onDelete }: { onRename: () => void
 
   return (
     <div className="entity-menu" ref={wrapperRef}>
-      <button type="button" className="entity-menu-button" onClick={toggle} title="More actions" aria-label="More actions">
+      <button
+        type="button"
+        className="entity-menu-button"
+        onClick={toggle}
+        title="More actions"
+        aria-label="More actions"
+      >
         ⋯
       </button>
       {open && pos && (
-        <div className="row-context-menu" style={{ top: pos.top, left: pos.left }}>
+        <div
+          className="row-context-menu"
+          style={{ top: pos.top, left: pos.left }}
+        >
           <div className="row-context-menu-item" onClick={() => pick(onRename)}>
-            Rename
+            {i18n.pages.project.flow_rename}
           </div>
-          <div className="row-context-menu-item" onClick={() => pick(onDuplicate)}>
-            Duplicate
+          <div
+            className="row-context-menu-item"
+            onClick={() => pick(onDuplicate)}
+          >
+            {i18n.pages.project.flow_duplicate}
           </div>
           <div className="row-context-menu-item" onClick={() => pick(onDelete)}>
-            Delete
+            {i18n.pages.project.flow_delete}
           </div>
         </div>
       )}
@@ -69,7 +100,17 @@ function FlowRowMenu({ onRename, onDuplicate, onDelete }: { onRename: () => void
 /** Prompts for the duplicate's name before anything is actually copied — must not collide with any
  * other Flow already in this project (checked against `existingNames`, case-insensitively so
  * "Foo"/"foo" don't both slip through as "distinct"). */
-function DuplicateFlowDialog({ sourceName, existingNames, onClose, onConfirm }: { sourceName: string; existingNames: string[]; onClose: () => void; onConfirm: (name: string) => Promise<void> }) {
+function DuplicateFlowDialog({
+  sourceName,
+  existingNames,
+  onClose,
+  onConfirm,
+}: {
+  sourceName: string;
+  existingNames: string[];
+  onClose: () => void;
+  onConfirm: (name: string) => Promise<void>;
+}) {
   const [name, setName] = useState(`${sourceName} copy`);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -77,11 +118,13 @@ function DuplicateFlowDialog({ sourceName, existingNames, onClose, onConfirm }: 
   async function handleSubmit(): Promise<void> {
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Name is required");
+      setError(i18n.pages.project.duplicate_name_required);
       return;
     }
     if (existingNames.some((n) => n.toLowerCase() === trimmed.toLowerCase())) {
-      setError(`A Flow named "${trimmed}" already exists in this project.`);
+      setError(
+        i18n.pages.project.duplicate_name_exists.replace("{name}", trimmed),
+      );
       return;
     }
     setSaving(true);
@@ -94,11 +137,16 @@ function DuplicateFlowDialog({ sourceName, existingNames, onClose, onConfirm }: 
   }
 
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="modal-backdrop"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="modal-box">
-        <h2 className="modal-title">Duplicate Flow</h2>
+        <h2 className="modal-title">{i18n.pages.project.duplicate_title}</h2>
         <label className="modal-field-row">
-          <span className="modal-field-label">New name</span>
+          <span className="modal-field-label">
+            {i18n.pages.project.duplicate_new_name}
+          </span>
           <input
             type="text"
             value={name}
@@ -112,10 +160,16 @@ function DuplicateFlowDialog({ sourceName, existingNames, onClose, onConfirm }: 
         {error && <p className="modal-error">{error}</p>}
         <div className="modal-actions">
           <button type="button" onClick={onClose} disabled={saving}>
-            Cancel
+            {i18n.pages.project.duplicate_cancel}
           </button>
-          <button type="button" onClick={() => void handleSubmit()} disabled={saving}>
-            {saving ? "Duplicating…" : "Duplicate"}
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={saving}
+          >
+            {saving
+              ? i18n.pages.project.duplicate_saving
+              : i18n.pages.project.duplicate_confirm}
           </button>
         </div>
       </div>
@@ -130,10 +184,15 @@ export default function ProjectPage() {
   const [newFlowName, setNewFlowName] = useState("");
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
   const [editingProjectName, setEditingProjectName] = useState(false);
-  const [duplicatingFlow, setDuplicatingFlow] = useState<FlowSummary | null>(null);
+  const [duplicatingFlow, setDuplicatingFlow] = useState<FlowSummary | null>(
+    null,
+  );
 
   async function refresh(): Promise<void> {
-    const [proj, flowList] = await Promise.all([getProject(projectId).catch(() => null), listFlows(projectId)]);
+    const [proj, flowList] = await Promise.all([
+      getProject(projectId).catch(() => null),
+      listFlows(projectId),
+    ]);
     setProject(proj);
     setFlows(flowList);
   }
@@ -143,7 +202,9 @@ export default function ProjectPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  async function handleCreateFlow(e: FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleCreateFlow(
+    e: FormEvent<HTMLFormElement>,
+  ): Promise<void> {
     e.preventDefault();
     const name = newFlowName.trim();
     if (!name) return;
@@ -155,7 +216,10 @@ export default function ProjectPage() {
   /** Copies the source Flow's graph verbatim into a brand new Flow record — no server-side
    * "duplicate" endpoint needed, just the same three calls a user could make by hand (read the
    * graph, create a Flow, save that graph into it). */
-  async function handleDuplicateFlow(sourceFlowId: string, newName: string): Promise<void> {
+  async function handleDuplicateFlow(
+    sourceFlowId: string,
+    newName: string,
+  ): Promise<void> {
     const { graphJson } = await getFlowWithGraph(projectId, sourceFlowId);
     const newFlow = await createFlow(projectId, newName);
     if (graphJson) await saveFlowGraph(projectId, newFlow.id, graphJson);
@@ -163,12 +227,18 @@ export default function ProjectPage() {
   }
 
   async function handleDeleteFlow(flowId: string, name: string): Promise<void> {
-    if (!confirm(`Delete Flow "${name}"? This can't be undone.`)) return;
+    if (
+      !confirm(i18n.pages.project.delete_flow_confirm.replace("{name}", name))
+    )
+      return;
     await deleteFlow(projectId, flowId);
     await refresh();
   }
 
-  async function commitFlowRename(flowId: string, rawName: string): Promise<void> {
+  async function commitFlowRename(
+    flowId: string,
+    rawName: string,
+  ): Promise<void> {
     const name = rawName.trim();
     if (name) await renameFlow(projectId, flowId, name);
     setEditingFlowId(null);
@@ -196,9 +266,14 @@ export default function ProjectPage() {
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Projects", href: "/projects" }, { label: project.name }]} />
+      <Breadcrumbs
+        items={[
+          { label: i18n.pages.projects.title, href: "/projects" },
+          { label: project.name },
+        ]}
+      />
       <Link href="/projects" className="back-link">
-        ← Back
+        {i18n.pages.project.back}
       </Link>
       {editingProjectName ? (
         <input
@@ -213,23 +288,33 @@ export default function ProjectPage() {
           }}
         />
       ) : (
-        <h1 className="page-title-editable" title="Click to rename" onClick={() => setEditingProjectName(true)}>
-          Project: {project.name}
+        <h1
+          className="page-title-editable"
+          title={i18n.pages.project.title_rename_hint}
+          onClick={() => setEditingProjectName(true)}
+        >
+          {i18n.pages.project.title_prefix}
+          {project.name}
         </h1>
       )}
 
       <Link href={`/projects/${projectId}/logs`} className="logs-link">
-        View Run Logs →
+        {i18n.pages.project.view_run_logs}
       </Link>
 
-      <h2 className="section-heading">Flows</h2>
+      <h2 className="section-heading">{i18n.pages.project.flows_heading}</h2>
       <form className="create-row" onSubmit={handleCreateFlow}>
-        <input type="text" placeholder="New Flow name" value={newFlowName} onChange={(e) => setNewFlowName(e.target.value)} />
-        <button type="submit">Create Flow</button>
+        <input
+          type="text"
+          placeholder={i18n.pages.project.new_flow_placeholder}
+          value={newFlowName}
+          onChange={(e) => setNewFlowName(e.target.value)}
+        />
+        <button type="submit">{i18n.pages.project.create_flow}</button>
       </form>
 
       {flows.length === 0 ? (
-        <p className="page-empty-note">No Flows yet — create one above.</p>
+        <p className="page-empty-note">{i18n.pages.project.flows_empty}</p>
       ) : (
         <ul className="entity-list">
           {flows.map((flow) => (
@@ -240,19 +325,28 @@ export default function ProjectPage() {
                   className="entity-rename-input"
                   defaultValue={flow.name}
                   autoFocus
-                  onBlur={(e) => void commitFlowRename(flow.id, e.currentTarget.value)}
+                  onBlur={(e) =>
+                    void commitFlowRename(flow.id, e.currentTarget.value)
+                  }
                   onKeyDown={(e) => {
                     if (e.key === "Enter") e.currentTarget.blur();
                     if (e.key === "Escape") setEditingFlowId(null);
                   }}
                 />
               ) : (
-                <Link href={`/projects/${projectId}/flows/${flow.id}`} className="entity-name">
+                <Link
+                  href={`/projects/${projectId}/flows/${flow.id}`}
+                  className="entity-name"
+                >
                   {flow.name}
                 </Link>
               )}
               <div className="entity-actions">
-                <FlowRowMenu onRename={() => setEditingFlowId(flow.id)} onDuplicate={() => setDuplicatingFlow(flow)} onDelete={() => void handleDeleteFlow(flow.id, flow.name)} />
+                <FlowRowMenu
+                  onRename={() => setEditingFlowId(flow.id)}
+                  onDuplicate={() => setDuplicatingFlow(flow)}
+                  onDelete={() => void handleDeleteFlow(flow.id, flow.name)}
+                />
               </div>
             </li>
           ))}

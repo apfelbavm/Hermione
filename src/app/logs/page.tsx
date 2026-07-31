@@ -20,12 +20,15 @@ export default function GlobalLogsPage() {
     void listProjects().then(setProjects);
   }, []);
 
-  const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
+  const projectById = useMemo(
+    () => new Map(projects.map((p) => [p.id, p])),
+    [projects],
+  );
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Logs" }]} />
-      <h1>Logs</h1>
+      <Breadcrumbs items={[{ label: i18n.pages.logs.page_title }]} />
+      <h1>{i18n.pages.logs.page_title}</h1>
       <p className="page-empty-note">{i18n.pages.logs.title}</p>
       {runs.length === 0 ? (
         <p className="page-empty-note">{i18n.pages.logs.empty}</p>
@@ -33,7 +36,20 @@ export default function GlobalLogsPage() {
         <ul className="run-list">
           {runs.map((run) => {
             const project = projectById.get(run.projectId);
-            return <RunRow key={run.id} run={run} project={project ? { name: project.name, href: `/projects/${project.id}/logs` } : undefined} />;
+            return (
+              <RunRow
+                key={run.id}
+                run={run}
+                project={
+                  project
+                    ? {
+                        name: project.name,
+                        href: `/projects/${project.id}/logs`,
+                      }
+                    : undefined
+                }
+              />
+            );
           })}
         </ul>
       )}

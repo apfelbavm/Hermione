@@ -1,18 +1,42 @@
 "use client";
 
-import { allGraphs, setPinLiteralValue, updateVariable } from "../../engine/graphMutations";
+import {
+  allGraphs,
+  setPinLiteralValue,
+  updateVariable,
+} from "../../engine/graphMutations";
+import { i18n } from "@i18n";
 import type { NodeInstance } from "../../engine/nodeInstance";
 import { getNodeDef } from "../../engine/registry";
-import type { CommentBox, FunctionDef, PinDef, Variable } from "../../engine/types";
-import { createContainerSelect, createTypeSelect, createTypedValueInput } from "../../overlay/typedValueInput";
+import type {
+  CommentBox,
+  FunctionDef,
+  PinDef,
+  Variable,
+} from "../../engine/types";
+import {
+  createContainerSelect,
+  createTypeSelect,
+  createTypedValueInput,
+} from "../../overlay/typedValueInput";
 import { DEFAULT_COMMENT_COLOR } from "../../render/commentGeometry";
-import { getEditingGraph, getVisibleVariablesForState, type Store } from "../../state/store";
+import {
+  getEditingGraph,
+  getVisibleVariablesForState,
+  type Store,
+} from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
 import { FunctionIoPanel } from "./FunctionIoPanel";
 import { ImperativeMount } from "./ImperativeMount";
 import { ScriptIoPanel } from "./ScriptIoPanel";
 
-function VariableDetails({ store, variable }: { store: Store; variable: Variable }) {
+function VariableDetails({
+  store,
+  variable,
+}: {
+  store: Store;
+  variable: Variable;
+}) {
   const disabled = store.state.simulating;
   return (
     <div className="details-content">
@@ -31,10 +55,15 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
           />
           <ImperativeMount
             build={() =>
-              createContainerSelect(variable.container ?? "single", (container) => {
-                updateVariable(store.state.rootGraph, variable.id, { container });
-                store.notify();
-              })
+              createContainerSelect(
+                variable.container ?? "single",
+                (container) => {
+                  updateVariable(store.state.rootGraph, variable.id, {
+                    container,
+                  });
+                  store.notify();
+                },
+              )
             }
             deps={[variable.id, variable.container]}
             disabled={disabled}
@@ -43,7 +72,9 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
             <ImperativeMount
               build={() =>
                 createTypeSelect(variable.keyType ?? "string", (keyType) => {
-                  updateVariable(store.state.rootGraph, variable.id, { keyType });
+                  updateVariable(store.state.rootGraph, variable.id, {
+                    keyType,
+                  });
                   store.notify();
                 })
               }
@@ -61,14 +92,22 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
                 variable.type,
                 variable.defaultValue,
                 (defaultValue) => {
-                  updateVariable(store.state.rootGraph, variable.id, { defaultValue });
+                  updateVariable(store.state.rootGraph, variable.id, {
+                    defaultValue,
+                  });
                   store.notify();
                 },
                 variable.container ?? "single",
                 variable.keyType ?? "string",
               )
             }
-            deps={[variable.id, variable.type, variable.container, variable.keyType, variable.defaultValue]}
+            deps={[
+              variable.id,
+              variable.type,
+              variable.container,
+              variable.keyType,
+              variable.defaultValue,
+            ]}
             disabled={disabled}
           />
         </div>
@@ -77,9 +116,21 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
   );
 }
 
-function NodeDetails({ store, node, properties }: { store: Store; node: NodeInstance; properties: PinDef[] }) {
+function NodeDetails({
+  store,
+  node,
+  properties,
+}: {
+  store: Store;
+  node: NodeInstance;
+  properties: PinDef[];
+}) {
   const def = getNodeDef(node.type);
-  const label = node.resolveNodeLabel(def, getVisibleVariablesForState(store.state), store.state.rootGraph.functions);
+  const label = node.resolveNodeLabel(
+    def,
+    getVisibleVariablesForState(store.state),
+    store.state.rootGraph.functions,
+  );
   const disabled = store.state.simulating;
 
   return (
@@ -87,11 +138,15 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
       <div className="details-item-name">{label}</div>
       <div>
         <div className="details-description-row">
-          <span className="variable-name">Description</span>
+          <span className="variable-name">
+            {i18n.components.details_panel.description}
+          </span>
           <textarea
             key={node.id}
             className="details-description-input"
-            placeholder="Shown as a speech bubble above this node on the canvas"
+            placeholder={
+              i18n.components.details_panel.node_description_placeholder
+            }
             defaultValue={node.description ?? ""}
             disabled={disabled}
             onInput={(e) => {
@@ -103,15 +158,25 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
 
         {def.configurableElementType && (
           <div className="variable-row">
-            <span className="variable-name">Element Type</span>
+            <span className="variable-name">
+              {i18n.components.details_panel.element_type}
+            </span>
             <ImperativeMount
               build={() =>
-                createTypeSelect(node.elementType ?? "number", (elementType) => {
-                  getEditingGraph(store.state).changeNodeElementType(getVisibleVariablesForState(store.state), store.state.rootGraph.functions, node.id, {
-                    elementType,
-                  });
-                  store.notify();
-                })
+                createTypeSelect(
+                  node.elementType ?? "number",
+                  (elementType) => {
+                    getEditingGraph(store.state).changeNodeElementType(
+                      getVisibleVariablesForState(store.state),
+                      store.state.rootGraph.functions,
+                      node.id,
+                      {
+                        elementType,
+                      },
+                    );
+                    store.notify();
+                  },
+                )
               }
               deps={[node.id, node.elementType]}
               disabled={disabled}
@@ -121,13 +186,20 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
 
         {def.configurableElementType?.includeKeyType && (
           <div className="variable-row">
-            <span className="variable-name">Key Type</span>
+            <span className="variable-name">
+              {i18n.components.details_panel.key_type}
+            </span>
             <ImperativeMount
               build={() =>
                 createTypeSelect(node.mapKeyType ?? "string", (mapKeyType) => {
-                  getEditingGraph(store.state).changeNodeElementType(getVisibleVariablesForState(store.state), store.state.rootGraph.functions, node.id, {
-                    mapKeyType,
-                  });
+                  getEditingGraph(store.state).changeNodeElementType(
+                    getVisibleVariablesForState(store.state),
+                    store.state.rootGraph.functions,
+                    node.id,
+                    {
+                      mapKeyType,
+                    },
+                  );
                   store.notify();
                 })
               }
@@ -142,10 +214,19 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
             <span className="variable-name">{prop.label}</span>
             <ImperativeMount
               build={() =>
-                createTypedValueInput(prop.type, node.pins[prop.id]?.value, (newValue) => {
-                  setPinLiteralValue(getEditingGraph(store.state), node.id, prop.id, newValue);
-                  store.notify();
-                })
+                createTypedValueInput(
+                  prop.type,
+                  node.pins[prop.id]?.value,
+                  (newValue) => {
+                    setPinLiteralValue(
+                      getEditingGraph(store.state),
+                      node.id,
+                      prop.id,
+                      newValue,
+                    );
+                    store.notify();
+                  },
+                )
               }
               deps={[node.id, prop.id, node.pins[prop.id]?.value]}
               disabled={disabled}
@@ -157,13 +238,23 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
   );
 }
 
-function CommentDetails({ store, comment }: { store: Store; comment: CommentBox }) {
+function CommentDetails({
+  store,
+  comment,
+}: {
+  store: Store;
+  comment: CommentBox;
+}) {
   return (
     <div className="details-content">
-      <div className="details-item-name">Comment</div>
+      <div className="details-item-name">
+        {i18n.components.details_panel.comment}
+      </div>
       <div>
         <div className="variable-row">
-          <span className="variable-name">Color</span>
+          <span className="variable-name">
+            {i18n.components.details_panel.color}
+          </span>
           <input
             key={comment.id}
             type="color"
@@ -184,11 +275,15 @@ function CommentDetails({ store, comment }: { store: Store; comment: CommentBox 
 function FunctionDescription({ store, fn }: { store: Store; fn: FunctionDef }) {
   return (
     <div className="details-description-row">
-      <span className="variable-name">Description</span>
+      <span className="variable-name">
+        {i18n.components.details_panel.description}
+      </span>
       <textarea
         key={fn.id}
         className="details-description-input"
-        placeholder="Shown as a tooltip when hovering this function"
+        placeholder={
+          i18n.components.details_panel.function_description_placeholder
+        }
         defaultValue={fn.description ?? ""}
         disabled={store.state.simulating}
         onInput={(e) => {
@@ -215,8 +310,16 @@ export function DetailsPanel({ store }: { store: Store }) {
   useStoreRevision(store);
   const selection = store.state.sidebarSelection;
 
-  const fn = selection?.kind === "function" ? store.state.rootGraph.functions.find((f) => f.id === selection.functionId) : undefined;
-  const script = selection?.kind === "script" ? store.state.rootGraph.scripts.find((s) => s.id === selection.scriptId) : undefined;
+  const fn =
+    selection?.kind === "function"
+      ? store.state.rootGraph.functions.find(
+          (f) => f.id === selection.functionId,
+        )
+      : undefined;
+  const script =
+    selection?.kind === "script"
+      ? store.state.rootGraph.scripts.find((s) => s.id === selection.scriptId)
+      : undefined;
   const variable =
     selection?.kind === "variable"
       ? allGraphs(store.state.rootGraph)
@@ -243,30 +346,65 @@ export function DetailsPanel({ store }: { store: Store }) {
   // Same fallthrough rule as selectedNode above — only shown for a single selected comment box (a
   // multi-comment selection shows nothing here rather than arbitrarily picking one of them).
   let selectedComment: CommentBox | undefined;
-  if (!variable && !fn && !script && !selectedNode && store.state.selectedCommentIds.size === 1) {
+  if (
+    !variable &&
+    !fn &&
+    !script &&
+    !selectedNode &&
+    store.state.selectedCommentIds.size === 1
+  ) {
     const [onlyCommentId] = store.state.selectedCommentIds;
-    selectedComment = getEditingGraph(store.state).commentBoxes.find((b) => b.id === onlyCommentId);
+    selectedComment = getEditingGraph(store.state).commentBoxes.find(
+      (b) => b.id === onlyCommentId,
+    );
   }
 
-  if (!variable && !fn && !script && !selectedNode && !selectedComment) return null;
+  if (!variable && !fn && !script && !selectedNode && !selectedComment)
+    return null;
 
   return (
     <div id="details-section">
-      <div className="details-header">Details</div>
+      <div className="details-header">
+        {i18n.components.details_panel.header}
+      </div>
       {variable && <VariableDetails store={store} variable={variable} />}
-      {selectedNode && <NodeDetails store={store} node={selectedNode} properties={nodeProperties ?? []} />}
-      {selectedComment && <CommentDetails store={store} comment={selectedComment} />}
+      {selectedNode && (
+        <NodeDetails
+          store={store}
+          node={selectedNode}
+          properties={nodeProperties ?? []}
+        />
+      )}
+      {selectedComment && (
+        <CommentDetails store={store} comment={selectedComment} />
+      )}
       {fn && (
         <div className="details-content">
           <FunctionDescription store={store} fn={fn} />
-          <FunctionIoPanel store={store} kind="input" getActiveFunction={() => fn} />
-          <FunctionIoPanel store={store} kind="output" getActiveFunction={() => fn} />
+          <FunctionIoPanel
+            store={store}
+            kind="input"
+            getActiveFunction={() => fn}
+          />
+          <FunctionIoPanel
+            store={store}
+            kind="output"
+            getActiveFunction={() => fn}
+          />
         </div>
       )}
       {script && (
         <div className="details-content">
-          <ScriptIoPanel store={store} kind="input" getSelectedScript={() => script} />
-          <ScriptIoPanel store={store} kind="output" getSelectedScript={() => script} />
+          <ScriptIoPanel
+            store={store}
+            kind="input"
+            getSelectedScript={() => script}
+          />
+          <ScriptIoPanel
+            store={store}
+            kind="output"
+            getSelectedScript={() => script}
+          />
         </div>
       )}
     </div>

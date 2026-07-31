@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { i18n } from "@i18n";
 import { closeFunctionTab, type Store } from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
 
@@ -8,7 +9,9 @@ import { useStoreRevision } from "../../state/useStore";
  * reordered; each open function gets its own closable tab, reorderable via native drag-and-drop. */
 export function GraphTabs({ store }: { store: Store }) {
   useStoreRevision(store);
-  const [draggingFunctionId, setDraggingFunctionId] = useState<string | null>(null);
+  const [draggingFunctionId, setDraggingFunctionId] = useState<string | null>(
+    null,
+  );
   const disabled = store.state.simulating;
 
   function reorder(fromId: string, toId: string): void {
@@ -24,24 +27,34 @@ export function GraphTabs({ store }: { store: Store }) {
   return (
     <>
       <div
-        className={"graph-tab" + (store.state.activeFunctionId === null ? " graph-tab-active" : "")}
-        title="The main graph — always open"
+        className={
+          "graph-tab" +
+          (store.state.activeFunctionId === null ? " graph-tab-active" : "")
+        }
+        title={i18n.components.graph_tabs.main_graph_title}
         onClick={() => {
           store.state.activeFunctionId = null;
           store.notify();
         }}
       >
-        {store.state.rootGraph.name || "Main Graph"}
+        {store.state.rootGraph.name || i18n.components.graph_tabs.main_graph}
       </div>
 
       {store.state.openFunctionTabs.map((functionId) => {
-        const fn = store.state.rootGraph.functions.find((f) => f.id === functionId);
+        const fn = store.state.rootGraph.functions.find(
+          (f) => f.id === functionId,
+        );
         if (!fn) return null; // stale reference to a since-deleted function
 
         return (
           <div
             key={functionId}
-            className={"graph-tab" + (store.state.activeFunctionId === functionId ? " graph-tab-active" : "")}
+            className={
+              "graph-tab" +
+              (store.state.activeFunctionId === functionId
+                ? " graph-tab-active"
+                : "")
+            }
             draggable={!disabled}
             onDragStart={(e) => {
               setDraggingFunctionId(functionId);
@@ -52,7 +65,8 @@ export function GraphTabs({ store }: { store: Store }) {
             }}
             onDrop={(e) => {
               e.preventDefault();
-              if (draggingFunctionId && draggingFunctionId !== functionId) reorder(draggingFunctionId, functionId);
+              if (draggingFunctionId && draggingFunctionId !== functionId)
+                reorder(draggingFunctionId, functionId);
               setDraggingFunctionId(null);
             }}
             onDragEnd={() => setDraggingFunctionId(null)}
@@ -69,7 +83,7 @@ export function GraphTabs({ store }: { store: Store }) {
             <button
               type="button"
               className="graph-tab-close"
-              title="Close tab"
+              title={i18n.components.graph_tabs.close_tab}
               disabled={disabled}
               onClick={(e) => {
                 e.stopPropagation();

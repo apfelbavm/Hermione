@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { createTemplatedCodeScriptDef, moveScript, removeCodeScriptDef } from "../../engine/graphMutations";
+import { i18n } from "@i18n";
+import {
+  createTemplatedCodeScriptDef,
+  moveScript,
+  removeCodeScriptDef,
+} from "../../engine/graphMutations";
 import type { CodeScriptDef } from "../../engine/types";
 import { SCRIPT_DRAG_MIME } from "../../overlay/dragTypes";
 import { openRowContextMenu } from "../../overlay/rowContextMenu";
@@ -26,16 +31,23 @@ export function ScriptsPanel({ store }: { store: Store }) {
 
   function commitRename(script: CodeScriptDef, rawNewName: string): void {
     const trimmed = rawNewName.trim();
-    const isDuplicate = trimmed.length === 0 || store.state.rootGraph.scripts.some((s) => s.id !== script.id && s.name === trimmed);
+    const isDuplicate =
+      trimmed.length === 0 ||
+      store.state.rootGraph.scripts.some(
+        (s) => s.id !== script.id && s.name === trimmed,
+      );
     if (!isDuplicate) script.name = trimmed;
     setEditingId(null);
     store.notify();
   }
 
-  const { rowDragHandlers, rowIndicatorClassName } = useRowDragReorder<string>(SCRIPT_DRAG_MIME, (draggedId, targetId, position) => {
-    moveScript(store.state.rootGraph, draggedId, targetId, position);
-    store.notify();
-  });
+  const { rowDragHandlers, rowIndicatorClassName } = useRowDragReorder<string>(
+    SCRIPT_DRAG_MIME,
+    (draggedId, targetId, position) => {
+      moveScript(store.state.rootGraph, draggedId, targetId, position);
+      store.notify();
+    },
+  );
 
   function handleAdd(): void {
     const name = nextAvailableName(
@@ -49,22 +61,37 @@ export function ScriptsPanel({ store }: { store: Store }) {
   }
 
   return (
-    <CollapsibleSection id="scripts-section" title="Scripts" empty={scripts.length === 0} onAdd={handleAdd} disabled={disabled}>
+    <CollapsibleSection
+      id="scripts-section"
+      title="Scripts"
+      empty={scripts.length === 0}
+      onAdd={handleAdd}
+      disabled={disabled}
+    >
       {scripts.map((script) => {
         const isEditing = editingId === script.id;
-        const isSelected = store.state.sidebarSelection?.kind === "script" && store.state.sidebarSelection.scriptId === script.id;
+        const isSelected =
+          store.state.sidebarSelection?.kind === "script" &&
+          store.state.sidebarSelection.scriptId === script.id;
 
         function editScript(): void {
           if (disabled) return;
           openScriptTab(store.state, script.id);
-          store.state.sidebarSelection = { kind: "script", scriptId: script.id };
+          store.state.sidebarSelection = {
+            kind: "script",
+            scriptId: script.id,
+          };
           store.notify();
         }
 
         return (
           <div
             key={script.id}
-            className={"variable-row" + (isSelected ? " function-row-active" : "") + rowIndicatorClassName(script.id)}
+            className={
+              "variable-row" +
+              (isSelected ? " function-row-active" : "") +
+              rowIndicatorClassName(script.id)
+            }
             draggable={!isEditing && !disabled}
             onDragStart={(e) => {
               e.dataTransfer.setData(SCRIPT_DRAG_MIME, script.id);
@@ -89,8 +116,14 @@ export function ScriptsPanel({ store }: { store: Store }) {
                 disabled={disabled}
                 onContextMenu={(screenPos) => {
                   openRowContextMenu(screenPos, [
-                    { label: "Edit Script", onClick: editScript },
-                    { label: "Rename", onClick: () => setEditingId(script.id) },
+                    {
+                      label: i18n.components.context_menu.edit_script,
+                      onClick: editScript,
+                    },
+                    {
+                      label: i18n.components.context_menu.rename,
+                      onClick: () => setEditingId(script.id),
+                    },
                   ]);
                 }}
                 onClick={editScript}
@@ -102,7 +135,10 @@ export function ScriptsPanel({ store }: { store: Store }) {
               onClick={() => {
                 closeScriptTab(store.state, script.id);
                 removeCodeScriptDef(store.state.rootGraph, script.id);
-                if (store.state.sidebarSelection?.kind === "script" && store.state.sidebarSelection.scriptId === script.id) {
+                if (
+                  store.state.sidebarSelection?.kind === "script" &&
+                  store.state.sidebarSelection.scriptId === script.id
+                ) {
                   store.state.sidebarSelection = null;
                 }
                 store.notify();

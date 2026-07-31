@@ -2,7 +2,8 @@
   "pages": {
     "logs": {
       "title": "Every run across every project (grouped by run — expand one to inspect its individual log entries).",
-      "empty": "No runs yet — simulate or run a deployed Flow to see its logs here."
+      "empty": "No runs yet — simulate or run a deployed Flow to see its logs here.",
+      "page_title": "Logs"
     },
     "emulate": {
       "loading_editor": "Loading editor…",
@@ -20,6 +21,147 @@
       "entry": "entry",
       "entries": "entries",
       "view_logs": "View in Logs →"
+    },
+    "projects": {
+      "title": "Projects",
+      "new_project_placeholder": "New project name",
+      "create_project": "Create Project",
+      "empty": "No projects yet — create one above.",
+      "rename": "Rename",
+      "delete": "Delete",
+      "delete_confirm": "Delete project \"{name}\"? This also deletes every Flow and run log inside it."
+    },
+    "project": {
+      "back": "← Back",
+      "not_found": "Project not found",
+      "title_prefix": "Project: ",
+      "title_rename_hint": "Click to rename",
+      "view_run_logs": "View Run Logs →",
+      "flows_heading": "Flows",
+      "new_flow_placeholder": "New Flow name",
+      "create_flow": "Create Flow",
+      "flows_empty": "No Flows yet — create one above.",
+      "flow_rename": "Rename",
+      "flow_duplicate": "Duplicate",
+      "flow_delete": "Delete",
+      "delete_flow_confirm": "Delete Flow \"{name}\"? This can't be undone.",
+      "duplicate_title": "Duplicate Flow",
+      "duplicate_new_name": "New name",
+      "duplicate_name_required": "Name is required",
+      "duplicate_name_exists": "A Flow named \"{name}\" already exists in this project.",
+      "duplicate_saving": "Duplicating…",
+      "duplicate_cancel": "Cancel",
+      "duplicate_confirm": "Duplicate"
+    },
+    "project_logs": {
+      "back": "← Back",
+      "title": "Run Logs",
+      "project_fallback": "Project",
+      "description": "Showing the latest {max} runs (grouped by run — expand one to inspect its individual log entries).",
+      "empty": "No runs yet — simulate a Flow to see its logs here."
+    },
+    "credential_vault": {
+      "title": "Credential Vault",
+      "add": "Add Credential",
+      "empty": "No credentials yet — add one above. A graph node references one by its Name.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "delete_confirm": "Delete credential \"{name}\"? Any node referencing it by name will start failing.",
+      "modal_add_title": "Add Credential",
+      "modal_edit_title": "Edit Credential",
+      "modal_name_label": "Name",
+      "modal_type_label": "Type",
+      "modal_name_required": "Name is required",
+      "modal_cancel": "Cancel",
+      "modal_save": "Save"
+    }
+  },
+  "components": {
+    "run_row": {
+      "simulate": "Simulate",
+      "production": "Production",
+      "execution_time": "Execution time: ",
+      "entry": "entry",
+      "entries": "entries",
+      "no_output": "No log output for this run.",
+      "ms": " ms",
+      "s": " s",
+      "m": " m"
+    },
+    "log_entry": {
+      "download": "⬇ Download"
+    },
+    "details_panel": {
+      "header": "Details",
+      "comment": "Comment",
+      "color": "Color",
+      "description": "Description",
+      "element_type": "Element Type",
+      "key_type": "Key Type",
+      "node_description_placeholder": "Shown as a speech bubble above this node on the canvas",
+      "function_description_placeholder": "Shown as a tooltip when hovering this function"
+    },
+    "graph_tabs": {
+      "main_graph": "Main Graph",
+      "main_graph_title": "The main graph — always open",
+      "close_tab": "Close tab"
+    },
+    "sidebar": {
+      "collapse": "Collapse",
+      "collapse_title": "Collapse/expand sidebar",
+      "projects": "Projects",
+      "credential_vault": "Credential Vault",
+      "logs": "Logs",
+      "emulate": "Emulate"
+    },
+    "theme_toggle": {
+      "title": "Toggle light/dark theme",
+      "dark": "🌙 Dark",
+      "light": "☀️ Light",
+      "loading": "🌓 Theme"
+    },
+    "app_shell_markup": {
+      "back": "← Back",
+      "back_title": "Back to the project",
+      "simulate": "Simulate ▶",
+      "pause": "⏸ Pause",
+      "pause_title": "Pause the running simulation",
+      "continue": "▶ Continue",
+      "continue_title": "Continue past the current breakpoint/pause",
+      "stop": "■ Stop",
+      "stop_title": "Stop the running simulation",
+      "auto_pan": "Auto Pan",
+      "auto_pan_title": "Pan the camera to follow whichever node is currently executing during a Simulate run",
+      "save": "Save",
+      "load": "Load",
+      "download_graph": "Download (Graph)",
+      "deploy": "Deploy",
+      "snap_to_grid": "Snap to Grid"
+    },
+    "app_shell": {
+      "sim_failed": "Simulation request failed: ",
+      "sim_error": "Error: ",
+      "deploy_error": "Deploy error: ",
+      "load_graph_failed": "Failed to load graph: ",
+      "load_flow_failed": "Failed to load Flow: ",
+      "ctx_delete": "Delete (Del)",
+      "ctx_collapse_to_function": "Collapse to Function",
+      "ctx_enable": "Enable",
+      "ctx_disable": "Disable",
+      "ctx_remove_breakpoint": "Remove Breakpoint",
+      "ctx_add_breakpoint": "Add Breakpoint",
+      "ctx_select_all": "Select All (Ctrl+A)",
+      "ctx_add_reroute": "Add Reroute Node",
+      "ctx_break_connection": "Break Connection",
+      "ctx_break_connection_to": "Break Connection → ",
+      "ctx_delete_pin": "Delete",
+      "ctx_get": "Get",
+      "ctx_set": "Set"
+    },
+    "context_menu": {
+      "rename": "Rename",
+      "edit": "Edit",
+      "edit_script": "Edit Script"
     }
   }
 }

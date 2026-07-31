@@ -1,4 +1,5 @@
 import * as Papa from "papaparse";
+import { i18n } from "@i18n";
 import { formatLogTimestamp } from "../../shared/formatLogTimestamp";
 import type { LogEntry } from "../../server/models";
 
@@ -41,7 +42,9 @@ export function LogEntryView({ entry }: { entry: LogEntry }) {
 
   let content: React.ReactNode;
   if (entry.format === "csv") {
-    const rows = (Papa.parse(entry.message, { delimiter: "," }).data as string[][]).filter((row) => row.length > 1 || row[0] !== "");
+    const rows = (
+      Papa.parse(entry.message, { delimiter: "," }).data as string[][]
+    ).filter((row) => row.length > 1 || row[0] !== "");
     content =
       rows.length > 0 ? (
         <div className="log-entry-csv-wrapper">
@@ -61,17 +64,28 @@ export function LogEntryView({ entry }: { entry: LogEntry }) {
         <pre className="log-entry-text log-entry-csv-text">{entry.message}</pre>
       );
   } else {
-    const text = entry.format === "json" ? formatJsonForDisplay(entry.message) : entry.message;
-    content = <pre className={`log-entry-text log-entry-${entry.format}`}>{text}</pre>;
+    const text =
+      entry.format === "json"
+        ? formatJsonForDisplay(entry.message)
+        : entry.message;
+    content = (
+      <pre className={`log-entry-text log-entry-${entry.format}`}>{text}</pre>
+    );
   }
 
   return (
     <div className="log-entry">
       <div className="log-entry-header">
-        <span className="log-entry-time">{formatLogTimestamp(entry.timestamp)}</span>
+        <span className="log-entry-time">
+          {formatLogTimestamp(entry.timestamp)}
+        </span>
         {downloadable && (
-          <button type="button" className="log-entry-download" onClick={() => downloadLogEntry(entry)}>
-            ⬇ Download
+          <button
+            type="button"
+            className="log-entry-download"
+            onClick={() => downloadLogEntry(entry)}
+          >
+            {i18n.components.log_entry.download}
           </button>
         )}
       </div>
