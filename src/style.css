@@ -1734,6 +1734,26 @@ body.resizing {
   background: var(--pp-button-bg-hover);
 }
 
+/* Wraps the "⋯" options button + its dropdown (see projects/[projectId]/page.tsx's FlowRowMenu) —
+   the dropdown itself is .row-context-menu, shared with the canvas's own right-click menus, and is
+   `position: fixed` (positioned in JS off the button's own getBoundingClientRect), so this wrapper
+   only needs to establish DOM containment for the outside-click handler, not lay anything out. */
+.entity-menu-button {
+  background: none;
+  border: none;
+  color: var(--pp-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.entity-menu-button:hover {
+  background: var(--pp-button-bg-hover);
+  color: var(--pp-text);
+}
+
 .run-list {
   list-style: none;
   margin: 0;
