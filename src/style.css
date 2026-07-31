@@ -1341,6 +1341,13 @@ body.resizing {
   border-bottom: 1px solid var(--pp-border);
 }
 
+.page-bottom-footer {
+  height: 40px;
+  flex: 0 0 auto;
+  background: var(--pp-surface);
+  border-top: 1px solid var(--pp-border);
+}
+
 /* Same max-width/margin/horizontal-padding as .page-content, so this bar's title/toggle align
    with the breadcrumbs/back-link/body below regardless of viewport width. */
 .page-top-header-inner {
