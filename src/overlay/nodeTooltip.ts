@@ -1,5 +1,5 @@
 import { getNodeDef } from "../engine/registry";
-import type { PinDef } from "../engine/types";
+import type { PinDef, PinType } from "../engine/types";
 import { hitTestNode, hitTestPin } from "../render/hitTest";
 import { computeAllNodeGeometries } from "../render/nodeGeometry";
 import { getEditingGraph, getVisibleVariablesForState, type Store } from "../state/store";
@@ -19,6 +19,66 @@ function describePinType(pin: PinDef): string {
   if (container === "single") return type;
   if (container === "map") return `Map<${capitalize(pin.keyType ?? "string")}, ${type}>`;
   return `${capitalize(container)}<${type}>`;
+}
+
+const MAX_VALUE_STRING_LENGTH = 60;
+const MAX_CONTAINER_PREVIEW_ROWS = 3;
+
+function clampValueString(s: string): string {
+  return s.length > MAX_VALUE_STRING_LENGTH ? `${s.slice(0, MAX_VALUE_STRING_LENGTH)}…` : s;
+}
+
+/** A single scalar value, formatted for display in a pin's hover tooltip — same per-type shapes
+ * createScalarInput (typedValueInput.ts) uses for editing, just rendered as read-only clamped text
+ * instead of a live control. `object` has no literal editor anywhere in this app either; JSON is the
+ * closest thing it has to a readable display form. */
+function formatScalarValue(type: PinType, value: unknown): string {
+  if (value === undefined || value === null) return "—";
+  if (type === "boolean") return value ? "true" : "false";
+  if (type === "object") {
+    try {
+      return clampValueString(JSON.stringify(value));
+    } catch {
+      return clampValueString(String(value));
+    }
+  }
+  return clampValueString(String(value));
+}
+
+interface MapEntry {
+  key: unknown;
+  value: unknown;
+}
+
+function isMapEntry(value: unknown): value is MapEntry {
+  return typeof value === "object" && value !== null && "key" in value && "value" in value;
+}
+
+/** An Array/Set/Map default value's runtime shape is always a plain array (a Map's own entries as
+ * `{key, value}` objects — see nodes/map.ts's own doc comment for why no real Map/Set instance is
+ * ever used) — previews at most the first 3 elements, one per row, each independently clamped. */
+function formatContainerValue(pin: PinDef, value: unknown): string {
+  const entries = Array.isArray(value) ? value : [];
+  const rows = entries.slice(0, MAX_CONTAINER_PREVIEW_ROWS).map((entry) => {
+    if (pin.container === "map" && isMapEntry(entry)) {
+      return `${formatScalarValue(pin.keyType ?? "string", entry.key)}: ${formatScalarValue(pin.type, entry.value)}`;
+    }
+    return formatScalarValue(pin.type, entry);
+  });
+  return rows.join("\n");
+}
+
+/** "Number: 42", "String: hello world", or (for a container pin) the type label followed by up to
+ * 3 preview rows on their own lines — shown instead of the plain type-only tooltip while simulating,
+ * for any OUTPUT pin currently carrying a known value (see AppState.pinValues/onPinValues). Returns
+ * just the type label when no value's been recorded for this pin yet (e.g. its node hasn't run in
+ * this simulation run). */
+function formatPinValueTooltip(pin: PinDef, value: unknown): string {
+  const typeLabel = describePinType(pin);
+  if (value === undefined) return typeLabel;
+  const container = pin.container ?? "single";
+  if (container === "single") return `${typeLabel}: ${formatScalarValue(pin.type, value)}`;
+  return `${typeLabel}:\n${formatContainerValue(pin, value)}`;
 }
 
 /** Either a pin or a whole node — whichever the mouse is currently resting on (see
@@ -98,7 +158,17 @@ export function setupNodeHoverTooltip(canvas: HTMLCanvasElement, store: Store): 
       if (target.kind === "pin") {
         const node = graph.nodes.find((n) => n.id === target.nodeId);
         const pin = node?.resolvePinDefs(variables, functions, scripts).find((p) => p.id === target.pinId);
-        if (pin) showTooltip(lastScreenPos, describePinType(pin));
+        if (!pin) return;
+
+        // While simulating, an output pin (never exec — a wire, not a value) shows whatever it's
+        // currently carrying instead of just its type, if anything's been recorded for it yet.
+        if (store.state.simulating && pin.direction === "output" && pin.type !== "exec") {
+          const value = store.state.pinValues.get(`${target.nodeId}:${target.pinId}`);
+          showTooltip(lastScreenPos, formatPinValueTooltip(pin, value));
+          return;
+        }
+
+        showTooltip(lastScreenPos, describePinType(pin));
         return;
       }
       const node = graph.nodes.find((n) => n.id === target.nodeId);

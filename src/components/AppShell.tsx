@@ -99,6 +99,7 @@ export default function AppShell() {
       selectedCommentIds: new Set(),
       executingNodeId: null,
       firedConnectionIds: new Set(),
+      pinValues: new Map(),
       wireDrag: null,
       marqueeSelection: null,
       sidebarSelection: null,
@@ -623,6 +624,7 @@ export default function AppShell() {
       currentRunId = null;
       logPanel.innerHTML = "";
       store.state.firedConnectionIds = new Set();
+      store.state.pinValues = new Map();
 
       // Commit any script tab's in-progress (unsaved) Monaco edits first — this IS the "submit"
       // step: the graph sent to the server is whatever's currently open for editing, flushed.
@@ -669,6 +671,14 @@ export default function AppShell() {
               store.state.firedConnectionIds.add((data as { connectionId: string }).connectionId);
               store.notify();
               break;
+            case "pin-values": {
+              const { nodeId, values } = data as { nodeId: string; values: Record<string, unknown> };
+              for (const [pinId, value] of Object.entries(values)) {
+                store.state.pinValues.set(`${nodeId}:${pinId}`, value);
+              }
+              store.notify();
+              break;
+            }
             case "paused":
               store.state.paused = true;
               store.notify();
@@ -765,6 +775,7 @@ export default function AppShell() {
         store.state.selectedCommentIds = new Set();
         store.state.executingNodeId = null;
         store.state.firedConnectionIds = new Set();
+        store.state.pinValues = new Map();
         saveGraphToLocalStorage(graph);
         store.notify();
       } catch (err) {

@@ -68,6 +68,12 @@ export interface AppState {
   selectedCommentIds: Set<string>;
   executingNodeId: string | null;
   firedConnectionIds: Set<string>;
+  /** Latest known value of every data output pin touched so far this run, keyed by `${nodeId}:
+   * ${pinId}` (same composite-key convention as the engine's own tickCache/execOutputs) — driven by
+   * the "pin-values" SSE event (see /api/simulate/route.ts's onPinValues). Read by the canvas hover
+   * tooltip (nodeTooltip.ts) to show "what's currently on this pin" while simulating. Reset to empty
+   * at the start of every run, alongside firedConnectionIds. */
+  pinValues: Map<string, unknown>;
   wireDrag: WireDragState | null;
   marqueeSelection: MarqueeSelectionState | null;
   sidebarSelection: SidebarSelection | null;

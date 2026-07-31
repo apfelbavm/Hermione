@@ -296,4 +296,10 @@ export interface ExecutionContext {
   /** May return a Promise to introduce a visualization pause between exec steps; awaited by the executor. */
   onNodeStart?: (nodeId: string) => void | Promise<void>;
   onExecFire?: (connectionId: string) => void;
+  /** Fired whenever a node's data OUTPUT pins get a fresh value — both when an exec node's own
+   * execute() produces them, and when a pure/data node's evaluate() runs to satisfy some downstream
+   * pin read (see executor.ts's runExecFrom/resolveDataPin) — so a client watching a live run can
+   * show "what's currently on this pin" (see nodeTooltip.ts's hover tooltip) without re-deriving the
+   * engine's own evaluation order itself. */
+  onPinValues?: (nodeId: string, values: Record<string, unknown>) => void;
 }

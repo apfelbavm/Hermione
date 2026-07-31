@@ -97,6 +97,9 @@ export async function POST(request: Request): Promise<Response> {
         onExecFire: (connectionId) => {
           send("exec-fire", { connectionId });
         },
+        onPinValues: (nodeId, values) => {
+          if (Object.keys(values).length > 0) send("pin-values", { nodeId, values });
+        },
       });
 
       try {

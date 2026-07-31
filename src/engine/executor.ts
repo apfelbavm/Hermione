@@ -91,11 +91,14 @@ export async function resolveDataPin(nodeId: string, pinId: string, ctx: Executi
   });
   resolving.delete(outputCacheKey);
 
+  const outputValues: Record<string, unknown> = {};
   for (const pinDef of upstreamPinDefs) {
     if (pinDef.direction === "output" && pinDef.type !== "exec") {
       ctx.tickCache.set(`${upstreamNode.id}:${pinDef.id}`, outputs[pinDef.id]);
+      outputValues[pinDef.id] = outputs[pinDef.id];
     }
   }
+  ctx.onPinValues?.(upstreamNode.id, outputValues);
 
   return ctx.tickCache.get(outputCacheKey);
 }
@@ -167,6 +170,7 @@ export async function runExecFrom(nodeId: string, execInPin: string, ctx: Execut
         for (const [pinId, value] of Object.entries(result.outputs)) {
           ctx.execOutputs.set(`${node.id}:${pinId}`, value);
         }
+        ctx.onPinValues?.(node.id, result.outputs);
       }
 
       nextExecPins = result.nextExec ? (Array.isArray(result.nextExec) ? result.nextExec : [result.nextExec]) : [];

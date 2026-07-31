@@ -28,6 +28,7 @@ function createFakeStore(rootGraph: Graph): Store {
     selectedCommentIds: new Set(),
     executingNodeId: null,
     firedConnectionIds: new Set(),
+    pinValues: new Map(),
     wireDrag: null,
     marqueeSelection: null,
     sidebarSelection: null,
