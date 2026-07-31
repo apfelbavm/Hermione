@@ -92,20 +92,43 @@ export interface DropboxSpaceUsageResult extends DropboxOpResult {
   allocated: number;
 }
 
+const managerCache = new Map<string, DropboxManager>();
+
 export class DropboxManager {
   private readonly client: Dropbox;
 
-  constructor(accessToken: string) {
+  /** Builds the client from the app key/secret + refresh token, not a pre-obtained access token —
+   * the Dropbox SDK's own DropboxAuth then transparently mints/refreshes the actual access token
+   * on demand before every request (see checkAndRefreshAccessToken in the SDK), so nothing here
+   * has to track expiry itself. */
+  constructor(appKey: string, appSecret: string, refreshToken: string) {
     this.client = new Dropbox({
-      accessToken,
-      fetch: globalThis.fetch.bind(globalThis),
+      auth: new DropboxAuth({
+        clientId: appKey,
+        clientSecret: appSecret,
+        refreshToken,
+        fetch: globalThis.fetch.bind(globalThis),
+      }),
     });
   }
 
-  /** One-time setup step, NOT part of the normal per-run auth flow (see dropbox.auth): exchanges a
-   * single-use authorization code (obtained by a human visiting Dropbox's /oauth2/authorize consent
-   * page with token_access_type=offline) for a long-lived refresh token — the value that then goes
-   * into the Credential Vault for dropbox.auth to use on every subsequent run. */
+  /** Reuses one DropboxManager (and its underlying DropboxAuth) per distinct credential instead of
+   * building a fresh one per node execution — DropboxAuth caches the current access token on itself,
+   * so only a reused instance benefits from that cache instead of re-minting a token every call. */
+  static forCredential(appKey: string, appSecret: string, refreshToken: string): DropboxManager {
+    const key = `${appKey}:${refreshToken}`;
+    let manager = managerCache.get(key);
+    if (!manager) {
+      manager = new DropboxManager(appKey, appSecret, refreshToken);
+      managerCache.set(key, manager);
+    }
+    return manager;
+  }
+
+  /** One-time setup step: exchanges a single-use authorization code (obtained by a human visiting
+   * Dropbox's /oauth2/authorize consent page with token_access_type=offline) for a long-lived
+   * refresh token — the value that then goes into the Credential Vault for every other node's
+   * forCredential() to use. */
   static async exchangeAuthCode(authCode: string, appKey: string, appSecret: string): Promise<DropboxAuthorizeResult> {
     try {
       const auth = new DropboxAuth({
@@ -131,34 +154,6 @@ export class DropboxManager {
         success: false,
         accessToken: "",
         refreshToken: "",
-        expiresIn: 0,
-        error: dropboxErrorMessage(err),
-      };
-    }
-  }
-
-  /** Exchanges a long-lived refresh token (app key + app secret) for a fresh short-lived access
-   * token — the flow Dropbox recommends over the deprecated non-expiring token type. */
-  static async refreshAccessToken(refreshToken: string, appKey: string, appSecret: string): Promise<DropboxTokenResult> {
-    try {
-      const auth = new DropboxAuth({
-        clientId: appKey,
-        clientSecret: appSecret,
-        refreshToken,
-        fetch: globalThis.fetch.bind(globalThis),
-      });
-      await auth.refreshAccessToken();
-      const expiresAt = auth.getAccessTokenExpiresAt();
-      return {
-        success: true,
-        accessToken: auth.getAccessToken(),
-        expiresIn: expiresAt ? Math.max(0, Math.round((expiresAt.getTime() - Date.now()) / 1000)) : 0,
-        error: "",
-      };
-    } catch (err) {
-      return {
-        success: false,
-        accessToken: "",
         expiresIn: 0,
         error: dropboxErrorMessage(err),
       };

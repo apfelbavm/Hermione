@@ -305,6 +305,7 @@
     },
     "dropbox": {
       "__shared": {
+        "pin_credential_name": "Credential Name",
         "pin_access_token": "Access Token",
         "pin_path": "Path",
         "pin_from_path": "From Path",
@@ -315,15 +316,9 @@
       },
       "authorize": {
         "label": "Dropbox Authorize",
-        "description": "One-time setup step: reads a named Credential Vault entry's App Key/App Secret/Authorization Code and exchanges the code for a long-lived refresh token to save back into the vault. Not part of the normal per-run auth flow — see Dropbox Auth.",
+        "description": "One-time setup step: reads a named Credential Vault entry's App Key/App Secret/Authorization Code and exchanges the code for a long-lived refresh token to save back into the vault. Every other Dropbox node uses that refresh token (via its own Credential Name pin) automatically, refreshing its access token on demand.",
         "pin_credential_name": "Credential Name",
         "pin_refresh_token": "Refresh Token",
-        "pin_expires_in": "Expires In (s)"
-      },
-      "auth": {
-        "label": "Dropbox Auth",
-        "description": "Exchanges a named Credential Vault entry's Dropbox app key/secret and refresh token for a fresh short-lived access token.",
-        "pin_credential_name": "Credential Name",
         "pin_expires_in": "Expires In (s)"
       },
       "upload": {

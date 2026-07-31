@@ -57,6 +57,55 @@ function getCredentialStub(name: string): CredentialRecord | undefined {
   return name === TEST_CREDENTIAL.name ? TEST_CREDENTIAL : undefined;
 }
 
+/** Every operation node now resolves DropboxManager.forCredential(appKey, appSecret, refreshToken),
+ * which is cached by that triple — so each test uses its own unique refresh token to guarantee a
+ * fresh (uncached) manager, keeping tests independent of run order and of each other's state. */
+let credentialCounter = 0;
+function freshCredential(): {
+  name: string;
+  getCredential: (name: string) => CredentialRecord | undefined;
+} {
+  credentialCounter += 1;
+  const credential: CredentialRecord = {
+    id: `cred-op-${credentialCounter}`,
+    name: `Op Credential ${credentialCounter}`,
+    type: "dropboxOAuth2",
+    data: {
+      appKey: "app-key-1",
+      appSecret: "app-secret-1",
+      authCode: "",
+      refreshToken: `refresh-op-${credentialCounter}`,
+    },
+    createdAt: "2024-01-01T00:00:00.000Z",
+    updatedAt: "2024-01-01T00:00:00.000Z",
+  };
+  return {
+    name: credential.name,
+    getCredential: (name) =>
+      name === credential.name ? credential : undefined,
+  };
+}
+
+/** Every real Dropbox request first goes through DropboxAuth.checkAndRefreshAccessToken, which
+ * (since these tests never pre-seed an access token) always fetches one from /oauth2/token before
+ * the actual API call — this stubs that first hop so callers only need to mock the real operation. */
+function withTokenRefresh(
+  handleOp: (url: string, init?: RequestInit) => Response | Promise<Response>,
+) {
+  return vi.fn(async (url: string, init?: RequestInit) => {
+    if (String(url).includes("/oauth2/token")) {
+      return new Response(
+        JSON.stringify({ access_token: "tok-live", expires_in: 14400 }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+    return handleOp(url, init);
+  });
+}
+
 describe("dropbox.authorize", () => {
   it("exchanges the vault credential's authorization code for a refresh token and access token", async () => {
     const fetchMock = vi.fn(async (url: string) => {
@@ -143,116 +192,10 @@ describe("dropbox.authorize", () => {
   });
 });
 
-describe("dropbox.auth", () => {
-  it("refreshes an access token via the vault credential's app key/secret/refresh token", async () => {
-    const fetchMock = vi.fn(async (url: string) => {
-      expect(String(url)).toContain("/oauth2/token");
-      return new Response(
-        JSON.stringify({ access_token: "tok-1", expires_in: 14400 }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const { graph } = buildGraph("dropbox.auth", "auth", {
-      credentialName: TEST_CREDENTIAL.name,
-    });
-    const ctx = createExecutionContext(graph, {
-      log: () => {},
-      getCredential: getCredentialStub,
-    });
-    await runExecFrom("auth", "exec-in", ctx);
-
-    expect(ctx.execOutputs.get("auth:success")).toBe(true);
-    expect(ctx.execOutputs.get("auth:accessToken")).toBe("tok-1");
-    expect(ctx.execOutputs.get("auth:expiresIn")).toBe(14400);
-    expect(ctx.execOutputs.get("auth:error")).toBe("");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("reports an error and never calls fetch when the named credential doesn't exist", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-
-    const { graph } = buildGraph("dropbox.auth", "auth", {
-      credentialName: "Nonexistent",
-    });
-    const ctx = createExecutionContext(graph, {
-      log: () => {},
-      getCredential: getCredentialStub,
-    });
-    await runExecFrom("auth", "exec-in", ctx);
-
-    expect(ctx.execOutputs.get("auth:success")).toBe(false);
-    expect(ctx.execOutputs.get("auth:error")).toContain("not found");
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("reports an error and never calls fetch when the named credential is the wrong type", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-
-    const wrongType: CredentialRecord = {
-      ...TEST_CREDENTIAL,
-      name: "Wrong Type",
-      type: "usernamePassword",
-      data: { username: "u", password: "p" },
-    };
-    const { graph } = buildGraph("dropbox.auth", "auth", {
-      credentialName: wrongType.name,
-    });
-    const ctx = createExecutionContext(graph, {
-      log: () => {},
-      getCredential: (name) =>
-        name === wrongType.name ? wrongType : undefined,
-    });
-    await runExecFrom("auth", "exec-in", ctx);
-
-    expect(ctx.execOutputs.get("auth:success")).toBe(false);
-    expect(ctx.execOutputs.get("auth:error")).toContain(
-      "not a Dropbox OAuth2 credential",
-    );
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("surfaces a failed refresh (bad refresh token) as an error instead of throwing", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              error: "invalid_grant",
-              error_description: "refresh token revoked",
-            }),
-            { status: 400 },
-          ),
-      ),
-    );
-
-    const { graph } = buildGraph("dropbox.auth", "auth", {
-      credentialName: TEST_CREDENTIAL.name,
-    });
-    const ctx = createExecutionContext(graph, {
-      log: () => {},
-      getCredential: getCredentialStub,
-    });
-    await runExecFrom("auth", "exec-in", ctx);
-
-    expect(ctx.execOutputs.get("auth:success")).toBe(false);
-    expect(ctx.execOutputs.get("auth:accessToken")).toBe("");
-    expect(ctx.execOutputs.get("auth:error")).toBe(
-      "invalid_grant: refresh token revoked",
-    );
-  });
-});
-
 describe("dropbox.upload", () => {
   it("uploads content to the given path and reports success", async () => {
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    const { name, getCredential } = freshCredential();
+    const fetchMock = withTokenRefresh(async (url, init) => {
       expect(String(url)).toContain("/files/upload");
       expect(
         (init?.headers as Record<string, string>)["Dropbox-API-Arg"],
@@ -265,11 +208,11 @@ describe("dropbox.upload", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph("dropbox.upload", "up", {
-      accessToken: "tok",
+      credentialName: name,
       path: "/report.csv",
       content: "a,b\n1,2",
     });
-    const ctx = createExecutionContext(graph, { log: () => {} });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
     await runExecFrom("up", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("up:success")).toBe(true);
@@ -277,9 +220,10 @@ describe("dropbox.upload", () => {
   });
 
   it("reports a Dropbox API error (e.g. path conflict) via the error output instead of throwing", async () => {
+    const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      vi.fn(
+      withTokenRefresh(
         async () =>
           new Response(
             JSON.stringify({ error_summary: "path/conflict/file/..." }),
@@ -289,23 +233,44 @@ describe("dropbox.upload", () => {
     );
 
     const { graph } = buildGraph("dropbox.upload", "up", {
-      accessToken: "tok",
+      credentialName: name,
       path: "/report.csv",
       content: "x",
     });
-    const ctx = createExecutionContext(graph, { log: () => {} });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
     await runExecFrom("up", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("up:success")).toBe(false);
     expect(ctx.execOutputs.get("up:error")).toBe("path/conflict/file/...");
   });
+
+  it("reports an error and never calls fetch when the named credential doesn't exist", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { graph } = buildGraph("dropbox.upload", "up", {
+      credentialName: "Nonexistent",
+      path: "/report.csv",
+      content: "x",
+    });
+    const ctx = createExecutionContext(graph, {
+      log: () => {},
+      getCredential: getCredentialStub,
+    });
+    await runExecFrom("up", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("up:success")).toBe(false);
+    expect(ctx.execOutputs.get("up:error")).toContain("not found");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("dropbox.download", () => {
   it("downloads a file's content and decodes it per the Encoding pin", async () => {
+    const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) => {
+      withTokenRefresh(async (url) => {
         expect(String(url)).toContain("/files/download");
         return new Response(Buffer.from("hello world"), {
           status: 200,
@@ -317,11 +282,11 @@ describe("dropbox.download", () => {
     );
 
     const { graph } = buildGraph("dropbox.download", "dl", {
-      accessToken: "tok",
+      credentialName: name,
       path: "/report.csv",
       encoding: "utf8",
     });
-    const ctx = createExecutionContext(graph, { log: () => {} });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
     await runExecFrom("dl", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("dl:success")).toBe(true);
@@ -330,9 +295,10 @@ describe("dropbox.download", () => {
   });
 
   it("reports a not-found error instead of throwing", async () => {
+    const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      vi.fn(
+      withTokenRefresh(
         async () =>
           new Response(JSON.stringify({ error_summary: "path/not_found/.." }), {
             status: 409,
@@ -341,10 +307,10 @@ describe("dropbox.download", () => {
     );
 
     const { graph } = buildGraph("dropbox.download", "dl", {
-      accessToken: "tok",
+      credentialName: name,
       path: "/missing.csv",
     });
-    const ctx = createExecutionContext(graph, { log: () => {} });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
     await runExecFrom("dl", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("dl:success")).toBe(false);
@@ -355,36 +321,39 @@ describe("dropbox.download", () => {
 
 describe("dropbox.listFolders", () => {
   it("returns only folder entries, ignoring files, and passes the Recursive pin through", async () => {
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      expect(String(url)).toContain("/files/list_folder");
-      const body = JSON.parse(String(init?.body));
-      expect(body.path).toBe("/root");
-      expect(body.recursive).toBe(true);
-      return new Response(
-        JSON.stringify({
-          entries: [
-            { ".tag": "folder", path_display: "/root/Sub A", name: "Sub A" },
-            {
-              ".tag": "file",
-              path_display: "/root/notes.txt",
-              name: "notes.txt",
-            },
-            { ".tag": "folder", path_display: "/root/Sub B", name: "Sub B" },
-          ],
-          cursor: "cursor-1",
-          has_more: false,
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    const { name, getCredential } = freshCredential();
+    vi.stubGlobal(
+      "fetch",
+      withTokenRefresh(async (url, init) => {
+        expect(String(url)).toContain("/files/list_folder");
+        const body = JSON.parse(String(init?.body));
+        expect(body.path).toBe("/root");
+        expect(body.recursive).toBe(true);
+        return new Response(
+          JSON.stringify({
+            entries: [
+              { ".tag": "folder", path_display: "/root/Sub A", name: "Sub A" },
+              {
+                ".tag": "file",
+                path_display: "/root/notes.txt",
+                name: "notes.txt",
+              },
+              { ".tag": "folder", path_display: "/root/Sub B", name: "Sub B" },
+            ],
+            cursor: "cursor-1",
+            has_more: false,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }),
+    );
 
     const { graph } = buildGraph("dropbox.listFolders", "lf", {
-      accessToken: "tok",
+      credentialName: name,
       path: "/root",
       recursive: true,
     });
-    const ctx = createExecutionContext(graph, { log: () => {} });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
     await runExecFrom("lf", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lf:success")).toBe(true);
@@ -396,39 +365,42 @@ describe("dropbox.listFolders", () => {
   });
 
   it("paginates through list_folder/continue until has_more is false", async () => {
-    const fetchMock = vi.fn(async (url: string) => {
-      if (String(url).includes("/files/list_folder/continue")) {
+    const { name, getCredential } = freshCredential();
+    vi.stubGlobal(
+      "fetch",
+      withTokenRefresh(async (url) => {
+        if (String(url).includes("/files/list_folder/continue")) {
+          return new Response(
+            JSON.stringify({
+              entries: [{ ".tag": "folder", path_display: "/root/Sub B" }],
+              cursor: "cursor-2",
+              has_more: false,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         return new Response(
           JSON.stringify({
-            entries: [{ ".tag": "folder", path_display: "/root/Sub B" }],
-            cursor: "cursor-2",
-            has_more: false,
+            entries: [{ ".tag": "folder", path_display: "/root/Sub A" }],
+            cursor: "cursor-1",
+            has_more: true,
           }),
           {
             status: 200,
             headers: { "Content-Type": "application/json" },
           },
         );
-      }
-      return new Response(
-        JSON.stringify({
-          entries: [{ ".tag": "folder", path_display: "/root/Sub A" }],
-          cursor: "cursor-1",
-          has_more: true,
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    });
-    vi.stubGlobal("fetch", fetchMock);
+      }),
+    );
 
     const { graph } = buildGraph("dropbox.listFolders", "lf", {
-      accessToken: "tok",
+      credentialName: name,
       path: "/root",
     });
-    const ctx = createExecutionContext(graph, { log: () => {} });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
     await runExecFrom("lf", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lf:success")).toBe(true);
@@ -439,9 +411,10 @@ describe("dropbox.listFolders", () => {
   });
 
   it("reports a Dropbox API error via the error output instead of throwing", async () => {
+    const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      vi.fn(
+      withTokenRefresh(
         async () =>
           new Response(JSON.stringify({ error_summary: "path/not_found/.." }), {
             status: 409,
@@ -450,10 +423,10 @@ describe("dropbox.listFolders", () => {
     );
 
     const { graph } = buildGraph("dropbox.listFolders", "lf", {
-      accessToken: "tok",
+      credentialName: name,
       path: "/missing",
     });
-    const ctx = createExecutionContext(graph, { log: () => {} });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
     await runExecFrom("lf", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lf:success")).toBe(false);
@@ -466,7 +439,8 @@ describe.each(["move", "copy", "rename"])("dropbox.%s", (op) => {
   const type = `dropbox.${op}`;
 
   it("sends from_path/to_path and reports success", async () => {
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    const { name, getCredential } = freshCredential();
+    const fetchMock = withTokenRefresh(async (url, init) => {
       expect(String(url)).toContain(
         op === "copy" ? "/files/copy_v2" : "/files/move_v2",
       );
@@ -481,11 +455,11 @@ describe.each(["move", "copy", "rename"])("dropbox.%s", (op) => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph(type, "op", {
-      accessToken: "tok",
+      credentialName: name,
       fromPath: "/a.txt",
       toPath: "/b.txt",
     });
-    const ctx = createExecutionContext(graph, { log: () => {} });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
     await runExecFrom("op", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("op:success")).toBe(true);
@@ -495,7 +469,8 @@ describe.each(["move", "copy", "rename"])("dropbox.%s", (op) => {
 
 describe("dropbox.delete", () => {
   it("deletes the given path and reports success", async () => {
-    const fetchMock = vi.fn(async (url: string) => {
+    const { name, getCredential } = freshCredential();
+    const fetchMock = withTokenRefresh(async (url) => {
       expect(String(url)).toContain("/files/delete_v2");
       return new Response(JSON.stringify({ metadata: { name: "a.txt" } }), {
         status: 200,
@@ -505,10 +480,10 @@ describe("dropbox.delete", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph("dropbox.delete", "del", {
-      accessToken: "tok",
+      credentialName: name,
       path: "/a.txt",
     });
-    const ctx = createExecutionContext(graph, { log: () => {} });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
     await runExecFrom("del", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("del:success")).toBe(true);
