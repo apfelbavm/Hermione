@@ -147,9 +147,9 @@
     },
     "theme_toggle": {
       "title": "Toggle light/dark theme",
-      "dark": "🌙 Dark",
-      "light": "☀️ Light",
-      "loading": "🌓 Theme"
+      "dark": "Dark",
+      "light": "Light",
+      "loading": "Theme"
     },
     "app_shell_markup": {
       "back": "← Back",

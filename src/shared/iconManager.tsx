@@ -40,4 +40,36 @@ export class IconManager {
       </svg>
     );
   }
+
+  static ThemeLightIcon() {
+    return (
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+        <circle cx="8" cy="8" r="3.2" />
+        <rect x="7.25" y="0.4" width="1.5" height="2.6" rx="0.75" />
+        <rect x="7.25" y="0.4" width="1.5" height="2.6" rx="0.75" transform="rotate(45 8 8)" />
+        <rect x="7.25" y="0.4" width="1.5" height="2.6" rx="0.75" transform="rotate(90 8 8)" />
+        <rect x="7.25" y="0.4" width="1.5" height="2.6" rx="0.75" transform="rotate(135 8 8)" />
+        <rect x="7.25" y="0.4" width="1.5" height="2.6" rx="0.75" transform="rotate(180 8 8)" />
+        <rect x="7.25" y="0.4" width="1.5" height="2.6" rx="0.75" transform="rotate(225 8 8)" />
+        <rect x="7.25" y="0.4" width="1.5" height="2.6" rx="0.75" transform="rotate(270 8 8)" />
+        <rect x="7.25" y="0.4" width="1.5" height="2.6" rx="0.75" transform="rotate(315 8 8)" />
+      </svg>
+    );
+  }
+
+  static ThemeDarkIcon() {
+    return (
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+        <path d="M13.8 10.2A6.2 6.2 0 0 1 6.4 2.2a6.3 6.3 0 1 0 7.4 8z" />
+      </svg>
+    );
+  }
+
+  static SaveIcon() {
+    return (
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+        <path fillRule="evenodd" clipRule="evenodd" d="M1 1H15V15H1V1ZM4 2H10V5H4V2ZM3 8H13V14H3V8Z" />
+      </svg>
+    );
+  }
 }

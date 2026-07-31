@@ -10,6 +10,7 @@ import { ScriptsPanel } from "./sidebar/ScriptsPanel";
 import { VariablePanel } from "./sidebar/VariablePanel";
 import { VersionRestorePanel } from "./sidebar/VersionRestorePanel";
 import { ThemeToggle } from "./ThemeToggle";
+import { IconManager } from "../shared/iconManager";
 
 export default function RestoreVersionMarkup({
   store,
@@ -96,7 +97,7 @@ export default function RestoreVersionMarkup({
           <div id="log-tabs-dynamic" />
           <span id="log-save-status" className="log-save-status" style={{ display: "none" }} />
           <button id="log-save-button" className="log-clear-button" title="Save script" style={{ display: "none" }}>
-            💾
+            <IconManager.SaveIcon />
           </button>
           <button id="log-clear-button" className="log-clear-button" title="Clear log">
             🗑
