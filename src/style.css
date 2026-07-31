@@ -1452,11 +1452,20 @@ body.resizing {
   color: var(--pp-text);
 }
 
+/* Holds one of Sidebar.tsx's flat currentColor SVG icons — sized/colored via this wrapper (not the
+   svg itself) so it stays in step with .app-sidebar-link's own color (grey at rest, --pp-text on
+   hover/active — see those rules) without the icon needing to know which state it's in. */
 .app-sidebar-link-icon {
   flex: 0 0 auto;
-  font-size: 15px;
   width: 20px;
-  text-align: center;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-sidebar-link-icon svg {
+  display: block;
 }
 
 .app-sidebar-link-label {
