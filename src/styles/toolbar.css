@@ -47,6 +47,35 @@
   background: var(--pp-bg);
 }
 
+#undo-button,
+#redo-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--pp-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+#undo-button:hover:not(:disabled),
+#redo-button:hover:not(:disabled) {
+  background: var(--pp-surface-hover-alt);
+  color: var(--pp-text);
+}
+
+#undo-button:disabled,
+#redo-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 #run-button {
   background: var(--pp-accent);
   color: #fff;

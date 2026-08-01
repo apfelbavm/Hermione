@@ -128,6 +128,8 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     const frameAllButton = document.getElementById("frame-all-button") as HTMLButtonElement;
     const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
     const backButton = document.getElementById("back-to-project-button") as HTMLButtonElement;
+    const undoButton = document.getElementById("undo-button") as HTMLButtonElement;
+    const redoButton = document.getElementById("redo-button") as HTMLButtonElement;
     const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
     if (!ctx) throw new Error("Canvas 2D context unavailable");
 
@@ -244,6 +246,8 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       snapToGridCheckbox.disabled = simulating;
       frameAllButton.disabled = simulating;
       loadFileInput.disabled = simulating;
+      undoButton.disabled = simulating || store.state.readOnly;
+      redoButton.disabled = simulating || store.state.readOnly;
 
       pauseButton.style.display = simulating ? "" : "none";
       continueButton.style.display = simulating ? "" : "none";
@@ -850,6 +854,16 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     }
     backButton.addEventListener("click", onBackButtonClick);
 
+    function onUndoClick(): void {
+      history.undo();
+    }
+    undoButton.addEventListener("click", onUndoClick);
+
+    function onRedoClick(): void {
+      history.redo();
+    }
+    redoButton.addEventListener("click", onRedoClick);
+
     return () => {
       cancelledLoad = true;
       activeSimulation?.abort();
@@ -876,6 +890,8 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       deployButton.removeEventListener("click", onCompileClick);
       frameAllButton.removeEventListener("click", onFrameAllClick);
       backButton.removeEventListener("click", onBackButtonClick);
+      undoButton.removeEventListener("click", onUndoClick);
+      redoButton.removeEventListener("click", onRedoClick);
     };
   }, []);
 
