@@ -1,8 +1,14 @@
-import { NodeColorCategory, type ExecutionContext } from "../engine/types";
-import { registerNode } from "../engine/registry";
-import { registerStructType } from "../engine/structRegistry";
-import { DropboxManager } from "../lib/dropboxManager";
-import type { DropboxOAuth2CredentialData } from "../credentials/types";
+import { NodeColorCategory, type ExecutionContext } from "../../engine/types";
+import { registerNode } from "../../engine/registry";
+import { DropboxManager } from "../../lib/dropboxManager";
+import type { DropboxOAuth2CredentialData } from "../../credentials/types";
+import {
+  AUTH_TOKENS_STRUCT_TYPE,
+  METADATA_STRUCT_TYPE,
+  REVISION_STRUCT_TYPE,
+  ACCOUNT_STRUCT_TYPE,
+  SPACE_USAGE_STRUCT_TYPE,
+} from "../structs/dropbox";
 import { i18n } from "@i18n";
 
 const ACCESS_LEVEL_OPTIONS = ["editor", "viewer"];
@@ -21,144 +27,6 @@ const ENCODING_OPTIONS = ["utf8", "base64"];
 const WRITE_MODE_OPTIONS = ["add", "overwrite"];
 const GROUP_NAME = "Request.Dropbox";
 
-// Same struct-output-pin pattern as nodes/azureStorage.ts: any result with 2+ non-success/error
-// fields gets a single struct-typed output pin instead of a loose pin per field.
-const AUTH_TOKENS_STRUCT_TYPE = "dropboxAuthTokens";
-const METADATA_STRUCT_TYPE = "dropboxMetadata";
-const REVISION_STRUCT_TYPE = "dropboxRevision";
-const ACCOUNT_STRUCT_TYPE = "dropboxAccount";
-const SPACE_USAGE_STRUCT_TYPE = "dropboxSpaceUsage";
-
-registerStructType({
-  id: AUTH_TOKENS_STRUCT_TYPE,
-  label: i18n.nodes.dropbox.authTokens.label,
-  category: "Dropbox",
-  fields: [
-    {
-      id: "accessToken",
-      label: i18n.nodes.dropbox.__shared.pin_access_token,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "refreshToken",
-      label: i18n.nodes.dropbox.authorize.pin_refresh_token,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "expiresIn",
-      label: i18n.nodes.dropbox.authorize.pin_expires_in,
-      type: "number",
-      defaultValue: 0,
-    },
-  ],
-});
-
-registerStructType({
-  id: METADATA_STRUCT_TYPE,
-  label: i18n.nodes.dropbox.metadata.label,
-  category: "Dropbox",
-  fields: [
-    {
-      id: "isFolder",
-      label: i18n.nodes.dropbox.getMetadata.pin_is_folder,
-      type: "boolean",
-      defaultValue: false,
-    },
-    {
-      id: "size",
-      label: i18n.nodes.dropbox.getMetadata.pin_size,
-      type: "number",
-      defaultValue: 0,
-    },
-    {
-      id: "contentHash",
-      label: i18n.nodes.dropbox.getMetadata.pin_content_hash,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "serverModified",
-      label: i18n.nodes.dropbox.getMetadata.pin_server_modified,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: REVISION_STRUCT_TYPE,
-  label: i18n.nodes.dropbox.revision.label,
-  category: "Dropbox",
-  fields: [
-    {
-      id: "rev",
-      label: i18n.nodes.dropbox.revision.pin_rev,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "size",
-      label: i18n.nodes.dropbox.revision.pin_size,
-      type: "number",
-      defaultValue: 0,
-    },
-    {
-      id: "serverModified",
-      label: i18n.nodes.dropbox.revision.pin_server_modified,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: ACCOUNT_STRUCT_TYPE,
-  label: i18n.nodes.dropbox.account.label,
-  category: "Dropbox",
-  fields: [
-    {
-      id: "accountId",
-      label: i18n.nodes.dropbox.getCurrentAccount.pin_account_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.dropbox.getCurrentAccount.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "email",
-      label: i18n.nodes.dropbox.addFolderMember.pin_email,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: SPACE_USAGE_STRUCT_TYPE,
-  label: i18n.nodes.dropbox.spaceUsage.label,
-  category: "Dropbox",
-  fields: [
-    {
-      id: "used",
-      label: i18n.nodes.dropbox.getSpaceUsage.pin_used,
-      type: "number",
-      defaultValue: 0,
-    },
-    {
-      id: "allocated",
-      label: i18n.nodes.dropbox.getSpaceUsage.pin_allocated,
-      type: "number",
-      defaultValue: 0,
-    },
-  ],
-});
-
 function credentialNamePin() {
   return {
     id: "credentialName",
@@ -171,7 +39,12 @@ function credentialNamePin() {
 
 /** Shared by every Dropbox node — looks up a named Credential Vault entry and returns its Dropbox
  * fields, or a clear error if the name is wrong/missing. */
-function resolveDropboxCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: DropboxOAuth2CredentialData } | { ok: false; error: string } {
+function resolveDropboxCredential(
+  ctx: ExecutionContext,
+  credentialName: string,
+):
+  | { ok: true; data: DropboxOAuth2CredentialData }
+  | { ok: false; error: string } {
   const credential = ctx.getCredential?.(credentialName);
   if (!credential)
     return {
@@ -229,7 +102,10 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
@@ -240,7 +116,11 @@ registerNode({
         },
       };
     }
-    const result = await DropboxManager.exchangeAuthCode(resolved.data.authCode, resolved.data.appKey, resolved.data.appSecret);
+    const result = await DropboxManager.exchangeAuthCode(
+      resolved.data.authCode,
+      resolved.data.appKey,
+      resolved.data.appSecret,
+    );
     return {
       nextExec: "exec-out",
       outputs: {
@@ -323,14 +203,27 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.upload(String(inputs.path ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", inputs.mode === "overwrite" ? "overwrite" : "add", Boolean(inputs.autorename));
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
+    const result = await manager.upload(
+      String(inputs.path ?? ""),
+      String(inputs.content ?? ""),
+      inputs.encoding === "base64" ? "base64" : "utf8",
+      inputs.mode === "overwrite" ? "overwrite" : "add",
+      Boolean(inputs.autorename),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -386,14 +279,24 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.download(String(inputs.path ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
+    const result = await manager.download(
+      String(inputs.path ?? ""),
+      inputs.encoding === "base64" ? "base64" : "utf8",
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -449,14 +352,24 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.listFolders(String(inputs.path ?? ""), Boolean(inputs.recursive));
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
+    const result = await manager.listFolders(
+      String(inputs.path ?? ""),
+      Boolean(inputs.recursive),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -513,14 +426,25 @@ function registerRelocationNode(type: "move" | "copy" | "rename") {
     ],
     latent: true,
     execute: async ({ inputs, ctx }) => {
-      const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+      const resolved = resolveDropboxCredential(
+        ctx,
+        String(inputs.credentialName ?? ""),
+      );
       if (!resolved.ok)
         return {
           nextExec: "exec-out",
           outputs: { success: false, error: resolved.error },
         };
-      const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-      const result = await manager[type](String(inputs.fromPath ?? ""), String(inputs.toPath ?? ""), Boolean(inputs.autorename));
+      const manager = DropboxManager.forCredential(
+        resolved.data.appKey,
+        resolved.data.appSecret,
+        resolved.data.refreshToken,
+      );
+      const result = await manager[type](
+        String(inputs.fromPath ?? ""),
+        String(inputs.toPath ?? ""),
+        Boolean(inputs.autorename),
+      );
       return { nextExec: "exec-out", outputs: result };
     },
   });
@@ -567,13 +491,20 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
     const result = await manager.delete(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
@@ -623,14 +554,24 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.createFolder(String(inputs.path ?? ""), Boolean(inputs.autorename));
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
+    const result = await manager.createFolder(
+      String(inputs.path ?? ""),
+      Boolean(inputs.autorename),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -679,7 +620,10 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
@@ -694,7 +638,11 @@ registerNode({
           error: resolved.error,
         },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
     const result = await manager.getMetadata(String(inputs.path ?? ""));
     return {
       nextExec: "exec-out",
@@ -771,14 +719,25 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.search(String(inputs.query ?? ""), String(inputs.path ?? ""), Number(inputs.maxResults ?? 100));
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
+    const result = await manager.search(
+      String(inputs.query ?? ""),
+      String(inputs.path ?? ""),
+      Number(inputs.maxResults ?? 100),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -836,14 +795,24 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.listRevisions(String(inputs.path ?? ""), Number(inputs.limit ?? 10));
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
+    const result = await manager.listRevisions(
+      String(inputs.path ?? ""),
+      Number(inputs.limit ?? 10),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -892,14 +861,24 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.restore(String(inputs.path ?? ""), String(inputs.rev ?? ""));
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
+    const result = await manager.restore(
+      String(inputs.path ?? ""),
+      String(inputs.rev ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -941,13 +920,20 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
     const result = await manager.permanentlyDelete(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
@@ -996,13 +982,20 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
     const result = await manager.getTemporaryLink(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
@@ -1059,14 +1052,24 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.getTemporaryUploadLink(String(inputs.path ?? ""), Number(inputs.durationSeconds ?? 14400));
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
+    const result = await manager.getTemporaryUploadLink(
+      String(inputs.path ?? ""),
+      Number(inputs.durationSeconds ?? 14400),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1123,14 +1126,25 @@ function registerRelocationBatchNode(type: "moveBatch" | "copyBatch") {
     ],
     latent: true,
     execute: async ({ inputs, ctx }) => {
-      const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+      const resolved = resolveDropboxCredential(
+        ctx,
+        String(inputs.credentialName ?? ""),
+      );
       if (!resolved.ok)
         return {
           nextExec: "exec-out",
           outputs: { success: false, error: resolved.error },
         };
-      const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-      const result = await manager[type]((inputs.fromPaths as string[]) ?? [], (inputs.toPaths as string[]) ?? [], Boolean(inputs.autorename));
+      const manager = DropboxManager.forCredential(
+        resolved.data.appKey,
+        resolved.data.appSecret,
+        resolved.data.refreshToken,
+      );
+      const result = await manager[type](
+        (inputs.fromPaths as string[]) ?? [],
+        (inputs.toPaths as string[]) ?? [],
+        Boolean(inputs.autorename),
+      );
       return { nextExec: "exec-out", outputs: result };
     },
   });
@@ -1176,13 +1190,20 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
     const result = await manager.deleteBatch((inputs.paths as string[]) ?? []);
     return { nextExec: "exec-out", outputs: result };
   },
@@ -1231,13 +1252,20 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
     const result = await manager.createSharedLink(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
@@ -1287,13 +1315,20 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
     const result = await manager.listSharedLinks(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
@@ -1342,13 +1377,20 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
     const result = await manager.shareFolder(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
@@ -1406,14 +1448,25 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.addFolderMember(String(inputs.sharedFolderId ?? ""), String(inputs.email ?? ""), String(inputs.accessLevel ?? ACCESS_LEVEL_OPTIONS[0]));
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
+    const result = await manager.addFolderMember(
+      String(inputs.sharedFolderId ?? ""),
+      String(inputs.email ?? ""),
+      String(inputs.accessLevel ?? ACCESS_LEVEL_OPTIONS[0]),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1455,7 +1508,10 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
@@ -1465,7 +1521,11 @@ registerNode({
           error: resolved.error,
         },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
     const result = await manager.getCurrentAccount();
     return {
       nextExec: "exec-out",
@@ -1519,7 +1579,10 @@ registerNode({
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveDropboxCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
@@ -1529,7 +1592,11 @@ registerNode({
           error: resolved.error,
         },
       };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
+    const manager = DropboxManager.forCredential(
+      resolved.data.appKey,
+      resolved.data.appSecret,
+      resolved.data.refreshToken,
+    );
     const result = await manager.getSpaceUsage();
     return {
       nextExec: "exec-out",

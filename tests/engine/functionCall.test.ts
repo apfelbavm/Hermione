@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/nodes";
+import { registerBuiltins } from "../../src/graph/nodes";
 import {
   createExecutionContext,
   runExecFrom,

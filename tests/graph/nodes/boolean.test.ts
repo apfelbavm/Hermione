@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/nodes/index";
-import { getNodeDef } from "../../src/engine/registry";
-import { NodeInstance } from "../../src/engine/nodeInstance";
+import { registerBuiltins } from "../../../src/graph/nodes/index";
+import { getNodeDef } from "../../../src/engine/registry";
+import { NodeInstance } from "../../../src/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -12,13 +12,21 @@ describe("boolean.not", () => {
 
   it("inverts true to false", () => {
     expect(
-      def.evaluate!({ node: {} as NodeInstance, inputs: { value: true }, ctx: {} as never }),
+      def.evaluate!({
+        node: {} as NodeInstance,
+        inputs: { value: true },
+        ctx: {} as never,
+      }),
     ).toEqual({ result: false });
   });
 
   it("inverts false to true", () => {
     expect(
-      def.evaluate!({ node: {} as NodeInstance, inputs: { value: false }, ctx: {} as never }),
+      def.evaluate!({
+        node: {} as NodeInstance,
+        inputs: { value: false },
+        ctx: {} as never,
+      }),
     ).toEqual({ result: true });
   });
 

@@ -1,8 +1,16 @@
-import { registerNode } from "../engine/registry";
-import { compileResultVar } from "../engine/compileUtils";
+import { registerNode } from "../../engine/registry";
+import { compileResultVar } from "../../engine/compileUtils";
 import { i18n } from "@i18n";
 
-const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+const HTTP_METHODS = [
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "HEAD",
+  "OPTIONS",
+];
 
 const HTTP_REQUEST_EXECUTE_SOURCE = `
 async function httpRequestExecute(url, rawMethod, headersJson, auth, body, rawTimeoutMs) {
@@ -66,7 +74,14 @@ interface HttpRequestResult {
   [key: string]: unknown;
 }
 
-const httpRequestExecute: (url: string, method: string, headersJson: string, auth: { header?: unknown; value?: unknown } | null | undefined, body: string, timeoutMs: number) => Promise<HttpRequestResult> = new Function(
+const httpRequestExecute: (
+  url: string,
+  method: string,
+  headersJson: string,
+  auth: { header?: unknown; value?: unknown } | null | undefined,
+  body: string,
+  timeoutMs: number,
+) => Promise<HttpRequestResult> = new Function(
   `${HTTP_REQUEST_EXECUTE_SOURCE}\nreturn httpRequestExecute;`,
 )();
 

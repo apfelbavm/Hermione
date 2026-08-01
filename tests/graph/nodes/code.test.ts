@@ -1,9 +1,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/nodes/index";
-import { getNodeDef } from "../../src/engine/registry";
-import { transpileScript } from "../../src/engine/transpile";
-import type { CodeScriptDef, ExecutionContext } from "../../src/engine/types";
-import { NodeInstance } from "../../src/engine/nodeInstance";
+import { registerBuiltins } from "../../../src/graph/nodes/index";
+import { getNodeDef } from "../../../src/engine/registry";
+import { transpileScript } from "../../../src/engine/transpile";
+import type {
+  CodeScriptDef,
+  ExecutionContext,
+} from "../../../src/engine/types";
+import { NodeInstance } from "../../../src/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -90,11 +93,17 @@ async function runCompiledWithOutputs(
     graph,
     compileFrom: () => [],
   });
-  const outputExprs = def.compileExecuteOutputs!({ node: node as NodeInstance, graph });
+  const outputExprs = def.compileExecuteOutputs!({
+    node: node as NodeInstance,
+    graph,
+  });
   const returnExpr = `{ ${Object.entries(outputExprs)
     .map(([id, expr]) => `${JSON.stringify(id)}: ${expr}`)
     .join(", ")} }`;
-  const fn = new AsyncFunction("rt", [...statements, `return ${returnExpr};`].join("\n"));
+  const fn = new AsyncFunction(
+    "rt",
+    [...statements, `return ${returnExpr};`].join("\n"),
+  );
   const outputs = await fn({ log: () => {} });
   return outputs as Record<string, unknown>;
 }
@@ -185,7 +194,12 @@ describe("code.run", () => {
         `function run(log, inputs) { return { doubled: inputs.n * 2, label: "ok" }; }`,
         [{ id: "pin-n", name: "n", type: "number", defaultValue: 0 }],
         [
-          { id: "pin-doubled", name: "doubled", type: "number", defaultValue: -1 },
+          {
+            id: "pin-doubled",
+            name: "doubled",
+            type: "number",
+            defaultValue: -1,
+          },
           { id: "pin-label", name: "label", type: "string", defaultValue: "" },
         ],
       );
@@ -203,17 +217,50 @@ describe("code.run", () => {
         { id: "pin-b", name: "b", type: "string", defaultValue: "fallback" },
       ];
 
-      const partial = await makeScript(`function run() { return { a: 7 }; }`, [], outputsSig);
-      const { result: partialResult } = await executeNode({ scriptId: partial.id }, {}, [partial]);
-      expect(partialResult.outputs).toEqual({ "pin-a": 7, "pin-b": "fallback" });
+      const partial = await makeScript(
+        `function run() { return { a: 7 }; }`,
+        [],
+        outputsSig,
+      );
+      const { result: partialResult } = await executeNode(
+        { scriptId: partial.id },
+        {},
+        [partial],
+      );
+      expect(partialResult.outputs).toEqual({
+        "pin-a": 7,
+        "pin-b": "fallback",
+      });
 
-      const noReturn = await makeScript(`function run() { /* nothing */ }`, [], outputsSig);
-      const { result: noReturnResult } = await executeNode({ scriptId: noReturn.id }, {}, [noReturn]);
-      expect(noReturnResult.outputs).toEqual({ "pin-a": 42, "pin-b": "fallback" });
+      const noReturn = await makeScript(
+        `function run() { /* nothing */ }`,
+        [],
+        outputsSig,
+      );
+      const { result: noReturnResult } = await executeNode(
+        { scriptId: noReturn.id },
+        {},
+        [noReturn],
+      );
+      expect(noReturnResult.outputs).toEqual({
+        "pin-a": 42,
+        "pin-b": "fallback",
+      });
 
-      const throws = await makeScript(`function run() { throw new Error("boom"); }`, [], outputsSig);
-      const { result: throwsResult } = await executeNode({ scriptId: throws.id }, {}, [throws]);
-      expect(throwsResult.outputs).toEqual({ "pin-a": 42, "pin-b": "fallback" });
+      const throws = await makeScript(
+        `function run() { throw new Error("boom"); }`,
+        [],
+        outputsSig,
+      );
+      const { result: throwsResult } = await executeNode(
+        { scriptId: throws.id },
+        {},
+        [throws],
+      );
+      expect(throwsResult.outputs).toEqual({
+        "pin-a": 42,
+        "pin-b": "fallback",
+      });
     });
 
     it("compiled output maps run()'s return value the same way, including the default-value fallback", async () => {
@@ -221,8 +268,16 @@ describe("code.run", () => {
         { id: "pin-a", name: "a", type: "number", defaultValue: 42 },
         { id: "pin-b", name: "b", type: "string", defaultValue: "fallback" },
       ];
-      const script = await makeScript(`function run() { return { a: 9 }; }`, [], outputsSig);
-      const outputs = await runCompiledWithOutputs({ id: "node-1", scriptId: script.id }, {}, [script]);
+      const script = await makeScript(
+        `function run() { return { a: 9 }; }`,
+        [],
+        outputsSig,
+      );
+      const outputs = await runCompiledWithOutputs(
+        { id: "node-1", scriptId: script.id },
+        {},
+        [script],
+      );
       expect(outputs).toEqual({ "pin-a": 9, "pin-b": "fallback" });
     });
 
@@ -232,19 +287,45 @@ describe("code.run", () => {
       ];
       const withAsync = await makeScript(
         `async function run(log, inputs) { return { result: "from async: " + inputs.greeting }; }`,
-        [{ id: "pin-greeting", name: "greeting", type: "string", defaultValue: "" }],
+        [
+          {
+            id: "pin-greeting",
+            name: "greeting",
+            type: "string",
+            defaultValue: "",
+          },
+        ],
         outputsSig,
       );
       const withoutAsync = await makeScript(
         `function run(log, inputs) { return { result: "from plain: " + inputs.greeting }; }`,
-        [{ id: "pin-greeting", name: "greeting", type: "string", defaultValue: "" }],
+        [
+          {
+            id: "pin-greeting",
+            name: "greeting",
+            type: "string",
+            defaultValue: "",
+          },
+        ],
         outputsSig,
       );
 
-      const asyncResult = await executeNode({ scriptId: withAsync.id }, { "pin-greeting": "hi" }, [withAsync]);
-      const plainResult = await executeNode({ scriptId: withoutAsync.id }, { "pin-greeting": "hi" }, [withoutAsync]);
-      expect(asyncResult.result.outputs).toEqual({ "pin-result": "from async: hi" });
-      expect(plainResult.result.outputs).toEqual({ "pin-result": "from plain: hi" });
+      const asyncResult = await executeNode(
+        { scriptId: withAsync.id },
+        { "pin-greeting": "hi" },
+        [withAsync],
+      );
+      const plainResult = await executeNode(
+        { scriptId: withoutAsync.id },
+        { "pin-greeting": "hi" },
+        [withoutAsync],
+      );
+      expect(asyncResult.result.outputs).toEqual({
+        "pin-result": "from async: hi",
+      });
+      expect(plainResult.result.outputs).toEqual({
+        "pin-result": "from plain: hi",
+      });
 
       const asyncCompiled = await runCompiledWithOutputs(
         { id: "node-1", scriptId: withAsync.id },
@@ -298,7 +379,11 @@ describe("code.run", () => {
       const script = await makeScript(
         `function run(log) { throw new Error("compiled boom"); }`,
       );
-      const logs = await runCompiled({ id: "node-1", scriptId: script.id }, {}, [script]);
+      const logs = await runCompiled(
+        { id: "node-1", scriptId: script.id },
+        {},
+        [script],
+      );
       expect(logs).toEqual(["Error: compiled boom"]);
     });
 

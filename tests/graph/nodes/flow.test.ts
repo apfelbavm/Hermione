@@ -1,17 +1,27 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/nodes/index";
-import { createExecutionContext, runExecFrom } from "../../src/engine/executor";
-import { connectPins,  removeInstancePin } from "../../src/engine/graphMutations";
-import { getNodeDef } from "../../src/engine/registry";
-import { Graph } from "../../src/engine/graph";
-import { NodeInstance } from "../../src/engine/nodeInstance";
-
+import { registerBuiltins } from "../../../src/graph/nodes/index";
+import {
+  createExecutionContext,
+  runExecFrom,
+} from "../../../src/engine/executor";
+import {
+  connectPins,
+  removeInstancePin,
+} from "../../../src/engine/graphMutations";
+import { getNodeDef } from "../../../src/engine/registry";
+import { Graph } from "../../../src/engine/graph";
+import { NodeInstance } from "../../../src/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
 });
 
-function addBuiltinNode(graph: Graph, type: string, id: string, position = { x: 0, y: 0 }) {
+function addBuiltinNode(
+  graph: Graph,
+  type: string,
+  id: string,
+  position = { x: 0, y: 0 },
+) {
   const def = getNodeDef(type);
   const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
@@ -31,10 +41,30 @@ function buildLoopGraph(start: number, end: number) {
   const printDone = addBuiltinNode(graph, "debug.print", "printDone");
   printDone.pins.message.value = "Done";
 
-  connectPins(graph, graph.variables, graph.functions, { fromNode: "loop", fromPin: "index", toNode: "toStr", toPin: "value" });
-  connectPins(graph, graph.variables, graph.functions, { fromNode: "toStr", fromPin: "result", toNode: "printIndex", toPin: "message" });
-  connectPins(graph, graph.variables, graph.functions, { fromNode: "loop", fromPin: "loop-body", toNode: "printIndex", toPin: "exec-in" });
-  connectPins(graph, graph.variables, graph.functions, { fromNode: "loop", fromPin: "completed", toNode: "printDone", toPin: "exec-in" });
+  connectPins(graph, graph.variables, graph.functions, {
+    fromNode: "loop",
+    fromPin: "index",
+    toNode: "toStr",
+    toPin: "value",
+  });
+  connectPins(graph, graph.variables, graph.functions, {
+    fromNode: "toStr",
+    fromPin: "result",
+    toNode: "printIndex",
+    toPin: "message",
+  });
+  connectPins(graph, graph.variables, graph.functions, {
+    fromNode: "loop",
+    fromPin: "loop-body",
+    toNode: "printIndex",
+    toPin: "exec-in",
+  });
+  connectPins(graph, graph.variables, graph.functions, {
+    fromNode: "loop",
+    fromPin: "completed",
+    toNode: "printDone",
+    toPin: "exec-in",
+  });
 
   return { graph, loop };
 }
@@ -84,7 +114,9 @@ describe("flow.forLoop", () => {
     const { graph } = buildLoopGraph(0, 1_000_000);
     const ctx = createExecutionContext(graph, { log: () => {} });
 
-    await expect(runExecFrom("loop", "exec-in", ctx)).rejects.toThrow(/iterations/);
+    await expect(runExecFrom("loop", "exec-in", ctx)).rejects.toThrow(
+      /iterations/,
+    );
   });
 
   it("when disabled, never runs the loop body (not even once) and fires only completed", async () => {
@@ -108,8 +140,18 @@ describe("flow.isValid", () => {
     printValid.pins.message.value = "valid";
     const printInvalid = addBuiltinNode(graph, "debug.print", "printInvalid");
     printInvalid.pins.message.value = "invalid";
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "check", fromPin: "valid", toNode: "printValid", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "check", fromPin: "invalid", toNode: "printInvalid", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "check",
+      fromPin: "valid",
+      toNode: "printValid",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "check",
+      fromPin: "invalid",
+      toNode: "printInvalid",
+      toPin: "exec-in",
+    });
     return { graph, isValid };
   }
 
@@ -164,7 +206,12 @@ describe("flow.isValid", () => {
 describe("flow.sequence", () => {
   it("starts with exactly two removable 'Then' pins", () => {
     const def = getNodeDef("flow.sequence");
-    const node = NodeInstance.createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
+    const node = NodeInstance.createNodeInstance(
+      "flow.sequence",
+      { x: 0, y: 0 },
+      def.pins,
+      "seq",
+    );
     const pins = def.deriveInstancePins!(node);
     expect(pins.map((p) => p.id)).toEqual(["exec-in", "then-0", "then-1"]);
     expect(pins.find((p) => p.id === "then-0")?.removable).toBe(true);
@@ -173,17 +220,32 @@ describe("flow.sequence", () => {
 
   it("adds a third 'Then 2' pin via addInstancePinEntry", () => {
     const def = getNodeDef("flow.sequence");
-    const node = NodeInstance.createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
+    const node = NodeInstance.createNodeInstance(
+      "flow.sequence",
+      { x: 0, y: 0 },
+      def.pins,
+      "seq",
+    );
     def.addInstancePinEntry!(node);
     const pins = def.deriveInstancePins!(node);
-    expect(pins.map((p) => p.id)).toEqual(["exec-in", "then-0", "then-1", "then-2"]);
+    expect(pins.map((p) => p.id)).toEqual([
+      "exec-in",
+      "then-0",
+      "then-1",
+      "then-2",
+    ]);
     expect(pins.find((p) => p.id === "then-2")?.label).toBe("Then 2");
   });
 
   it("renumbers labels contiguously after removing a middle entry, keeping the underlying pin ids", () => {
     const graph = new Graph("g", "root");
     const def = getNodeDef("flow.sequence");
-    const node = NodeInstance.createNodeInstance("flow.sequence", { x: 0, y: 0 }, def.pins, "seq");
+    const node = NodeInstance.createNodeInstance(
+      "flow.sequence",
+      { x: 0, y: 0 },
+      def.pins,
+      "seq",
+    );
     graph.nodes.push(node);
     def.addInstancePinEntry!(node); // now then-0, then-1, then-2
 
@@ -206,9 +268,24 @@ describe("flow.sequence", () => {
 
     // Then 0's chain: Delay -> "A". Then 1: immediately "B". If Then 1 ran interleaved with Then
     // 0's async delay instead of strictly after it finished, "B" would log BEFORE "A".
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "seq", fromPin: "then-0", toNode: "delay", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "delay", fromPin: "exec-out", toNode: "printA", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "seq", fromPin: "then-1", toNode: "printB", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "seq",
+      fromPin: "then-0",
+      toNode: "delay",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "delay",
+      fromPin: "exec-out",
+      toNode: "printA",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "seq",
+      fromPin: "then-1",
+      toNode: "printB",
+      toPin: "exec-in",
+    });
 
     const logs: string[] = [];
     const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
@@ -226,8 +303,18 @@ describe("flow.sequence", () => {
     const printB = addBuiltinNode(graph, "debug.print", "printB");
     printB.pins.message.value = "B";
 
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "seq", fromPin: "then-0", toNode: "printA", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "seq", fromPin: "then-1", toNode: "printB", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "seq",
+      fromPin: "then-0",
+      toNode: "printA",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "seq",
+      fromPin: "then-1",
+      toNode: "printB",
+      toPin: "exec-in",
+    });
 
     const logs: string[] = [];
     const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
@@ -240,9 +327,19 @@ describe("flow.sequence", () => {
 describe("flow.parallel", () => {
   it("starts with exactly two removable 'Branch' pins plus a fixed 'Completed' pin", () => {
     const def = getNodeDef("flow.parallel");
-    const node = NodeInstance.createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
+    const node = NodeInstance.createNodeInstance(
+      "flow.parallel",
+      { x: 0, y: 0 },
+      def.pins,
+      "par",
+    );
     const pins = def.deriveInstancePins!(node);
-    expect(pins.map((p) => p.id)).toEqual(["exec-in", "branch-0", "branch-1", "completed"]);
+    expect(pins.map((p) => p.id)).toEqual([
+      "exec-in",
+      "branch-0",
+      "branch-1",
+      "completed",
+    ]);
     expect(pins.find((p) => p.id === "branch-0")?.removable).toBe(true);
     expect(pins.find((p) => p.id === "branch-1")?.removable).toBe(true);
     expect(pins.find((p) => p.id === "completed")?.removable).toBeUndefined();
@@ -250,25 +347,51 @@ describe("flow.parallel", () => {
 
   it("adds a third 'Branch 2' pin via addInstancePinEntry", () => {
     const def = getNodeDef("flow.parallel");
-    const node = NodeInstance.createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
+    const node = NodeInstance.createNodeInstance(
+      "flow.parallel",
+      { x: 0, y: 0 },
+      def.pins,
+      "par",
+    );
     def.addInstancePinEntry!(node);
     const pins = def.deriveInstancePins!(node);
-    expect(pins.map((p) => p.id)).toEqual(["exec-in", "branch-0", "branch-1", "branch-2", "completed"]);
+    expect(pins.map((p) => p.id)).toEqual([
+      "exec-in",
+      "branch-0",
+      "branch-1",
+      "branch-2",
+      "completed",
+    ]);
     expect(pins.find((p) => p.id === "branch-2")?.label).toBe("Branch 2");
   });
 
   it("renumbers labels contiguously after removing a middle entry, keeping the underlying pin ids", () => {
     const graph = new Graph("g", "root");
     const def = getNodeDef("flow.parallel");
-    const node = NodeInstance.createNodeInstance("flow.parallel", { x: 0, y: 0 }, def.pins, "par");
+    const node = NodeInstance.createNodeInstance(
+      "flow.parallel",
+      { x: 0, y: 0 },
+      def.pins,
+      "par",
+    );
     graph.nodes.push(node);
     def.addInstancePinEntry!(node); // now branch-0, branch-1, branch-2
 
     removeInstancePin(graph, "par", "branch-1");
 
     const pins = def.deriveInstancePins!(node);
-    expect(pins.map((p) => p.id)).toEqual(["exec-in", "branch-0", "branch-2", "completed"]);
-    expect(pins.map((p) => p.label)).toEqual(["", "Branch 0", "Branch 1", "Completed"]);
+    expect(pins.map((p) => p.id)).toEqual([
+      "exec-in",
+      "branch-0",
+      "branch-2",
+      "completed",
+    ]);
+    expect(pins.map((p) => p.label)).toEqual([
+      "",
+      "Branch 0",
+      "Branch 1",
+      "Completed",
+    ]);
   });
 
   it("runs branches concurrently — a faster branch logs before a slower one regardless of pin order — then fires completed only once both finish", async () => {
@@ -288,11 +411,36 @@ describe("flow.parallel", () => {
     // Branch 0 is wired to the SLOWER delay and Branch 1 to the FASTER one — if the node ran
     // branches one-at-a-time in pin order (like Sequence) instead of truly concurrently, "slow"
     // would always log before "fast". Only genuine concurrency lets "fast" log first.
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "branch-0", toNode: "slowDelay", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "slowDelay", fromPin: "exec-out", toNode: "printSlow", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "branch-1", toNode: "fastDelay", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "fastDelay", fromPin: "exec-out", toNode: "printFast", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "completed", toNode: "printDone", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "par",
+      fromPin: "branch-0",
+      toNode: "slowDelay",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "slowDelay",
+      fromPin: "exec-out",
+      toNode: "printSlow",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "par",
+      fromPin: "branch-1",
+      toNode: "fastDelay",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "fastDelay",
+      fromPin: "exec-out",
+      toNode: "printFast",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "par",
+      fromPin: "completed",
+      toNode: "printDone",
+      toPin: "exec-in",
+    });
 
     const logs: string[] = [];
     const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
@@ -312,9 +460,24 @@ describe("flow.parallel", () => {
     const printDone = addBuiltinNode(graph, "debug.print", "printDone");
     printDone.pins.message.value = "Done";
 
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "branch-0", toNode: "printA", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "branch-1", toNode: "printB", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "par", fromPin: "completed", toNode: "printDone", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "par",
+      fromPin: "branch-0",
+      toNode: "printA",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "par",
+      fromPin: "branch-1",
+      toNode: "printB",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "par",
+      fromPin: "completed",
+      toNode: "printDone",
+      toPin: "exec-in",
+    });
 
     const logs: string[] = [];
     const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });

@@ -1,9 +1,15 @@
-import { NodeColorCategory, type ExecutionContext } from "../engine/types";
-import { registerNode } from "../engine/registry";
-import { registerStructType } from "../engine/structRegistry";
-import { AzureStorageManager } from "../lib/azureStorageManager";
-import type { AzureStorageBlobUploadOptions } from "../lib/azureStorageManager";
-import type { AzureStorageConnectionStringCredentialData } from "../credentials/types";
+import { NodeColorCategory, type ExecutionContext } from "../../engine/types";
+import { registerNode } from "../../engine/registry";
+import { AzureStorageManager } from "../../lib/azureStorageManager";
+import type { AzureStorageBlobUploadOptions } from "../../lib/azureStorageManager";
+import type { AzureStorageConnectionStringCredentialData } from "../../credentials/types";
+import {
+  TIER_OPTIONS,
+  UPLOAD_OPTIONS_STRUCT_TYPE,
+  CONTAINER_PROPERTIES_STRUCT_TYPE,
+  BLOB_PROPERTIES_STRUCT_TYPE,
+  ACCOUNT_INFO_STRUCT_TYPE,
+} from "../structs/azureStorage";
 import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over AzureStorageManager (src/lib/azureStorageManager.ts),
@@ -17,168 +23,7 @@ import { i18n } from "@i18n";
 
 const ENCODING_OPTIONS = ["utf8", "base64"];
 const ACCESS_OPTIONS = ["private", "blob", "container"];
-const TIER_OPTIONS = ["", "Hot", "Cool", "Cold", "Archive"];
 const GROUP_NAME = "Request.AzureStorage";
-
-// The concrete example: Upload Blob's "options" pin is a struct (see engine/structRegistry.ts and
-// nodes/struct.ts's generic Make/Break Struct nodes) instead of one bare contentType string, so a
-// flow can build one full BlockBlobUploadOptions-shaped value with Make Struct (or plug in a
-// literal built right on this pin) and reuse it across multiple uploads.
-const UPLOAD_OPTIONS_STRUCT_TYPE = "azureStorageBlobUploadOptions";
-
-// Same reasoning applies to every multi-field result below (container/blob properties, account
-// info): one struct-typed output pin instead of a loose pin per field, so a flow can pass the
-// whole result around (or Break Struct it) rather than wiring each field separately.
-const CONTAINER_PROPERTIES_STRUCT_TYPE = "azureStorageContainerProperties";
-const BLOB_PROPERTIES_STRUCT_TYPE = "azureStorageBlobProperties";
-const ACCOUNT_INFO_STRUCT_TYPE = "azureStorageAccountInfo";
-
-registerStructType({
-  id: UPLOAD_OPTIONS_STRUCT_TYPE,
-  label: i18n.nodes.azureStorage.uploadOptions.label,
-  category: "Azure",
-  fields: [
-    {
-      id: "contentType",
-      label: i18n.nodes.azureStorage.uploadOptions.pin_content_type,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "cacheControl",
-      label: i18n.nodes.azureStorage.uploadOptions.pin_cache_control,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "contentEncoding",
-      label: i18n.nodes.azureStorage.uploadOptions.pin_content_encoding,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "contentLanguage",
-      label: i18n.nodes.azureStorage.uploadOptions.pin_content_language,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "contentDisposition",
-      label: i18n.nodes.azureStorage.uploadOptions.pin_content_disposition,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "tier",
-      label: i18n.nodes.azureStorage.uploadOptions.pin_tier,
-      type: "string",
-      defaultValue: TIER_OPTIONS[0],
-      options: TIER_OPTIONS,
-    },
-    {
-      id: "metadata",
-      label: i18n.nodes.azureStorage.__shared.pin_metadata,
-      type: "string",
-      container: "map",
-      keyType: "string",
-      defaultValue: [],
-    },
-  ],
-});
-
-registerStructType({
-  id: CONTAINER_PROPERTIES_STRUCT_TYPE,
-  label: i18n.nodes.azureStorage.containerProperties.label,
-  category: "Azure",
-  fields: [
-    {
-      id: "etag",
-      label: i18n.nodes.azureStorage.__shared.pin_etag,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "lastModified",
-      label: i18n.nodes.azureStorage.__shared.pin_last_modified,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "publicAccess",
-      label: i18n.nodes.azureStorage.getContainerProperties.pin_public_access,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "metadata",
-      label: i18n.nodes.azureStorage.__shared.pin_metadata,
-      type: "string",
-      container: "map",
-      keyType: "string",
-      defaultValue: [],
-    },
-  ],
-});
-
-registerStructType({
-  id: BLOB_PROPERTIES_STRUCT_TYPE,
-  label: i18n.nodes.azureStorage.blobProperties.label,
-  category: "Azure",
-  fields: [
-    {
-      id: "size",
-      label: i18n.nodes.azureStorage.getBlobProperties.pin_size,
-      type: "number",
-      defaultValue: 0,
-    },
-    {
-      id: "contentType",
-      label: i18n.nodes.azureStorage.uploadOptions.pin_content_type,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "etag",
-      label: i18n.nodes.azureStorage.__shared.pin_etag,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "lastModified",
-      label: i18n.nodes.azureStorage.__shared.pin_last_modified,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "metadata",
-      label: i18n.nodes.azureStorage.__shared.pin_metadata,
-      type: "string",
-      container: "map",
-      keyType: "string",
-      defaultValue: [],
-    },
-  ],
-});
-
-registerStructType({
-  id: ACCOUNT_INFO_STRUCT_TYPE,
-  label: i18n.nodes.azureStorage.accountInfo.label,
-  category: "Azure",
-  fields: [
-    {
-      id: "accountKind",
-      label: i18n.nodes.azureStorage.getAccountInfo.pin_account_kind,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "skuName",
-      label: i18n.nodes.azureStorage.getAccountInfo.pin_sku_name,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
 
 interface MapEntry {
   key: unknown;
@@ -191,7 +36,8 @@ interface MapEntry {
 function mapEntriesToRecord(value: unknown): Record<string, string> {
   const entries = Array.isArray(value) ? (value as MapEntry[]) : [];
   const record: Record<string, string> = {};
-  for (const entry of entries) record[String(entry.key ?? "")] = String(entry.value ?? "");
+  for (const entry of entries)
+    record[String(entry.key ?? "")] = String(entry.value ?? "");
   return record;
 }
 
@@ -279,7 +125,12 @@ function errorPin() {
 
 /** Shared by every Azure Storage node — looks up a named Credential Vault entry and returns its
  * connection string, or a clear error if the name is wrong/missing. */
-function resolveAzureStorageCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: AzureStorageConnectionStringCredentialData } | { ok: false; error: string } {
+function resolveAzureStorageCredential(
+  ctx: ExecutionContext,
+  credentialName: string,
+):
+  | { ok: true; data: AzureStorageConnectionStringCredentialData }
+  | { ok: false; error: string } {
   const credential = ctx.getCredential?.(credentialName);
   if (!credential)
     return {
@@ -297,7 +148,10 @@ function resolveAzureStorageCredential(ctx: ExecutionContext, credentialName: st
   };
 }
 
-function managerFor(ctx: ExecutionContext, credentialName: string): { ok: true; manager: AzureStorageManager } | { ok: false; error: string } {
+function managerFor(
+  ctx: ExecutionContext,
+  credentialName: string,
+): { ok: true; manager: AzureStorageManager } | { ok: false; error: string } {
   const resolved = resolveAzureStorageCredential(ctx, credentialName);
   if (!resolved.ok) return resolved;
   return {
@@ -341,7 +195,9 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, containers: [], error: resolved.error },
       };
-    const result = await resolved.manager.listContainers(String(inputs.prefix ?? ""));
+    const result = await resolved.manager.listContainers(
+      String(inputs.prefix ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -376,8 +232,14 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const access = inputs.access === "blob" || inputs.access === "container" ? inputs.access : "private";
-    const result = await resolved.manager.createContainer(String(inputs.containerName ?? ""), access);
+    const access =
+      inputs.access === "blob" || inputs.access === "container"
+        ? inputs.access
+        : "private";
+    const result = await resolved.manager.createContainer(
+      String(inputs.containerName ?? ""),
+      access,
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -388,7 +250,14 @@ registerNode({
   description: i18n.nodes.azureStorage.deleteContainer.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), execOutPin(), successPin(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    containerNamePin(),
+    execOutPin(),
+    successPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
@@ -397,7 +266,9 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const result = await resolved.manager.deleteContainer(String(inputs.containerName ?? ""));
+    const result = await resolved.manager.deleteContainer(
+      String(inputs.containerName ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -440,7 +311,9 @@ registerNode({
           error: resolved.error,
         },
       };
-    const result = await resolved.manager.getContainerProperties(String(inputs.containerName ?? ""));
+    const result = await resolved.manager.getContainerProperties(
+      String(inputs.containerName ?? ""),
+    );
     return {
       nextExec: "exec-out",
       outputs: {
@@ -463,7 +336,15 @@ registerNode({
   description: i18n.nodes.azureStorage.setContainerMetadata.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), metadataInPin(), execOutPin(), successPin(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    containerNamePin(),
+    metadataInPin(),
+    execOutPin(),
+    successPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
@@ -472,7 +353,10 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const result = await resolved.manager.setContainerMetadata(String(inputs.containerName ?? ""), mapEntriesToRecord(inputs.metadata));
+    const result = await resolved.manager.setContainerMetadata(
+      String(inputs.containerName ?? ""),
+      mapEntriesToRecord(inputs.metadata),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -520,7 +404,11 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, blobs: [], error: resolved.error },
       };
-    const result = await resolved.manager.listBlobs(String(inputs.containerName ?? ""), String(inputs.prefix ?? ""), Boolean(inputs.recursive));
+    const result = await resolved.manager.listBlobs(
+      String(inputs.containerName ?? ""),
+      String(inputs.prefix ?? ""),
+      Boolean(inputs.recursive),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -586,7 +474,8 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const options = (inputs.options ?? {}) as Partial<AzureStorageBlobUploadOptions>;
+    const options = (inputs.options ??
+      {}) as Partial<AzureStorageBlobUploadOptions>;
     const uploadOptions: AzureStorageBlobUploadOptions = {
       contentType: String(options.contentType ?? ""),
       cacheControl: String(options.cacheControl ?? ""),
@@ -596,7 +485,14 @@ registerNode({
       tier: String(options.tier ?? ""),
       metadata: mapEntriesToRecord(options.metadata),
     };
-    const result = await resolved.manager.uploadBlob(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", uploadOptions, Boolean(inputs.overwrite));
+    const result = await resolved.manager.uploadBlob(
+      String(inputs.containerName ?? ""),
+      String(inputs.blobName ?? ""),
+      String(inputs.content ?? ""),
+      inputs.encoding === "base64" ? "base64" : "utf8",
+      uploadOptions,
+      Boolean(inputs.overwrite),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -638,7 +534,11 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, content: "", error: resolved.error },
       };
-    const result = await resolved.manager.downloadBlob(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+    const result = await resolved.manager.downloadBlob(
+      String(inputs.containerName ?? ""),
+      String(inputs.blobName ?? ""),
+      inputs.encoding === "base64" ? "base64" : "utf8",
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -649,7 +549,15 @@ registerNode({
   description: i18n.nodes.azureStorage.deleteBlob.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), execOutPin(), successPin(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    containerNamePin(),
+    blobNamePin(),
+    execOutPin(),
+    successPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
@@ -658,7 +566,10 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const result = await resolved.manager.deleteBlob(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
+    const result = await resolved.manager.deleteBlob(
+      String(inputs.containerName ?? ""),
+      String(inputs.blobName ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -713,7 +624,12 @@ function registerRelocationNode(type: "copyBlob" | "moveBlob") {
           nextExec: "exec-out",
           outputs: { success: false, error: resolved.error },
         };
-      const result = await resolved.manager[type](String(inputs.sourceContainer ?? ""), String(inputs.sourceBlob ?? ""), String(inputs.destContainer ?? ""), String(inputs.destBlob ?? ""));
+      const result = await resolved.manager[type](
+        String(inputs.sourceContainer ?? ""),
+        String(inputs.sourceBlob ?? ""),
+        String(inputs.destContainer ?? ""),
+        String(inputs.destBlob ?? ""),
+      );
       return { nextExec: "exec-out", outputs: result };
     },
   });
@@ -762,7 +678,10 @@ registerNode({
           error: resolved.error,
         },
       };
-    const result = await resolved.manager.getBlobProperties(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
+    const result = await resolved.manager.getBlobProperties(
+      String(inputs.containerName ?? ""),
+      String(inputs.blobName ?? ""),
+    );
     return {
       nextExec: "exec-out",
       outputs: {
@@ -786,7 +705,16 @@ registerNode({
   description: i18n.nodes.azureStorage.setBlobMetadata.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), metadataInPin(), execOutPin(), successPin(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    containerNamePin(),
+    blobNamePin(),
+    metadataInPin(),
+    execOutPin(),
+    successPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
@@ -795,7 +723,11 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const result = await resolved.manager.setBlobMetadata(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), mapEntriesToRecord(inputs.metadata));
+    const result = await resolved.manager.setBlobMetadata(
+      String(inputs.containerName ?? ""),
+      String(inputs.blobName ?? ""),
+      mapEntriesToRecord(inputs.metadata),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -829,7 +761,10 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, exists: false, error: resolved.error },
       };
-    const result = await resolved.manager.blobExists(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
+    const result = await resolved.manager.blobExists(
+      String(inputs.containerName ?? ""),
+      String(inputs.blobName ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -877,7 +812,12 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, url: "", error: resolved.error },
       };
-    const result = await resolved.manager.generateBlobSasUrl(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60));
+    const result = await resolved.manager.generateBlobSasUrl(
+      String(inputs.containerName ?? ""),
+      String(inputs.blobName ?? ""),
+      String(inputs.permissions ?? "r"),
+      Number(inputs.expiresInMinutes ?? 60),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -924,7 +864,11 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, url: "", error: resolved.error },
       };
-    const result = await resolved.manager.generateContainerSasUrl(String(inputs.containerName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60));
+    const result = await resolved.manager.generateContainerSasUrl(
+      String(inputs.containerName ?? ""),
+      String(inputs.permissions ?? "r"),
+      Number(inputs.expiresInMinutes ?? 60),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });

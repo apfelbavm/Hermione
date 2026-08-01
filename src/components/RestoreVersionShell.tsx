@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { registerBuiltins } from "../nodes";
+import { registerBuiltins } from "../graph/nodes";
 import { isNodeLatent } from "../engine/latency";
 import { nextId } from "../engine/graphMutations";
 import { Graph } from "../engine/graph";

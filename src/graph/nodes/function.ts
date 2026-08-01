@@ -1,6 +1,6 @@
-import { runFunctionCall } from "../engine/executor";
-import { NodeColorCategory } from "../engine/types";
-import { registerNode } from "../engine/registry";
+import { runFunctionCall } from "../../engine/executor";
+import { NodeColorCategory } from "../../engine/types";
+import { registerNode } from "../../engine/registry";
 import { i18n } from "@i18n";
 
 // Compiler support (compileExecute/compileEvaluate) for these three node types is intentionally

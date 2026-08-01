@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { registerBuiltins } from "../nodes";
+import { registerBuiltins } from "../graph/nodes";
 import { connectPins, insertRerouteOnConnection, nextId, removeInstancePin } from "../engine/graphMutations";
 import { canCollapseSelectionToFunction, collapseSelectionToFunction } from "../engine/collapseToFunction";
 import { connectionsTouchingPin } from "../engine/graphQueries";

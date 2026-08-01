@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { registerBuiltins } from "../src/nodes";
+import { registerBuiltins } from "../src/graph/nodes";
 import { compileGraph } from "../src/compiler/codegen";
 import { deserializeGraph } from "../src/persistence/load";
 

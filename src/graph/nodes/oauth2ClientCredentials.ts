@@ -1,6 +1,6 @@
 import * as oauth from "oauth4webapi";
-import { NodeColorCategory } from "../engine/types";
-import { registerNode } from "../engine/registry";
+import { NodeColorCategory } from "../../engine/types";
+import { registerNode } from "../../engine/registry";
 import { i18n } from "@i18n";
 
 // OAuth2 Client Credentials (RFC 6749 §4.4) — the standard app-only / service-to-service grant:
@@ -117,14 +117,26 @@ registerNode({
       token_endpoint: tokenUrl,
     };
     const client: oauth.Client = { client_id: clientId };
-    const clientAuth = sendAs === "basicAuthHeader" ? oauth.ClientSecretBasic(clientSecret) : oauth.ClientSecretPost(clientSecret);
+    const clientAuth =
+      sendAs === "basicAuthHeader"
+        ? oauth.ClientSecretBasic(clientSecret)
+        : oauth.ClientSecretPost(clientSecret);
 
     let status = 0;
     try {
-      const response = await oauth.clientCredentialsGrantRequest(as, client, clientAuth, new URLSearchParams(scope ? { scope } : {}));
+      const response = await oauth.clientCredentialsGrantRequest(
+        as,
+        client,
+        clientAuth,
+        new URLSearchParams(scope ? { scope } : {}),
+      );
       status = response.status;
 
-      const result = await oauth.processClientCredentialsResponse(as, client, response);
+      const result = await oauth.processClientCredentialsResponse(
+        as,
+        client,
+        response,
+      );
       return {
         nextExec: "exec-out",
         outputs: {
@@ -140,10 +152,18 @@ registerNode({
         },
       };
     } catch (err) {
-      if (err instanceof oauth.ResponseBodyError || err instanceof oauth.WWWAuthenticateChallengeError) {
+      if (
+        err instanceof oauth.ResponseBodyError ||
+        err instanceof oauth.WWWAuthenticateChallengeError
+      ) {
         status = err.status;
       }
-      const message = err instanceof oauth.ResponseBodyError ? err.error_description || err.error : err instanceof Error ? err.message : String(err);
+      const message =
+        err instanceof oauth.ResponseBodyError
+          ? err.error_description || err.error
+          : err instanceof Error
+            ? err.message
+            : String(err);
       return {
         nextExec: "exec-out",
         outputs: {

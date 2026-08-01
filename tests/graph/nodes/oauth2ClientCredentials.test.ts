@@ -1,9 +1,12 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { registerBuiltins } from "../../src/nodes/index";
-import { createExecutionContext, runExecFrom } from "../../src/engine/executor";
-import { getNodeDef } from "../../src/engine/registry";
-import { Graph } from "../../src/engine/graph";
-import { NodeInstance } from "../../src/engine/nodeInstance";
+import { registerBuiltins } from "../../../src/graph/nodes/index";
+import {
+  createExecutionContext,
+  runExecFrom,
+} from "../../../src/engine/executor";
+import { getNodeDef } from "../../../src/engine/registry";
+import { Graph } from "../../../src/engine/graph";
+import { NodeInstance } from "../../../src/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -16,7 +19,12 @@ afterEach(() => {
 function buildGraph(pinValues: Record<string, unknown>) {
   const graph: Graph = new Graph("g", "test");
   const def = getNodeDef("auth.oauth2ClientCredentials");
-  const node = NodeInstance.createNodeInstance("auth.oauth2ClientCredentials", { x: 0, y: 0 }, def.pins, "oauth");
+  const node = NodeInstance.createNodeInstance(
+    "auth.oauth2ClientCredentials",
+    { x: 0, y: 0 },
+    def.pins,
+    "oauth",
+  );
   for (const [id, value] of Object.entries(pinValues)) {
     node.pins[id].value = value;
   }
@@ -32,10 +40,17 @@ describe("auth.oauth2ClientCredentials", () => {
   it("requests a token from tokenServiceUrl, sending client_id/secret in the body by default", async () => {
     const fetchMock = vi.fn(
       async (_url: string, _init?: RequestInit) =>
-        new Response(JSON.stringify({ access_token: "tok-1", token_type: "bearer", expires_in: 3600 }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({
+            access_token: "tok-1",
+            token_type: "bearer",
+            expires_in: 3600,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -49,7 +64,10 @@ describe("auth.oauth2ClientCredentials", () => {
 
     expect(ctx.execOutputs.get("oauth:success")).toBe(true);
     expect(ctx.execOutputs.get("oauth:accessToken")).toBe("tok-1");
-    expect(ctx.execOutputs.get("oauth:auth")).toEqual({ header: "Authorization", value: "Bearer tok-1" });
+    expect(ctx.execOutputs.get("oauth:auth")).toEqual({
+      header: "Authorization",
+      value: "Bearer tok-1",
+    });
     expect(ctx.execOutputs.get("oauth:expiresIn")).toBe(3600);
     expect(ctx.execOutputs.get("oauth:status")).toBe(200);
 
@@ -64,7 +82,15 @@ describe("auth.oauth2ClientCredentials", () => {
 
   it("includes scope in the request body when given", async () => {
     const fetchMock = vi.fn(
-      async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ access_token: "tok", token_type: "bearer", expires_in: 60 }), { status: 200 }),
+      async (_url: string, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            access_token: "tok",
+            token_type: "bearer",
+            expires_in: 60,
+          }),
+          { status: 200 },
+        ),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -74,7 +100,11 @@ describe("auth.oauth2ClientCredentials", () => {
       clientSecret: "secret-1",
       scope: "read write",
     });
-    await runExecFrom("oauth", "exec-in", createExecutionContext(graph, { log: () => {} }));
+    await runExecFrom(
+      "oauth",
+      "exec-in",
+      createExecutionContext(graph, { log: () => {} }),
+    );
 
     const [, init] = fetchMock.mock.calls[0];
     const body = new URLSearchParams(init!.body as string);
@@ -83,7 +113,15 @@ describe("auth.oauth2ClientCredentials", () => {
 
   it("sends client credentials as a Basic Auth header instead when Send As is basicAuthHeader", async () => {
     const fetchMock = vi.fn(
-      async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ access_token: "tok", token_type: "bearer", expires_in: 60 }), { status: 200 }),
+      async (_url: string, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            access_token: "tok",
+            token_type: "bearer",
+            expires_in: 60,
+          }),
+          { status: 200 },
+        ),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -93,14 +131,20 @@ describe("auth.oauth2ClientCredentials", () => {
       clientSecret: "secret-1",
       sendAs: "basicAuthHeader",
     });
-    await runExecFrom("oauth", "exec-in", createExecutionContext(graph, { log: () => {} }));
+    await runExecFrom(
+      "oauth",
+      "exec-in",
+      createExecutionContext(graph, { log: () => {} }),
+    );
 
     const [, init] = fetchMock.mock.calls[0];
     const headers = new Headers(init!.headers);
     // oauth4webapi percent-encodes client_id/client_secret before Basic-encoding them (RFC 6749
     // Appendix B), unlike a naive `btoa(id + ":" + secret)` — notably more correct, since it means a
     // colon inside either value can't be confused with the id:secret separator.
-    expect(headers.get("authorization")).toBe(`Basic ${btoa("client%2D1:secret%2D1")}`);
+    expect(headers.get("authorization")).toBe(
+      `Basic ${btoa("client%2D1:secret%2D1")}`,
+    );
     const body = new URLSearchParams(init!.body as string);
     expect(body.get("client_id")).toBe(null);
     expect(body.get("client_secret")).toBe(null);
@@ -111,10 +155,16 @@ describe("auth.oauth2ClientCredentials", () => {
       "fetch",
       vi.fn(
         async (_url: string, _init?: RequestInit) =>
-          new Response(JSON.stringify({ error: "invalid_client", error_description: "bad secret" }), {
-            status: 401,
-            headers: { "Content-Type": "application/json" },
-          }),
+          new Response(
+            JSON.stringify({
+              error: "invalid_client",
+              error_description: "bad secret",
+            }),
+            {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
       ),
     );
 

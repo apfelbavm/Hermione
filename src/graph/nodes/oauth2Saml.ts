@@ -1,7 +1,7 @@
-import { NodeColorCategory } from "../engine/types";
-import { registerNode } from "../engine/registry";
-import { compileResultVar } from "../engine/compileUtils";
-import type { Oauth2SamlBearerCredentialData } from "../credentials/types";
+import { NodeColorCategory } from "../../engine/types";
+import { registerNode } from "../../engine/registry";
+import { compileResultVar } from "../../engine/compileUtils";
+import type { Oauth2SamlBearerCredentialData } from "../../credentials/types";
 import { i18n } from "@i18n";
 
 // SAML 2.0 Bearer Assertion exchange (RFC 7522 grant type) — but the assertion itself is NOT built
@@ -118,7 +118,16 @@ interface Oauth2SamlResult {
   [key: string]: unknown;
 }
 
-const oauth2SamlExchange: (idpUrl: string, tokenServiceUrl: string, clientId: string, userId: string, companyId: string, privateKey: string) => Promise<Oauth2SamlResult> = new Function(`${OAUTH2_SAML_EXCHANGE_SOURCE}\nreturn oauth2SamlExchange;`)();
+const oauth2SamlExchange: (
+  idpUrl: string,
+  tokenServiceUrl: string,
+  clientId: string,
+  userId: string,
+  companyId: string,
+  privateKey: string,
+) => Promise<Oauth2SamlResult> = new Function(
+  `${OAUTH2_SAML_EXCHANGE_SOURCE}\nreturn oauth2SamlExchange;`,
+)();
 
 function failResult(error: string): Oauth2SamlResult {
   return {
@@ -196,18 +205,29 @@ registerNode({
     if (!credential) {
       return {
         nextExec: "exec-out",
-        outputs: failResult(`Credential "${credentialName}" not found in the vault`),
+        outputs: failResult(
+          `Credential "${credentialName}" not found in the vault`,
+        ),
       };
     }
     if (credential.type !== "oauth2SamlBearer") {
       return {
         nextExec: "exec-out",
-        outputs: failResult(`Credential "${credentialName}" is not an OAuth2 SAML Bearer credential`),
+        outputs: failResult(
+          `Credential "${credentialName}" is not an OAuth2 SAML Bearer credential`,
+        ),
       };
     }
 
     const data = credential.data as Oauth2SamlBearerCredentialData;
-    const result = await oauth2SamlExchange(data.idpUrl, data.tokenServiceUrl, data.clientId, data.userId, data.companyId, data.privateKey);
+    const result = await oauth2SamlExchange(
+      data.idpUrl,
+      data.tokenServiceUrl,
+      data.clientId,
+      data.userId,
+      data.companyId,
+      data.privateKey,
+    );
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [

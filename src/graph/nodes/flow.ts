@@ -1,9 +1,9 @@
-import { registerNode } from "../engine/registry";
-import { DELAY_HELPER_SOURCE, indent } from "../engine/compileUtils";
-import { runExecFrom } from "../engine/executor";
-import { connectionsFrom } from "../engine/graphQueries";
-import type { PinDef } from "../engine/types";
-import { NodeInstance } from "../engine/nodeInstance";
+import { registerNode } from "../../engine/registry";
+import { DELAY_HELPER_SOURCE, indent } from "../../engine/compileUtils";
+import { runExecFrom } from "../../engine/executor";
+import { connectionsFrom } from "../../engine/graphQueries";
+import type { PinDef } from "../../engine/types";
+import { NodeInstance } from "../../engine/nodeInstance";
 import { i18n } from "@i18n";
 
 function wait(ms: number): Promise<void> {
@@ -37,7 +37,10 @@ registerNode({
     return { nextExec: "exec-out" };
   },
   compileHelpers: { delay: DELAY_HELPER_SOURCE },
-  compileExecute: ({ inputs, compileFrom }) => [`await delay(Number(${inputs.duration}));`, ...compileFrom("exec-out")],
+  compileExecute: ({ inputs, compileFrom }) => [
+    `await delay(Number(${inputs.duration}));`,
+    ...compileFrom("exec-out"),
+  ],
 });
 
 registerNode({
@@ -68,7 +71,13 @@ registerNode({
     },
   ],
   execute: ({ inputs }) => ({ nextExec: inputs.condition ? "true" : "false" }),
-  compileExecute: ({ inputs, compileFrom }) => [`if (${inputs.condition}) {`, ...indent(compileFrom("true")), `} else {`, ...indent(compileFrom("false")), `}`],
+  compileExecute: ({ inputs, compileFrom }) => [
+    `if (${inputs.condition}) {`,
+    ...indent(compileFrom("true")),
+    `} else {`,
+    ...indent(compileFrom("false")),
+    `}`,
+  ],
 });
 
 registerNode({
@@ -99,9 +108,18 @@ registerNode({
     },
   ],
   execute: ({ inputs }) => ({
-    nextExec: inputs.object === undefined || inputs.object === null ? "invalid" : "valid",
+    nextExec:
+      inputs.object === undefined || inputs.object === null
+        ? "invalid"
+        : "valid",
   }),
-  compileExecute: ({ inputs, compileFrom }) => [`if (${inputs.object} !== undefined && ${inputs.object} !== null) {`, ...indent(compileFrom("valid")), `} else {`, ...indent(compileFrom("invalid")), `}`],
+  compileExecute: ({ inputs, compileFrom }) => [
+    `if (${inputs.object} !== undefined && ${inputs.object} !== null) {`,
+    ...indent(compileFrom("valid")),
+    `} else {`,
+    ...indent(compileFrom("invalid")),
+    `}`,
+  ],
 });
 
 const MAX_FOR_LOOP_ITERATIONS = 100_000;
@@ -157,7 +175,9 @@ registerNode({
     const end = Math.round(Number(inputs.end ?? 0));
 
     if (end - start + 1 > MAX_FOR_LOOP_ITERATIONS) {
-      throw new Error(`For Loop (${node.id}) would run ${end - start + 1} iterations, over the ${MAX_FOR_LOOP_ITERATIONS} limit — check its Start/End.`);
+      throw new Error(
+        `For Loop (${node.id}) would run ${end - start + 1} iterations, over the ${MAX_FOR_LOOP_ITERATIONS} limit — check its Start/End.`,
+      );
     }
 
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
@@ -216,7 +236,10 @@ registerNode({
       direction: "output",
     },
   ],
-  deriveInstancePins: (node) => [{ id: "exec-in", label: "", type: "exec", direction: "input" }, ...sequenceThenPinDefs(node)],
+  deriveInstancePins: (node) => [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    ...sequenceThenPinDefs(node),
+  ],
   addInstancePinEntry: (node) => {
     const suffixes = sequenceThenIds(node).map(thenSuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -305,12 +328,27 @@ registerNode({
   latentBodyPins: (node) => parallelBranchIds(node),
   execute: async ({ node, ctx }) => {
     const branchIds = parallelBranchIds(node);
-    await Promise.all(branchIds.flatMap((branchId) => connectionsFrom(ctx.graph, node.id, branchId).map((conn) => runExecFrom(conn.toNode, conn.toPin, ctx))));
+    await Promise.all(
+      branchIds.flatMap((branchId) =>
+        connectionsFrom(ctx.graph, node.id, branchId).map((conn) =>
+          runExecFrom(conn.toNode, conn.toPin, ctx),
+        ),
+      ),
+    );
     return { nextExec: "completed" };
   },
 
   compileExecute: ({ node, compileFrom }) => {
-    const branchBlocks = parallelBranchIds(node).map((branchId) => [`(async () => {`, ...indent(compileFrom(branchId)), `})(),`]);
-    return [`await Promise.all([`, ...indent(branchBlocks.flat()), `]);`, ...compileFrom("completed")];
+    const branchBlocks = parallelBranchIds(node).map((branchId) => [
+      `(async () => {`,
+      ...indent(compileFrom(branchId)),
+      `})(),`,
+    ]);
+    return [
+      `await Promise.all([`,
+      ...indent(branchBlocks.flat()),
+      `]);`,
+      ...compileFrom("completed"),
+    ];
   },
 });

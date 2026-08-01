@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { registerBuiltins } from "../../src/nodes";
+import { registerBuiltins } from "../../src/graph/nodes";
 import { createExecutionContext, runExecFrom } from "../../src/engine/executor";
 import { connectPins } from "../../src/engine/graphMutations";
 import { getNodeDef } from "../../src/engine/registry";

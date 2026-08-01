@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { registerBuiltins } from "../../../nodes";
+import { registerBuiltins } from "../../../graph/nodes";
 import { createExecutionContext, runExecFrom } from "../../../engine/executor";
 import { deserializeGraph } from "../../../persistence/load";
 import { checkpointSimulation, disposeSimulationRun, registerSimulationRun, requestSimulationResume } from "../../../engine/simulationControl";

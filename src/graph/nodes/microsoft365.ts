@@ -1,8 +1,32 @@
-import { NodeColorCategory, type ExecutionContext } from "../engine/types";
-import { registerNode } from "../engine/registry";
-import { registerStructType } from "../engine/structRegistry";
-import { GraphManager } from "../lib/graphManager";
-import type { MicrosoftGraphClientCredentialsData } from "../credentials/types";
+import { NodeColorCategory, type ExecutionContext } from "../../engine/types";
+import { registerNode } from "../../engine/registry";
+import { GraphManager } from "../../lib/graphManager";
+import type { MicrosoftGraphClientCredentialsData } from "../../credentials/types";
+import {
+  USER_STRUCT_TYPE,
+  GROUP_STRUCT_TYPE,
+  MESSAGE_STRUCT_TYPE,
+  EVENT_STRUCT_TYPE,
+  DRIVE_ITEM_STRUCT_TYPE,
+  TEAM_STRUCT_TYPE,
+  CHANNEL_STRUCT_TYPE,
+  CHANNEL_MESSAGE_STRUCT_TYPE,
+  CHAT_STRUCT_TYPE,
+  SITE_STRUCT_TYPE,
+  SITE_LIST_STRUCT_TYPE,
+  LIST_ITEM_STRUCT_TYPE,
+  WORKSHEET_STRUCT_TYPE,
+  TABLE_STRUCT_TYPE,
+  PLANNER_PLAN_STRUCT_TYPE,
+  PLANNER_TASK_STRUCT_TYPE,
+  TODO_LIST_STRUCT_TYPE,
+  TODO_TASK_STRUCT_TYPE,
+  CONTACT_STRUCT_TYPE,
+  APPLICATION_STRUCT_TYPE,
+  DIRECTORY_ROLE_STRUCT_TYPE,
+  TRENDING_DOCUMENT_STRUCT_TYPE,
+  MESSAGE_DETAIL_STRUCT_TYPE,
+} from "../structs/microsoft365";
 import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over GraphManager (src/lib/graphManager.ts),
@@ -26,619 +50,6 @@ const BODY_TYPE_OPTIONS = ["text", "html"];
 const SHARING_LINK_TYPE_OPTIONS = ["view", "edit"];
 const SHARING_LINK_SCOPE_OPTIONS = ["anonymous", "organization"];
 
-// Same struct-array pattern as nodes/azureStorage.ts/dropbox.ts/github.ts: every "list X" result
-// is an array of same-shaped Graph resource objects (see graphManager.ts's Graph* interfaces), so
-// each gets a registered struct type instead of an opaque "object" array element type.
-const USER_STRUCT_TYPE = "graphUser";
-const GROUP_STRUCT_TYPE = "graphGroup";
-const MESSAGE_STRUCT_TYPE = "graphMessage";
-const EVENT_STRUCT_TYPE = "graphEvent";
-const DRIVE_ITEM_STRUCT_TYPE = "graphDriveItem";
-const TEAM_STRUCT_TYPE = "graphTeam";
-const CHANNEL_STRUCT_TYPE = "graphChannel";
-const CHANNEL_MESSAGE_STRUCT_TYPE = "graphChannelMessage";
-const CHAT_STRUCT_TYPE = "graphChat";
-const SITE_STRUCT_TYPE = "graphSite";
-const SITE_LIST_STRUCT_TYPE = "graphSiteList";
-const LIST_ITEM_STRUCT_TYPE = "graphListItem";
-const WORKSHEET_STRUCT_TYPE = "graphWorksheet";
-const TABLE_STRUCT_TYPE = "graphTable";
-const PLANNER_PLAN_STRUCT_TYPE = "graphPlannerPlan";
-const PLANNER_TASK_STRUCT_TYPE = "graphPlannerTask";
-const TODO_LIST_STRUCT_TYPE = "graphTodoList";
-const TODO_TASK_STRUCT_TYPE = "graphTodoTask";
-const CONTACT_STRUCT_TYPE = "graphContact";
-const APPLICATION_STRUCT_TYPE = "graphApplication";
-const DIRECTORY_ROLE_STRUCT_TYPE = "graphDirectoryRole";
-const TRENDING_DOCUMENT_STRUCT_TYPE = "graphTrendingDocument";
-const MESSAGE_DETAIL_STRUCT_TYPE = "graphMessageDetail";
-
-registerStructType({
-  id: USER_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphUser.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "userPrincipalName",
-      label: i18n.nodes.microsoft365.__shared.pin_user_principal_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "mail",
-      label: i18n.nodes.microsoft365.__shared.pin_mail,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: GROUP_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphGroup.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "mailNickname",
-      label: i18n.nodes.microsoft365.__shared.pin_mail_nickname,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: MESSAGE_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphMessage.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "subject",
-      label: i18n.nodes.microsoft365.__shared.pin_subject,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "from",
-      label: i18n.nodes.microsoft365.getMessage.pin_from,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "receivedDateTime",
-      label: i18n.nodes.microsoft365.getMessage.pin_received_date_time,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: EVENT_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphEvent.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "subject",
-      label: i18n.nodes.microsoft365.__shared.pin_subject,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "start",
-      label: i18n.nodes.microsoft365.createEvent.pin_start,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "end",
-      label: i18n.nodes.microsoft365.createEvent.pin_end,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: DRIVE_ITEM_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphDriveItem.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "isFolder",
-      label: i18n.nodes.microsoft365.__shared.pin_is_folder,
-      type: "boolean",
-      defaultValue: false,
-    },
-    {
-      id: "size",
-      label: i18n.nodes.microsoft365.__shared.pin_size,
-      type: "number",
-      defaultValue: 0,
-    },
-  ],
-});
-
-registerStructType({
-  id: TEAM_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphTeam.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: CHANNEL_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphChannel.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "description",
-      label: i18n.nodes.microsoft365.__shared.pin_description,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: CHANNEL_MESSAGE_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphChannelMessage.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "from",
-      label: i18n.nodes.microsoft365.getMessage.pin_from,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "content",
-      label: i18n.nodes.microsoft365.__shared.pin_content,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "createdDateTime",
-      label: i18n.nodes.microsoft365.__shared.pin_created_date_time,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: CHAT_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphChat.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "topic",
-      label: i18n.nodes.microsoft365.__shared.pin_topic,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "chatType",
-      label: i18n.nodes.microsoft365.__shared.pin_chat_type,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: SITE_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphSite.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "webUrl",
-      label: i18n.nodes.microsoft365.__shared.pin_web_url,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: SITE_LIST_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphSiteList.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: LIST_ITEM_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphListItem.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "fieldsJson",
-      label: i18n.nodes.microsoft365.createListItem.pin_fields_json,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: WORKSHEET_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphWorksheet.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: TABLE_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphTable.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: PLANNER_PLAN_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphPlannerPlan.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "title",
-      label: i18n.nodes.microsoft365.__shared.pin_title,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: PLANNER_TASK_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphPlannerTask.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "title",
-      label: i18n.nodes.microsoft365.__shared.pin_title,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "percentComplete",
-      label: i18n.nodes.microsoft365.__shared.pin_percent_complete,
-      type: "number",
-      defaultValue: 0,
-    },
-  ],
-});
-
-registerStructType({
-  id: TODO_LIST_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphTodoList.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: TODO_TASK_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphTodoTask.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "title",
-      label: i18n.nodes.microsoft365.__shared.pin_title,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "status",
-      label: i18n.nodes.microsoft365.__shared.pin_status,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: CONTACT_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphContact.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "email",
-      label: i18n.nodes.microsoft365.__shared.pin_email,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: APPLICATION_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphApplication.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "appId",
-      label: i18n.nodes.microsoft365.__shared.pin_app_id,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: DIRECTORY_ROLE_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphDirectoryRole.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: TRENDING_DOCUMENT_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphTrendingDocument.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "webUrl",
-      label: i18n.nodes.microsoft365.__shared.pin_web_url,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
-registerStructType({
-  id: MESSAGE_DETAIL_STRUCT_TYPE,
-  label: i18n.nodes.microsoft365.graphMessageDetail.label,
-  category: "Microsoft 365",
-  fields: [
-    {
-      id: "subject",
-      label: i18n.nodes.microsoft365.__shared.pin_subject,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "from",
-      label: i18n.nodes.microsoft365.getMessage.pin_from,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "bodyContent",
-      label: i18n.nodes.microsoft365.getMessage.pin_body_content,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "receivedDateTime",
-      label: i18n.nodes.microsoft365.getMessage.pin_received_date_time,
-      type: "string",
-      defaultValue: "",
-    },
-  ],
-});
-
 function credentialNamePin() {
   return {
     id: "credentialName",
@@ -649,7 +60,9 @@ function credentialNamePin() {
   };
 }
 
-function userIdPin(label: string = i18n.nodes.microsoft365.__shared.pin_user_id) {
+function userIdPin(
+  label: string = i18n.nodes.microsoft365.__shared.pin_user_id,
+) {
   return {
     id: "userId",
     label,
@@ -661,7 +74,12 @@ function userIdPin(label: string = i18n.nodes.microsoft365.__shared.pin_user_id)
 
 /** Shared by every Microsoft 365 node — looks up a named Credential Vault entry and returns its
  * tenant/client fields, or a clear error if the name is wrong/missing. */
-function resolveGraphCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: MicrosoftGraphClientCredentialsData } | { ok: false; error: string } {
+function resolveGraphCredential(
+  ctx: ExecutionContext,
+  credentialName: string,
+):
+  | { ok: true; data: MicrosoftGraphClientCredentialsData }
+  | { ok: false; error: string } {
   const credential = ctx.getCredential?.(credentialName);
   if (!credential)
     return {
@@ -680,7 +98,11 @@ function resolveGraphCredential(ctx: ExecutionContext, credentialName: string): 
 }
 
 function managerFor(data: MicrosoftGraphClientCredentialsData): GraphManager {
-  return GraphManager.forCredential(data.tenantId, data.clientId, data.clientSecret);
+  return GraphManager.forCredential(
+    data.tenantId,
+    data.clientId,
+    data.clientSecret,
+  );
 }
 
 function execInOutPins() {
@@ -749,14 +171,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, users: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listUsers(String(inputs.filter ?? ""), Number(inputs.top ?? 100));
+    const result = await managerFor(resolved.data).listUsers(
+      String(inputs.filter ?? ""),
+      Number(inputs.top ?? 100),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -784,7 +212,10 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
@@ -795,7 +226,9 @@ registerNode({
         },
       };
     }
-    const result = await managerFor(resolved.data).getUser(String(inputs.userId ?? ""));
+    const result = await managerFor(resolved.data).getUser(
+      String(inputs.userId ?? ""),
+    );
     return {
       nextExec: "exec-out",
       outputs: {
@@ -868,14 +301,23 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, id: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).createUser(String(inputs.displayName ?? ""), String(inputs.userPrincipalName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.password ?? ""), Boolean(inputs.forceChangePasswordNextSignIn));
+    const result = await managerFor(resolved.data).createUser(
+      String(inputs.displayName ?? ""),
+      String(inputs.userPrincipalName ?? ""),
+      String(inputs.mailNickname ?? ""),
+      String(inputs.password ?? ""),
+      Boolean(inputs.forceChangePasswordNextSignIn),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -903,14 +345,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).updateUser(String(inputs.userId ?? ""), String(inputs.propertiesJson ?? "{}"));
+    const result = await managerFor(resolved.data).updateUser(
+      String(inputs.userId ?? ""),
+      String(inputs.propertiesJson ?? "{}"),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -921,17 +369,29 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteUser.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    execInOutPins().error,
+  ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).deleteUser(String(inputs.userId ?? ""));
+    const result = await managerFor(resolved.data).deleteUser(
+      String(inputs.userId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -973,14 +433,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, groups: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listGroups(String(inputs.filter ?? ""), Number(inputs.top ?? 100));
+    const result = await managerFor(resolved.data).listGroups(
+      String(inputs.filter ?? ""),
+      Number(inputs.top ?? 100),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1041,14 +507,23 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, id: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).createGroup(String(inputs.displayName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.description ?? ""), Boolean(inputs.securityEnabled), Boolean(inputs.mailEnabled));
+    const result = await managerFor(resolved.data).createGroup(
+      String(inputs.displayName ?? ""),
+      String(inputs.mailNickname ?? ""),
+      String(inputs.description ?? ""),
+      Boolean(inputs.securityEnabled),
+      Boolean(inputs.mailEnabled),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1075,14 +550,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).deleteGroup(String(inputs.groupId ?? ""));
+    const result = await managerFor(resolved.data).deleteGroup(
+      String(inputs.groupId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1110,14 +590,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).addGroupMember(String(inputs.groupId ?? ""), String(inputs.userId ?? ""));
+    const result = await managerFor(resolved.data).addGroupMember(
+      String(inputs.groupId ?? ""),
+      String(inputs.userId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1175,7 +661,10 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
@@ -1232,14 +721,21 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, messages: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listMessages(String(inputs.userId ?? ""), Number(inputs.top ?? 25), String(inputs.filter ?? ""));
+    const result = await managerFor(resolved.data).listMessages(
+      String(inputs.userId ?? ""),
+      Number(inputs.top ?? 25),
+      String(inputs.filter ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1274,7 +770,10 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
@@ -1290,7 +789,10 @@ registerNode({
         },
       };
     }
-    const result = await managerFor(resolved.data).getMessage(String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
+    const result = await managerFor(resolved.data).getMessage(
+      String(inputs.userId ?? ""),
+      String(inputs.messageId ?? ""),
+    );
     return {
       nextExec: "exec-out",
       outputs: {
@@ -1330,14 +832,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).deleteMessage(String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
+    const result = await managerFor(resolved.data).deleteMessage(
+      String(inputs.userId ?? ""),
+      String(inputs.messageId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1373,14 +881,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, events: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listEvents(String(inputs.userId ?? ""), Number(inputs.top ?? 25));
+    const result = await managerFor(resolved.data).listEvents(
+      String(inputs.userId ?? ""),
+      Number(inputs.top ?? 25),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1450,7 +964,10 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
@@ -1493,14 +1010,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).deleteEvent(String(inputs.userId ?? ""), String(inputs.eventId ?? ""));
+    const result = await managerFor(resolved.data).deleteEvent(
+      String(inputs.userId ?? ""),
+      String(inputs.eventId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1536,14 +1059,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, items: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listDriveItems(String(inputs.userId ?? ""), String(inputs.folderPath ?? ""));
+    const result = await managerFor(resolved.data).listDriveItems(
+      String(inputs.userId ?? ""),
+      String(inputs.folderPath ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1585,14 +1114,21 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, content: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).downloadFile(String(inputs.userId ?? ""), String(inputs.filePath ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+    const result = await managerFor(resolved.data).downloadFile(
+      String(inputs.userId ?? ""),
+      String(inputs.filePath ?? ""),
+      inputs.encoding === "base64" ? "base64" : "utf8",
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1635,14 +1171,22 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).uploadFile(String(inputs.userId ?? ""), String(inputs.filePath ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+    const result = await managerFor(resolved.data).uploadFile(
+      String(inputs.userId ?? ""),
+      String(inputs.filePath ?? ""),
+      String(inputs.content ?? ""),
+      inputs.encoding === "base64" ? "base64" : "utf8",
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1670,14 +1214,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).deleteDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""));
+    const result = await managerFor(resolved.data).deleteDriveItem(
+      String(inputs.userId ?? ""),
+      String(inputs.path ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1706,14 +1256,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, teams: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listJoinedTeams(String(inputs.userId ?? ""));
+    const result = await managerFor(resolved.data).listJoinedTeams(
+      String(inputs.userId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1754,14 +1309,21 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).sendChannelMessage(String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), String(inputs.message ?? ""));
+    const result = await managerFor(resolved.data).sendChannelMessage(
+      String(inputs.teamId ?? ""),
+      String(inputs.channelId ?? ""),
+      String(inputs.message ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1815,7 +1377,10 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
@@ -1827,7 +1392,11 @@ registerNode({
         },
       };
     }
-    const result = await managerFor(resolved.data).rawRequest(String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.bodyJson ?? ""));
+    const result = await managerFor(resolved.data).rawRequest(
+      String(inputs.method ?? "GET"),
+      String(inputs.path ?? ""),
+      String(inputs.bodyJson ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1862,14 +1431,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, channels: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listChannels(String(inputs.teamId ?? ""));
+    const result = await managerFor(resolved.data).listChannels(
+      String(inputs.teamId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1916,14 +1490,21 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, id: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).createChannel(String(inputs.teamId ?? ""), String(inputs.displayName ?? ""), String(inputs.description ?? ""));
+    const result = await managerFor(resolved.data).createChannel(
+      String(inputs.teamId ?? ""),
+      String(inputs.displayName ?? ""),
+      String(inputs.description ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -1972,14 +1553,21 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, messages: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listChannelMessages(String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), Number(inputs.top ?? 25));
+    const result = await managerFor(resolved.data).listChannelMessages(
+      String(inputs.teamId ?? ""),
+      String(inputs.channelId ?? ""),
+      Number(inputs.top ?? 25),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2008,14 +1596,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, chats: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listChats(String(inputs.userId ?? ""));
+    const result = await managerFor(resolved.data).listChats(
+      String(inputs.userId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2049,14 +1642,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).sendChatMessage(String(inputs.chatId ?? ""), String(inputs.message ?? ""));
+    const result = await managerFor(resolved.data).sendChatMessage(
+      String(inputs.chatId ?? ""),
+      String(inputs.message ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2091,14 +1690,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, sites: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listSites(String(inputs.search ?? ""));
+    const result = await managerFor(resolved.data).listSites(
+      String(inputs.search ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2133,14 +1737,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, lists: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listSiteLists(String(inputs.siteId ?? ""));
+    const result = await managerFor(resolved.data).listSiteLists(
+      String(inputs.siteId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2182,14 +1791,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, items: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listListItems(String(inputs.siteId ?? ""), String(inputs.listId ?? ""));
+    const result = await managerFor(resolved.data).listListItems(
+      String(inputs.siteId ?? ""),
+      String(inputs.listId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2236,14 +1851,21 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, id: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).createListItem(String(inputs.siteId ?? ""), String(inputs.listId ?? ""), String(inputs.fieldsJson ?? "{}"));
+    const result = await managerFor(resolved.data).createListItem(
+      String(inputs.siteId ?? ""),
+      String(inputs.listId ?? ""),
+      String(inputs.fieldsJson ?? "{}"),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2284,14 +1906,21 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, id: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).createFolder(String(inputs.userId ?? ""), String(inputs.parentPath ?? ""), String(inputs.name ?? ""));
+    const result = await managerFor(resolved.data).createFolder(
+      String(inputs.userId ?? ""),
+      String(inputs.parentPath ?? ""),
+      String(inputs.name ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2326,14 +1955,21 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).moveDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""));
+    const result = await managerFor(resolved.data).moveDriveItem(
+      String(inputs.userId ?? ""),
+      String(inputs.path ?? ""),
+      String(inputs.destinationFolderPath ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2375,14 +2011,22 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).copyDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""), String(inputs.newName ?? ""));
+    const result = await managerFor(resolved.data).copyDriveItem(
+      String(inputs.userId ?? ""),
+      String(inputs.path ?? ""),
+      String(inputs.destinationFolderPath ?? ""),
+      String(inputs.newName ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2432,14 +2076,22 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, link: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).createSharingLink(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.type ?? "view"), String(inputs.scope ?? "organization"));
+    const result = await managerFor(resolved.data).createSharingLink(
+      String(inputs.userId ?? ""),
+      String(inputs.path ?? ""),
+      String(inputs.type ?? "view"),
+      String(inputs.scope ?? "organization"),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2475,14 +2127,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, items: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).searchDriveItems(String(inputs.userId ?? ""), String(inputs.query ?? ""));
+    const result = await managerFor(resolved.data).searchDriveItems(
+      String(inputs.userId ?? ""),
+      String(inputs.query ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2518,14 +2176,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, worksheets: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listWorksheets(String(inputs.userId ?? ""), String(inputs.path ?? ""));
+    const result = await managerFor(resolved.data).listWorksheets(
+      String(inputs.userId ?? ""),
+      String(inputs.path ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2573,14 +2237,22 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, valuesJson: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).getWorksheetRange(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""));
+    const result = await managerFor(resolved.data).getWorksheetRange(
+      String(inputs.userId ?? ""),
+      String(inputs.path ?? ""),
+      String(inputs.worksheetName ?? ""),
+      String(inputs.address ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2629,14 +2301,23 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).setWorksheetRange(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""), String(inputs.valuesJson ?? "[]"));
+    const result = await managerFor(resolved.data).setWorksheetRange(
+      String(inputs.userId ?? ""),
+      String(inputs.path ?? ""),
+      String(inputs.worksheetName ?? ""),
+      String(inputs.address ?? ""),
+      String(inputs.valuesJson ?? "[]"),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2672,14 +2353,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, tables: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listTables(String(inputs.userId ?? ""), String(inputs.path ?? ""));
+    const result = await managerFor(resolved.data).listTables(
+      String(inputs.userId ?? ""),
+      String(inputs.path ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2721,14 +2408,22 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).addTableRow(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.tableName ?? ""), String(inputs.valuesJson ?? "[]"));
+    const result = await managerFor(resolved.data).addTableRow(
+      String(inputs.userId ?? ""),
+      String(inputs.path ?? ""),
+      String(inputs.tableName ?? ""),
+      String(inputs.valuesJson ?? "[]"),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2763,14 +2458,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, plans: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listPlannerPlans(String(inputs.groupId ?? ""));
+    const result = await managerFor(resolved.data).listPlannerPlans(
+      String(inputs.groupId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2817,14 +2517,21 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, id: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).createPlannerTask(String(inputs.planId ?? ""), String(inputs.bucketId ?? ""), String(inputs.title ?? ""));
+    const result = await managerFor(resolved.data).createPlannerTask(
+      String(inputs.planId ?? ""),
+      String(inputs.bucketId ?? ""),
+      String(inputs.title ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2859,14 +2566,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, tasks: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listPlannerTasks(String(inputs.planId ?? ""));
+    const result = await managerFor(resolved.data).listPlannerTasks(
+      String(inputs.planId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2895,14 +2607,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, lists: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listTodoLists(String(inputs.userId ?? ""));
+    const result = await managerFor(resolved.data).listTodoLists(
+      String(inputs.userId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2943,14 +2660,21 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, id: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).createTodoTask(String(inputs.userId ?? ""), String(inputs.listId ?? ""), String(inputs.title ?? ""));
+    const result = await managerFor(resolved.data).createTodoTask(
+      String(inputs.userId ?? ""),
+      String(inputs.listId ?? ""),
+      String(inputs.title ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -2986,14 +2710,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, tasks: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listTodoTasks(String(inputs.userId ?? ""), String(inputs.listId ?? ""));
+    const result = await managerFor(resolved.data).listTodoTasks(
+      String(inputs.userId ?? ""),
+      String(inputs.listId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -3022,14 +2752,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, contacts: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listContacts(String(inputs.userId ?? ""));
+    const result = await managerFor(resolved.data).listContacts(
+      String(inputs.userId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -3070,14 +2805,21 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, id: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).createContact(String(inputs.userId ?? ""), String(inputs.displayName ?? ""), String(inputs.email ?? ""));
+    const result = await managerFor(resolved.data).createContact(
+      String(inputs.userId ?? ""),
+      String(inputs.displayName ?? ""),
+      String(inputs.email ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -3105,14 +2847,20 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).deleteContact(String(inputs.userId ?? ""), String(inputs.contactId ?? ""));
+    const result = await managerFor(resolved.data).deleteContact(
+      String(inputs.userId ?? ""),
+      String(inputs.contactId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -3147,14 +2895,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, applications: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listApplications(String(inputs.filter ?? ""));
+    const result = await managerFor(resolved.data).listApplications(
+      String(inputs.filter ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -3182,7 +2935,10 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
@@ -3217,14 +2973,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, skuIds: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listUserLicenses(String(inputs.userId ?? ""));
+    const result = await managerFor(resolved.data).listUserLicenses(
+      String(inputs.userId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -3261,7 +3022,8 @@ registerNode({
     },
     {
       id: "expirationDateTime",
-      label: i18n.nodes.microsoft365.createSubscription.pin_expiration_date_time,
+      label:
+        i18n.nodes.microsoft365.createSubscription.pin_expiration_date_time,
       type: "string",
       direction: "input",
       defaultValue: "",
@@ -3278,14 +3040,22 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, id: "", error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).createSubscription(String(inputs.resource ?? ""), String(inputs.changeType ?? "updated"), String(inputs.notificationUrl ?? ""), String(inputs.expirationDateTime ?? ""));
+    const result = await managerFor(resolved.data).createSubscription(
+      String(inputs.resource ?? ""),
+      String(inputs.changeType ?? "updated"),
+      String(inputs.notificationUrl ?? ""),
+      String(inputs.expirationDateTime ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -3312,14 +3082,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).deleteSubscription(String(inputs.subscriptionId ?? ""));
+    const result = await managerFor(resolved.data).deleteSubscription(
+      String(inputs.subscriptionId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -3348,14 +3123,19 @@ registerNode({
   ] as never,
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    const resolved = resolveGraphCredential(
+      ctx,
+      String(inputs.credentialName ?? ""),
+    );
     if (!resolved.ok) {
       return {
         nextExec: "exec-out",
         outputs: { success: false, documents: [], error: resolved.error },
       };
     }
-    const result = await managerFor(resolved.data).listTrendingDocuments(String(inputs.userId ?? ""));
+    const result = await managerFor(resolved.data).listTrendingDocuments(
+      String(inputs.userId ?? ""),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
 });

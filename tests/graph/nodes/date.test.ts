@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/nodes/index";
-import { getNodeDef } from "../../src/engine/registry";
-import { NodeInstance } from "../../src/engine/nodeInstance";
+import { registerBuiltins } from "../../../src/graph/nodes/index";
+import { getNodeDef } from "../../../src/engine/registry";
+import { NodeInstance } from "../../../src/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -49,7 +49,9 @@ describe("date.now", () => {
 
 describe("date.fromString / date.fromNumber", () => {
   it("parses an ISO string into a Date", () => {
-    const { result } = evaluate("date.fromString", { value: "2020-01-01T00:00:00.000Z" }) as {
+    const { result } = evaluate("date.fromString", {
+      value: "2020-01-01T00:00:00.000Z",
+    }) as {
       result: Date;
     };
     expect(result).toBeInstanceOf(Date);
@@ -57,29 +59,42 @@ describe("date.fromString / date.fromNumber", () => {
   });
 
   it("converts epoch milliseconds into a Date", () => {
-    const { result } = evaluate("date.fromNumber", { value: ONE_DAY_MS }) as { result: Date };
+    const { result } = evaluate("date.fromNumber", { value: ONE_DAY_MS }) as {
+      result: Date;
+    };
     expect(result).toBeInstanceOf(Date);
     expect(result.getTime()).toBe(ONE_DAY_MS);
   });
 
   it("compileEvaluate produces expressions that evaluate to the same result", () => {
-    expect(eval(compile("date.fromString", { value: '"2020-01-02T00:00:00.000Z"' }).result).getTime()).toBe(
-      LATER.getTime(),
-    );
-    expect(eval(compile("date.fromNumber", { value: "0" }).result).getTime()).toBe(0);
+    expect(
+      eval(
+        compile("date.fromString", { value: '"2020-01-02T00:00:00.000Z"' })
+          .result,
+      ).getTime(),
+    ).toBe(LATER.getTime());
+    expect(
+      eval(compile("date.fromNumber", { value: "0" }).result).getTime(),
+    ).toBe(0);
   });
 });
 
 describe("date.subtract", () => {
   it("returns the millisecond difference between two dates", () => {
-    expect(evaluate("date.subtract", { a: LATER, b: EARLIER })).toEqual({ result: ONE_DAY_MS });
-  });
-
-  it("treats an unconnected (null, or an unset datetime-local widget's \"\") input as the epoch", () => {
-    expect(evaluate("date.subtract", { a: new Date(ONE_DAY_MS), b: null })).toEqual({
+    expect(evaluate("date.subtract", { a: LATER, b: EARLIER })).toEqual({
       result: ONE_DAY_MS,
     });
-    expect(evaluate("date.subtract", { a: new Date(ONE_DAY_MS), b: "" })).toEqual({
+  });
+
+  it('treats an unconnected (null, or an unset datetime-local widget\'s "") input as the epoch', () => {
+    expect(
+      evaluate("date.subtract", { a: new Date(ONE_DAY_MS), b: null }),
+    ).toEqual({
+      result: ONE_DAY_MS,
+    });
+    expect(
+      evaluate("date.subtract", { a: new Date(ONE_DAY_MS), b: "" }),
+    ).toEqual({
       result: ONE_DAY_MS,
     });
   });
@@ -113,8 +128,12 @@ describe("date comparisons", () => {
 
   for (const [type, laterVsEarlier, equalVsEqual] of cases) {
     it(`${type} evaluates A(later) vs B(earlier) and A(equal) vs B(equal)`, () => {
-      expect(evaluate(type, { a: LATER, b: EARLIER })).toEqual({ result: laterVsEarlier });
-      expect(evaluate(type, { a: EARLIER, b: new Date(EARLIER.getTime()) })).toEqual({
+      expect(evaluate(type, { a: LATER, b: EARLIER })).toEqual({
+        result: laterVsEarlier,
+      });
+      expect(
+        evaluate(type, { a: EARLIER, b: new Date(EARLIER.getTime()) }),
+      ).toEqual({
         result: equalVsEqual,
       });
     });
@@ -137,7 +156,9 @@ describe("string.fromDate", () => {
   });
 
   it("compileEvaluate matches evaluate", () => {
-    const expr = compile("string.fromDate", { value: `new Date(${EARLIER.getTime()})` }).result;
+    const expr = compile("string.fromDate", {
+      value: `new Date(${EARLIER.getTime()})`,
+    }).result;
     expect(eval(expr)).toBe("2020-01-01T00:00:00.000Z");
   });
 });

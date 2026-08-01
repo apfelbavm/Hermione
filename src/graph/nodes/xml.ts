@@ -1,6 +1,15 @@
-import { registerNode } from "../engine/registry";
+import { registerNode } from "../../engine/registry";
 import { i18n } from "@i18n";
-import { XML_BUILDER_IMPORT_LINE, XML_BUILD_OPTIONS_LITERAL, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, extractTabularRows, jsonValueToXml, objectsToCsv, xmlToJsonValue } from "./dataFormatHelpers";
+import {
+  XML_BUILDER_IMPORT_LINE,
+  XML_BUILD_OPTIONS_LITERAL,
+  XML_IMPORT_LINE,
+  XML_PARSE_OPTIONS_LITERAL,
+  extractTabularRows,
+  jsonValueToXml,
+  objectsToCsv,
+  xmlToJsonValue,
+} from "./dataFormatHelpers";
 
 registerNode({
   type: "xml.toJson",
@@ -79,7 +88,9 @@ registerNode({
     }
   },
   compileEvaluate: ({ inputs }) => {
-    const attempt = `(() => { try { return { xml: new XMLBuilder(${XML_BUILD_OPTIONS_LITERAL}).build(${inputs.json}), success: true }; } ` + `catch { return { xml: "", success: false }; } })()`;
+    const attempt =
+      `(() => { try { return { xml: new XMLBuilder(${XML_BUILD_OPTIONS_LITERAL}).build(${inputs.json}), success: true }; } ` +
+      `catch { return { xml: "", success: false }; } })()`;
     return { xml: `${attempt}.xml`, success: `${attempt}.success` };
   },
   compileImports: [XML_BUILDER_IMPORT_LINE],

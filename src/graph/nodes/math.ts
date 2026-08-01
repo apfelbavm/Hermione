@@ -1,5 +1,5 @@
-import { NodeColorCategory } from "../engine/types";
-import { registerNode } from "../engine/registry";
+import { NodeColorCategory } from "../../engine/types";
+import { registerNode } from "../../engine/registry";
 import { i18n } from "@i18n";
 
 const GROUP_ARITHMETIC = i18n.nodes.math.group_arithmetic;
@@ -473,7 +473,10 @@ registerNode({
     },
   ],
   evaluate: ({ inputs }) => ({
-    result: Math.min(Math.max(Number(inputs.value ?? 0), Number(inputs.min ?? 0)), Number(inputs.max ?? 0)),
+    result: Math.min(
+      Math.max(Number(inputs.value ?? 0), Number(inputs.min ?? 0)),
+      Number(inputs.max ?? 0),
+    ),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `Math.min(Math.max(Number(${inputs.value}), Number(${inputs.min})), Number(${inputs.max}))`,

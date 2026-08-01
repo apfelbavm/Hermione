@@ -1,8 +1,12 @@
-import { registerNode } from "../engine/registry";
-import { NodeColorCategory } from "../engine/types";
-import type { PinDef } from "../engine/types";
-import { NodeInstance } from "../engine/nodeInstance";
-import { allStructTypeDefs, defaultStructValue, tryGetStructTypeDef } from "../engine/structRegistry";
+import { registerNode } from "../../engine/registry";
+import { NodeColorCategory } from "../../engine/types";
+import type { PinDef } from "../../engine/types";
+import { NodeInstance } from "../../engine/nodeInstance";
+import {
+  allStructTypeDefs,
+  defaultStructValue,
+  tryGetStructTypeDef,
+} from "../../engine/structRegistry";
 import { i18n } from "@i18n";
 
 const GROUP = i18n.nodes.struct.group;
@@ -20,7 +24,10 @@ function fieldPins(subType: string, direction: "input" | "output"): PinDef[] {
   }));
 }
 
-function structValuePin(subType: string, direction: "input" | "output"): PinDef {
+function structValuePin(
+  subType: string,
+  direction: "input" | "output",
+): PinDef {
   const def = tryGetStructTypeDef(subType);
   return {
     id: VALUE_PIN_ID,
@@ -28,7 +35,8 @@ function structValuePin(subType: string, direction: "input" | "output"): PinDef 
     type: "struct",
     subType,
     direction,
-    defaultValue: direction === "input" ? (def ? defaultStructValue(def) : {}) : undefined,
+    defaultValue:
+      direction === "input" ? (def ? defaultStructValue(def) : {}) : undefined,
   };
 }
 
@@ -48,14 +56,18 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableSubType: { kind: "struct" },
-  pins: [...fieldPins(FALLBACK_SUBTYPE, "input"), structValuePin(FALLBACK_SUBTYPE, "output")],
+  pins: [
+    ...fieldPins(FALLBACK_SUBTYPE, "input"),
+    structValuePin(FALLBACK_SUBTYPE, "output"),
+  ],
   deriveInstancePins: (node) => {
     const subType = subTypeOf(node);
     return [...fieldPins(subType, "input"), structValuePin(subType, "output")];
   },
   evaluate: ({ node, inputs }) => {
     const value: Record<string, unknown> = {};
-    for (const field of tryGetStructTypeDef(subTypeOf(node))?.fields ?? []) value[field.id] = inputs[field.id];
+    for (const field of tryGetStructTypeDef(subTypeOf(node))?.fields ?? [])
+      value[field.id] = inputs[field.id];
     return { [VALUE_PIN_ID]: value };
   },
 });
@@ -67,15 +79,20 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableSubType: { kind: "struct" },
-  pins: [structValuePin(FALLBACK_SUBTYPE, "input"), ...fieldPins(FALLBACK_SUBTYPE, "output")],
+  pins: [
+    structValuePin(FALLBACK_SUBTYPE, "input"),
+    ...fieldPins(FALLBACK_SUBTYPE, "output"),
+  ],
   deriveInstancePins: (node) => {
     const subType = subTypeOf(node);
     return [structValuePin(subType, "input"), ...fieldPins(subType, "output")];
   },
   evaluate: ({ node, inputs }) => {
-    const struct = (inputs[VALUE_PIN_ID] as Record<string, unknown> | undefined) ?? {};
+    const struct =
+      (inputs[VALUE_PIN_ID] as Record<string, unknown> | undefined) ?? {};
     const result: Record<string, unknown> = {};
-    for (const field of tryGetStructTypeDef(subTypeOf(node))?.fields ?? []) result[field.id] = struct[field.id];
+    for (const field of tryGetStructTypeDef(subTypeOf(node))?.fields ?? [])
+      result[field.id] = struct[field.id];
     return result;
   },
 });

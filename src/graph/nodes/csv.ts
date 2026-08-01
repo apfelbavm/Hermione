@@ -1,5 +1,10 @@
-import { registerNode } from "../engine/registry";
-import { csvToObjects, extractTabularRows, jsonValueToXml, objectsToCsv } from "./dataFormatHelpers";
+import { registerNode } from "../../engine/registry";
+import {
+  csvToObjects,
+  extractTabularRows,
+  jsonValueToXml,
+  objectsToCsv,
+} from "./dataFormatHelpers";
 import { i18n } from "@i18n";
 
 registerNode({
@@ -54,7 +59,10 @@ registerNode({
   latent: true,
   execute: async ({ inputs }) => {
     try {
-      const rows = await csvToObjects(String(inputs.csv ?? ""), String(inputs.delimiter ?? ","));
+      const rows = await csvToObjects(
+        String(inputs.csv ?? ""),
+        String(inputs.delimiter ?? ","),
+      );
       const rootTag = String(inputs.rootTag ?? "").trim() || "rows";
       const rowTag = String(inputs.rowTag ?? "").trim() || "row";
       return {
@@ -121,7 +129,13 @@ registerNode({
   group: "Conversion",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "csv", label: i18n.nodes.__shared.pin_csv, type: "string", direction: "input", defaultValue: "" },
+    {
+      id: "csv",
+      label: i18n.nodes.__shared.pin_csv,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
     {
       id: "delimiter",
       label: i18n.nodes.__shared.pin_delimiter,
@@ -160,7 +174,10 @@ registerNode({
   latent: true,
   execute: async ({ inputs }) => {
     try {
-      const rows = await csvToObjects(String(inputs.csv ?? ""), String(inputs.delimiter ?? ","));
+      const rows = await csvToObjects(
+        String(inputs.csv ?? ""),
+        String(inputs.delimiter ?? ","),
+      );
       const rootTag = String(inputs.rootTag ?? "").trim() || "rows";
       const rowTag = String(inputs.rowTag ?? "").trim() || "row";
       return {

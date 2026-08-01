@@ -1,10 +1,10 @@
-import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
-import { registerNode } from "../engine/registry";
-import { connectionsFrom } from "../engine/graphQueries";
-import { runExecFrom } from "../engine/executor";
-import { NodeColorCategory } from "../engine/types";
-import type { PinDef, PinType } from "../engine/types";
-import { NodeInstance } from "../engine/nodeInstance";
+import { DEFAULT_VALUE_BY_TYPE } from "../../engine/graphMutations";
+import { registerNode } from "../../engine/registry";
+import { connectionsFrom } from "../../engine/graphQueries";
+import { runExecFrom } from "../../engine/executor";
+import { NodeColorCategory } from "../../engine/types";
+import type { PinDef, PinType } from "../../engine/types";
+import { NodeInstance } from "../../engine/nodeInstance";
 import { i18n } from "@i18n";
 
 const GROUP = i18n.nodes.set.group;
@@ -42,7 +42,11 @@ function compileDedupe(expr: string): string {
   return `(() => { const seen = new Set(); const out = []; for (const v of (${expr})) { const k = JSON.stringify(v); if (!seen.has(k)) { seen.add(k); out.push(v); } } return out; })()`;
 }
 
-function setPin(elementType: PinType, id = "set", label = i18n.nodes.set.pin_set_in): PinDef {
+function setPin(
+  elementType: PinType,
+  id = "set",
+  label = i18n.nodes.set.pin_set_in,
+): PinDef {
   return {
     id,
     label,
@@ -53,7 +57,10 @@ function setPin(elementType: PinType, id = "set", label = i18n.nodes.set.pin_set
   };
 }
 
-function setOutPin(elementType: PinType, label = i18n.nodes.set.pin_result): PinDef {
+function setOutPin(
+  elementType: PinType,
+  label = i18n.nodes.set.pin_result,
+): PinDef {
   return {
     id: "result",
     label,
@@ -115,7 +122,10 @@ registerNode({
     },
     setOutPin("number"),
   ],
-  deriveInstancePins: (node) => [...makeSetEntryPins(node), setOutPin(elementTypeOf(node))],
+  deriveInstancePins: (node) => [
+    ...makeSetEntryPins(node),
+    setOutPin(elementTypeOf(node)),
+  ],
   addInstancePinEntry: (node) => {
     const suffixes = makeSetEntryIds(node).map(entrySuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -200,7 +210,9 @@ registerNode({
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.set);
-    const exists = arr.some((v) => JSON.stringify(v) === JSON.stringify(inputs.item));
+    const exists = arr.some(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    );
     return {
       result: exists ? arr.slice() : [...arr, inputs.item],
       added: !exists,
@@ -249,9 +261,13 @@ registerNode({
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.set);
-    const index = arr.findIndex((v) => JSON.stringify(v) === JSON.stringify(inputs.item));
+    const index = arr.findIndex(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    );
     const removed = index !== -1;
-    const result = removed ? [...arr.slice(0, index), ...arr.slice(index + 1)] : arr.slice();
+    const result = removed
+      ? [...arr.slice(0, index), ...arr.slice(index + 1)]
+      : arr.slice();
     return { result, removed };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -307,7 +323,9 @@ registerNode({
     ];
   },
   evaluate: ({ inputs }) => ({
-    contains: asArray(inputs.set).some((v) => JSON.stringify(v) === JSON.stringify(inputs.item)),
+    contains: asArray(inputs.set).some(
+      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
+    ),
   }),
   compileEvaluate: ({ inputs }) => ({
     contains: `(${compileAsArray(inputs.set)}).some((v) => ${jsonEq("v", inputs.item)})`,
@@ -388,16 +406,26 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [{ ...setPin("number"), id: "a", label: i18n.nodes.set.union.pin_set_a }, { ...setPin("number"), id: "b", label: i18n.nodes.set.union.pin_set_b }, setOutPin("number")],
+  pins: [
+    { ...setPin("number"), id: "a", label: i18n.nodes.set.union.pin_set_a },
+    { ...setPin("number"), id: "b", label: i18n.nodes.set.union.pin_set_b },
+    setOutPin("number"),
+  ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: i18n.nodes.set.union.pin_set_a }, { ...setPin(t), id: "b", label: i18n.nodes.set.union.pin_set_b }, setOutPin(t)];
+    return [
+      { ...setPin(t), id: "a", label: i18n.nodes.set.union.pin_set_a },
+      { ...setPin(t), id: "b", label: i18n.nodes.set.union.pin_set_b },
+      setOutPin(t),
+    ];
   },
   evaluate: ({ inputs }) => ({
     result: dedupe([...asArray(inputs.a), ...asArray(inputs.b)]),
   }),
   compileEvaluate: ({ inputs }) => ({
-    result: compileDedupe(`[...${compileAsArray(inputs.a)}, ...${compileAsArray(inputs.b)}]`),
+    result: compileDedupe(
+      `[...${compileAsArray(inputs.a)}, ...${compileAsArray(inputs.b)}]`,
+    ),
   }),
 });
 
@@ -423,13 +451,19 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: i18n.nodes.set.intersection.pin_set_a }, { ...setPin(t), id: "b", label: i18n.nodes.set.intersection.pin_set_b }, setOutPin(t)];
+    return [
+      { ...setPin(t), id: "a", label: i18n.nodes.set.intersection.pin_set_a },
+      { ...setPin(t), id: "b", label: i18n.nodes.set.intersection.pin_set_b },
+      setOutPin(t),
+    ];
   },
   evaluate: ({ inputs }) => {
     const a = asArray(inputs.a);
     const b = asArray(inputs.b);
     return {
-      result: a.filter((v) => b.some((bv) => JSON.stringify(bv) === JSON.stringify(v))),
+      result: a.filter((v) =>
+        b.some((bv) => JSON.stringify(bv) === JSON.stringify(v)),
+      ),
     };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -459,13 +493,19 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: i18n.nodes.set.difference.pin_set_a }, { ...setPin(t), id: "b", label: i18n.nodes.set.difference.pin_set_b }, setOutPin(t)];
+    return [
+      { ...setPin(t), id: "a", label: i18n.nodes.set.difference.pin_set_a },
+      { ...setPin(t), id: "b", label: i18n.nodes.set.difference.pin_set_b },
+      setOutPin(t),
+    ];
   },
   evaluate: ({ inputs }) => {
     const a = asArray(inputs.a);
     const b = asArray(inputs.b);
     return {
-      result: a.filter((v) => !b.some((bv) => JSON.stringify(bv) === JSON.stringify(v))),
+      result: a.filter(
+        (v) => !b.some((bv) => JSON.stringify(bv) === JSON.stringify(v)),
+      ),
     };
   },
   compileEvaluate: ({ inputs }) => ({
@@ -549,7 +589,9 @@ registerNode({
   execute: async ({ node, inputs, ctx }) => {
     const arr = asArray(inputs.set);
     if (arr.length > MAX_SET_FOR_EACH_ITERATIONS) {
-      throw new Error(`Set For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_SET_FOR_EACH_ITERATIONS} limit.`);
+      throw new Error(
+        `Set For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_SET_FOR_EACH_ITERATIONS} limit.`,
+      );
     }
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
     for (let i = 0; i < arr.length; i++) {

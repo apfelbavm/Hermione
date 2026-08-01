@@ -1,17 +1,24 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/nodes/index";
-import { createExecutionContext, runExecFrom } from "../../src/engine/executor";
-import { connectPins } from "../../src/engine/graphMutations";
-import { getNodeDef } from "../../src/engine/registry";
-import { Graph } from "../../src/engine/graph";
-import { NodeInstance } from "../../src/engine/nodeInstance";
-
+import { registerBuiltins } from "../../../src/graph/nodes/index";
+import {
+  createExecutionContext,
+  runExecFrom,
+} from "../../../src/engine/executor";
+import { connectPins } from "../../../src/engine/graphMutations";
+import { getNodeDef } from "../../../src/engine/registry";
+import { Graph } from "../../../src/engine/graph";
+import { NodeInstance } from "../../../src/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
 });
 
-function addBuiltinNode(graph: Graph, type: string, id: string, position = { x: 0, y: 0 }) {
+function addBuiltinNode(
+  graph: Graph,
+  type: string,
+  id: string,
+  position = { x: 0, y: 0 },
+) {
   const def = getNodeDef(type);
   const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
@@ -27,7 +34,12 @@ describe("core.reroute (data)", () => {
 
   it("deriveInstancePins reflects the instance's own elementType/container/mapKeyType", () => {
     const def = getNodeDef("core.reroute");
-    const node = NodeInstance.createNodeInstance("core.reroute", { x: 0, y: 0 }, def.pins, "r1");
+    const node = NodeInstance.createNodeInstance(
+      "core.reroute",
+      { x: 0, y: 0 },
+      def.pins,
+      "r1",
+    );
     node.elementType = "string";
     node.container = "array";
     const pins = def.deriveInstancePins!(node);
@@ -41,8 +53,16 @@ describe("core.reroute (data)", () => {
 
   it("evaluate/compileEvaluate pass the input straight through unchanged", () => {
     const def = getNodeDef("core.reroute");
-    expect(def.evaluate!({ node: {} as any, inputs: { in: 42 }, ctx: {} as any })).toEqual({ out: 42 });
-    expect(def.compileEvaluate!({ node: {} as any, inputs: { in: "x" }, graph: {} as any })).toEqual({ out: "x" });
+    expect(
+      def.evaluate!({ node: {} as any, inputs: { in: 42 }, ctx: {} as any }),
+    ).toEqual({ out: 42 });
+    expect(
+      def.compileEvaluate!({
+        node: {} as any,
+        inputs: { in: "x" },
+        graph: {} as any,
+      }),
+    ).toEqual({ out: "x" });
   });
 
   it("passes a real value through end to end via math.add -> string.fromNumber -> reroute -> debug.print", async () => {
@@ -56,10 +76,30 @@ describe("core.reroute (data)", () => {
     reroute.elementType = "string";
     addBuiltinNode(graph, "debug.print", "print");
 
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "start", fromPin: "exec-out", toNode: "print", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "add", fromPin: "result", toNode: "toStr", toPin: "value" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "toStr", fromPin: "result", toNode: "reroute", toPin: "in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "reroute", fromPin: "out", toNode: "print", toPin: "message" });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "start",
+      fromPin: "exec-out",
+      toNode: "print",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "add",
+      fromPin: "result",
+      toNode: "toStr",
+      toPin: "value",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "toStr",
+      fromPin: "result",
+      toNode: "reroute",
+      toPin: "in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "reroute",
+      fromPin: "out",
+      toNode: "print",
+      toPin: "message",
+    });
 
     const logs: string[] = [];
     const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });
@@ -78,7 +118,9 @@ describe("core.rerouteExec", () => {
 
   it("execute() always continues to exec-out", () => {
     const def = getNodeDef("core.rerouteExec");
-    expect(def.execute!({ node: {} as any, inputs: {}, ctx: {} as any })).toEqual({ nextExec: "exec-out" });
+    expect(
+      def.execute!({ node: {} as any, inputs: {}, ctx: {} as any }),
+    ).toEqual({ nextExec: "exec-out" });
   });
 
   it("runs a real exec chain through unchanged: On Run -> reroute -> Print", async () => {
@@ -88,8 +130,18 @@ describe("core.rerouteExec", () => {
     const print = addBuiltinNode(graph, "debug.print", "print");
     print.pins.message.value = "through";
 
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "start", fromPin: "exec-out", toNode: "reroute", toPin: "exec-in" });
-    connectPins(graph, graph.variables, graph.functions, { fromNode: "reroute", fromPin: "exec-out", toNode: "print", toPin: "exec-in" });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "start",
+      fromPin: "exec-out",
+      toNode: "reroute",
+      toPin: "exec-in",
+    });
+    connectPins(graph, graph.variables, graph.functions, {
+      fromNode: "reroute",
+      fromPin: "exec-out",
+      toNode: "print",
+      toPin: "exec-in",
+    });
 
     const logs: string[] = [];
     const ctx = createExecutionContext(graph, { log: (m) => logs.push(m) });

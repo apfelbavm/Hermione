@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { registerBuiltins } from "../../src/nodes";
+import { registerBuiltins } from "../../src/graph/nodes";
 import { getNodeDef } from "../../src/engine/registry";
 import { Graph } from "../../src/engine/graph";
 import { NodeInstance } from "../../src/engine/nodeInstance";

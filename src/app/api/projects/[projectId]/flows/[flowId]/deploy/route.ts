@@ -1,4 +1,4 @@
-import { registerBuiltins } from "../../../../../../../nodes";
+import { registerBuiltins } from "../../../../../../../graph/nodes";
 import { compileGraph } from "../../../../../../../compiler/codegen";
 import { deserializeGraph } from "../../../../../../../persistence/load";
 import { getDatabaseManager } from "../../../../../../../server/DatabaseManager";

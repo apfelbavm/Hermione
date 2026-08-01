@@ -1,13 +1,17 @@
-import { NodeInstance } from "../engine/nodeInstance";
-import { registerNode } from "../engine/registry";
-import type { PinDef, PinType } from "../engine/types";
+import { NodeInstance } from "../../engine/nodeInstance";
+import { registerNode } from "../../engine/registry";
+import type { PinDef, PinType } from "../../engine/types";
 import { i18n } from "@i18n";
 
 function rerouteElementType(node: NodeInstance): PinType {
   return node.elementType ?? "object";
 }
 
-function reroutePinDef(node: NodeInstance, id: string, direction: "input" | "output"): PinDef {
+function reroutePinDef(
+  node: NodeInstance,
+  id: string,
+  direction: "input" | "output",
+): PinDef {
   return {
     id,
     label: "",
@@ -28,7 +32,10 @@ registerNode({
     { id: "in", label: "", type: "object", direction: "input" },
     { id: "out", label: "", type: "object", direction: "output" },
   ],
-  deriveInstancePins: (node) => [reroutePinDef(node, "in", "input"), reroutePinDef(node, "out", "output")],
+  deriveInstancePins: (node) => [
+    reroutePinDef(node, "in", "input"),
+    reroutePinDef(node, "out", "output"),
+  ],
   evaluate: ({ inputs }) => ({ out: inputs.in }),
   compileEvaluate: ({ inputs }) => ({ out: inputs.in }),
 });

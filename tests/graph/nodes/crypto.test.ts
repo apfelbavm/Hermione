@@ -1,20 +1,32 @@
 import forge from "node-forge";
 import * as openpgp from "openpgp";
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/nodes/index";
-import { createExecutionContext, runExecFrom } from "../../src/engine/executor";
-import { getNodeDef } from "../../src/engine/registry";
-import { Graph } from "../../src/engine/graph";
-import { NodeInstance } from "../../src/engine/nodeInstance";
+import { registerBuiltins } from "../../../src/graph/nodes/index";
+import {
+  createExecutionContext,
+  runExecFrom,
+} from "../../../src/engine/executor";
+import { getNodeDef } from "../../../src/engine/registry";
+import { Graph } from "../../../src/engine/graph";
+import { NodeInstance } from "../../../src/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
 });
 
-function buildGraph(type: string, id: string, pinValues: Record<string, unknown>) {
+function buildGraph(
+  type: string,
+  id: string,
+  pinValues: Record<string, unknown>,
+) {
   const graph = new Graph("g", "test");
   const def = getNodeDef(type);
-  const node = NodeInstance.createNodeInstance(type, { x: 0, y: 0 }, def.pins, id);
+  const node = NodeInstance.createNodeInstance(
+    type,
+    { x: 0, y: 0 },
+    def.pins,
+    id,
+  );
   for (const [pinId, value] of Object.entries(pinValues)) {
     node.pins[pinId].value = value;
   }
@@ -22,7 +34,11 @@ function buildGraph(type: string, id: string, pinValues: Record<string, unknown>
   return graph;
 }
 
-async function runNode(type: string, id: string, pinValues: Record<string, unknown>) {
+async function runNode(
+  type: string,
+  id: string,
+  pinValues: Record<string, unknown>,
+) {
   const graph = buildGraph(type, id, pinValues);
   const ctx = createExecutionContext(graph, { log: () => {} });
   await runExecFrom(id, "exec-in", ctx);
@@ -75,7 +91,9 @@ describe("crypto.pgpEncrypt / crypto.pgpDecrypt", () => {
   });
 
   it("round-trips through a passphrase-protected private key", async () => {
-    const protectedPublic = await openpgp.readPrivateKey({ armoredKey: protectedPrivateKeyArmored });
+    const protectedPublic = await openpgp.readPrivateKey({
+      armoredKey: protectedPrivateKeyArmored,
+    });
     const encOutputs = await runNode("crypto.pgpEncrypt", "enc2", {
       plaintext: "guarded message",
       publicKeyArmored: protectedPublic.toPublic().armor(),
@@ -104,7 +122,11 @@ describe("crypto.pgpEncrypt / crypto.pgpDecrypt", () => {
   it("reports success:false when decrypting with the wrong passphrase", async () => {
     const encOutputs = await runNode("crypto.pgpEncrypt", "enc3", {
       plaintext: "secret",
-      publicKeyArmored: (await openpgp.readPrivateKey({ armoredKey: protectedPrivateKeyArmored })).toPublic().armor(),
+      publicKeyArmored: (
+        await openpgp.readPrivateKey({ armoredKey: protectedPrivateKeyArmored })
+      )
+        .toPublic()
+        .armor(),
     });
 
     const decOutputs = await runNode("crypto.pgpDecrypt", "dec3", {
@@ -127,7 +149,9 @@ describe("crypto.pgpEncrypt / crypto.pgpDecrypt", () => {
     expect(outputs.get("enc4:success")).toBe(true);
     // Auto mode never passes a config object at all, so openpgp's own default (showVersion: false)
     // applies regardless of what the (unused) showVersion/versionString pins are set to.
-    expect(outputs.get("enc4:encryptedArmored") as string).not.toContain("should-be-ignored");
+    expect(outputs.get("enc4:encryptedArmored") as string).not.toContain(
+      "should-be-ignored",
+    );
   });
 
   it("applies the explicit tuning pins end-to-end when autoDetectSettings is false", async () => {
@@ -160,7 +184,10 @@ describe("crypto.pgpEncrypt / crypto.pgpDecrypt", () => {
   });
 
   it("still round-trips correctly when decrypt's own autoDetectSettings is turned off with matching (permissive) values", async () => {
-    const encOutputs = await runNode("crypto.pgpEncrypt", "enc6", { plaintext: "explicit decrypt config", publicKeyArmored });
+    const encOutputs = await runNode("crypto.pgpEncrypt", "enc6", {
+      plaintext: "explicit decrypt config",
+      publicKeyArmored,
+    });
     const decOutputs = await runNode("crypto.pgpDecrypt", "dec6", {
       encryptedArmored: encOutputs.get("enc6:encryptedArmored"),
       privateKeyArmored,
@@ -193,7 +220,9 @@ describe("crypto.pkcs7Encrypt / crypto.pkcs7Decrypt", () => {
 
     certPem = forge.pki.certificateToPem(cert);
     privateKeyPem = forge.pki.privateKeyToPem(keys.privateKey);
-    otherPrivateKeyPem = forge.pki.privateKeyToPem(forge.pki.rsa.generateKeyPair({ bits: 2048 }).privateKey);
+    otherPrivateKeyPem = forge.pki.privateKeyToPem(
+      forge.pki.rsa.generateKeyPair({ bits: 2048 }).privateKey,
+    );
   });
 
   it("round-trips plaintext through a real self-signed certificate/private key pair", async () => {
@@ -259,8 +288,12 @@ describe("crypto.pkcs7Encrypt / crypto.pkcs7Decrypt", () => {
     // The actual content-encryption cipher lives on the message's own top-level encryptedContent
     // (not each recipient's own encryptedContent, which is the RSA key-transport algorithm instead)
     // — @types/node-forge doesn't declare this field at all, hence the `as any`.
-    const parsed = forge.pkcs7.messageFromPem(outputs.get("pauto:envelopedDataPem") as string) as any;
-    expect(parsed.encryptedContent.algorithm).toBe(forge.pki.oids["aes256-CBC"]);
+    const parsed = forge.pkcs7.messageFromPem(
+      outputs.get("pauto:envelopedDataPem") as string,
+    ) as any;
+    expect(parsed.encryptedContent.algorithm).toBe(
+      forge.pki.oids["aes256-CBC"],
+    );
   });
 
   it("applies the explicit cipherAlgorithm pin end-to-end when autoDetectSettings is false, and still decrypts correctly", async () => {
@@ -276,15 +309,22 @@ describe("crypto.pkcs7Encrypt / crypto.pkcs7Decrypt", () => {
         cipherAlgorithm: option,
       });
       expect(encOutputs.get(`${id}:success`)).toBe(true);
-      const envelopedDataPem = encOutputs.get(`${id}:envelopedDataPem`) as string;
+      const envelopedDataPem = encOutputs.get(
+        `${id}:envelopedDataPem`,
+      ) as string;
 
       const parsed = forge.pkcs7.messageFromPem(envelopedDataPem) as any;
       expect(parsed.encryptedContent.algorithm).toBe(forge.pki.oids[oidName]);
 
       const decId = `pdec-${option}`;
-      const decOutputs = await runNode("crypto.pkcs7Decrypt", decId, { envelopedDataPem, privateKeyPem });
+      const decOutputs = await runNode("crypto.pkcs7Decrypt", decId, {
+        envelopedDataPem,
+        privateKeyPem,
+      });
       expect(decOutputs.get(`${decId}:success`)).toBe(true);
-      expect(decOutputs.get(`${decId}:plaintext`)).toBe(`encrypted with ${option}`);
+      expect(decOutputs.get(`${decId}:plaintext`)).toBe(
+        `encrypted with ${option}`,
+      );
     }
   });
 });

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { StaticImageData } from "next/image";
 import { i18n } from "@i18n";
-import { registerBuiltins } from "../nodes";
+import { registerBuiltins } from "../graph/nodes";
 import { buildDemoGraph } from "../templates/demoGraph";
 import { buildDropboxTemplateGraph } from "../templates/dropboxTemplateGraph";
 import { Graph } from "../engine/graph";

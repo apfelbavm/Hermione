@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/nodes";
+import { registerBuiltins } from "../../src/graph/nodes";
 import { connectPins } from "../../src/engine/graphMutations";
 import { getNodeDef } from "../../src/engine/registry";
 import { compileGraph } from "../../src/compiler/codegen";

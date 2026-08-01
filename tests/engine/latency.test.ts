@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/nodes";
+import { registerBuiltins } from "../../src/graph/nodes";
 import { connectPins, createFunctionDef } from "../../src/engine/graphMutations";
 import { isFunctionLatent, isNodeLatent } from "../../src/engine/latency";
 import { getNodeDef } from "../../src/engine/registry";

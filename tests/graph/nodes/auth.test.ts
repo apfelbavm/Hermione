@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/nodes/index";
-import { getNodeDef } from "../../src/engine/registry";
+import { registerBuiltins } from "../../../src/graph/nodes/index";
+import { getNodeDef } from "../../../src/engine/registry";
 
 beforeAll(() => {
   registerBuiltins();
@@ -23,13 +23,19 @@ describe("auth.basic", () => {
     const def = getNodeDef("auth.basic");
     const { auth } = def.compileEvaluate!({
       node: {} as any,
-      inputs: { username: JSON.stringify("user"), password: JSON.stringify("pass") },
+      inputs: {
+        username: JSON.stringify("user"),
+        password: JSON.stringify("pass"),
+      },
       graph: {} as any,
     });
 
     // eslint-disable-next-line no-new-func
     const value = new Function("btoa", `return (${auth});`)(btoa);
-    expect(value).toEqual({ header: "Authorization", value: `Basic ${btoa("user:pass")}` });
+    expect(value).toEqual({
+      header: "Authorization",
+      value: `Basic ${btoa("user:pass")}`,
+    });
   });
 
   it("has no exec pins — it's a pure value-producing node, not an action", () => {
