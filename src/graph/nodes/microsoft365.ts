@@ -138,7 +138,7 @@ registerNode({
     execInOutPins().success,
     { id: "users", label: i18n.nodes.microsoft365.listUsers.pin_users, type: "struct", subType: USER_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -159,7 +159,7 @@ registerNode({
   description: i18n.nodes.microsoft365.getUser.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "user", label: i18n.nodes.microsoft365.graphUser.label, type: "struct", subType: USER_STRUCT_TYPE, direction: "output" }, execInOutPins().error] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "user", label: i18n.nodes.microsoft365.graphUser.label, type: "struct", subType: USER_STRUCT_TYPE, direction: "output" }, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -208,7 +208,7 @@ registerNode({
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -229,7 +229,7 @@ registerNode({
   description: i18n.nodes.microsoft365.updateUser.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "propertiesJson", label: i18n.nodes.microsoft365.updateUser.pin_properties_json, type: "string", direction: "input", defaultValue: "{}" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "propertiesJson", label: i18n.nodes.microsoft365.updateUser.pin_properties_json, type: "string", direction: "input", defaultValue: "{}" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -250,7 +250,7 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteUser.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -280,7 +280,7 @@ registerNode({
     execInOutPins().success,
     { id: "groups", label: i18n.nodes.microsoft365.listGroups.pin_groups, type: "struct", subType: GROUP_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -313,7 +313,7 @@ registerNode({
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -334,7 +334,7 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteGroup.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), { id: "groupId", label: i18n.nodes.microsoft365.__shared.pin_group_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), { id: "groupId", label: i18n.nodes.microsoft365.__shared.pin_group_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -355,7 +355,7 @@ registerNode({
   description: i18n.nodes.microsoft365.addGroupMember.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), { id: "groupId", label: i18n.nodes.microsoft365.__shared.pin_group_id, type: "string", direction: "input", defaultValue: "" }, userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), { id: "groupId", label: i18n.nodes.microsoft365.__shared.pin_group_id, type: "string", direction: "input", defaultValue: "" }, userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -388,7 +388,7 @@ registerNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -419,7 +419,7 @@ registerNode({
     execInOutPins().success,
     { id: "messages", label: i18n.nodes.microsoft365.listMessages.pin_messages, type: "struct", subType: MESSAGE_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -449,7 +449,7 @@ registerNode({
     execInOutPins().success,
     { id: "message", label: i18n.nodes.microsoft365.graphMessageDetail.label, type: "struct", subType: MESSAGE_DETAIL_STRUCT_TYPE, direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -491,7 +491,7 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteMessage.description,
   group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "messageId", label: i18n.nodes.microsoft365.__shared.pin_message_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "messageId", label: i18n.nodes.microsoft365.__shared.pin_message_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -521,7 +521,7 @@ registerNode({
     execInOutPins().success,
     { id: "events", label: i18n.nodes.microsoft365.listEvents.pin_events, type: "struct", subType: EVENT_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -556,7 +556,7 @@ registerNode({
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -585,7 +585,7 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteEvent.description,
   group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "eventId", label: i18n.nodes.microsoft365.__shared.pin_event_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "eventId", label: i18n.nodes.microsoft365.__shared.pin_event_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -615,7 +615,7 @@ registerNode({
     execInOutPins().success,
     { id: "items", label: i18n.nodes.microsoft365.listDriveItems.pin_items, type: "struct", subType: DRIVE_ITEM_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -646,7 +646,7 @@ registerNode({
     execInOutPins().success,
     { id: "content", label: i18n.nodes.microsoft365.__shared.pin_content, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -677,7 +677,7 @@ registerNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -698,7 +698,7 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteDriveItem.description,
   group: GROUP_NAME_ONEDRIVE,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -719,15 +719,7 @@ registerNode({
   description: i18n.nodes.microsoft365.listJoinedTeams.description,
   group: GROUP_NAME_TEAMS,
   colorCategory: NodeColorCategory.Integration,
-  pins: [
-    execInOutPins().execIn,
-    credentialNamePin(),
-    userIdPin(),
-    execInOutPins().execOut,
-    execInOutPins().success,
-    { id: "teams", label: i18n.nodes.microsoft365.listJoinedTeams.pin_teams, type: "struct", subType: TEAM_STRUCT_TYPE, container: "array", direction: "output" },
-    execInOutPins().error,
-  ] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "teams", label: i18n.nodes.microsoft365.listJoinedTeams.pin_teams, type: "struct", subType: TEAM_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -757,7 +749,7 @@ registerNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -789,7 +781,7 @@ registerNode({
     { id: "status", label: i18n.nodes.__shared.pin_status, type: "number", direction: "output" },
     { id: "data", label: i18n.nodes.microsoft365.request.pin_data, type: "object", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -823,7 +815,7 @@ registerNode({
     execInOutPins().success,
     { id: "channels", label: i18n.nodes.microsoft365.listChannels.pin_channels, type: "struct", subType: CHANNEL_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -859,7 +851,7 @@ registerNode({
       direction: "output",
     },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -890,7 +882,7 @@ registerNode({
     execInOutPins().success,
     { id: "messages", label: i18n.nodes.microsoft365.listChannelMessages.pin_messages, type: "struct", subType: CHANNEL_MESSAGE_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -911,15 +903,7 @@ registerNode({
   description: i18n.nodes.microsoft365.listChats.description,
   group: GROUP_NAME_TEAMS,
   colorCategory: NodeColorCategory.Integration,
-  pins: [
-    execInOutPins().execIn,
-    credentialNamePin(),
-    userIdPin(),
-    execInOutPins().execOut,
-    execInOutPins().success,
-    { id: "chats", label: i18n.nodes.microsoft365.listChats.pin_chats, type: "struct", subType: CHAT_STRUCT_TYPE, container: "array", direction: "output" },
-    execInOutPins().error,
-  ] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "chats", label: i18n.nodes.microsoft365.listChats.pin_chats, type: "struct", subType: CHAT_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -948,7 +932,7 @@ registerNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -977,7 +961,7 @@ registerNode({
     execInOutPins().success,
     { id: "sites", label: i18n.nodes.microsoft365.listSites.pin_sites, type: "struct", subType: SITE_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1006,7 +990,7 @@ registerNode({
     execInOutPins().success,
     { id: "lists", label: i18n.nodes.microsoft365.listSiteLists.pin_lists, type: "struct", subType: SITE_LIST_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1036,7 +1020,7 @@ registerNode({
     execInOutPins().success,
     { id: "items", label: i18n.nodes.microsoft365.listListItems.pin_items, type: "struct", subType: LIST_ITEM_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1067,7 +1051,7 @@ registerNode({
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1098,7 +1082,7 @@ registerNode({
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1128,7 +1112,7 @@ registerNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1159,7 +1143,7 @@ registerNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1191,7 +1175,7 @@ registerNode({
     execInOutPins().success,
     { id: "link", label: i18n.nodes.microsoft365.createSharingLink.pin_link, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1221,7 +1205,7 @@ registerNode({
     execInOutPins().success,
     { id: "items", label: i18n.nodes.microsoft365.listDriveItems.pin_items, type: "struct", subType: DRIVE_ITEM_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1251,7 +1235,7 @@ registerNode({
     execInOutPins().success,
     { id: "worksheets", label: i18n.nodes.microsoft365.listWorksheets.pin_worksheets, type: "struct", subType: WORKSHEET_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1283,7 +1267,7 @@ registerNode({
     execInOutPins().success,
     { id: "valuesJson", label: i18n.nodes.microsoft365.__shared.pin_values_json, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1315,7 +1299,7 @@ registerNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1345,7 +1329,7 @@ registerNode({
     execInOutPins().success,
     { id: "tables", label: i18n.nodes.microsoft365.listTables.pin_tables, type: "struct", subType: TABLE_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1376,7 +1360,7 @@ registerNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1405,7 +1389,7 @@ registerNode({
     execInOutPins().success,
     { id: "plans", label: i18n.nodes.microsoft365.listPlannerPlans.pin_plans, type: "struct", subType: PLANNER_PLAN_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1436,7 +1420,7 @@ registerNode({
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1465,7 +1449,7 @@ registerNode({
     execInOutPins().success,
     { id: "tasks", label: i18n.nodes.microsoft365.listPlannerTasks.pin_tasks, type: "struct", subType: PLANNER_TASK_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1494,7 +1478,7 @@ registerNode({
     execInOutPins().success,
     { id: "lists", label: i18n.nodes.microsoft365.listTodoLists.pin_lists, type: "struct", subType: TODO_LIST_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1525,7 +1509,7 @@ registerNode({
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1555,7 +1539,7 @@ registerNode({
     execInOutPins().success,
     { id: "tasks", label: i18n.nodes.microsoft365.listTodoTasks.pin_tasks, type: "struct", subType: TODO_TASK_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1584,7 +1568,7 @@ registerNode({
     execInOutPins().success,
     { id: "contacts", label: i18n.nodes.microsoft365.listContacts.pin_contacts, type: "struct", subType: CONTACT_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1615,7 +1599,7 @@ registerNode({
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1636,7 +1620,7 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteContact.description,
   group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "contactId", label: i18n.nodes.microsoft365.deleteContact.pin_contact_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "contactId", label: i18n.nodes.microsoft365.deleteContact.pin_contact_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1665,7 +1649,7 @@ registerNode({
     execInOutPins().success,
     { id: "applications", label: i18n.nodes.microsoft365.listApplications.pin_applications, type: "struct", subType: APPLICATION_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1686,14 +1670,7 @@ registerNode({
   description: i18n.nodes.microsoft365.listDirectoryRoles.description,
   group: GROUP_NAME_ADMIN,
   colorCategory: NodeColorCategory.Integration,
-  pins: [
-    execInOutPins().execIn,
-    credentialNamePin(),
-    execInOutPins().execOut,
-    execInOutPins().success,
-    { id: "roles", label: i18n.nodes.microsoft365.listDirectoryRoles.pin_roles, type: "struct", subType: DIRECTORY_ROLE_STRUCT_TYPE, container: "array", direction: "output" },
-    execInOutPins().error,
-  ] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), execInOutPins().execOut, execInOutPins().success, { id: "roles", label: i18n.nodes.microsoft365.listDirectoryRoles.pin_roles, type: "struct", subType: DIRECTORY_ROLE_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1714,7 +1691,7 @@ registerNode({
   description: i18n.nodes.microsoft365.listUserLicenses.description,
   group: GROUP_NAME_ADMIN,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "skuIds", label: i18n.nodes.microsoft365.listUserLicenses.pin_sku_ids, type: "string", container: "array", direction: "output" }, execInOutPins().error] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "skuIds", label: i18n.nodes.microsoft365.listUserLicenses.pin_sku_ids, type: "string", container: "array", direction: "output" }, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1746,7 +1723,7 @@ registerNode({
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1767,7 +1744,7 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteSubscription.description,
   group: GROUP_NAME_ADMIN,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), { id: "subscriptionId", label: i18n.nodes.microsoft365.deleteSubscription.pin_subscription_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
+  pins: [execInOutPins().execIn, credentialNamePin(), { id: "subscriptionId", label: i18n.nodes.microsoft365.deleteSubscription.pin_subscription_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
@@ -1796,7 +1773,7 @@ registerNode({
     execInOutPins().success,
     { id: "documents", label: i18n.nodes.microsoft365.listTrendingDocuments.pin_documents, type: "struct", subType: TRENDING_DOCUMENT_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
-  ] as never,
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
