@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { i18n } from "@i18n";
 import type { FunctionDef } from "../engine/types";
 import type { Store } from "../state/store";
@@ -11,7 +10,7 @@ import { VariablePanel } from "./sidebar/VariablePanel";
 import { ThemeToggle } from "./ThemeToggle";
 import { IconManager } from "../shared/iconManager";
 
-export default function AppShellMarkup({ store, projectId }: { store: Store; projectId: string }) {
+export default function AppShellMarkup({ store }: { store: Store }) {
   useStoreRevision(store);
 
   const activeFunction: FunctionDef | null = store.state.activeFunctionId ? (store.state.rootGraph.functions.find((f) => f.id === store.state.activeFunctionId) ?? null) : null;
@@ -20,10 +19,10 @@ export default function AppShellMarkup({ store, projectId }: { store: Store; pro
     <div id="app">
       <div id="toolbar">
         <div id="toolbar-left">
-          <Link href={`/projects/${projectId}`} id="back-to-project-button" title={i18n.components.app_shell_markup.back_title}>
+          <button type="button" id="back-to-project-button" title={i18n.components.app_shell_markup.back_title}>
             <IconManager.ChevronLeftIcon />
             {i18n.components.app_shell_markup.back}
-          </Link>
+          </button>
           <span id="toolbar-title">Hermione</span>
         </div>
         <div id="toolbar-center">

@@ -1349,6 +1349,10 @@ body.resizing {
   font-size: 13px;
   padding: 4px 8px;
   border-radius: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 #back-to-project-button:hover {

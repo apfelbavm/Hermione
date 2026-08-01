@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { registerBuiltins } from "../nodes";
 import { connectPins, insertRerouteOnConnection, nextId, removeInstancePin } from "../engine/graphMutations";
 import { canCollapseSelectionToFunction, collapseSelectionToFunction } from "../engine/collapseToFunction";
@@ -39,6 +40,7 @@ import { deployFlow, getFlowWithGraph, saveFlowGraph } from "../client/api";
 import { isNodeLatent } from "../engine/latency";
 import { NodeInstance } from "../engine/nodeInstance";
 import AppShellMarkup from "./AppShellMarkup";
+import { UnsavedChangesDialog } from "./UnsavedChangesDialog";
 import { i18n } from "@i18n";
 
 registerBuiltins();
@@ -96,6 +98,12 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
   );
   const [history] = useState(() => createHistoryManager(store));
   useResizablePanels();
+  const router = useRouter();
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [savingBeforeLeave, setSavingBeforeLeave] = useState(false);
+  // Snapshot of the graph as last loaded/saved — compared against the current graph to decide
+  // whether the back-to-project button needs to warn about unsaved changes (see onBackButtonClick).
+  const lastSavedGraphJsonRef = useRef<string | null>(null);
 
   useEffect(() => {
     const canvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
@@ -119,6 +127,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     const autoPanCheckbox = document.getElementById("auto-pan-checkbox") as HTMLInputElement;
     const frameAllButton = document.getElementById("frame-all-button") as HTMLButtonElement;
     const loadFileInput = document.getElementById("load-file-input") as HTMLInputElement;
+    const backButton = document.getElementById("back-to-project-button") as HTMLButtonElement;
     const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
     if (!ctx) throw new Error("Canvas 2D context unavailable");
 
@@ -130,6 +139,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         if (cancelledLoad) return;
         flowName = flow.name;
         store.state.rootGraph = graphJson ? deserializeGraph(graphJson) : buildDemoGraph();
+        lastSavedGraphJsonRef.current = serializeGraph(store.state.rootGraph);
         store.notify();
       } catch (err) {
         appendLog(i18n.components.app_shell.load_flow_failed + (err instanceof Error ? err.message : String(err)));
@@ -744,7 +754,9 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
     async function onSaveClick(): Promise<void> {
       await scriptEditor.flushDirtyScripts();
-      await saveFlowGraph(projectId, flowId, serializeGraph(store.state.rootGraph));
+      const graphJson = serializeGraph(store.state.rootGraph);
+      await saveFlowGraph(projectId, flowId, graphJson);
+      lastSavedGraphJsonRef.current = graphJson;
     }
     saveButton.addEventListener("click", onSaveClick);
 
@@ -777,7 +789,9 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         store.state.executingNodeId = null;
         store.state.firedConnectionIds = new Set();
         store.state.pinValues = new Map();
-        await saveFlowGraph(projectId, flowId, serializeGraph(graph));
+        const graphJson = serializeGraph(graph);
+        await saveFlowGraph(projectId, flowId, graphJson);
+        lastSavedGraphJsonRef.current = graphJson;
         store.notify();
       } catch (err) {
         appendLog(i18n.components.app_shell.load_graph_failed + (err instanceof Error ? err.message : String(err)));
@@ -822,6 +836,20 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     }
     frameAllButton.addEventListener("click", onFrameAllClick);
 
+    // The button only ever leaves immediately when nothing changed since the last load/save —
+    // otherwise defers to the UnsavedChangesDialog rendered below (its buttons call router.push
+    // themselves once the user picks Save-and-leave/Leave-without-saving).
+    async function onBackButtonClick(): Promise<void> {
+      await scriptEditor.flushDirtyScripts();
+      const currentGraphJson = serializeGraph(store.state.rootGraph);
+      if (currentGraphJson === lastSavedGraphJsonRef.current) {
+        router.push(`/projects/${projectId}`);
+        return;
+      }
+      setShowUnsavedDialog(true);
+    }
+    backButton.addEventListener("click", onBackButtonClick);
+
     return () => {
       cancelledLoad = true;
       activeSimulation?.abort();
@@ -847,8 +875,36 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       loadFileInput.removeEventListener("change", onLoadFileChange);
       deployButton.removeEventListener("click", onCompileClick);
       frameAllButton.removeEventListener("click", onFrameAllClick);
+      backButton.removeEventListener("click", onBackButtonClick);
     };
   }, []);
 
-  return <AppShellMarkup store={store} projectId={projectId} />;
+  async function handleSaveAndLeave(): Promise<void> {
+    setSavingBeforeLeave(true);
+    try {
+      const graphJson = serializeGraph(store.state.rootGraph);
+      await saveFlowGraph(projectId, flowId, graphJson);
+      router.push(`/projects/${projectId}`);
+    } finally {
+      setSavingBeforeLeave(false);
+      setShowUnsavedDialog(false);
+    }
+  }
+
+  return (
+    <>
+      <AppShellMarkup store={store} />
+      {showUnsavedDialog && (
+        <UnsavedChangesDialog
+          saving={savingBeforeLeave}
+          onCancel={() => setShowUnsavedDialog(false)}
+          onDiscard={() => {
+            setShowUnsavedDialog(false);
+            router.push(`/projects/${projectId}`);
+          }}
+          onSaveAndLeave={() => void handleSaveAndLeave()}
+        />
+      )}
+    </>
+  );
 }
