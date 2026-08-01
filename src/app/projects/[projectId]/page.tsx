@@ -10,6 +10,7 @@ import { PageShell } from "../../../components/PageHeader";
 import { Breadcrumbs } from "../../../components/Breadcrumbs";
 import { CreateFlowDialog } from "../../../components/CreateFlowDialog";
 import { useDebounce } from "../../../hooks/useDebounce";
+import { IconManager } from "../../../shared/iconManager";
 
 /** The "⋯" options menu on a Flow row — Rename/Duplicate/Delete used to be three separate buttons
  * in .entity-actions; folded into one menu instead as the row's action surface grows. Positioned via
@@ -143,6 +144,7 @@ export default function ProjectPage() {
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
   const [duplicatingFlow, setDuplicatingFlow] = useState<FlowSummary | null>(null);
   const [description, setDescription] = useState("");
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
   const visibleFlows = flows.filter((flow) => flow.name.toLowerCase().includes(debouncedSearchTerm.trim().toLowerCase()));
 
   async function refresh(): Promise<void> {
@@ -153,6 +155,7 @@ export default function ProjectPage() {
   }
 
   async function commitDescription(value: string): Promise<void> {
+    setIsEditingDescription(false);
     if (project && value === project.description) return;
     const updated = await updateProjectDescription(projectId, value);
     setProject(updated);
@@ -212,7 +215,25 @@ export default function ProjectPage() {
       <Breadcrumbs items={[{ label: i18n.pages.projects.title, href: "/projects" }, { label: project.name }]} />
       <h1>"{project.name}" Flows</h1>
 
-      <textarea className="project-description-input" placeholder={i18n.pages.project.description_placeholder} value={description} onChange={(e) => setDescription(e.target.value)} onBlur={(e) => void commitDescription(e.target.value)} />
+      <div className="project-description-box">
+        {isEditingDescription ? (
+          <textarea
+            className="project-description-input"
+            placeholder={i18n.pages.project.description_placeholder}
+            value={description}
+            autoFocus
+            onChange={(e) => setDescription(e.target.value)}
+            onBlur={(e) => void commitDescription(e.target.value)}
+          />
+        ) : (
+          <p className="project-description-text">{description || i18n.pages.project.description_placeholder}</p>
+        )}
+        {!isEditingDescription && (
+          <button type="button" className="project-description-edit-button" onClick={() => setIsEditingDescription(true)} title="Edit description" aria-label="Edit description">
+            {IconManager.EditIcon()}
+          </button>
+        )}
+      </div>
 
       <Link href={`/projects/${projectId}/logs`} className="logs-link">
         {i18n.pages.project.view_logs}
