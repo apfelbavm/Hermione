@@ -1,0 +1,138 @@
+#toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 40px;
+  flex: 0 0 auto;
+  padding: 0 12px;
+  background: var(--pp-surface);
+  border-bottom: 1px solid var(--pp-border);
+}
+
+#toolbar-left,
+#toolbar-center,
+#toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#toolbar-left {
+  justify-self: start;
+}
+
+#toolbar-center {
+  justify-self: center;
+}
+
+#toolbar-right {
+  justify-self: end;
+}
+
+#toolbar-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Wraps a related run of toolbar buttons in one bordered box — same "reads as one grouped control"
+   language as #canvas-hud-toolbar's own border+background, just inline in the main toolbar instead
+   of floating over the canvas. Currently just the Simulate/Pause/Continue trio. */
+.toolbar-button-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 6px;
+  background: var(--pp-bg);
+}
+
+#run-button {
+  background: var(--pp-accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#run-button:hover {
+  background: var(--pp-accent-hover);
+}
+
+#pause-button,
+#continue-button,
+#stop-button,
+#save-button,
+#load-button,
+#download-button,
+#deploy-button {
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#pause-button:hover:not(:disabled),
+#continue-button:hover:not(:disabled),
+#stop-button:hover:not(:disabled),
+#save-button:hover,
+#load-button:hover,
+#download-button:hover,
+#deploy-button:hover {
+  background: var(--pp-button-bg-hover);
+}
+
+/* Restore old version page's toolbar-center controls (see VersionRestorePanel.tsx) — version
+   picker styled like the Projects/Emulate pages' dropdowns, Cancel like the plain toolbar buttons
+   above, Restore like #run-button's accent green. */
+#version-restore-controls select {
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 4px;
+  color: var(--pp-text);
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+#version-restore-controls button {
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#version-restore-controls button:hover:not(:disabled) {
+  background: var(--pp-button-bg-hover);
+}
+
+#version-restore-controls .restore-version-button {
+  background: var(--pp-accent);
+  color: #fff;
+}
+
+#version-restore-controls .restore-version-button:hover:not(:disabled) {
+  background: var(--pp-accent-hover);
+}
+
+.toolbar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--pp-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toolbar-toggle:has(input:disabled) {
+  color: var(--pp-text-dim);
+  cursor: not-allowed;
+}

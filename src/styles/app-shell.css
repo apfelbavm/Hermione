@@ -1,0 +1,240 @@
+/* ---------------------------------------------------------------------------------------------
+   Home / Projects / Project / Logs / Credential Vault — the plain (non-canvas) pages surrounding
+   the editor. Uses the exact same `--pp-*` variables as the editor's own toolbar/sidebar above,
+   rather than inventing a separate visual language for them. */
+
+#back-to-project-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--pp-text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+#back-to-project-button:hover {
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+}
+
+.page-top-header {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  flex: 0 0 auto;
+  background: var(--pp-surface);
+  border-bottom: 1px solid var(--pp-border);
+}
+
+.page-bottom-footer {
+  height: 40px;
+  flex: 0 0 auto;
+  background: var(--pp-surface);
+  border-top: 1px solid var(--pp-border);
+}
+
+/* Same max-width/margin/horizontal-padding as .page-content, so this bar's title/toggle align
+   with the breadcrumbs/back-link/body below regardless of viewport width. */
+.page-top-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* The plain-page counterpart of #app: a full-height column with the full-bleed header on top and
+   the sidebar+content row (.page-body) below it. */
+.page-frame {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--pp-bg);
+  color: var(--pp-text);
+}
+
+/* Houses the nav Sidebar and the page's own scrollable content side by side — the plain-page
+   counterpart of #main-area. */
+.page-body {
+  display: flex;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+/* height (not min-height) + its own overflow-y, since html/body are overflow: hidden globally (see
+   that rule near the top of this file) — every plain page needs to scroll internally rather than
+   relying on the page/body scrolling, or content taller than the viewport gets clipped. */
+.page-content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 24px 32px 48px;
+}
+
+/* The nav rail (see components/Sidebar.tsx) — collapse state is pure CSS off a `data-sidebar`
+   attribute on <html> (see client/sidebar.ts), never React state, so there's no hydration-mismatch
+   flash to guard against between server and client renders. */
+.app-sidebar {
+  flex: 0 0 auto;
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  background: var(--pp-surface-alt);
+  border-right: 1px solid var(--pp-border);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+:root[data-sidebar="collapsed"] .app-sidebar {
+  width: 52px;
+}
+
+.app-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 16px;
+  margin-bottom: 4px;
+  background: none;
+  border: none;
+  color: var(--pp-text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+}
+
+.app-sidebar-toggle:hover {
+  background: var(--pp-surface-hover);
+  color: var(--pp-text);
+}
+
+.app-sidebar-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.app-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  color: var(--pp-text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.app-sidebar-link:hover {
+  background: var(--pp-surface-hover);
+  color: var(--pp-text);
+}
+
+.app-sidebar-link-active {
+  background: var(--pp-selected-bg);
+  color: var(--pp-text);
+}
+
+/* Holds one of Sidebar.tsx's flat currentColor SVG icons — sized/colored via this wrapper (not the
+   svg itself) so it stays in step with .app-sidebar-link's own color (grey at rest, --pp-text on
+   hover/active — see those rules) without the icon needing to know which state it's in. */
+.app-sidebar-link-icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-sidebar-link-icon svg {
+  display: block;
+}
+
+.app-sidebar-link-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapsed: icons only, centered, labels hidden entirely (not just visually — see .app-sidebar's
+   own narrower width above). */
+:root[data-sidebar="collapsed"] .app-sidebar-link-label {
+  display: none;
+}
+
+:root[data-sidebar="collapsed"] .app-sidebar-link,
+:root[data-sidebar="collapsed"] .app-sidebar-toggle {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Home's own body needs to flex/center its hero vertically (see .landing-hero) — every other page
+   just wants .page-content's plain scrolling column, so this is opt-in via PageShell's
+   contentClassName rather than baked into .page-content itself. */
+.landing-page-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-top-header-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--pp-text);
+}
+
+.theme-toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  border: 1px solid var(--pp-border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.theme-toggle-button:hover {
+  background: var(--pp-button-bg-hover);
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--pp-text-muted);
+  margin-bottom: 16px;
+}
+
+.breadcrumbs a {
+  color: var(--pp-link);
+  text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-current {
+  color: var(--pp-text);
+}
+
+.breadcrumb-sep {
+  color: var(--pp-text-dim);
+}

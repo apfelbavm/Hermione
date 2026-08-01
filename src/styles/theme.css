@@ -1,0 +1,77 @@
+* {
+  box-sizing: border-box;
+}
+
+/* No spinner arrows on any number input, anywhere (canvas pin widgets, sidebar type/value fields). */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* One global set of theme variables, shared by every page including the Flow editor's own DOM
+   chrome (toolbar/sidebar/panels/menus/etc. below) — light is the default (:root), dark is an
+   override activated by [data-theme="dark"] on <html> (see components/ThemeToggle.tsx and the
+   inline bootstrap script in app/layout.tsx that sets it before first paint). The one thing these
+   variables can't reach is the editor's own <canvas> content (node/wire/grid colors) — a 2D canvas
+   context has no notion of CSS variables — so engine/color.ts's `Colors` reads the same
+   `data-theme` attribute directly instead; see AppShell.tsx's theme-change listener, which
+   redraws the canvas when it flips. Per-pin/variable TYPE colors (Colors.PIN_COLORS) and node
+   category/status colors stay fixed across both themes on purpose (see that file). */
+:root {
+  --pp-bg: #f5f6f8;
+  --pp-surface: #ffffff;
+  --pp-surface-hover: #eef1f4;
+  --pp-surface-hover-alt: #e4e8ec;
+  --pp-surface-alt: #eef0f3;
+  --pp-border: #dde1e6;
+  --pp-border-strong: #c9ced4;
+  --pp-border-accent: #3b82c4;
+  --pp-border-comment: #1b1e22;
+  --pp-text: #1b1e22;
+  --pp-text-muted: #5b6169;
+  --pp-text-muted-strong: #43484f;
+  --pp-text-dim: #8a9098;
+  --pp-link: #1a6fb0;
+  --pp-json: #2f7a4a;
+  --pp-xml: #8a6d1f;
+  --pp-danger: #c23b3f;
+  --pp-accent: #3b8a5c;
+  --pp-accent-hover: #2f7549;
+  --pp-button-bg: #e7e9ec;
+  --pp-button-bg-hover: #d7dbe0;
+  --pp-modal-backdrop: rgba(15, 17, 20, 0.45);
+  /* Selected-row surface (Functions/Variables/Scripts list rows, graph tab, etc.) — distinct from
+     --pp-surface-hover since a selection needs to persist visually even while NOT hovered. */
+  --pp-selected-bg: #dceaf5;
+}
+
+:root[data-theme="dark"] {
+  --pp-bg: #1e2126;
+  --pp-surface: #24272d;
+  --pp-surface-hover: #282c33;
+  --pp-surface-hover-alt: #2b2f36;
+  --pp-surface-alt: #1c1f24;
+  --pp-border: #33383f;
+  --pp-border-strong: #3d4148;
+  --pp-border-accent: #3b6b8a;
+  --pp-border-comment: transparent;
+  --pp-text: #e8e8e8;
+  --pp-text-muted: #9aa0a8;
+  --pp-text-muted-strong: #b8bec7;
+  --pp-text-dim: #6b7078;
+  --pp-link: #6db3e8;
+  --pp-json: #cfe8c8;
+  --pp-xml: #e8d9a0;
+  --pp-danger: #e5484d;
+  --pp-accent: #3b8a5c;
+  --pp-accent-hover: #46a56d;
+  --pp-button-bg: #33383f;
+  --pp-button-bg-hover: #454a52;
+  --pp-modal-backdrop: rgba(0, 0, 0, 0.55);
+  --pp-selected-bg: #2f4a5e;
+}

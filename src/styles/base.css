@@ -1,0 +1,36 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: "Segoe UI", sans-serif;
+  background: var(--pp-bg);
+  color: var(--pp-text);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--pp-bg);
+  color: var(--pp-text);
+}
+
+/* Generic "this control is locked" look — covers every plain button/input/select/textarea across
+   the toolbar and sidebar panels while a Simulate run is in progress (see AppState.simulating).
+   Deliberately NOT scoped to a specific className: every one of these controls goes through a
+   native `disabled` attribute for that reason (see CLAUDE.md's per-element-disabled guidance),
+   so one shared rule covers all of them instead of restyling each control's own disabled state. */
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* While a resizer drag is in progress, block text selection anywhere on the page — otherwise a
+   fast drag over the canvas/sidebar/log text selects it instead of just resizing. */
+body.resizing {
+  user-select: none;
+}

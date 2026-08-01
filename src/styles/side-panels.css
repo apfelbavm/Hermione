@@ -1,0 +1,402 @@
+.editable-name-label-disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--pp-border);
+}
+
+/* Unreal-style Details section: the sole content of its own standalone #right-sidebar, so it just
+ * fills the whole thing (no more margin-top: auto/min-height — those existed only to push it below
+ * the Functions/Variables/Scripts lists a single shared sidebar used to also hold). Hidden entirely
+ * (via JS) when nothing is selected. */
+#details-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.details-header {
+  padding: 10px 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--pp-border);
+}
+
+.details-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.details-item-name {
+  padding: 10px 12px 4px;
+  font-weight: 600;
+  /* Deliberately fixed gold, not a --pp-* variable — same "selection/highlight accent stays
+     consistent across themes" reasoning as engine/color.ts's NODE_BORDER_SELECTED (same color). */
+  color: #e8b339;
+}
+
+#variable-details-fields {
+  padding: 0 6px 6px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--pp-border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-header-title {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Fixed-width slot so the title text doesn't shift when the arrow disappears on an empty section
+   (see CollapsibleSection.tsx, which leaves this span empty rather than omitting it). */
+.panel-header-arrow {
+  display: inline-flex;
+  width: 12px;
+  flex: 0 0 auto;
+}
+
+.panel-section.collapsed .panel-body {
+  display: none;
+}
+
+.panel-header-add {
+  flex: 0 0 auto;
+  background: var(--pp-border-accent);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.panel-header-add:hover {
+  filter: brightness(1.15);
+}
+
+.panel-list {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.variable-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+/* Same hover background as the canvas's right-click node-search menu (.node-search-list li:hover)
+ * — excluded on a row that's already selected/active so hovering it doesn't wash out that state. */
+.variable-row:hover:not(.variable-row-selected):not(.function-row-active) {
+  background: var(--pp-surface-hover-alt);
+}
+
+.variable-type-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.variable-row .variable-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-row .variable-type {
+  color: var(--pp-text-muted);
+  font-size: 11px;
+}
+
+.variable-row button {
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  border: none;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.variable-row button:hover {
+  background: var(--pp-button-bg-hover);
+}
+
+.function-name {
+  cursor: pointer;
+}
+
+.function-row-active {
+  background: var(--pp-selected-bg);
+  outline: 1px solid var(--pp-border-accent);
+}
+
+.function-row-active .function-name {
+  color: #e8b339;
+  font-weight: 600;
+}
+
+.variable-row-selected {
+  background: var(--pp-selected-bg);
+  outline: 1px solid var(--pp-border-accent);
+}
+
+/* Manual drag-to-reorder drop indicator (see variablePanel.ts) — an inset box-shadow rather than
+ * a real border so it never nudges row height/layout while dragging. Fixed gold, same reasoning as
+ * .details-item-name above. */
+.variable-row-drop-above {
+  box-shadow: inset 0 2px 0 0 #e8b339;
+}
+
+.variable-row-drop-below {
+  box-shadow: inset 0 -2px 0 0 #e8b339;
+}
+
+.editable-name-label {
+  cursor: default;
+}
+
+.row-context-menu {
+  position: fixed;
+  z-index: 20;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  min-width: 100px;
+  padding: 4px;
+  font-size: 13px;
+}
+
+.row-context-menu-item {
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--pp-text);
+}
+
+.row-context-menu-item:hover {
+  background: var(--pp-border-accent);
+  color: #fff;
+}
+
+.row-context-menu-item-disabled {
+  color: var(--pp-text-dim);
+  cursor: default;
+}
+
+.row-context-menu-item-disabled:hover {
+  background: none;
+}
+
+.typed-value-input {
+  box-sizing: border-box;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border-strong);
+  color: var(--pp-text);
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 2px 4px;
+  min-width: 0;
+}
+
+.typed-value-input[type="number"] {
+  flex: 0 0 52px;
+}
+
+.typed-value-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.typed-value-input-wrapper .typed-value-input[type="text"] {
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
+}
+
+.typed-value-expand {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 18px;
+  font-size: 10px;
+}
+
+.typed-value-input[type="text"] {
+  flex: 0 0 64px;
+}
+
+.typed-value-input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  accent-color: #5db85c;
+}
+
+.typed-value-type-select {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border-strong);
+  color: var(--pp-text);
+  border-radius: 3px;
+  font: inherit;
+  font-size: 11px;
+  padding: 1px 5px 1px 4px;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.typed-value-type-select:hover {
+  border-color: var(--pp-border-accent);
+}
+
+.typed-value-type-caret {
+  color: var(--pp-text-muted);
+  font-size: 9px;
+}
+
+.pick-list-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Container-type icons (Array/Set/Map) — see typedValueInput.ts's createContainerIcon, matching
+   the shape drawn on their canvas pins in drawNodes.ts's drawPinShape. */
+.container-icon {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1px;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.container-icon-cell {
+  background: currentColor;
+  border-radius: 1px;
+}
+
+.container-icon-cell-wide {
+  grid-column: span 2;
+}
+
+.container-icon-braces {
+  flex: 0 0 auto;
+  font-family: Georgia, serif;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+
+.typed-value-placeholder {
+  flex: 0 0 20px;
+  text-align: center;
+  color: var(--pp-text-dim);
+  font-size: 11px;
+}
+
+.typed-value-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.typed-value-list-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.typed-value-list-row .typed-value-input {
+  flex: 1 1 auto;
+  width: 0;
+}
+
+.typed-value-list-remove {
+  flex: 0 0 auto;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  border: none;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.typed-value-list-remove:hover {
+  background: var(--pp-button-bg-hover);
+}
+
+.typed-value-list-add {
+  align-self: flex-start;
+  background: var(--pp-border-accent);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.typed-value-list-add:hover {
+  filter: brightness(1.15);
+}
+
+.variable-row input.variable-name.typed-value-input {
+  flex: 1 1 auto;
+  width: 0;
+}
+
+.panel-add-row {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  border-top: 1px solid var(--pp-border);
+}
+
+.panel-add-row button {
+  background: var(--pp-border-accent);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.panel-add-row button:hover {
+  filter: brightness(1.15);
+}

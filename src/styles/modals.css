@@ -1,0 +1,182 @@
+/* Credential Vault's Add/Edit dialog — a hand-rolled overlay (no dialog library in this codebase
+   yet, and this is a one-off), matching the same panel language as the rest of these pages. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--pp-modal-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-box {
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 8px;
+  padding: 20px 24px;
+  width: 500px;
+  max-width: calc(100vw - 32px);
+  color: var(--pp-text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.modal-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+}
+
+.modal-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.modal-field-label {
+  font-size: 12px;
+  color: var(--pp-text-muted);
+}
+
+.modal-field-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  border-radius: 50%;
+  border: 1px solid var(--pp-border-strong);
+  font-size: 10px;
+  line-height: 1;
+  cursor: help;
+  color: var(--pp-text-muted);
+}
+
+.modal-field-row input,
+.modal-field-row select {
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 4px;
+  color: var(--pp-text);
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.modal-error {
+  color: var(--pp-danger);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.modal-actions button {
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  border: none;
+  border-radius: 4px;
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.modal-actions button:last-child {
+  background: var(--pp-accent);
+  color: #fff;
+}
+
+.modal-actions button:hover {
+  background: var(--pp-button-bg-hover);
+}
+
+.modal-actions button:last-child:hover {
+  background: var(--pp-accent-hover);
+}
+
+.unsaved-changes-dialog .modal-actions {
+  margin-top: 64px;
+}
+
+.unsaved-changes-dialog .modal-actions button {
+  white-space: nowrap;
+}
+
+.create-flow-dialog {
+  width: calc(100vw - 128px);
+  max-width: 1920px;
+}
+
+.flow-template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 300px);
+  justify-content: center;
+  gap: 16px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+
+.flow-template-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--pp-text);
+  font: inherit;
+}
+
+.flow-template-tile:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.flow-template-tile-image {
+  position: relative;
+  width: 300px;
+  height: 300px;
+  max-width: 100%;
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 6px;
+  border-bottom: 5px solid #c542a0;
+  background: var(--pp-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pp-text-muted);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.flow-template-tile-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.flow-template-tile-creating {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pp-modal-backdrop);
+  color: var(--pp-text);
+}
+
+.flow-template-tile:hover .flow-template-tile-image {
+  border-color: var(--pp-accent);
+}
+
+.flow-template-tile-name {
+  font-size: 13px;
+}

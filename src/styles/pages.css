@@ -1,0 +1,537 @@
+.landing-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.landing-title {
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.landing-links {
+  display: flex;
+  gap: 16px;
+}
+
+.landing-link {
+  display: inline-block;
+  padding: 10px 22px;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.landing-link:hover {
+  background: var(--pp-button-bg-hover);
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.page-header h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--pp-text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+  margin-bottom: 16px;
+}
+
+.back-link:hover {
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+}
+
+.section-heading {
+  font-size: 16px;
+  margin: 28px 0 12px;
+  color: var(--pp-text-muted-strong);
+}
+
+.page-empty-note {
+  color: var(--pp-text-muted);
+  font-size: 13px;
+}
+
+.ai-docs-content {
+  margin-top: 12px;
+  padding: 16px;
+  border-radius: 6px;
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.project-description-input {
+  display: block;
+  width: 100%;
+  max-width: 560px;
+  min-height: 44px;
+  margin: 4px 0 12px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--pp-text);
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.logs-link {
+  display: inline-block;
+  color: var(--pp-link);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.logs-link:hover {
+  text-decoration: underline;
+}
+
+.create-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.create-row input[type="text"] {
+  flex: 1 1 auto;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 4px;
+  color: var(--pp-text);
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.create-row button {
+  background: var(--pp-accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.create-row button:hover {
+  background: var(--pp-accent-hover);
+}
+
+.create-row select {
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 4px;
+  color: var(--pp-text);
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+/* Search bar + "Create" button row on the Projects and Project pages — the button sits at the
+   search bar's top right rather than being full-width like .create-row's old submit button. */
+.search-create-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.search-input {
+  flex: 1 1 auto;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 4px;
+  color: var(--pp-text);
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.search-create-row button {
+  background: var(--pp-accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.search-create-row button:hover {
+  background: var(--pp-accent-hover);
+}
+
+.emulate-picker-row {
+  align-items: flex-end;
+}
+
+.emulate-picker-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.emulate-picker-label {
+  font-size: 12px;
+  color: var(--pp-text-muted);
+}
+
+.entity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--pp-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.entity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--pp-surface);
+  border-bottom: 1px solid var(--pp-border);
+}
+
+.entity-row:last-child {
+  border-bottom: none;
+}
+
+.entity-row:hover {
+  background: var(--pp-surface-hover);
+}
+
+.entity-name {
+  flex: 1 1 auto;
+  color: var(--pp-text);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.entity-name:hover {
+  text-decoration: underline;
+}
+
+.entity-rename-input {
+  flex: 1 1 auto;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border-accent);
+  border-radius: 4px;
+  color: var(--pp-text);
+  padding: 5px 8px;
+  font-size: 14px;
+}
+
+.entity-version-badge {
+  flex: 0 0 auto;
+  background: var(--pp-border-accent);
+  color: #fff;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.entity-meta {
+  flex: 0 0 auto;
+  color: var(--pp-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.entity-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.entity-actions button {
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.entity-actions button:hover {
+  background: var(--pp-button-bg-hover);
+}
+
+/* Wraps the "⋯" options button + its dropdown (see projects/[projectId]/page.tsx's FlowRowMenu) —
+   the dropdown itself is .row-context-menu, shared with the canvas's own right-click menus, and is
+   `position: fixed` (positioned in JS off the button's own getBoundingClientRect), so this wrapper
+   only needs to establish DOM containment for the outside-click handler, not lay anything out. */
+.entity-menu-button {
+  background: none;
+  border: none;
+  color: var(--pp-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.entity-menu-button:hover {
+  background: var(--pp-button-bg-hover);
+  color: var(--pp-text);
+}
+
+.run-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.run-row {
+  border: 1px solid var(--pp-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--pp-surface);
+}
+
+.run-row-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  color: var(--pp-text);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+}
+
+.run-row-header:hover {
+  background: var(--pp-surface-hover-alt);
+}
+
+.run-row-caret {
+  display: inline-flex;
+  align-items: center;
+  color: var(--pp-text-muted);
+  flex: 0 0 auto;
+}
+
+.run-row-flow-name {
+  font-weight: 600;
+  flex: 1 1 auto;
+}
+
+/* Only present on a production run whose "EventRun" trigger actually ran (see RunLog.executionMs's
+   own doc comment) — light grey and un-bolded so it reads as metadata about the run, not part of
+   the Flow's own name. */
+.run-row-execution-time {
+  font-weight: normal;
+  color: var(--pp-text-dim);
+}
+
+/* Only rendered by the global Logs page (app/logs/page.tsx) — the per-project one omits it since
+   which project a run belongs to is already implied by the page itself. */
+.run-row-project-name {
+  flex: 0 0 auto;
+  color: var(--pp-link);
+  text-decoration: none;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--pp-surface-hover);
+}
+
+.run-row-project-name:hover {
+  text-decoration: underline;
+}
+
+.run-row-time,
+.run-row-count {
+  color: var(--pp-text-muted);
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+/* Distinguishes a Simulate run (interpreted, editor-only) from a production run (the Flow's own
+   compiled output, see api/emulate/run/route.ts) at a glance — see RunLog.kind. */
+.run-row-kind {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.run-row-kind-simulate {
+  background: var(--pp-surface-hover-alt);
+  color: var(--pp-text-muted-strong);
+}
+
+.run-row-kind-production {
+  background: var(--pp-accent);
+  color: #fff;
+}
+
+.run-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 14px 14px;
+  border-top: 1px solid var(--pp-border);
+}
+
+.log-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.log-entry-time {
+  color: var(--pp-text-dim);
+  font-size: 11px;
+  font-family: "Consolas", "Courier New", monospace;
+}
+
+.log-entry-download {
+  background: var(--pp-button-bg);
+  color: var(--pp-text);
+  border: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.log-entry-download:hover {
+  background: var(--pp-button-bg-hover);
+}
+
+.log-entry-text {
+  margin: 0;
+  background: var(--pp-surface-alt);
+  border: 1px solid var(--pp-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: "Consolas", "Courier New", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--pp-text);
+  /* A single huge logged message shouldn't be able to blow out the whole page — clamp it to its
+     own scrollable box instead. */
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.log-entry-json {
+  color: var(--pp-json);
+}
+
+.log-entry-xml {
+  color: var(--pp-xml);
+}
+
+.log-entry-csv-wrapper {
+  overflow: auto;
+  max-height: 80vh;
+  border: 1px solid var(--pp-border);
+  border-radius: 4px;
+}
+
+.log-entry-csv {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+}
+
+.log-entry-csv td {
+  padding: 4px 10px;
+  border: 1px solid var(--pp-border);
+  color: var(--pp-text);
+  white-space: nowrap;
+}
+
+.log-entry-csv tr:nth-child(odd) {
+  background: var(--pp-surface-alt);
+}
+
+.entity-type-tag {
+  color: var(--pp-text-muted);
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.emulate-content {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 16px;
+}
+
+.emulate-editor-frame {
+  position: relative;
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The deployed script's date/version, overlaid top-right of the editor — pointer-events:none so it
+   never intercepts a click meant for Monaco's own scrollbar/gutter underneath it. */
+.emulate-editor-meta {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 2;
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--pp-text-muted);
+  background: var(--pp-surface);
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--pp-border);
+  pointer-events: none;
+}
