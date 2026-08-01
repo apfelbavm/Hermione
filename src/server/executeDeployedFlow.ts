@@ -20,12 +20,14 @@ export interface ExecuteFlowResult {
  * flow.executeFlow node can take: the interpreter's own ExecutionContext.executeFlow hook (wired in
  * by api/simulate/route.ts) and a DEPLOYED flow's own compiled flow.executeFlow, which imports this
  * exact function directly (see compileUtils.ts's EXECUTE_FLOW_IMPORT) instead of re-implementing
- * this lookup inline in generated code. Never throws: every failure mode (never deployed, no "On
- * Run" trigger, the deployed script itself throwing) is reported as `{ success: false, error }`
- * instead, since a calling flow reads success/error off real output pins rather than a try/catch.
- * Also persists its own RunLog (kind "chained") for the triggered flow itself — otherwise its log
- * output would only ever show up buried inside the CALLING flow's own run, under the caller's own
- * flowId, with no trace of it under the triggered flow's own Logs. */
+ * this lookup inline in generated code. Fires the target's "On Execute" event (nodes/event.ts's
+ * event.execute, manifest kind "execute") — NOT "On Run" (kind "run"), which only ever fires from
+ * the Emulate page's own Run button (see api/emulate/run/route.ts). Never throws: every failure
+ * mode (never deployed, no "On Execute" event, the deployed script itself throwing) is reported as
+ * `{ success: false, error }` instead, since a calling flow reads success/error off real output pins
+ * rather than a try/catch. Also persists its own RunLog (kind "chained") for the triggered flow
+ * itself — otherwise its log output would only ever show up buried inside the CALLING flow's own
+ * run, under the caller's own flowId, with no trace of it under the triggered flow's own Logs. */
 export async function executeDeployedFlow(projectId: string, flowId: string, log: (message: string) => void): Promise<ExecuteFlowResult> {
   if (!flowId) {
     return { success: false, error: "No Flow selected — nothing to execute.", outputs: {} };
@@ -47,9 +49,9 @@ export async function executeDeployedFlow(projectId: string, flowId: string, log
   let executionMs: number | undefined;
   let result: ExecuteFlowResult;
   try {
-    const runTrigger = deployed.manifest.triggers.find((t) => t.kind === "run");
-    if (!runTrigger) {
-      result = { success: false, error: 'The "EventRun" function does not exist in this graph.', outputs: {} };
+    const executeTrigger = deployed.manifest.triggers.find((t) => t.kind === "execute");
+    if (!executeTrigger) {
+      result = { success: false, error: 'The "On Execute" event does not exist in this graph.', outputs: {} };
     } else {
       applyCredentialEnvVars(db);
 
@@ -59,11 +61,18 @@ export async function executeDeployedFlow(projectId: string, flowId: string, log
       const compiled = (await import(/* webpackIgnore: true */ url)) as Record<string, unknown>;
       const CompiledFlow = compiled.CompiledFlow as new (log: (message: string) => void) => Record<string, unknown>;
       const instance = new CompiledFlow(record);
-      const fn = (instance[runTrigger.functionName] as () => Promise<Record<string, unknown> | void>).bind(instance);
+      const fn = (instance[executeTrigger.functionName] as (...fieldArgs: unknown[]) => Promise<Record<string, unknown> | void>).bind(instance);
+
+      // Declared by event.execute's own describeInstance, in the exact same order codegen.ts
+      // compiled its trigger method's real parameters (see eventTriggerArgNamesByNode). A chained
+      // call has no caller-supplied values of its own (unlike an HTTP request's body/query params),
+      // so every declared field is fed its own default value.
+      const declaredFields = (executeTrigger.details.params as { defaultValue: unknown }[] | undefined) ?? [];
+      const args = declaredFields.map((field) => field.defaultValue);
 
       const executionStartedAt = performance.now();
       try {
-        const returned = await fn();
+        const returned = await fn(...args);
         result = { success: true, error: "", outputs: returned && typeof returned === "object" ? returned : {} };
       } finally {
         executionMs = performance.now() - executionStartedAt;

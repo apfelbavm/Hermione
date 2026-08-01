@@ -117,6 +117,7 @@
       "simulate": "Simulate",
       "production": "Production",
       "chained": "Chained",
+      "deploy": "Deploy",
       "execution_time": "Execution time: ",
       "revision": "Revision: ",
       "entry": "entry",
@@ -1249,9 +1250,17 @@
         "label": "On Run",
         "description": "Fires when the editor's own Run button is pressed."
       },
+      "deploy": {
+        "label": "On Deploy",
+        "description": "Fires once, right after the graph is deployed."
+      },
       "request": {
         "label": "On HTTP Request",
         "description": "Fires when the deployed script's HTTP endpoint is called, outputting its user-declared request fields."
+      },
+      "execute": {
+        "label": "On Execute",
+        "description": "Fires when another Flow calls this one via Execute Flow, outputting its user-declared fields."
       }
     },
     "flow": {

@@ -377,6 +377,11 @@
   color: var(--pp-accent);
 }
 
+.run-row-kind-deploy {
+  background: var(--pp-surface-hover-alt);
+  color: var(--pp-link);
+}
+
 .run-entries {
   display: flex;
   flex-direction: column;

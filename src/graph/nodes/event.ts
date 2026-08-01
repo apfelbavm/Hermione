@@ -52,9 +52,22 @@ registerNode({
   eventTrigger: { kind: "run" },
 });
 
+registerNode({
+  type: "event.deploy",
+  label: i18n.nodes.event.deploy.label,
+  description: i18n.nodes.event.deploy.description,
+  group: "Events",
+  colorCategory: NodeColorCategory.Events,
+  pins: [{ id: "exec-out", label: "", type: "exec", direction: "output" }],
+  execute: () => ({ nextExec: "exec-out" }),
+  eventTrigger: { kind: "deploy" },
+});
+
 /** A brand-new request field, seeded the same way flow.ts's addOutputEntry seeds a fresh Execute
  * Flow/Return Flow Values output: an unused "Param_N" name, type "string" (the common case for a
- * request field), its own default value. */
+ * request field), its own default value. Shared by event.request and event.execute — both are
+ * identically-shaped "fields" events, just fed by a different caller (an HTTP client vs. another
+ * Flow's flow.executeFlow). */
 function addRequestFieldEntry(node: NodeInstance): void {
   const entries = node.outputEntries ?? [];
   const taken = new Set(entries.map((e) => e.name));
@@ -96,6 +109,47 @@ registerNode({
     // The deployed hooks route (see api/hooks/[projectId]/[flowId]/route.ts) reads this to know
     // which request fields (by name, in this exact order) to parse and pass positionally to the
     // compiled trigger method — see codegen.ts's eventTriggerArgNamesByNode.
+    describeInstance: (node) => ({
+      params: (node.outputEntries ?? []).map((entry) => ({ name: entry.name, type: entry.type, defaultValue: entry.defaultValue ?? null })),
+    }),
+  },
+});
+
+registerNode({
+  type: "event.execute",
+  label: i18n.nodes.event.execute.label,
+  description: i18n.nodes.event.execute.description,
+  group: "Events",
+  colorCategory: NodeColorCategory.Events,
+  pins: [], // real pins are derived per-instance from this node's own outputEntries
+  editableOutputs: true,
+  deriveInstancePins: (node) => [
+    { id: "exec-out", label: "", type: "exec", direction: "output" },
+    ...(node.outputEntries ?? []).map((entry) => ({
+      id: entry.id,
+      label: entry.name,
+      type: entry.type,
+      direction: "output" as const,
+      defaultValue: entry.defaultValue,
+      container: entry.container,
+      keyType: entry.keyType,
+      subType: entry.subType,
+    })),
+  ],
+  addInstancePinEntry: addRequestFieldEntry,
+  // Simulating locally has no real calling Flow to read from — each declared field just reports
+  // its own default value, same as event.request.
+  execute: ({ node }) => ({
+    nextExec: "exec-out",
+    outputs: Object.fromEntries((node.outputEntries ?? []).map((entry) => [entry.id, entry.defaultValue])),
+  }),
+  eventTrigger: {
+    kind: "execute",
+    // server/executeDeployedFlow.ts reads this the same way the hooks route reads event.request's
+    // own params — by name, in this exact order — to pass positionally to the compiled trigger
+    // method (see codegen.ts's eventTriggerArgNamesByNode). A chained call has no caller-supplied
+    // values of its own (unlike an HTTP request's body/query), so every field is always fed its
+    // own declared default.
     describeInstance: (node) => ({
       params: (node.outputEntries ?? []).map((entry) => ({ name: entry.name, type: entry.type, defaultValue: entry.defaultValue ?? null })),
     }),

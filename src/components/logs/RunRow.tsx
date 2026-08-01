@@ -52,7 +52,7 @@ export function RunRow({ run, project }: { run: RunLog; project?: { name: string
             </span>
           )}
         </span>
-        <span className={`run-row-kind run-row-kind-${run.kind}`}>{run.kind === "simulate" ? i18n.components.run_row.simulate : run.kind === "chained" ? i18n.components.run_row.chained : i18n.components.run_row.production}</span>
+        <span className={`run-row-kind run-row-kind-${run.kind}`}>{run.kind === "simulate" ? i18n.components.run_row.simulate : run.kind === "chained" ? i18n.components.run_row.chained : run.kind === "deploy" ? i18n.components.run_row.deploy : i18n.components.run_row.production}</span>
         {run.version !== undefined && (
           <span className="entity-version-badge">
             {i18n.pages.project.flow_version_prefix}

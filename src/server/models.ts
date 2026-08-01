@@ -47,7 +47,7 @@ export interface LogEntry {
   timestamp: string;
 }
 
-export type RunKind = "simulate" | "production" | "chained";
+export type RunKind = "simulate" | "production" | "chained" | "deploy";
 
 export interface RunLog {
   id: string;
