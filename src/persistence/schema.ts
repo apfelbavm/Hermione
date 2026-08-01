@@ -23,12 +23,21 @@ const SUPPORTED_FORMAT_VERSIONS = [1, 2, CURRENT_FORMAT_VERSION];
  * `NodeInstance` — it has none of NodeInstance.prototype's methods (e.g. resolvePinDefs). Rebuilds
  * a proper instance so the loaded node behaves identically to one built with `new NodeInstance(...)`. */
 function reviveNode(node: NodeInstance): NodeInstance {
-  const revived = new NodeInstance(node.id, node.type, node.position, node.pins, node.variableId, node.functionId, node.scriptId);
+  const revived = new NodeInstance(
+    node.id,
+    node.type,
+    node.position,
+    node.pins,
+    node.variableId,
+    node.functionId,
+    node.scriptId,
+  );
   revived.disabled = node.disabled;
   revived.breakpoint = node.breakpoint;
   revived.elementType = node.elementType;
   revived.mapKeyType = node.mapKeyType;
   revived.container = node.container;
+  revived.subType = node.subType;
   revived.description = node.description;
   return revived;
 }
@@ -47,7 +56,10 @@ function reviveGraph(graph: Graph): Graph {
   // (same defaulting-IS-the-migration story as this function's own doc comment) — CodeScriptDef
   // requires it, so a stale save would otherwise load with `outputs: undefined` and throw the
   // instant anything (e.g. code.ts's deriveScriptPins) iterates it.
-  revived.scripts = (graph.scripts ?? []).map((s) => ({ ...s, outputs: s.outputs ?? [] }));
+  revived.scripts = (graph.scripts ?? []).map((s) => ({
+    ...s,
+    outputs: s.outputs ?? [],
+  }));
   revived.functions = (graph.functions ?? []).map((fn) => ({
     ...fn,
     body: reviveGraph(fn.body),

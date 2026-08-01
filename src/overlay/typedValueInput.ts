@@ -1,5 +1,6 @@
 import { Colors } from "../engine/color";
 import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
+import { allStructTypeDefs } from "../engine/structRegistry";
 import type { PinContainer, PinType } from "../engine/types";
 import { guardAgainstMultilinePaste, openMultilineTextEditor } from "./multilineTextEditor";
 
@@ -60,7 +61,7 @@ function createTypeDot(type: PinType): HTMLSpanElement {
  * and for each row's own per-element/per-key/per-value editor inside a list (see
  * createContainerListInput). */
 function createScalarInput(type: PinType, value: unknown, onChange: (value: unknown) => void): HTMLElement {
-  if (type === "object" || type === "exec") {
+  if (type === "object" || type === "exec" || type === "struct") {
     const span = document.createElement("span");
     span.className = "typed-value-placeholder";
     span.textContent = "—";
@@ -303,6 +304,25 @@ function openContainerMenu(screenPos: { x: number; y: number }, onPick: (contain
  * editing a variable's or a function I/O entry's type. Each option, and the closed button itself,
  * shows the same colored dot used everywhere else a variable's type is indicated (see the
  * Variables list in variablePanel.ts and canvas node headers in drawNodes.ts). */
+/** Sibling of createTypeSelect for picking a configurableSubType node instance's struct CLASS (see
+ * NodeDef.configurableSubType/structRegistry.ts) — a plain labeled list, not a colored-dot menu
+ * like createTypeSelect's PinType options, since every entry here is already the same "struct"
+ * type; label is the only thing distinguishing them. */
+export function createStructTypeSelect(current: string, onChange: (subType: string) => void): HTMLElement {
+  const select = document.createElement("select");
+  select.className = "typed-value-type-select";
+  for (const def of allStructTypeDefs()) {
+    const option = document.createElement("option");
+    option.value = def.id;
+    option.textContent = def.label;
+    select.appendChild(option);
+  }
+  select.value = current;
+  select.addEventListener("mousedown", (e) => e.stopPropagation());
+  select.addEventListener("change", () => onChange(select.value));
+  return select;
+}
+
 export function createTypeSelect(current: PinType, onChange: (type: PinType) => void): HTMLElement {
   const button = document.createElement("button");
   button.type = "button";

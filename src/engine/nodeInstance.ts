@@ -1,5 +1,6 @@
 import { cloneDefaultValue, nextId } from "./graphMutations";
 import { getNodeDef } from "./registry";
+import { allStructTypeDefs } from "./structRegistry";
 import { CodeScriptDef, FunctionDef, NodeDef, Pin, PinContainer, PinDef, PinType, Variable } from "./types";
 
 export class NodeInstance {
@@ -32,6 +33,10 @@ export class NodeInstance {
    * depending on whichever wire it gets spliced into (see graphMutations.ts's
    * insertRerouteOnConnection), so its container has to live per-instance too. */
   container?: PinContainer;
+  /** Set only for a node whose NodeDef.configurableSubType is set — see that field's doc comment.
+   * Seeded by createNodeInstance (to the first registered struct type), changed via
+   * Graph.changeNodeSubType. */
+  subType?: string;
   /** User-authored, per-instance note — edited in the Details panel (see detailsPanel.ts) and shown
    * as a small speech-bubble above this node on the canvas whenever it's non-empty (see
    * overlay/nodeDescriptionOverlay.ts). Distinct from NodeDef.description (the node TYPE's static,
@@ -52,6 +57,7 @@ export class NodeInstance {
     this.elementType = undefined;
     this.mapKeyType = undefined;
     this.container = undefined;
+    this.subType = undefined;
     this.description = undefined;
   }
 
@@ -77,6 +83,7 @@ export class NodeInstance {
       node.elementType = NodeInstance.DEFAULT_ELEMENT_TYPE;
       if (def.configurableElementType.includeKeyType) node.mapKeyType = NodeInstance.DEFAULT_KEY_TYPE;
     }
+    if (def.configurableSubType?.kind === "struct") node.subType = allStructTypeDefs()[0]?.id;
     return node;
   }
 

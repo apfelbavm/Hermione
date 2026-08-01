@@ -1,6 +1,8 @@
 import { NodeColorCategory, type ExecutionContext } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { registerStructType } from "../engine/structRegistry";
 import { AzureStorageManager } from "../lib/azureStorageManager";
+import type { AzureStorageBlobUploadOptions } from "../lib/azureStorageManager";
 import type { AzureStorageConnectionStringCredentialData } from "../credentials/types";
 import { i18n } from "@i18n";
 
@@ -15,7 +17,66 @@ import { i18n } from "@i18n";
 
 const ENCODING_OPTIONS = ["utf8", "base64"];
 const ACCESS_OPTIONS = ["private", "blob", "container"];
+const TIER_OPTIONS = ["", "Hot", "Cool", "Cold", "Archive"];
 const GROUP_NAME = "Request.AzureStorage";
+
+// The concrete example: Upload Blob's "options" pin is a struct (see engine/structRegistry.ts and
+// nodes/struct.ts's generic Make/Break Struct nodes) instead of one bare contentType string, so a
+// flow can build one full BlockBlobUploadOptions-shaped value with Make Struct (or plug in a
+// literal built right on this pin) and reuse it across multiple uploads.
+const UPLOAD_OPTIONS_STRUCT_TYPE = "azureStorageBlobUploadOptions";
+
+registerStructType({
+  id: UPLOAD_OPTIONS_STRUCT_TYPE,
+  label: i18n.nodes.azureStorage.uploadOptions.label,
+  fields: [
+    {
+      id: "contentType",
+      label: i18n.nodes.azureStorage.uploadOptions.pin_content_type,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "cacheControl",
+      label: i18n.nodes.azureStorage.uploadOptions.pin_cache_control,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "contentEncoding",
+      label: i18n.nodes.azureStorage.uploadOptions.pin_content_encoding,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "contentLanguage",
+      label: i18n.nodes.azureStorage.uploadOptions.pin_content_language,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "contentDisposition",
+      label: i18n.nodes.azureStorage.uploadOptions.pin_content_disposition,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "tier",
+      label: i18n.nodes.azureStorage.uploadOptions.pin_tier,
+      type: "string",
+      defaultValue: TIER_OPTIONS[0],
+      options: TIER_OPTIONS,
+    },
+    {
+      id: "metadata",
+      label: i18n.nodes.azureStorage.__shared.pin_metadata,
+      type: "string",
+      container: "map",
+      keyType: "string",
+      defaultValue: [],
+    },
+  ],
+});
 
 interface MapEntry {
   key: unknown;
@@ -401,11 +462,20 @@ registerNode({
       options: ENCODING_OPTIONS,
     },
     {
-      id: "contentType",
-      label: i18n.nodes.azureStorage.uploadBlob.pin_content_type,
-      type: "string",
+      id: "options",
+      label: i18n.nodes.azureStorage.uploadOptions.label,
+      type: "struct",
+      subType: UPLOAD_OPTIONS_STRUCT_TYPE,
       direction: "input",
-      defaultValue: "",
+      defaultValue: {
+        contentType: "",
+        cacheControl: "",
+        contentEncoding: "",
+        contentLanguage: "",
+        contentDisposition: "",
+        tier: TIER_OPTIONS[0],
+        metadata: [],
+      },
     },
     {
       id: "overwrite",
@@ -426,14 +496,17 @@ registerNode({
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
-    const result = await resolved.manager.uploadBlob(
-      String(inputs.containerName ?? ""),
-      String(inputs.blobName ?? ""),
-      String(inputs.content ?? ""),
-      inputs.encoding === "base64" ? "base64" : "utf8",
-      String(inputs.contentType ?? ""),
-      Boolean(inputs.overwrite),
-    );
+    const options = (inputs.options ?? {}) as Partial<AzureStorageBlobUploadOptions>;
+    const uploadOptions: AzureStorageBlobUploadOptions = {
+      contentType: String(options.contentType ?? ""),
+      cacheControl: String(options.cacheControl ?? ""),
+      contentEncoding: String(options.contentEncoding ?? ""),
+      contentLanguage: String(options.contentLanguage ?? ""),
+      contentDisposition: String(options.contentDisposition ?? ""),
+      tier: String(options.tier ?? ""),
+      metadata: mapEntriesToRecord(options.metadata),
+    };
+    const result = await resolved.manager.uploadBlob(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", uploadOptions, Boolean(inputs.overwrite));
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -580,7 +653,7 @@ registerNode({
     },
     {
       id: "contentType",
-      label: i18n.nodes.azureStorage.uploadBlob.pin_content_type,
+      label: i18n.nodes.azureStorage.uploadOptions.pin_content_type,
       type: "string",
       direction: "output",
     },

@@ -6,7 +6,7 @@ import type { NodeInstance } from "../../engine/nodeInstance";
 import { getNodeDef } from "../../engine/registry";
 import type { CommentBox, FunctionDef, PinDef, Variable } from "../../engine/types";
 import { setLastVariableType } from "../../client/lastVariableType";
-import { createContainerSelect, createTypeSelect, createTypedValueInput } from "../../overlay/typedValueInput";
+import { createContainerSelect, createStructTypeSelect, createTypeSelect, createTypedValueInput } from "../../overlay/typedValueInput";
 import { DEFAULT_COMMENT_COLOR } from "../../render/commentGeometry";
 import { getEditingGraph, getVisibleVariablesForState, type Store } from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
@@ -139,6 +139,22 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
                 })
               }
               deps={[node.id, node.mapKeyType]}
+              disabled={disabled}
+            />
+          </div>
+        )}
+
+        {def.configurableSubType?.kind === "struct" && (
+          <div className="variable-row">
+            <span className="variable-name">{i18n.components.details_panel.struct_type}</span>
+            <ImperativeMount
+              build={() =>
+                createStructTypeSelect(node.subType ?? "", (subType) => {
+                  getEditingGraph(store.state).changeNodeSubType(getVisibleVariablesForState(store.state), store.state.rootGraph.functions, node.id, subType);
+                  store.notify();
+                })
+              }
+              deps={[node.id, node.subType]}
               disabled={disabled}
             />
           </div>

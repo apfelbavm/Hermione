@@ -15,6 +15,7 @@ import "./oauth2Saml";
 import "./oauth2ClientCredentials";
 import "./dropbox";
 import "./azureStorage";
+import "./struct";
 import "./github";
 import "./microsoft365";
 import "./array";

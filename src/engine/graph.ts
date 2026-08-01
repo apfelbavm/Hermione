@@ -94,6 +94,27 @@ export class Graph {
     node.pins = pins;
   }
 
+  /** Sibling of changeNodeElementType for a configurableSubType node instance (see
+   * NodeDef.configurableSubType) — e.g. a Make/Break Struct node switching which struct class it
+   * builds/inspects. Same "disconnect everything, patch, rebuild every pin fresh" shape, since here
+   * too every pin the node has depends on the one chosen value. */
+  changeNodeSubType(variables: Variable[], functions: FunctionDef[], nodeId: string, subType: string): void {
+    const node = this.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    for (const conn of this.connections.filter((c) => c.fromNode === nodeId || c.toNode === nodeId)) {
+      this.removeConnection(variables, functions, conn.id);
+    }
+
+    node.subType = subType;
+
+    const pins: Record<string, Pin> = {};
+    for (const def of node.resolvePinDefs(variables, functions)) {
+      pins[def.id] = def.direction === "input" ? { value: cloneDefaultValue(def.defaultValue) } : {};
+    }
+    node.pins = pins;
+  }
+
   /** True if any of this node's DATA (non-exec) output pins feeds something else. A node can only be
    * disabled while this is false — disabling it anyway would silently starve whatever's downstream of
    * a real value, since a disabled node's execute()/evaluate() never runs. Re-enabling has no such

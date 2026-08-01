@@ -28,6 +28,7 @@ export const DEFAULT_VALUE_BY_TYPE: Record<PinType, unknown> = {
   object: null,
   date: "",
   enum: "",
+  struct: {},
 };
 
 /** Removes one entry pin from a node with an expandable, user-editable pin list (see
@@ -415,7 +416,14 @@ export function updateFunctionOutput(rootGraph: Graph, fn: FunctionDef, entryId:
 /** Creates a new script with an empty signature and no source yet. Scripts live only on the root
  * graph (rootGraph.scripts), same as functions — never nested inside a function body. */
 export function createCodeScriptDef(name: string): CodeScriptDef {
-  return { id: nextId("script"), name, source: "", compiledJs: "", inputs: [], outputs: [] };
+  return {
+    id: nextId("script"),
+    name,
+    source: "",
+    compiledJs: "",
+    inputs: [],
+    outputs: [],
+  };
 }
 
 const TEMPLATE_INPUT_NAME = "MyInputPin";

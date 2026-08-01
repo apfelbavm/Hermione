@@ -31,6 +31,8 @@ export interface PinTypeShape {
   type: PinType;
   container?: PinContainer;
   keyType?: PinType;
+  /** Only meaningful when type === "struct" — see PinDef.subType's own doc comment. */
+  subType?: string;
 }
 
 /** Two pins can wire together only if their container matches ("single" is the implicit default),
@@ -38,13 +40,16 @@ export interface PinTypeShape {
  * container pin never silently connects to a differently-shaped one (no Array<Number> ->
  * Set<Number>, no Map<string,X> -> Map<number,X>); the user would need an explicit conversion node
  * (e.g. Set To Array) for that. "enum" is never compatible with anything, including another enum
- * pin — see PinType's own doc comment for why. */
+ * pin — see PinType's own doc comment for why. "struct" is the opposite: two struct pins ARE
+ * wireable, but only when their subType (which registered struct class — see structRegistry.ts)
+ * also matches, same as Unreal's own struct pins. */
 export function isPinTypeCompatible(a: PinTypeShape, b: PinTypeShape): boolean {
   if (a.type === "enum" || b.type === "enum") return false;
   const containerA = a.container ?? "single";
   const containerB = b.container ?? "single";
   if (containerA !== containerB) return false;
   if (a.type !== b.type) return false;
+  if (a.type === "struct" && a.subType !== b.subType) return false;
   if (containerA === "map" && a.keyType !== b.keyType) return false;
   return true;
 }

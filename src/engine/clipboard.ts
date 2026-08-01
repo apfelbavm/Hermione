@@ -128,6 +128,7 @@ function cloneOptionalFields(target: NodeInstance, source: NodeInstance): void {
   target.elementType = source.elementType;
   target.mapKeyType = source.mapKeyType;
   target.container = source.container;
+  target.subType = source.subType;
   target.description = source.description;
 }
 

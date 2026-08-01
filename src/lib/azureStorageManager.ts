@@ -69,6 +69,19 @@ export interface AzureStorageAccountInfoResult extends AzureStorageOpResult {
   skuName: string;
 }
 
+/** The fields of BlockBlobUploadOptions this app exposes as a struct pin type (see
+ * nodes/azureStorage.ts's registered "azureStorageBlobUploadOptions" struct and nodes/struct.ts's
+ * generic Make/Break Struct nodes) — an empty string/{} field means "leave that SDK option unset". */
+export interface AzureStorageBlobUploadOptions {
+  contentType: string;
+  cacheControl: string;
+  contentEncoding: string;
+  contentLanguage: string;
+  contentDisposition: string;
+  tier: string;
+  metadata: Record<string, string>;
+}
+
 const managerCache = new Map<string, AzureStorageManager>();
 
 export class AzureStorageManager {
@@ -172,11 +185,25 @@ export class AzureStorageManager {
     }
   }
 
-  async uploadBlob(containerName: string, blobName: string, content: string, encoding: "utf8" | "base64", contentType: string, overwrite: boolean): Promise<AzureStorageOpResult> {
+  async uploadBlob(containerName: string, blobName: string, content: string, encoding: "utf8" | "base64", uploadOptions: AzureStorageBlobUploadOptions, overwrite: boolean): Promise<AzureStorageOpResult> {
     try {
       const blockBlobClient = this.client.getContainerClient(containerName).getBlockBlobClient(blobName);
       const buffer = encoding === "base64" ? Buffer.from(content, "base64") : Buffer.from(content, "utf8");
-      const options: BlockBlobUploadOptions = contentType ? { blobHTTPHeaders: { blobContentType: contentType } } : {};
+      const { contentType, cacheControl, contentEncoding, contentLanguage, contentDisposition, tier, metadata } = uploadOptions;
+      const options: BlockBlobUploadOptions = {
+        blobHTTPHeaders:
+          contentType || cacheControl || contentEncoding || contentLanguage || contentDisposition
+            ? {
+                blobContentType: contentType || undefined,
+                blobCacheControl: cacheControl || undefined,
+                blobContentEncoding: contentEncoding || undefined,
+                blobContentLanguage: contentLanguage || undefined,
+                blobContentDisposition: contentDisposition || undefined,
+              }
+            : undefined,
+        tier: tier || undefined,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      };
       if (!overwrite && (await blockBlobClient.exists())) {
         return { success: false, error: `Blob "${blobName}" already exists` };
       }

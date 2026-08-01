@@ -7,8 +7,12 @@ import type { CredentialRecord } from "../credentials/types";
  * Colors.PIN_COLORS) so it visually reads as "pick one," not "plug something in," matching
  * Unreal's own enum pins — minus Unreal's "you can still wire two of the same enum together"
  * allowance, since this engine has no real enum *classes* to match on, just an ad hoc options
- * list per pin. */
-export type PinType = "exec" | "number" | "boolean" | "string" | "object" | "date" | "enum";
+ * list per pin.
+ *
+ * "struct" is the opposite: a real class DOES exist for it (see structRegistry.ts's StructTypeDef,
+ * looked up by PinDef.subType) — two struct pins are wireable exactly when their subType also
+ * matches (see isPinTypeCompatible), same as Unreal's own struct pins. */
+export type PinType = "exec" | "number" | "boolean" | "string" | "object" | "date" | "enum" | "struct";
 
 /** Same 4 values debug.ts's "Print (Formatted)" node resolves its own Format pin to (see FORMATS
  * there) — shared here so ExecutionContext.log and server/runLogs.ts's LogEntry both refer to
@@ -49,6 +53,10 @@ export interface PinDef {
   container?: PinContainer;
   /** Only meaningful when container === "map" — the map's KEY type (`type` is the value type). */
   keyType?: PinType;
+  /** Only meaningful when `type` is "enum" or "struct" — which registered enum/struct class this
+   * pin is (see structRegistry.ts). Orthogonal to PinType for the same reason `container` is (see
+   * PinContainer's own doc comment): keeps every exhaustive `Record<PinType, ...>` map untouched. */
+  subType?: string;
 }
 
 export interface ExecuteResult {
@@ -178,6 +186,13 @@ export interface NodeDef {
    * detailsPanel.ts) instead of a wireable pin, using the same changeNodeElementType mutation a
    * Variable's own type change uses. */
   configurableElementType?: { includeKeyType?: boolean };
+  /** Sibling of configurableElementType for a node whose pins all key off one user-chosen struct
+   * CLASS instead of one element type — currently only struct.make/struct.break (see nodes/struct.ts).
+   * Consumed via NodeInstance.subType by this node's own deriveInstancePins; edited via a "Struct
+   * Type" selector in the Details panel, using the same changeNodeSubType mutation
+   * changeNodeElementType's sibling. `kind` is forward-looking (only "struct" exists today) so a
+   * future non-struct subType family doesn't need a whole new NodeDef flag. */
+  configurableSubType?: { kind: "struct" };
   /** Present only on a node whose entries come in linked PAIRS (Make Map's key-N/value-N) — called
    * by removeInstancePin right after it deletes+prunes `removedPinId`, returning any additional pin
    * ids (the paired sibling) that should be deleted+pruned the same way, since the generic
@@ -243,6 +258,10 @@ export interface Variable {
   container?: PinContainer;
   /** Only meaningful when container === "map". */
   keyType?: PinType;
+  /** Only meaningful when `type` is "enum" or "struct" — see PinDef.subType's own doc comment. Not
+   * yet exposed by the Add Variable UI (createTypeSelect's options don't include "struct"/"enum"),
+   * so this is currently write-only plumbing for a future struct/enum-typed variable. */
+  subType?: string;
 }
 
 export interface CommentBox {
@@ -263,6 +282,8 @@ export interface PinSignatureEntry {
   defaultValue: unknown;
   container?: PinContainer;
   keyType?: PinType;
+  /** Only meaningful when `type` is "enum" or "struct" — see PinDef.subType's own doc comment. */
+  subType?: string;
 }
 
 /** A user-defined function: its own typed signature plus its own body graph (whose `variables`
