@@ -7,6 +7,10 @@ const MAX_HISTORY_ENTRIES = 200;
 export interface HistoryManager {
   undo: () => void;
   redo: () => void;
+  /** Discards all prior entries and starts a fresh history at the current graph — call once the
+   * "real" graph (flow load, version restore) has replaced whatever placeholder state the manager
+   * was created with, so undo can never rewind past it. */
+  reset: () => void;
 }
 
 export function createHistoryManager(store: Store): HistoryManager {
@@ -27,7 +31,7 @@ export function createHistoryManager(store: Store): HistoryManager {
     }
     if (restoring) return;
     const current = snapshot();
-    if (current === history[index]) return; 
+    if (current === history[index]) return;
 
     history = history.slice(0, index + 1);
     history.push(current);
@@ -77,5 +81,14 @@ export function createHistoryManager(store: Store): HistoryManager {
     restore(history[index]);
   }
 
-  return { undo, redo };
+  function reset(): void {
+    if (debounceTimer !== null) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    history = [snapshot()];
+    index = 0;
+  }
+
+  return { undo, redo, reset };
 }

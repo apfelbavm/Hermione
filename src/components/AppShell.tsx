@@ -144,6 +144,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         flowName = flow.name;
         store.state.rootGraph = graphJson ? deserializeGraph(graphJson) : buildDemoGraph();
         lastSavedGraphJsonRef.current = serializeGraph(store.state.rootGraph);
+        history.reset();
         store.notify();
       } catch (err) {
         appendLog(i18n.components.app_shell.load_flow_failed + (err instanceof Error ? err.message : String(err)));
