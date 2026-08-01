@@ -530,6 +530,148 @@
         "pin_params": "Params (JSON)"
       }
     },
+    "microsoft365": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_user_id": "User ID or UPN",
+        "pin_id": "ID",
+        "pin_display_name": "Display Name",
+        "pin_user_principal_name": "User Principal Name",
+        "pin_mail": "Mail",
+        "pin_mail_nickname": "Mail Nickname",
+        "pin_description": "Description",
+        "pin_group_id": "Group ID",
+        "pin_filter": "Filter (OData)",
+        "pin_top": "Top",
+        "pin_subject": "Subject",
+        "pin_body": "Body",
+        "pin_body_type": "Body Type",
+        "pin_message_id": "Message ID",
+        "pin_event_id": "Event ID",
+        "pin_path": "Path",
+        "pin_content": "Content",
+        "pin_encoding": "Encoding"
+      },
+      "listUsers": {
+        "label": "Microsoft 365 List Users",
+        "description": "Lists users in the Azure AD tenant, optionally filtered with an OData $filter expression.",
+        "pin_users": "Users"
+      },
+      "getUser": {
+        "label": "Microsoft 365 Get User",
+        "description": "Fetches a single user's profile by ID or user principal name (UPN)."
+      },
+      "createUser": {
+        "label": "Microsoft 365 Create User",
+        "description": "Creates a new user in the Azure AD tenant.",
+        "pin_password": "Password",
+        "pin_force_change_password": "Force Change Password Next Sign-In"
+      },
+      "updateUser": {
+        "label": "Microsoft 365 Update User",
+        "description": "Updates a user's properties by ID or UPN using a raw JSON object of the fields to change.",
+        "pin_properties_json": "Properties (JSON)"
+      },
+      "deleteUser": {
+        "label": "Microsoft 365 Delete User",
+        "description": "Deletes a user from the Azure AD tenant by ID or UPN."
+      },
+      "listGroups": {
+        "label": "Microsoft 365 List Groups",
+        "description": "Lists groups in the Azure AD tenant, optionally filtered with an OData $filter expression.",
+        "pin_groups": "Groups"
+      },
+      "createGroup": {
+        "label": "Microsoft 365 Create Group",
+        "description": "Creates a new security or Microsoft 365 group in the Azure AD tenant.",
+        "pin_security_enabled": "Security Enabled",
+        "pin_mail_enabled": "Mail Enabled"
+      },
+      "deleteGroup": {
+        "label": "Microsoft 365 Delete Group",
+        "description": "Deletes a group from the Azure AD tenant by ID."
+      },
+      "addGroupMember": {
+        "label": "Microsoft 365 Add Group Member",
+        "description": "Adds a user as a member of a group by ID."
+      },
+      "sendMail": {
+        "label": "Microsoft 365 Send Mail",
+        "description": "Sends an email as a user via Outlook/Exchange Online.",
+        "pin_from_user_id": "From User ID or UPN",
+        "pin_to": "To",
+        "pin_save_to_sent_items": "Save To Sent Items"
+      },
+      "listMessages": {
+        "label": "Microsoft 365 List Messages",
+        "description": "Lists messages in a user's mailbox, optionally filtered with an OData $filter expression.",
+        "pin_messages": "Messages"
+      },
+      "getMessage": {
+        "label": "Microsoft 365 Get Message",
+        "description": "Fetches a single email message's subject, sender and body content by ID.",
+        "pin_from": "From",
+        "pin_body_content": "Body Content",
+        "pin_received_date_time": "Received Date/Time"
+      },
+      "deleteMessage": {
+        "label": "Microsoft 365 Delete Message",
+        "description": "Deletes an email message from a user's mailbox by ID."
+      },
+      "listEvents": {
+        "label": "Microsoft 365 List Events",
+        "description": "Lists events on a user's calendar.",
+        "pin_events": "Events"
+      },
+      "createEvent": {
+        "label": "Microsoft 365 Create Event",
+        "description": "Creates a new event on a user's calendar.",
+        "pin_start": "Start (ISO 8601)",
+        "pin_end": "End (ISO 8601)",
+        "pin_time_zone": "Time Zone",
+        "pin_attendees": "Attendees"
+      },
+      "deleteEvent": {
+        "label": "Microsoft 365 Delete Event",
+        "description": "Deletes an event from a user's calendar by ID."
+      },
+      "listDriveItems": {
+        "label": "Microsoft 365 List Drive Items",
+        "description": "Lists the files and folders under a path in a user's OneDrive, or the root if left blank.",
+        "pin_items": "Items"
+      },
+      "downloadFile": {
+        "label": "Microsoft 365 Download File",
+        "description": "Downloads the content of a file at a path in a user's OneDrive."
+      },
+      "uploadFile": {
+        "label": "Microsoft 365 Upload File",
+        "description": "Uploads content to a path in a user's OneDrive, creating or overwriting the file."
+      },
+      "deleteDriveItem": {
+        "label": "Microsoft 365 Delete Drive Item",
+        "description": "Deletes a file or folder at a path in a user's OneDrive."
+      },
+      "listJoinedTeams": {
+        "label": "Microsoft 365 List Joined Teams",
+        "description": "Lists the Microsoft Teams teams a user is a member of.",
+        "pin_teams": "Teams"
+      },
+      "sendChannelMessage": {
+        "label": "Microsoft 365 Send Channel Message",
+        "description": "Posts a message to a channel in a Microsoft Teams team.",
+        "pin_team_id": "Team ID",
+        "pin_channel_id": "Channel ID"
+      },
+      "request": {
+        "label": "Microsoft 365 Request",
+        "description": "Sends a raw request to any Microsoft Graph API route not covered by the other Microsoft 365 nodes, e.g. \"GET /me/drive\".",
+        "pin_method": "Method",
+        "pin_path": "Path",
+        "pin_body_json": "Body (JSON)",
+        "pin_data": "Data"
+      }
+    },
     "boolean": {
       "not": {
         "label": "Not",

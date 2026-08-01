@@ -2,7 +2,7 @@
  * (src/server/credentials.ts) and browser (the Credential Vault page, the oauth2Saml node's
  * interpreter path) can import this freely, unlike src/server/* itself. */
 
-export type CredentialTypeId = "usernamePassword" | "oauth2SamlBearer" | "dropboxOAuth2" | "githubToken" | "githubApp";
+export type CredentialTypeId = "usernamePassword" | "oauth2SamlBearer" | "dropboxOAuth2" | "githubToken" | "githubApp" | "microsoftGraphClientCredentials";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -47,7 +47,17 @@ export interface GithubAppCredentialData {
   installationId: string;
 }
 
-export type CredentialData = UsernamePasswordCredentialData | Oauth2SamlBearerCredentialData | DropboxOAuth2CredentialData | GithubTokenCredentialData | GithubAppCredentialData;
+/** An Azure AD app registration's tenant + client id/secret, used with the OAuth2 client credentials
+ * grant to act as itself (app-only, no signed-in user) against Microsoft Graph — see
+ * nodes/microsoft365.ts, which resolves this into a GraphManager that mints/refreshes the access
+ * token on demand, the same way DropboxOAuth2CredentialData feeds DropboxManager. */
+export interface MicrosoftGraphClientCredentialsData {
+  tenantId: string;
+  clientId: string;
+  clientSecret: string;
+}
+
+export type CredentialData = UsernamePasswordCredentialData | Oauth2SamlBearerCredentialData | DropboxOAuth2CredentialData | GithubTokenCredentialData | GithubAppCredentialData | MicrosoftGraphClientCredentialsData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */

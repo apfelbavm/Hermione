@@ -89,3 +89,18 @@ registerCredentialType({
     { id: "installationId", label: "Installation ID" },
   ],
 });
+
+registerCredentialType({
+  id: "microsoftGraphClientCredentials",
+  label: "Microsoft Graph (App-only)",
+  fields: [
+    { id: "tenantId", label: "Tenant ID" },
+    { id: "clientId", label: "Client ID" },
+    {
+      id: "clientSecret",
+      label: "Client Secret",
+      secret: true,
+      help: "From an Azure AD app registration granted application (not delegated) Microsoft Graph permissions, e.g. User.Read.All, Mail.Send, Calendars.ReadWrite, Files.ReadWrite.All, Group.ReadWrite.All, with admin consent.",
+    },
+  ],
+});
