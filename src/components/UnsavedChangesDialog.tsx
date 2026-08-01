@@ -6,7 +6,7 @@ import { i18n } from "@i18n";
 export function UnsavedChangesDialog({ saving, onCancel, onDiscard, onSaveAndLeave }: { saving: boolean; onCancel: () => void; onDiscard: () => void; onSaveAndLeave: () => void }) {
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && !saving && onCancel()}>
-      <div className="modal-box">
+      <div className="modal-box unsaved-changes-dialog">
         <h2 className="modal-title">{i18n.components.unsaved_changes_dialog.title}</h2>
         <p>{i18n.components.unsaved_changes_dialog.message}</p>
         <div className="modal-actions">

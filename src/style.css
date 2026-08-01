@@ -2131,7 +2131,7 @@ body.resizing {
   border: 1px solid var(--pp-border-strong);
   border-radius: 8px;
   padding: 20px 24px;
-  width: 380px;
+  width: 500px;
   max-width: calc(100vw - 32px);
   color: var(--pp-text);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
@@ -2215,18 +2215,20 @@ body.resizing {
   background: var(--pp-accent-hover);
 }
 
-/* Create Flow dialog's template picker — wider than the plain single-field modal-box since it hosts
-   a scrollable grid of 300x300 tiles below the name field (see CreateFlowDialog.tsx). Grows to fill
-   the viewport (minus a 64px margin on each side) up to a 1920px cap, rather than staying a fixed
-   width. */
+.unsaved-changes-dialog .modal-actions {
+  margin-top: 64px;
+}
+
+.unsaved-changes-dialog .modal-actions button {
+  white-space: nowrap;
+}
+
+
 .create-flow-dialog {
   width: calc(100vw - 128px);
   max-width: 1920px;
 }
 
-/* Fixed 300px tracks (not minmax/1fr) so tiles never grow past their image size; auto-fill just
-   picks how many columns fit the dialog's own width above and wraps the rest to new rows.
-   justify-content centers a short/last row instead of leaving it hugging the left edge. */
 .flow-template-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, 300px);
