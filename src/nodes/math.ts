@@ -364,3 +364,118 @@ registerNode({
     result: `(Number(${inputs.a}) !== Number(${inputs.b}))`,
   }),
 });
+
+registerNode({
+  type: "math.min",
+  label: i18n.nodes.math.min.label,
+  description: i18n.nodes.math.min.description,
+  group: GROUP_ARITHMETIC,
+  colorCategory: NodeColorCategory.Math,
+  pins: [
+    {
+      id: "a",
+      label: i18n.nodes.__shared.pin_a,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+    },
+    {
+      id: "b",
+      label: i18n.nodes.__shared.pin_b,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "number",
+      direction: "output",
+    },
+  ],
+  evaluate: ({ inputs }) => ({
+    result: Math.min(Number(inputs.a ?? 0), Number(inputs.b ?? 0)),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `Math.min(Number(${inputs.a}), Number(${inputs.b}))`,
+  }),
+});
+
+registerNode({
+  type: "math.max",
+  label: i18n.nodes.math.max.label,
+  description: i18n.nodes.math.max.description,
+  group: GROUP_ARITHMETIC,
+  colorCategory: NodeColorCategory.Math,
+  pins: [
+    {
+      id: "a",
+      label: i18n.nodes.__shared.pin_a,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+    },
+    {
+      id: "b",
+      label: i18n.nodes.__shared.pin_b,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "number",
+      direction: "output",
+    },
+  ],
+  evaluate: ({ inputs }) => ({
+    result: Math.max(Number(inputs.a ?? 0), Number(inputs.b ?? 0)),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `Math.max(Number(${inputs.a}), Number(${inputs.b}))`,
+  }),
+});
+
+registerNode({
+  type: "math.clamp",
+  label: i18n.nodes.math.clamp.label,
+  description: i18n.nodes.math.clamp.description,
+  group: GROUP_ARITHMETIC,
+  colorCategory: NodeColorCategory.Math,
+  pins: [
+    {
+      id: "value",
+      label: i18n.nodes.__shared.pin_value,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+    },
+    {
+      id: "min",
+      label: i18n.nodes.__shared.pin_min,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+    },
+    {
+      id: "max",
+      label: i18n.nodes.__shared.pin_max,
+      type: "number",
+      direction: "input",
+      defaultValue: 0,
+    },
+    {
+      id: "result",
+      label: i18n.nodes.__shared.pin_result,
+      type: "number",
+      direction: "output",
+    },
+  ],
+  evaluate: ({ inputs }) => ({
+    result: Math.min(Math.max(Number(inputs.value ?? 0), Number(inputs.min ?? 0)), Number(inputs.max ?? 0)),
+  }),
+  compileEvaluate: ({ inputs }) => ({
+    result: `Math.min(Math.max(Number(${inputs.value}), Number(${inputs.min})), Number(${inputs.max}))`,
+  }),
+});

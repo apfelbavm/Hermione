@@ -26,6 +26,13 @@ const GROUP_NAME = "Request.AzureStorage";
 // literal built right on this pin) and reuse it across multiple uploads.
 const UPLOAD_OPTIONS_STRUCT_TYPE = "azureStorageBlobUploadOptions";
 
+// Same reasoning applies to every multi-field result below (container/blob properties, account
+// info): one struct-typed output pin instead of a loose pin per field, so a flow can pass the
+// whole result around (or Break Struct it) rather than wiring each field separately.
+const CONTAINER_PROPERTIES_STRUCT_TYPE = "azureStorageContainerProperties";
+const BLOB_PROPERTIES_STRUCT_TYPE = "azureStorageBlobProperties";
+const ACCOUNT_INFO_STRUCT_TYPE = "azureStorageAccountInfo";
+
 registerStructType({
   id: UPLOAD_OPTIONS_STRUCT_TYPE,
   label: i18n.nodes.azureStorage.uploadOptions.label,
@@ -74,6 +81,97 @@ registerStructType({
       container: "map",
       keyType: "string",
       defaultValue: [],
+    },
+  ],
+});
+
+registerStructType({
+  id: CONTAINER_PROPERTIES_STRUCT_TYPE,
+  label: i18n.nodes.azureStorage.containerProperties.label,
+  fields: [
+    {
+      id: "etag",
+      label: i18n.nodes.azureStorage.__shared.pin_etag,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "lastModified",
+      label: i18n.nodes.azureStorage.__shared.pin_last_modified,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "publicAccess",
+      label: i18n.nodes.azureStorage.getContainerProperties.pin_public_access,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "metadata",
+      label: i18n.nodes.azureStorage.__shared.pin_metadata,
+      type: "string",
+      container: "map",
+      keyType: "string",
+      defaultValue: [],
+    },
+  ],
+});
+
+registerStructType({
+  id: BLOB_PROPERTIES_STRUCT_TYPE,
+  label: i18n.nodes.azureStorage.blobProperties.label,
+  fields: [
+    {
+      id: "size",
+      label: i18n.nodes.azureStorage.getBlobProperties.pin_size,
+      type: "number",
+      defaultValue: 0,
+    },
+    {
+      id: "contentType",
+      label: i18n.nodes.azureStorage.uploadOptions.pin_content_type,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "etag",
+      label: i18n.nodes.azureStorage.__shared.pin_etag,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "lastModified",
+      label: i18n.nodes.azureStorage.__shared.pin_last_modified,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "metadata",
+      label: i18n.nodes.azureStorage.__shared.pin_metadata,
+      type: "string",
+      container: "map",
+      keyType: "string",
+      defaultValue: [],
+    },
+  ],
+});
+
+registerStructType({
+  id: ACCOUNT_INFO_STRUCT_TYPE,
+  label: i18n.nodes.azureStorage.accountInfo.label,
+  fields: [
+    {
+      id: "accountKind",
+      label: i18n.nodes.azureStorage.getAccountInfo.pin_account_kind,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "skuName",
+      label: i18n.nodes.azureStorage.getAccountInfo.pin_sku_name,
+      type: "string",
+      defaultValue: "",
     },
   ],
 });
@@ -136,17 +234,6 @@ function metadataInPin() {
     container: "map" as const,
     keyType: "string" as const,
     defaultValue: [],
-  };
-}
-
-function metadataOutPin() {
-  return {
-    id: "metadata",
-    label: i18n.nodes.azureStorage.__shared.pin_metadata,
-    type: "string" as const,
-    direction: "output" as const,
-    container: "map" as const,
-    keyType: "string" as const,
   };
 }
 
@@ -324,24 +411,12 @@ registerNode({
     execOutPin(),
     successPin(),
     {
-      id: "etag",
-      label: i18n.nodes.azureStorage.__shared.pin_etag,
-      type: "string",
+      id: "properties",
+      label: i18n.nodes.azureStorage.containerProperties.label,
+      type: "struct",
+      subType: CONTAINER_PROPERTIES_STRUCT_TYPE,
       direction: "output",
     },
-    {
-      id: "lastModified",
-      label: i18n.nodes.azureStorage.__shared.pin_last_modified,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "publicAccess",
-      label: i18n.nodes.azureStorage.getContainerProperties.pin_public_access,
-      type: "string",
-      direction: "output",
-    },
-    metadataOutPin(),
     errorPin(),
   ],
   latent: true,
@@ -352,17 +427,28 @@ registerNode({
         nextExec: "exec-out",
         outputs: {
           success: false,
-          etag: "",
-          lastModified: "",
-          publicAccess: "",
-          metadata: [],
+          properties: {
+            etag: "",
+            lastModified: "",
+            publicAccess: "",
+            metadata: [],
+          },
           error: resolved.error,
         },
       };
     const result = await resolved.manager.getContainerProperties(String(inputs.containerName ?? ""));
     return {
       nextExec: "exec-out",
-      outputs: { ...result, metadata: recordToMapEntries(result.metadata) },
+      outputs: {
+        success: result.success,
+        properties: {
+          etag: result.etag,
+          lastModified: result.lastModified,
+          publicAccess: result.publicAccess,
+          metadata: recordToMapEntries(result.metadata),
+        },
+        error: result.error,
+      },
     };
   },
 });
@@ -646,30 +732,12 @@ registerNode({
     execOutPin(),
     successPin(),
     {
-      id: "size",
-      label: i18n.nodes.azureStorage.getBlobProperties.pin_size,
-      type: "number",
+      id: "properties",
+      label: i18n.nodes.azureStorage.blobProperties.label,
+      type: "struct",
+      subType: BLOB_PROPERTIES_STRUCT_TYPE,
       direction: "output",
     },
-    {
-      id: "contentType",
-      label: i18n.nodes.azureStorage.uploadOptions.pin_content_type,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "etag",
-      label: i18n.nodes.azureStorage.__shared.pin_etag,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "lastModified",
-      label: i18n.nodes.azureStorage.__shared.pin_last_modified,
-      type: "string",
-      direction: "output",
-    },
-    metadataOutPin(),
     errorPin(),
   ],
   latent: true,
@@ -680,18 +748,30 @@ registerNode({
         nextExec: "exec-out",
         outputs: {
           success: false,
-          size: 0,
-          contentType: "",
-          etag: "",
-          lastModified: "",
-          metadata: [],
+          properties: {
+            size: 0,
+            contentType: "",
+            etag: "",
+            lastModified: "",
+            metadata: [],
+          },
           error: resolved.error,
         },
       };
     const result = await resolved.manager.getBlobProperties(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
     return {
       nextExec: "exec-out",
-      outputs: { ...result, metadata: recordToMapEntries(result.metadata) },
+      outputs: {
+        success: result.success,
+        properties: {
+          size: result.size,
+          contentType: result.contentType,
+          etag: result.etag,
+          lastModified: result.lastModified,
+          metadata: recordToMapEntries(result.metadata),
+        },
+        error: result.error,
+      },
     };
   },
 });
@@ -857,15 +937,10 @@ registerNode({
     execOutPin(),
     successPin(),
     {
-      id: "accountKind",
-      label: i18n.nodes.azureStorage.getAccountInfo.pin_account_kind,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "skuName",
-      label: i18n.nodes.azureStorage.getAccountInfo.pin_sku_name,
-      type: "string",
+      id: "accountInfo",
+      label: i18n.nodes.azureStorage.accountInfo.label,
+      type: "struct",
+      subType: ACCOUNT_INFO_STRUCT_TYPE,
       direction: "output",
     },
     errorPin(),
@@ -878,12 +953,21 @@ registerNode({
         nextExec: "exec-out",
         outputs: {
           success: false,
-          accountKind: "",
-          skuName: "",
+          accountInfo: { accountKind: "", skuName: "" },
           error: resolved.error,
         },
       };
     const result = await resolved.manager.getAccountInfo();
-    return { nextExec: "exec-out", outputs: result };
+    return {
+      nextExec: "exec-out",
+      outputs: {
+        success: result.success,
+        accountInfo: {
+          accountKind: result.accountKind,
+          skuName: result.skuName,
+        },
+        error: result.error,
+      },
+    };
   },
 });

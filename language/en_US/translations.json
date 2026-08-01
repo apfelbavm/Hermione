@@ -237,6 +237,8 @@
       "pin_success": "Success",
       "pin_timeout": "Timeout (ms)",
       "pin_value": "Value",
+      "pin_min": "Min",
+      "pin_max": "Max",
       "pin_xml": "XML"
     },
     "struct": {
@@ -523,6 +525,9 @@
         "description": "Fetches metadata and properties (ETag, last modified, public access level) for a container.",
         "pin_public_access": "Public Access"
       },
+      "containerProperties": {
+        "label": "Azure Storage Container Properties"
+      },
       "setContainerMetadata": {
         "label": "Azure Storage Set Container Metadata",
         "description": "Replaces the custom metadata key/value pairs on a container."
@@ -570,6 +575,9 @@
         "description": "Fetches metadata and properties (size, content type, ETag, last modified) for a blob, without downloading its content.",
         "pin_size": "Size (bytes)"
       },
+      "blobProperties": {
+        "label": "Azure Storage Blob Properties"
+      },
       "setBlobMetadata": {
         "label": "Azure Storage Set Blob Metadata",
         "description": "Replaces the custom metadata key/value pairs on a blob."
@@ -592,6 +600,9 @@
         "description": "Fetches the account kind and SKU name of an Azure Storage account.",
         "pin_account_kind": "Account Kind",
         "pin_sku_name": "SKU Name"
+      },
+      "accountInfo": {
+        "label": "Azure Storage Account Info"
       }
     },
     "github": {
@@ -1243,6 +1254,18 @@
       "add": {
         "label": "Add ( + )",
         "description": "Adds two numbers together."
+      },
+      "clamp": {
+        "label": "Clamp",
+        "description": "Clamps a number between a minimum and maximum value."
+      },
+      "max": {
+        "label": "Max",
+        "description": "Returns the larger of two numbers."
+      },
+      "min": {
+        "label": "Min",
+        "description": "Returns the smaller of two numbers."
       },
       "subtract": {
         "label": "Subtract ( - )",
