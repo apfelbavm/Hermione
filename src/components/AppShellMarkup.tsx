@@ -5,9 +5,9 @@ import { useStoreRevision } from "../state/useStore";
 import { DetailsPanel } from "./sidebar/DetailsPanel";
 import { FunctionsPanel } from "./sidebar/FunctionsPanel";
 import { GraphTabs } from "./sidebar/GraphTabs";
+import { PageHeader } from "./PageHeader";
 import { ScriptsPanel } from "./sidebar/ScriptsPanel";
 import { VariablePanel } from "./sidebar/VariablePanel";
-import { ThemeToggle } from "./ThemeToggle";
 import { IconManager } from "../shared/iconManager";
 
 export default function AppShellMarkup({ store }: { store: Store }) {
@@ -17,13 +17,13 @@ export default function AppShellMarkup({ store }: { store: Store }) {
 
   return (
     <div id="app">
+      <PageHeader />
       <div id="toolbar">
         <div id="toolbar-left">
           <button type="button" id="back-to-project-button" title={i18n.components.app_shell_markup.back_title}>
             <IconManager.ChevronLeftIcon />
             {i18n.components.app_shell_markup.back}
           </button>
-          <span id="toolbar-title">Hermione</span>
           <div id="history-controls" className="toolbar-button-group">
             <button id="undo-button" title={i18n.components.app_shell_markup.undo_title}>
               <IconManager.UndoIcon />
@@ -57,7 +57,6 @@ export default function AppShellMarkup({ store }: { store: Store }) {
           <button id="download-button">{i18n.components.app_shell_markup.download_graph}</button>
           <button id="deploy-button">{i18n.components.app_shell_markup.deploy}</button>
           <input id="load-file-input" type="file" accept="application/json" style={{ display: "none" }} />
-          <ThemeToggle />
         </div>
       </div>
       <div id="main-area">
