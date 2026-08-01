@@ -330,49 +330,105 @@ function typeMenuGroups(includeStructsAndEnums: boolean): { header?: string; ent
   return groups;
 }
 
+/** Same filtered/keyboard-navigable shape as the node-creation search menu (nodeSearchMenu.ts), just
+ * over typeMenuGroups' flat type/struct/enum entries instead of NodeDefs — group headers are kept
+ * next to their still-matching entries and dropped entirely once a query empties out that group. */
 function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinType, subType?: string) => void, includeStructsAndEnums: boolean): void {
   const menu = document.createElement("div");
-  menu.className = "row-context-menu";
+  menu.className = "row-context-menu type-menu";
   menu.style.left = `${screenPos.x}px`;
   menu.style.top = `${screenPos.y}px`;
 
-  for (const group of typeMenuGroups(includeStructsAndEnums)) {
-    if (group.header) {
-      const header = document.createElement("div");
-      header.className = "pick-list-group-header";
-      header.textContent = group.header;
-      menu.appendChild(header);
+  const search = document.createElement("input");
+  search.type = "text";
+  search.placeholder = "Search types…";
+  search.className = "type-menu-search-input";
+  menu.appendChild(search);
+
+  const list = document.createElement("div");
+  list.className = "type-menu-list";
+  menu.appendChild(list);
+
+  const allGroups = typeMenuGroups(includeStructsAndEnums);
+  let flatEntries: TypeMenuEntry[] = [];
+  let highlighted = 0;
+
+  function render(): void {
+    list.innerHTML = "";
+    const query = search.value.trim().toLowerCase();
+    flatEntries = [];
+
+    for (const group of allGroups) {
+      const entries = query ? group.entries.filter((entry) => entry.label.toLowerCase().includes(query)) : group.entries;
+      if (entries.length === 0) continue;
+      if (group.header) {
+        const header = document.createElement("div");
+        header.className = "pick-list-group-header";
+        header.textContent = group.header;
+        list.appendChild(header);
+      }
+      for (const entry of entries) {
+        const index = flatEntries.length;
+        flatEntries.push(entry);
+        const el = document.createElement("div");
+        el.className = "row-context-menu-item pick-list-item";
+        if (index === highlighted) el.classList.add("highlighted");
+        el.append(createTypeDot(entry.type), document.createTextNode(entry.label));
+        el.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          pick(entry);
+        });
+        list.appendChild(el);
+      }
     }
-    for (const entry of group.entries) {
-      const el = document.createElement("div");
-      el.className = "row-context-menu-item pick-list-item";
-      el.append(createTypeDot(entry.type), document.createTextNode(entry.label));
-      el.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        close();
-        onPick(entry.type, entry.subType);
-      });
-      menu.appendChild(el);
+
+    if (flatEntries.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "row-context-menu-item pick-list-empty";
+      empty.textContent = "No matching types";
+      list.appendChild(empty);
     }
+  }
+
+  function pick(entry: TypeMenuEntry): void {
+    close();
+    onPick(entry.type, entry.subType);
   }
 
   function close(): void {
     menu.remove();
     document.removeEventListener("mousedown", onOutside, true);
-    document.removeEventListener("keydown", onKeydown, true);
   }
   function onOutside(e: MouseEvent): void {
     if (!menu.contains(e.target as Node)) close();
   }
-  function onKeydown(e: KeyboardEvent): void {
-    if (e.key === "Escape") close();
-  }
+
+  search.addEventListener("input", () => {
+    highlighted = 0;
+    render();
+  });
+  search.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      highlighted = Math.min(highlighted + 1, flatEntries.length - 1);
+      render();
+      e.preventDefault();
+    } else if (e.key === "ArrowUp") {
+      highlighted = Math.max(highlighted - 1, 0);
+      render();
+      e.preventDefault();
+    } else if (e.key === "Enter") {
+      if (flatEntries[highlighted]) pick(flatEntries[highlighted]);
+      e.preventDefault();
+    } else if (e.key === "Escape") {
+      close();
+      e.preventDefault();
+    }
+  });
 
   document.body.appendChild(menu);
-  setTimeout(() => {
-    document.addEventListener("mousedown", onOutside, true);
-    document.addEventListener("keydown", onKeydown, true);
-  }, 0);
+  render();
+  search.focus();
+  setTimeout(() => document.addEventListener("mousedown", onOutside, true), 0);
 }
 
 function openContainerMenu(screenPos: { x: number; y: number }, onPick: (container: PinContainer) => void): void {
