@@ -10,7 +10,6 @@ import { PageHeader } from "./PageHeader";
 import { ScriptsPanel } from "./sidebar/ScriptsPanel";
 import { VariablePanel } from "./sidebar/VariablePanel";
 import { VersionRestorePanel } from "./sidebar/VersionRestorePanel";
-import { ThemeToggle } from "./ThemeToggle";
 import { IconManager } from "../shared/iconManager";
 
 export default function RestoreVersionMarkup({
