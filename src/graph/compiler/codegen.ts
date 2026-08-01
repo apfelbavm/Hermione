@@ -3,7 +3,7 @@ import { getNodeDef } from "../engine/registry";
 import { indent, compileResultVar } from "../engine/compileUtils";
 import { Graph } from "../engine/graph";
 import { NodeInstance } from "../engine/nodeInstance";
-import type { FunctionDef } from "../engine/types";
+import type { CodeScriptDef, FunctionDef } from "../engine/types";
 
 export interface TriggerDescriptor {
   nodeId: string;
@@ -66,6 +66,17 @@ interface CompileState {
    * indexing into a result object. Keyed by node.id (not fn.id) since the same function can be
    * called from multiple sites, each needing its own distinctly-named bindings. */
   functionCallOutputNamesByNode: Map<string, Map<string, string>>;
+  /** script.id -> its generated top-level helper function name, memoized so a script bound to more
+   * than one Code node still only ever gets compiled (and only ever declares its own `run`) once. */
+  scriptHelperNames: Map<string, string>;
+  usedScriptHelperNames: Set<string>;
+  /** script.id -> its declared outputs' compiled `let` binding names inside its own helper function
+   * (see compileScriptDef) — the call site (compileFrom's code.run branch) destructures the call's
+   * return value using these same names, exactly like functionOutputNamesByGraph for function.call. */
+  scriptOutputNamesById: Map<string, Map<string, string>>;
+  /** A code.run node's id -> its own compiled destructured binding names, one per output pin — same
+   * role as functionCallOutputNamesByNode, but for Code nodes' script outputs. */
+  codeCallOutputNamesByNode: Map<string, Map<string, string>>;
 }
 
 /** Resolves a variable id to the exact JS reference compiled code should use for it — a bare local
@@ -165,6 +176,14 @@ function compileResolveDataPin(rootGraph: Graph, graph: Graph, nodeId: string, p
   if (upstreamNode.type === "function.call") {
     const name = state.functionCallOutputNamesByNode.get(upstreamNode.id)?.get(conn.fromPin);
     if (!name) throw new Error(`Output "${conn.fromPin}" isn't declared on function call node "${upstreamNode.id}" — cannot compile this reference`);
+    return name;
+  }
+
+  // A code.run's data outputs are, the same way, just the real bindings its own compiled statement
+  // (see compileFrom's code.run branch) already destructured its script's return value into.
+  if (upstreamNode.type === "code.run") {
+    const name = state.codeCallOutputNamesByNode.get(upstreamNode.id)?.get(conn.fromPin);
+    if (!name) throw new Error(`Output "${conn.fromPin}" isn't declared on code node "${upstreamNode.id}" — cannot compile this reference`);
     return name;
   }
 
@@ -294,6 +313,55 @@ function compileFrom(rootGraph: Graph, graph: Graph, nodeId: string, execInPin: 
     return statements;
   }
 
+  // code.run is a user-authored script (see nodes/code.ts), not a fixed NodeDef — it's handled
+  // directly here too, same reason and same shape as function.call above, so its script's own
+  // top-level statements live in one real top-level function (see compileScriptDef) instead of
+  // being re-declared inline as an IIFE inside every trigger/method that happens to call it.
+  if (node.type === "code.run") {
+    const script = rootGraph.scripts.find((s) => s.id === node.scriptId);
+    if (!script) {
+      throw new Error(`Code node "${node.id}" has no script assigned — cannot compile this graph yet`);
+    }
+    if (!script.compiledJs) {
+      throw new Error(`Code node "${node.id}"'s script "${script.name}" has never been saved — cannot compile this graph yet`);
+    }
+
+    const helperName = compileScriptDef(script, state);
+    const inputsObjExpr = `{ ${script.inputs.map((input) => `${JSON.stringify(input.name)}: ${compileResolveDataPin(rootGraph, graph, node.id, input.id, state)}`).join(", ")} }`;
+    const call = `await ${helperName}(this.log, ${inputsObjExpr})`;
+
+    let statements: string[];
+    if (script.outputs.length === 0) {
+      statements = [`${call};`];
+    } else {
+      // Same call-site destructuring convention as function.call: real bound names, one per output,
+      // prefixed by compileResultVar(node.id) so two Code nodes (even bound to the same script)
+      // never collide, keyed by the script's own shorthand-returned binding name (see
+      // compileScriptDef), not the output's pin id.
+      const scriptOutputNames = state.scriptOutputNamesById.get(script.id)!;
+      const usedNamesForThisCall = new Set<string>();
+      const callOutputNames = new Map<string, string>();
+      for (const output of script.outputs) {
+        callOutputNames.set(output.id, uniqueName(`${compileResultVar(node.id)}_${slugify(output.name, "out")}`, usedNamesForThisCall));
+      }
+      state.codeCallOutputNamesByNode.set(node.id, callOutputNames);
+
+      const destructureEntries = script.outputs.map((output) => `${scriptOutputNames.get(output.id)}: ${callOutputNames.get(output.id)}`).join(", ");
+      statements = [`const { ${destructureEntries} } = ${call};`];
+    }
+
+    const outgoing = connectionsFrom(graph, node.id, "exec-out");
+    if (outgoing.length > 1) {
+      throw new Error(`Node "${node.id}" (code.run) exec-out pin fans out to ${outgoing.length} wires — parallel exec fan-out is not supported by the compiler yet`);
+    }
+    if (outgoing.length === 1) {
+      const [conn] = outgoing;
+      statements.push(...compileFrom(rootGraph, graph, conn.toNode, conn.toPin, visiting, state));
+    }
+    visiting.delete(key);
+    return statements;
+  }
+
   const def = getNodeDef(node.type);
   if (!def.compileExecute) {
     throw new Error(`Node type "${node.type}" has no compileExecute — cannot compile this graph yet`);
@@ -398,6 +466,53 @@ function compileFunctionDef(rootGraph: Graph, fn: FunctionDef, state: CompileSta
   return fnName;
 }
 
+/** Compiles a CodeScriptDef's user-authored script into its own top-level helper function,
+ * memoized by script.id in state.scriptHelperNames so a script bound to more than one Code node is
+ * still only ever compiled — and its own top-level statements only ever declared — once. A plain
+ * top-level function rather than a class method (unlike compileFunctionDef): a script's whole
+ * signature is just (log, inputs), it never needs `this` for anything. */
+function compileScriptDef(script: CodeScriptDef, state: CompileState): string {
+  const existing = state.scriptHelperNames.get(script.id);
+  if (existing) return existing;
+
+  const helperName = uniqueName(`script_${slugify(script.name, "script")}`, state.usedScriptHelperNames);
+  state.scriptHelperNames.set(script.id, helperName);
+
+  const usedOutputNames = new Set<string>();
+  const outputNames = new Map<string, string>();
+  for (const output of script.outputs) {
+    outputNames.set(output.id, uniqueName(slugify(output.name, "out"), usedOutputNames));
+  }
+  state.scriptOutputNamesById.set(script.id, outputNames);
+
+  // Normalizes whatever run() returned (or a throw) into real `let` bindings, one per declared
+  // output, falling back to that output's own default exactly like namedInputsFor/pinOutputsFor do
+  // at interpret time — the call site (compileFrom's code.run branch) destructures these back out
+  // the same way function.call reads a custom function's outputs.
+  const outputDeclarations = script.outputs.map((output) => `let ${outputNames.get(output.id)} = (${JSON.stringify(output.name)} in __normalized) ? __normalized[${JSON.stringify(output.name)}] : ${JSON.stringify(output.defaultValue)}; // ${output.name}`);
+  const returnEntries = script.outputs.map((output) => `    ${outputNames.get(output.id)}, // ${output.name}`).join("\n");
+
+  const source = [
+    `async function ${helperName}(log, inputs) {`,
+    "  let __ret;",
+    "  try {",
+    ...script.compiledJs.split("\n").map((line) => `    ${line}`),
+    "    __ret = await run(log, inputs);",
+    "  } catch (__err) {",
+    '    log("Error: " + (__err instanceof Error ? __err.message : String(__err)));',
+    "  }",
+    '  const __normalized = (__ret && typeof __ret === "object") ? __ret : {};',
+    ...indent(outputDeclarations),
+    "  return {",
+    returnEntries,
+    "  };",
+    "}",
+  ].join("\n");
+
+  state.helpers.set(helperName, source);
+  return helperName;
+}
+
 function functionNameFor(node: NodeInstance, usedNames: Set<string>): string {
   const rawName = typeof node.pins.name?.value === "string" ? node.pins.name.value : node.type;
   return uniqueName(slugify(rawName, "trigger"), usedNames);
@@ -415,6 +530,10 @@ export function compileGraph(graph: Graph, version = 1, revision = 1): CompileRe
     functionArgNamesByGraph: new Map<Graph, Map<string, string>>(),
     functionOutputNamesByGraph: new Map<Graph, Map<string, string>>(),
     functionCallOutputNamesByNode: new Map<string, Map<string, string>>(),
+    scriptHelperNames: new Map<string, string>(),
+    usedScriptHelperNames: new Set<string>(),
+    scriptOutputNamesById: new Map<string, Map<string, string>>(),
+    codeCallOutputNamesByNode: new Map<string, Map<string, string>>(),
   };
 
   // Every global variable becomes a real `this.<name>` class field, named up front so any

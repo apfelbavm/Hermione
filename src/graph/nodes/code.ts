@@ -1,5 +1,4 @@
 import { registerNode } from "../engine/registry";
-import { compileResultVar } from "../engine/compileUtils";
 import type { CodeScriptDef } from "../engine/types";
 import { i18n } from "@i18n";
 // The Code node runs a user-authored script (see CodeScriptDef in types.ts, edited via Monaco in
@@ -140,46 +139,8 @@ registerNode({
     }
     return { nextExec: "exec-out", outputs: pinOutputsFor(script, returned) };
   },
-  compileExecute: ({ node, inputs, graph, compileFrom }) => {
-    const script = graph.scripts.find((s) => s.id === node.scriptId);
-    if (!script) {
-      throw new Error(`Code node "${node.id}" has no script assigned — cannot compile this graph yet`);
-    }
-    if (!script.compiledJs) {
-      throw new Error(`Code node "${node.id}"'s script "${script.name}" has never been saved — cannot compile this graph yet`);
-    }
-
-    const inputsObjExpr = `{ ${script.inputs.map((input) => `${JSON.stringify(input.name)}: ${inputs[input.id]}`).join(", ")} }`;
-    const resultVar = compileResultVar(node.id);
-
-    return [
-      // Declared up front (not `const` inside the try) so a thrown/never-returning script still
-      // leaves it as a plain {} — compileExecuteOutputs below reads named properties off it
-      // unconditionally, same "every output always gets SOME value" guarantee execute() gives via
-      // pinOutputsFor's defaultValue fallback.
-      `let ${resultVar} = {};`,
-      "try {",
-      "  const __run = (function () {",
-      ...script.compiledJs.split("\n").map((line) => `    ${line}`),
-      "    return run;",
-      "  })();",
-      `  const __ret = await __run(this.log, ${inputsObjExpr});`,
-      `  ${resultVar} = (__ret && typeof __ret === "object") ? __ret : {};`,
-      "} catch (__err) {",
-      '  this.log("Error: " + (__err instanceof Error ? __err.message : String(__err)));',
-      "}",
-      ...compileFrom("exec-out"),
-    ];
-  },
-  compileExecuteOutputs: ({ node, graph }) => {
-    const script = graph.scripts.find((s) => s.id === node.scriptId);
-    if (!script) return {};
-    const v = compileResultVar(node.id);
-    const outputs: Record<string, string> = {};
-    for (const output of script.outputs) {
-      const nameExpr = JSON.stringify(output.name);
-      outputs[output.id] = `(${nameExpr} in ${v} ? ${v}[${nameExpr}] : ${JSON.stringify(output.defaultValue)})`;
-    }
-    return outputs;
-  },
+  // compileExecute/compileExecuteOutputs are special-cased directly in compiler/codegen.ts instead
+  // of declared here (same reason as function.call in nodes/function.ts): a script's own
+  // compiledJs is compiled once into its own top-level helper function, not re-inlined into every
+  // flow that calls it.
 });

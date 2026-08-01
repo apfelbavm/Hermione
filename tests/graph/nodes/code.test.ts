@@ -4,12 +4,16 @@ import { getNodeDef } from "../../../src/graph/engine/registry";
 import { transpileScript } from "../../../src/graph/engine/transpile";
 import type { CodeScriptDef, ExecutionContext } from "../../../src/graph/engine/types";
 import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import { Graph } from "../../../src/graph/engine/graph";
+import { connectPins } from "../../../src/graph/engine/graphMutations";
+import { compileGraph } from "../../../src/graph/compiler/codegen";
+import { deployedScriptPath, writeDeployedScriptFile, deleteDeployedScriptFile } from "../../../src/server/deployedScriptFile";
+import { randomUUID } from "node:crypto";
+import { pathToFileURL } from "node:url";
 
 beforeAll(() => {
   registerBuiltins();
 });
-
-const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (...args: string[]) => (...args: unknown[]) => Promise<unknown>;
 
 /** Builds a real CodeScriptDef the way scriptEditor.ts's Save button would — source in, compiledJs
  * out via the actual transpile step, not a hand-written plain-JS fixture — so these tests exercise
@@ -42,43 +46,93 @@ async function executeNode(node: Partial<NodeInstance>, inputs: Record<string, u
   return { result, logs };
 }
 
-async function runCompiled(node: Partial<NodeInstance>, inputs: Record<string, string>, scripts: CodeScriptDef[]) {
-  const def = getNodeDef("code.run");
+/** Writes compiled source to the same location a real deploy uses (see server/deployedScriptFile.ts)
+ * and imports it back — cache-busted so repeat compiles in one test run don't hit a stale module. */
+async function loadCompiled(code: string): Promise<Record<string, unknown>> {
+  const flowId = `test-${randomUUID()}`;
+  writeDeployedScriptFile(flowId, code);
+  try {
+    const url = `${pathToFileURL(deployedScriptPath(flowId)).href}?t=${Date.now()}-${Math.random()}`;
+    return await import(/* @vite-ignore */ url);
+  } finally {
+    deleteDeployedScriptFile(flowId);
+  }
+}
+
+function instantiate(compiled: Record<string, unknown>, log: (message: string) => void): Record<string, unknown> {
+  const CompiledFlow = compiled.CompiledFlow as new (log: (message: string) => void) => Record<string, unknown>;
+  return new CompiledFlow(log);
+}
+
+function invokeTrigger(instance: Record<string, unknown>, functionName: string): Promise<void> {
+  return (instance[functionName] as () => Promise<void>).call(instance);
+}
+
+/** Compiles a graph with a single Start -> code.run (bound to `script`) node, runs it, and returns
+ * everything logged along the way — code.run's compile-time behavior is now special-cased directly
+ * in compiler/codegen.ts (mirroring function.call), so it's only exercisable through a real
+ * compileGraph() pass rather than by calling NodeDef fields directly. */
+async function runCompiled(script: CodeScriptDef, pinValues: Record<string, unknown> = {}): Promise<string[]> {
+  const graph = new Graph("g1", "test");
+  graph.scripts.push(script);
+  const startDef = getNodeDef("event.start");
+  const start = NodeInstance.createNodeInstance("event.start", { x: 0, y: 0 }, startDef.pins, "start");
+  graph.nodes.push(start);
+
+  const codeDef = getNodeDef("code.run");
+  const codeNode = NodeInstance.createNodeInstance("code.run", { x: 100, y: 0 }, codeDef.deriveScriptPins!(script), "code1", undefined, undefined, script.id);
+  graph.nodes.push(codeNode);
+  for (const [pinId, value] of Object.entries(pinValues)) {
+    codeNode.pins[pinId].value = value;
+  }
+
+  connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: codeNode.id, toPin: "exec-in" }, graph.scripts);
+
+  const { code, manifest } = compileGraph(graph);
+  const compiled = await loadCompiled(code);
   const logs: string[] = [];
-  const statements = def.compileExecute!({
-    node: node as NodeInstance,
-    inputs,
-    graph: { scripts } as any,
-    compileFrom: () => [],
-  });
-  const fn = new AsyncFunction(statements.join("\n"));
-  await fn.call({ log: (m: string) => logs.push(m) });
+  const instance = instantiate(compiled, (m) => logs.push(m));
+  await invokeTrigger(instance, manifest.triggers[0].functionName);
   return logs;
 }
 
-/** Sibling of runCompiled that ALSO evaluates compileExecuteOutputs' expressions against the same
- * scope compileExecute's statements ran in — exactly how a real downstream node's own compiled
- * compileEvaluate expression gets embedded (see codegen.ts) — by appending a `return { ... }`
- * built from those expressions before invoking the generated function. */
-async function runCompiledWithOutputs(node: Partial<NodeInstance>, inputs: Record<string, string>, scripts: CodeScriptDef[]) {
-  const def = getNodeDef("code.run");
-  const graph = { scripts } as any;
-  const statements = def.compileExecute!({
-    node: node as NodeInstance,
-    inputs,
-    graph,
-    compileFrom: () => [],
+/** Sibling of runCompiled that also chains a debug.print node per script output (each output must
+ * be string-typed so it wires directly into print's message pin) so compiled output handling
+ * (destructuring at the call site — see compileFrom's code.run branch in codegen.ts) gets
+ * exercised the same way a real downstream node would consume it, not just the exec-side logging.
+ * Returns one logged line per output, in declared order. */
+async function runCompiledWithOutputs(script: CodeScriptDef, pinValues: Record<string, unknown> = {}): Promise<string[]> {
+  const graph = new Graph("g1", "test");
+  graph.scripts.push(script);
+  const startDef = getNodeDef("event.start");
+  const start = NodeInstance.createNodeInstance("event.start", { x: 0, y: 0 }, startDef.pins, "start");
+  graph.nodes.push(start);
+
+  const codeDef = getNodeDef("code.run");
+  const codeNode = NodeInstance.createNodeInstance("code.run", { x: 100, y: 0 }, codeDef.deriveScriptPins!(script), "code1", undefined, undefined, script.id);
+  graph.nodes.push(codeNode);
+  for (const [pinId, value] of Object.entries(pinValues)) {
+    codeNode.pins[pinId].value = value;
+  }
+
+  const printDef = getNodeDef("debug.print");
+  connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: codeNode.id, toPin: "exec-in" }, graph.scripts);
+
+  let previousExecNode = codeNode.id;
+  script.outputs.forEach((output, i) => {
+    const printNode = NodeInstance.createNodeInstance("debug.print", { x: 200 + i * 100, y: 0 }, printDef.pins, `print${i}`);
+    graph.nodes.push(printNode);
+    connectPins(graph, graph.variables, graph.functions, { fromNode: previousExecNode, fromPin: "exec-out", toNode: printNode.id, toPin: "exec-in" }, graph.scripts);
+    connectPins(graph, graph.variables, graph.functions, { fromNode: codeNode.id, fromPin: output.id, toNode: printNode.id, toPin: "message" }, graph.scripts);
+    previousExecNode = printNode.id;
   });
-  const outputExprs = def.compileExecuteOutputs!({
-    node: node as NodeInstance,
-    graph,
-  });
-  const returnExpr = `{ ${Object.entries(outputExprs)
-    .map(([id, expr]) => `${JSON.stringify(id)}: ${expr}`)
-    .join(", ")} }`;
-  const fn = new AsyncFunction([...statements, `return ${returnExpr};`].join("\n"));
-  const outputs = await fn.call({ log: () => {} });
-  return outputs as Record<string, unknown>;
+
+  const { code, manifest } = compileGraph(graph);
+  const compiled = await loadCompiled(code);
+  const logs: string[] = [];
+  const instance = instantiate(compiled, (m) => logs.push(m));
+  await invokeTrigger(instance, manifest.triggers[0].functionName);
+  return logs;
 }
 
 describe("code.run", () => {
@@ -187,12 +241,12 @@ describe("code.run", () => {
 
     it("compiled output maps run()'s return value the same way, including the default-value fallback", async () => {
       const outputsSig: CodeScriptDef["outputs"] = [
-        { id: "pin-a", name: "a", type: "number", defaultValue: 42 },
+        { id: "pin-a", name: "a", type: "string", defaultValue: "forty-two" },
         { id: "pin-b", name: "b", type: "string", defaultValue: "fallback" },
       ];
-      const script = await makeScript(`function run() { return { a: 9 }; }`, [], outputsSig);
-      const outputs = await runCompiledWithOutputs({ id: "node-1", scriptId: script.id }, {}, [script]);
-      expect(outputs).toEqual({ "pin-a": 9, "pin-b": "fallback" });
+      const script = await makeScript(`function run() { return { a: "nine" }; }`, [], outputsSig);
+      const logs = await runCompiledWithOutputs(script);
+      expect(logs).toEqual(["nine", "fallback"]);
     });
 
     it("works identically whether or not the user's run() is declared async — both call sites always await the result", async () => {
@@ -231,10 +285,10 @@ describe("code.run", () => {
         "pin-result": "from plain: hi",
       });
 
-      const asyncCompiled = await runCompiledWithOutputs({ id: "node-1", scriptId: withAsync.id }, { "pin-greeting": '"hi"' }, [withAsync]);
-      const plainCompiled = await runCompiledWithOutputs({ id: "node-2", scriptId: withoutAsync.id }, { "pin-greeting": '"hi"' }, [withoutAsync]);
-      expect(asyncCompiled).toEqual({ "pin-result": "from async: hi" });
-      expect(plainCompiled).toEqual({ "pin-result": "from plain: hi" });
+      const asyncLogs = await runCompiledWithOutputs(withAsync, { "pin-greeting": "hi" });
+      const plainLogs = await runCompiledWithOutputs(withoutAsync, { "pin-greeting": "hi" });
+      expect(asyncLogs).toEqual(["from async: hi"]);
+      expect(plainLogs).toEqual(["from plain: hi"]);
     });
   });
 
@@ -250,7 +304,7 @@ describe("code.run", () => {
     expect(second.logs).toEqual(["call 1"]);
   });
 
-  describe("compileExecute", () => {
+  describe("compiled", () => {
     it("compiles to statements that run to the same result as execute()", async () => {
       const script = await makeScript(`function run(log: (m: string) => void, inputs: { greeting: string }) { log(inputs.greeting + "!"); }`, [
         {
@@ -260,30 +314,37 @@ describe("code.run", () => {
           defaultValue: "",
         },
       ]);
-      const logs = await runCompiled({ id: "node-1", scriptId: script.id }, { "pin-greeting": JSON.stringify("Hi") }, [script]);
+      const logs = await runCompiled(script, { "pin-greeting": "Hi" });
       expect(logs).toEqual(["Hi!"]);
     });
 
     it("catches a thrown error in compiled output the same way execute() does", async () => {
       const script = await makeScript(`function run(log) { throw new Error("compiled boom"); }`);
-      const logs = await runCompiled({ id: "node-1", scriptId: script.id }, {}, [script]);
+      const logs = await runCompiled(script);
       expect(logs).toEqual(["Error: compiled boom"]);
     });
 
     it("throws a clear compile error when no script is bound", () => {
-      const def = getNodeDef("code.run");
-      expect(() =>
-        def.compileExecute!({
-          node: {} as NodeInstance,
-          inputs: {},
-          graph: { scripts: [] } as any,
-          compileFrom: () => [],
-        }),
-      ).toThrow(/no script assigned/);
+      // A node's pins are only ever resolvable while its bound script still exists in
+      // graph.scripts (see NodeInstance.resolvePinDefs) — wire it up while a placeholder script IS
+      // present so connectPins can resolve real exec-in/exec-out pins, then remove that script to
+      // reproduce the dangling-reference state compileGraph itself must guard against.
+      const placeholder: CodeScriptDef = { id: "gone", name: "Gone", source: "function run(){}", compiledJs: "", inputs: [], outputs: [] };
+      const graph = new Graph("g1", "test");
+      graph.scripts.push(placeholder);
+      const startDef = getNodeDef("event.start");
+      const start = NodeInstance.createNodeInstance("event.start", { x: 0, y: 0 }, startDef.pins, "start");
+      graph.nodes.push(start);
+      const codeDef = getNodeDef("code.run");
+      const codeNode = NodeInstance.createNodeInstance("code.run", { x: 100, y: 0 }, codeDef.deriveScriptPins!(placeholder), "code1", undefined, undefined, placeholder.id);
+      graph.nodes.push(codeNode);
+      connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: codeNode.id, toPin: "exec-in" }, graph.scripts);
+      graph.scripts = [];
+
+      expect(() => compileGraph(graph)).toThrow(/no script assigned/);
     });
 
     it("throws a clear compile error when the bound script has never been saved", () => {
-      const def = getNodeDef("code.run");
       const unsaved: CodeScriptDef = {
         id: "s3",
         name: "Unsaved",
@@ -292,14 +353,17 @@ describe("code.run", () => {
         inputs: [],
         outputs: [],
       };
-      expect(() =>
-        def.compileExecute!({
-          node: { scriptId: "s3" } as NodeInstance,
-          inputs: {},
-          graph: { scripts: [unsaved] } as any,
-          compileFrom: () => [],
-        }),
-      ).toThrow(/never been saved/);
+      const graph = new Graph("g1", "test");
+      graph.scripts.push(unsaved);
+      const startDef = getNodeDef("event.start");
+      const start = NodeInstance.createNodeInstance("event.start", { x: 0, y: 0 }, startDef.pins, "start");
+      graph.nodes.push(start);
+      const codeDef = getNodeDef("code.run");
+      const codeNode = NodeInstance.createNodeInstance("code.run", { x: 100, y: 0 }, codeDef.deriveScriptPins!(unsaved), "code1", undefined, undefined, unsaved.id);
+      graph.nodes.push(codeNode);
+      connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: codeNode.id, toPin: "exec-in" }, graph.scripts);
+
+      expect(() => compileGraph(graph)).toThrow(/never been saved/);
     });
   });
 });

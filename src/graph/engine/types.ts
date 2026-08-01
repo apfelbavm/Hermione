@@ -170,9 +170,9 @@ export interface NodeDef {
    * returned statements always precede whatever `compileFrom(execOutPin)` appends after them. */
   compileExecuteOutputs?: (args: {
     node: NodeInstance;
-    /** Needed only by a node whose output SHAPE is derived from bound data rather than fixed (e.g.
-     * code.run's outputs come from its bound CodeScriptDef, looked up via node.scriptId) — every
-     * fixed-shape node (http.request, etc.) can safely ignore this. */
+    /** Available for a node whose output shape could depend on bound data — every current
+     * implementer (http.request, the crypto/oauth2Saml/odata/sftp nodes) has a fixed shape and
+     * safely ignores this. */
     graph: Graph;
   }) => Record<string, string>;
   /** Named helper-function source snippets this node's generated code depends on (e.g. `delay`), deduped by name across the whole compiled file. */
