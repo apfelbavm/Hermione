@@ -2,18 +2,8 @@ import { registerStructType } from "../../engine/structRegistry";
 import { i18n } from "@i18n";
 
 export const TIER_OPTIONS = ["", "Hot", "Cool", "Cold", "Archive"];
-
-// The concrete example: Upload Blob's "options" pin is a struct (see engine/structRegistry.ts and
-// nodes/struct.ts's generic Make/Break Struct nodes) instead of one bare contentType string, so a
-// flow can build one full BlockBlobUploadOptions-shaped value with Make Struct (or plug in a
-// literal built right on this pin) and reuse it across multiple uploads.
 export const UPLOAD_OPTIONS_STRUCT_TYPE = "azureStorageBlobUploadOptions";
-
-// Same reasoning applies to every multi-field result below (container/blob properties, account
-// info): one struct-typed output pin instead of a loose pin per field, so a flow can pass the
-// whole result around (or Break Struct it) rather than wiring each field separately.
-export const CONTAINER_PROPERTIES_STRUCT_TYPE =
-  "azureStorageContainerProperties";
+export const CONTAINER_PROPERTIES_STRUCT_TYPE = "azureStorageContainerProperties";
 export const BLOB_PROPERTIES_STRUCT_TYPE = "azureStorageBlobProperties";
 export const ACCOUNT_INFO_STRUCT_TYPE = "azureStorageAccountInfo";
 

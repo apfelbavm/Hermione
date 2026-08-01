@@ -1,8 +1,6 @@
 import { registerStructType } from "../../engine/structRegistry";
 import { i18n } from "@i18n";
 
-// Same struct-output-pin pattern as structs/azureStorage.ts: any result with 2+ non-success/error
-// fields gets a single struct-typed output pin instead of a loose pin per field.
 export const AUTH_TOKENS_STRUCT_TYPE = "dropboxAuthTokens";
 export const METADATA_STRUCT_TYPE = "dropboxMetadata";
 export const REVISION_STRUCT_TYPE = "dropboxRevision";

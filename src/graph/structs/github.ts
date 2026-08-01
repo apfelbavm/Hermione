@@ -1,9 +1,6 @@
 import { registerStructType } from "../../engine/structRegistry";
 import { i18n } from "@i18n";
 
-// Same struct-output-pin pattern as structs/azureStorage.ts: any result with 2+ non-success/error
-// fields (or an array of same-shaped objects, e.g. issues/pull requests) gets a struct type
-// instead of loose pins/opaque "object" values.
 export const ISSUE_STRUCT_TYPE = "githubIssue";
 export const PULL_REQUEST_STRUCT_TYPE = "githubPullRequest";
 export const CREATE_RESULT_STRUCT_TYPE = "githubCreateResult";
@@ -16,30 +13,10 @@ registerStructType({
   label: i18n.nodes.github.issue.label,
   category: "GitHub",
   fields: [
-    {
-      id: "number",
-      label: i18n.nodes.github.__shared.pin_number,
-      type: "number",
-      defaultValue: 0,
-    },
-    {
-      id: "title",
-      label: i18n.nodes.github.__shared.pin_title,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "state",
-      label: i18n.nodes.github.__shared.pin_state,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "url",
-      label: i18n.nodes.github.__shared.pin_url,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "number", label: i18n.nodes.github.__shared.pin_number, type: "number", defaultValue: 0 },
+    { id: "title", label: i18n.nodes.github.__shared.pin_title, type: "string", defaultValue: "" },
+    { id: "state", label: i18n.nodes.github.__shared.pin_state, type: "string", defaultValue: "" },
+    { id: "url", label: i18n.nodes.github.__shared.pin_url, type: "string", defaultValue: "" },
   ],
 });
 
@@ -48,30 +25,10 @@ registerStructType({
   label: i18n.nodes.github.pullRequest.label,
   category: "GitHub",
   fields: [
-    {
-      id: "number",
-      label: i18n.nodes.github.__shared.pin_number,
-      type: "number",
-      defaultValue: 0,
-    },
-    {
-      id: "title",
-      label: i18n.nodes.github.__shared.pin_title,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "state",
-      label: i18n.nodes.github.__shared.pin_state,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "url",
-      label: i18n.nodes.github.__shared.pin_url,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "number", label: i18n.nodes.github.__shared.pin_number, type: "number", defaultValue: 0 },
+    { id: "title", label: i18n.nodes.github.__shared.pin_title, type: "string", defaultValue: "" },
+    { id: "state", label: i18n.nodes.github.__shared.pin_state, type: "string", defaultValue: "" },
+    { id: "url", label: i18n.nodes.github.__shared.pin_url, type: "string", defaultValue: "" },
   ],
 });
 
@@ -80,12 +37,7 @@ registerStructType({
   label: i18n.nodes.github.createResult.label,
   category: "GitHub",
   fields: [
-    {
-      id: "number",
-      label: i18n.nodes.github.__shared.pin_number,
-      type: "number",
-      defaultValue: 0,
-    },
+    { id: "number", label: i18n.nodes.github.__shared.pin_number, type: "number", defaultValue: 0 },
     {
       id: "url",
       label: i18n.nodes.github.__shared.pin_url,
