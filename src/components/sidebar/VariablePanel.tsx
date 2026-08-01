@@ -5,7 +5,8 @@ import { i18n } from "@i18n";
 import { Colors } from "../../engine/color";
 import type { Graph } from "../../engine/graph";
 import { addVariable, DEFAULT_VALUE_BY_TYPE, moveVariable, nextId, removeVariable, updateVariable } from "../../engine/graphMutations";
-import type { PinContainer, PinType, Variable } from "../../engine/types";
+import type { PinContainer, Variable } from "../../engine/types";
+import { getLastVariableType } from "../../client/lastVariableType";
 import { VARIABLE_DRAG_MIME } from "../../overlay/dragTypes";
 import { openRowContextMenu } from "../../overlay/rowContextMenu";
 import { nextAvailableName } from "../../overlay/uniqueName";
@@ -63,7 +64,7 @@ export function VariablePanel({ id, title, store, getGraph }: { id?: string; tit
       graph.variables.map((v) => v.name),
       "NewVariable",
     );
-    const type: PinType = "number";
+    const type = getLastVariableType();
     const variable: Variable = {
       id: nextId("var"),
       name,

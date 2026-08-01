@@ -5,6 +5,7 @@ import { i18n } from "@i18n";
 import type { NodeInstance } from "../../engine/nodeInstance";
 import { getNodeDef } from "../../engine/registry";
 import type { CommentBox, FunctionDef, PinDef, Variable } from "../../engine/types";
+import { setLastVariableType } from "../../client/lastVariableType";
 import { createContainerSelect, createTypeSelect, createTypedValueInput } from "../../overlay/typedValueInput";
 import { DEFAULT_COMMENT_COLOR } from "../../render/commentGeometry";
 import { getEditingGraph, getVisibleVariablesForState, type Store } from "../../state/store";
@@ -24,6 +25,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
             build={() =>
               createTypeSelect(variable.type, (type) => {
                 updateVariable(store.state.rootGraph, variable.id, { type });
+                setLastVariableType(type);
                 store.notify();
               })
             }

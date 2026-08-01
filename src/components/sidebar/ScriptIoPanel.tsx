@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { i18n } from "@i18n";
 import { addScriptInput, addScriptOutput, DEFAULT_VALUE_BY_TYPE, moveScriptInput, moveScriptOutput, nextId, removeScriptInput, removeScriptOutput, updateScriptInput, updateScriptOutput } from "../../engine/graphMutations";
-import type { CodeScriptDef, PinSignatureEntry, PinType } from "../../engine/types";
+import type { CodeScriptDef, PinSignatureEntry } from "../../engine/types";
+import { getLastVariableType, setLastVariableType } from "../../client/lastVariableType";
 import { SCRIPT_IO_ENTRY_DRAG_MIME } from "../../overlay/dragTypes";
 import { openRowContextMenu } from "../../overlay/rowContextMenu";
 import { createContainerSelect, createTypeSelect, createTypedValueInput } from "../../overlay/typedValueInput";
@@ -45,7 +46,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
       entries.map((entry) => entry.name),
       kind === "input" ? "NewInput" : "NewOutput",
     );
-    const type: PinType = "number";
+    const type = getLastVariableType();
     const entry: PinSignatureEntry = {
       id: nextId("io"),
       name,
@@ -102,6 +103,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
                 build={() =>
                   createTypeSelect(entry.type, (type) => {
                     update(store.state.rootGraph, script!, entry.id, { type });
+                    setLastVariableType(type);
                     store.notify();
                   })
                 }

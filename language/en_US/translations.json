@@ -1,8 +1,8 @@
 {
   "pages": {
     "logs": {
-      "title": "Every run across every project (grouped by run — expand one to inspect its individual log entries).",
-      "empty": "No runs yet — simulate or run a deployed Flow to see its logs here.",
+      "title": "Every run across every project.",
+      "empty": "No runs yet",
       "page_title": "Logs"
     },
     "ai_docs": {
@@ -83,8 +83,8 @@
       "back": "Back",
       "title": "Run Logs",
       "project_fallback": "Project",
-      "description": "Showing the latest {max} runs (grouped by run — expand one to inspect its individual log entries).",
-      "empty": "No runs yet — simulate a Flow to see its logs here."
+      "description": "Showing the latest {max} runs.",
+      "empty": "No runs yet"
     },
     "restore_flow_version": {
       "title": "Restore old version",

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { i18n } from "@i18n";
 import { addFunctionInput, addFunctionOutput, DEFAULT_VALUE_BY_TYPE, moveFunctionEntry, nextId, removeFunctionInput, removeFunctionOutput, updateFunctionInput, updateFunctionOutput } from "../../engine/graphMutations";
-import type { FunctionDef, PinSignatureEntry, PinType } from "../../engine/types";
+import type { FunctionDef, PinSignatureEntry } from "../../engine/types";
+import { getLastVariableType, setLastVariableType } from "../../client/lastVariableType";
 import { FUNCTION_IO_ENTRY_DRAG_MIME } from "../../overlay/dragTypes";
 import { openRowContextMenu } from "../../overlay/rowContextMenu";
 import { createContainerSelect, createTypeSelect, createTypedValueInput } from "../../overlay/typedValueInput";
@@ -44,7 +45,7 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
       entries.map((entry) => entry.name),
       kind === "input" ? "NewInput" : "NewOutput",
     );
-    const type: PinType = "number";
+    const type = getLastVariableType();
     const entry: PinSignatureEntry = {
       id: nextId("io"),
       name,
@@ -102,6 +103,7 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
                 build={() =>
                   createTypeSelect(entry.type, (type) => {
                     update(store.state.rootGraph, fn!, entry.id, { type });
+                    setLastVariableType(type);
                     store.notify();
                   })
                 }
