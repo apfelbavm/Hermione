@@ -50,6 +50,7 @@ function deriveScriptPins(script: CodeScriptDef) {
       defaultValue: input.defaultValue,
       container: input.container,
       keyType: input.keyType,
+      subType: input.subType,
     })),
     {
       id: "exec-out",
@@ -64,6 +65,7 @@ function deriveScriptPins(script: CodeScriptDef) {
       direction: "output" as const,
       container: output.container,
       keyType: output.keyType,
+      subType: output.subType,
     })),
   ];
 }

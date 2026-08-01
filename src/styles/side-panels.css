@@ -110,7 +110,6 @@
   font-size: 11px;
 }
 
-
 .function-name {
   cursor: pointer;
 }
@@ -252,6 +251,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.pick-list-group-header {
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pp-text-dim);
 }
 
 .container-icon {

@@ -1,6 +1,7 @@
 import { Graph } from "./graph";
 import { NodeInstance } from "./nodeInstance";
 import { getNodeDef, isPinTypeCompatible } from "./registry";
+import { defaultStructValue, tryGetStructTypeDef } from "./structRegistry";
 import type { CodeScriptDef, CommentBox, Connection, FunctionDef, PinContainer, PinSignatureEntry, PinType, Variable } from "./types";
 
 /** Defensive shallow clone for a value about to be copied from a PinDef/Variable's `defaultValue`
@@ -322,13 +323,21 @@ export interface TypedEntryPatch {
   defaultValue?: unknown;
   container?: PinContainer;
   keyType?: PinType;
+  /** Only meaningful when type === "struct" (or "enum") — see PinDef.subType's own doc comment. */
+  subType?: string;
 }
 
 /** A brand-new default for `type`/`container` — an empty list for any non-"single" container
- * (Array/Set/Map are all backed by a plain array, see PinContainer's own doc comment), otherwise
- * the plain per-type default. */
-export function defaultValueFor(type: PinType, container: PinContainer | undefined): unknown {
-  return container && container !== "single" ? [] : DEFAULT_VALUE_BY_TYPE[type];
+ * (Array/Set/Map are all backed by a plain array, see PinContainer's own doc comment), the
+ * all-fields-defaulted struct value for a "struct" type (see structRegistry.ts), otherwise the
+ * plain per-type default. */
+export function defaultValueFor(type: PinType, container: PinContainer | undefined, subType?: string): unknown {
+  if (container && container !== "single") return [];
+  if (type === "struct") {
+    const def = subType ? tryGetStructTypeDef(subType) : undefined;
+    return def ? defaultStructValue(def) : {};
+  }
+  return DEFAULT_VALUE_BY_TYPE[type];
 }
 
 /** Renames/retypes/revalues a variable in place (global or local — searched across every graph).
@@ -342,13 +351,18 @@ export function updateVariable(rootGraph: Graph, variableId: string, patch: Type
     .find((v) => v.id === variableId);
   if (!variable) return;
 
-  const signatureChanged = (patch.type !== undefined && patch.type !== variable.type) || (patch.container !== undefined && patch.container !== variable.container) || (patch.keyType !== undefined && patch.keyType !== variable.keyType);
+  const signatureChanged =
+    (patch.type !== undefined && patch.type !== variable.type) ||
+    (patch.container !== undefined && patch.container !== variable.container) ||
+    (patch.keyType !== undefined && patch.keyType !== variable.keyType) ||
+    (patch.subType !== undefined && patch.subType !== variable.subType);
   if (patch.name !== undefined) variable.name = patch.name;
   if (patch.type !== undefined) variable.type = patch.type;
   if (patch.container !== undefined) variable.container = patch.container;
   if (patch.keyType !== undefined) variable.keyType = patch.keyType;
+  if (patch.subType !== undefined) variable.subType = patch.subType;
   if (patch.defaultValue !== undefined) variable.defaultValue = patch.defaultValue;
-  else if (signatureChanged) variable.defaultValue = defaultValueFor(variable.type, variable.container);
+  else if (signatureChanged) variable.defaultValue = defaultValueFor(variable.type, variable.container, variable.subType);
 
   if (signatureChanged) {
     for (const g of allGraphs(rootGraph)) {
@@ -366,13 +380,18 @@ function updateFunctionEntry(rootGraph: Graph, fn: FunctionDef, entries: PinSign
   const entry = entries.find((e) => e.id === entryId);
   if (!entry) return;
 
-  const signatureChanged = (patch.type !== undefined && patch.type !== entry.type) || (patch.container !== undefined && patch.container !== entry.container) || (patch.keyType !== undefined && patch.keyType !== entry.keyType);
+  const signatureChanged =
+    (patch.type !== undefined && patch.type !== entry.type) ||
+    (patch.container !== undefined && patch.container !== entry.container) ||
+    (patch.keyType !== undefined && patch.keyType !== entry.keyType) ||
+    (patch.subType !== undefined && patch.subType !== entry.subType);
   if (patch.name !== undefined) entry.name = patch.name;
   if (patch.type !== undefined) entry.type = patch.type;
   if (patch.container !== undefined) entry.container = patch.container;
   if (patch.keyType !== undefined) entry.keyType = patch.keyType;
+  if (patch.subType !== undefined) entry.subType = patch.subType;
   if (patch.defaultValue !== undefined) entry.defaultValue = patch.defaultValue;
-  else if (signatureChanged) entry.defaultValue = defaultValueFor(entry.type, entry.container);
+  else if (signatureChanged) entry.defaultValue = defaultValueFor(entry.type, entry.container, entry.subType);
 
   if (signatureChanged) {
     for (const g of allGraphs(rootGraph)) {
@@ -557,13 +576,18 @@ function updateScriptEntry(rootGraph: Graph, script: CodeScriptDef, entries: Pin
   const entry = entries.find((e) => e.id === entryId);
   if (!entry) return;
 
-  const signatureChanged = (patch.type !== undefined && patch.type !== entry.type) || (patch.container !== undefined && patch.container !== entry.container) || (patch.keyType !== undefined && patch.keyType !== entry.keyType);
+  const signatureChanged =
+    (patch.type !== undefined && patch.type !== entry.type) ||
+    (patch.container !== undefined && patch.container !== entry.container) ||
+    (patch.keyType !== undefined && patch.keyType !== entry.keyType) ||
+    (patch.subType !== undefined && patch.subType !== entry.subType);
   if (patch.name !== undefined) entry.name = patch.name;
   if (patch.type !== undefined) entry.type = patch.type;
   if (patch.container !== undefined) entry.container = patch.container;
   if (patch.keyType !== undefined) entry.keyType = patch.keyType;
+  if (patch.subType !== undefined) entry.subType = patch.subType;
   if (patch.defaultValue !== undefined) entry.defaultValue = patch.defaultValue;
-  else if (signatureChanged) entry.defaultValue = defaultValueFor(entry.type, entry.container);
+  else if (signatureChanged) entry.defaultValue = defaultValueFor(entry.type, entry.container, entry.subType);
 
   if (signatureChanged) {
     for (const g of allGraphs(rootGraph)) {

@@ -101,13 +101,21 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
 
               <ImperativeMount
                 build={() =>
-                  createTypeSelect(entry.type, (type) => {
-                    update(store.state.rootGraph, script!, entry.id, { type });
-                    setLastVariableType(type);
-                    store.notify();
-                  })
+                  createTypeSelect(
+                    entry.type,
+                    (type, subType) => {
+                      update(store.state.rootGraph, script!, entry.id, {
+                        type,
+                        subType,
+                      });
+                      setLastVariableType(type);
+                      store.notify();
+                    },
+                    entry.subType,
+                    true,
+                  )
                 }
-                deps={[entry.id, entry.type]}
+                deps={[entry.id, entry.type, entry.subType]}
                 disabled={disabled}
               />
 

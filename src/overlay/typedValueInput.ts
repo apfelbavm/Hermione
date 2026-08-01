@@ -1,6 +1,7 @@
 import { Colors } from "../engine/color";
 import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
-import { allStructTypeDefs } from "../engine/structRegistry";
+import { allEnumTypeDefs, tryGetEnumTypeDef } from "../engine/enumRegistry";
+import { allStructTypeDefs, tryGetStructTypeDef } from "../engine/structRegistry";
 import type { PinContainer, PinType } from "../engine/types";
 import { guardAgainstMultilinePaste, openMultilineTextEditor } from "./multilineTextEditor";
 
@@ -284,8 +285,94 @@ function openPickList<T>(screenPos: { x: number; y: number }, options: readonly 
   }, 0);
 }
 
-function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinType) => void): void {
-  openPickList(screenPos, PIN_TYPE_OPTIONS, (type) => [createTypeDot(type), document.createTextNode(type)], onPick);
+/** Everything openTypeMenu needs to render and pick one option — either one of the flat "simple"
+ * PIN_TYPE_OPTIONS (no subType) or one registered struct/enum CLASS (type is always "struct"/
+ * "enum", subType is that class's id, label is that class's own label instead of the bare type
+ * name). */
+interface TypeMenuEntry {
+  type: PinType;
+  subType?: string;
+  label: string;
+}
+
+/** Builds the flyout's flat list of options: the "simple" types first (ungrouped, unchanged order),
+ * then every registered struct type under a "Structs" header, then every registered enum type
+ * under an "Enums" header — each group only appears once at least one type of that kind is
+ * registered (see structRegistry.ts/enumRegistry.ts). `includeStructsAndEnums` is false for
+ * selectors that only ever apply to one non-struct value (e.g. a Map's key type, an Array's
+ * element type) — struct/enum classes aren't wireable as those today. */
+function typeMenuGroups(includeStructsAndEnums: boolean): { header?: string; entries: TypeMenuEntry[] }[] {
+  const groups: { header?: string; entries: TypeMenuEntry[] }[] = [{ entries: PIN_TYPE_OPTIONS.map((type) => ({ type, label: type })) }];
+  if (!includeStructsAndEnums) return groups;
+
+  const structs = allStructTypeDefs();
+  if (structs.length > 0) {
+    groups.push({
+      header: "Structs",
+      entries: structs.map((def) => ({
+        type: "struct",
+        subType: def.id,
+        label: def.label,
+      })),
+    });
+  }
+  const enums = allEnumTypeDefs();
+  if (enums.length > 0) {
+    groups.push({
+      header: "Enums",
+      entries: enums.map((def) => ({
+        type: "enum",
+        subType: def.id,
+        label: def.label,
+      })),
+    });
+  }
+  return groups;
+}
+
+function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinType, subType?: string) => void, includeStructsAndEnums: boolean): void {
+  const menu = document.createElement("div");
+  menu.className = "row-context-menu";
+  menu.style.left = `${screenPos.x}px`;
+  menu.style.top = `${screenPos.y}px`;
+
+  for (const group of typeMenuGroups(includeStructsAndEnums)) {
+    if (group.header) {
+      const header = document.createElement("div");
+      header.className = "pick-list-group-header";
+      header.textContent = group.header;
+      menu.appendChild(header);
+    }
+    for (const entry of group.entries) {
+      const el = document.createElement("div");
+      el.className = "row-context-menu-item pick-list-item";
+      el.append(createTypeDot(entry.type), document.createTextNode(entry.label));
+      el.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        close();
+        onPick(entry.type, entry.subType);
+      });
+      menu.appendChild(el);
+    }
+  }
+
+  function close(): void {
+    menu.remove();
+    document.removeEventListener("mousedown", onOutside, true);
+    document.removeEventListener("keydown", onKeydown, true);
+  }
+  function onOutside(e: MouseEvent): void {
+    if (!menu.contains(e.target as Node)) close();
+  }
+  function onKeydown(e: KeyboardEvent): void {
+    if (e.key === "Escape") close();
+  }
+
+  document.body.appendChild(menu);
+  setTimeout(() => {
+    document.addEventListener("mousedown", onOutside, true);
+    document.addEventListener("keydown", onKeydown, true);
+  }, 0);
 }
 
 function openContainerMenu(screenPos: { x: number; y: number }, onPick: (container: PinContainer) => void): void {
@@ -323,31 +410,48 @@ export function createStructTypeSelect(current: string, onChange: (subType: stri
   return select;
 }
 
-export function createTypeSelect(current: PinType, onChange: (type: PinType) => void): HTMLElement {
+/** A custom dropdown (not a native <select> — those can't show arbitrary markup per option) for
+ * editing a variable's or a function I/O entry's type. Each option, and the closed button itself,
+ * shows the same colored dot used everywhere else a variable's type is indicated (see the
+ * Variables list in variablePanel.ts and canvas node headers in drawNodes.ts). `currentSubType`/
+ * `includeStructsAndEnums` opt this selector into also offering registered struct/enum classes,
+ * grouped after the plain types (see typeMenuGroups) — omit both for a selector that should only
+ * ever show the plain types (e.g. a Map's key type, an Array's element type). */
+export function createTypeSelect(current: PinType, onChange: (type: PinType, subType?: string) => void, currentSubType?: string, includeStructsAndEnums = false): HTMLElement {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "typed-value-type-select";
 
-  function renderButton(type: PinType): void {
+  function labelFor(type: PinType, subType?: string): string {
+    if (type === "struct") return (subType && tryGetStructTypeDef(subType)?.label) ?? type;
+    if (type === "enum") return (subType && tryGetEnumTypeDef(subType)?.label) ?? type;
+    return type;
+  }
+
+  function renderButton(type: PinType, subType?: string): void {
     button.innerHTML = "";
     const caret = document.createElement("span");
     caret.className = "typed-value-type-caret";
     caret.textContent = "▾";
-    button.append(createTypeDot(type), document.createTextNode(type), caret);
+    button.append(createTypeDot(type), document.createTextNode(labelFor(type, subType)), caret);
   }
-  renderButton(current);
+  renderButton(current, currentSubType);
 
   button.addEventListener("mousedown", (e) => e.stopPropagation());
   button.addEventListener("click", () => {
     const rect = button.getBoundingClientRect();
-    openTypeMenu({ x: rect.left, y: rect.bottom }, (type) => {
-      renderButton(type);
-      onChange(type);
-      // A native <button> keeps focus after being clicked — left focused, it would permanently
-      // block whatever re-render onChange triggers (e.g. detailsPanel.ts's "don't wipe fields
-      // mid-edit" guard checks document.activeElement), since nothing else ever moves focus away.
-      button.blur();
-    });
+    openTypeMenu(
+      { x: rect.left, y: rect.bottom },
+      (type, subType) => {
+        renderButton(type, subType);
+        onChange(type, subType);
+        // A native <button> keeps focus after being clicked — left focused, it would permanently
+        // block whatever re-render onChange triggers (e.g. detailsPanel.ts's "don't wipe fields
+        // mid-edit" guard checks document.activeElement), since nothing else ever moves focus away.
+        button.blur();
+      },
+      includeStructsAndEnums,
+    );
   });
 
   return button;

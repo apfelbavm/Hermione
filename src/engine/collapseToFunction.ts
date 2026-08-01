@@ -170,7 +170,10 @@ export function collapseSelectionToFunction(rootGraph: Graph, graph: Graph, sele
     y: COLLAPSED_BODY_OFFSET.y - minY,
   };
   for (const node of selectedNodes) {
-    node.position = { x: node.position.x + offset.x, y: node.position.y + offset.y };
+    node.position = {
+      x: node.position.x + offset.x,
+      y: node.position.y + offset.y,
+    };
   }
   fn.body.nodes.push(...selectedNodes);
   fn.body.connections.push(...internalConnections);
@@ -209,12 +212,16 @@ export function collapseSelectionToFunction(rootGraph: Graph, graph: Graph, sele
       id: nextId("io"),
       name: uniqueSignatureName(usedInputNames, targetPinDef.label),
       type: targetPinDef.type,
-      defaultValue: targetPinDef.defaultValue ?? defaultValueFor(targetPinDef.type, targetPinDef.container),
+      defaultValue: targetPinDef.defaultValue ?? defaultValueFor(targetPinDef.type, targetPinDef.container, targetPinDef.subType),
       container: targetPinDef.container,
       keyType: targetPinDef.keyType,
+      subType: targetPinDef.subType,
     };
     addFunctionInput(fn, entry);
-    inputSources.set(entry.id, { fromNode: first.fromNode, fromPin: first.fromPin });
+    inputSources.set(entry.id, {
+      fromNode: first.fromNode,
+      fromPin: first.fromPin,
+    });
 
     for (const c of group) {
       connectPins(
@@ -241,9 +248,10 @@ export function collapseSelectionToFunction(rootGraph: Graph, graph: Graph, sele
       id: nextId("io"),
       name: uniqueSignatureName(usedOutputNames, sourcePinDef.label),
       type: sourcePinDef.type,
-      defaultValue: defaultValueFor(sourcePinDef.type, sourcePinDef.container),
+      defaultValue: defaultValueFor(sourcePinDef.type, sourcePinDef.container, sourcePinDef.subType),
       container: sourcePinDef.container,
       keyType: sourcePinDef.keyType,
+      subType: sourcePinDef.subType,
     };
     addFunctionOutput(fn, entry);
     outputTargets.set(

@@ -101,13 +101,21 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
 
               <ImperativeMount
                 build={() =>
-                  createTypeSelect(entry.type, (type) => {
-                    update(store.state.rootGraph, fn!, entry.id, { type });
-                    setLastVariableType(type);
-                    store.notify();
-                  })
+                  createTypeSelect(
+                    entry.type,
+                    (type, subType) => {
+                      update(store.state.rootGraph, fn!, entry.id, {
+                        type,
+                        subType,
+                      });
+                      setLastVariableType(type);
+                      store.notify();
+                    },
+                    entry.subType,
+                    true,
+                  )
                 }
-                deps={[entry.id, entry.type]}
+                deps={[entry.id, entry.type, entry.subType]}
                 disabled={disabled}
               />
 

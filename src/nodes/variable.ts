@@ -38,6 +38,7 @@ registerNode({
       direction: "output",
       container: variable.container,
       keyType: variable.keyType,
+      subType: variable.subType,
     },
   ],
   evaluate: ({ node, ctx }) => ({
@@ -66,6 +67,7 @@ registerNode({
       defaultValue: variable.defaultValue,
       container: variable.container,
       keyType: variable.keyType,
+      subType: variable.subType,
     },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],

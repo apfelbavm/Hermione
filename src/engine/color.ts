@@ -59,7 +59,7 @@ export const Colors = {
       object: "#4f9bd6",
       date: "#d6a23b",
       enum: "#1f6b45",
-      struct: "#1a2a6b",
+      struct: "#142f9c",
     };
   },
 

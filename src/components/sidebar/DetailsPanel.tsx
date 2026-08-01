@@ -23,13 +23,21 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
         <div className="variable-row">
           <ImperativeMount
             build={() =>
-              createTypeSelect(variable.type, (type) => {
-                updateVariable(store.state.rootGraph, variable.id, { type });
-                setLastVariableType(type);
-                store.notify();
-              })
+              createTypeSelect(
+                variable.type,
+                (type, subType) => {
+                  updateVariable(store.state.rootGraph, variable.id, {
+                    type,
+                    subType,
+                  });
+                  setLastVariableType(type);
+                  store.notify();
+                },
+                variable.subType,
+                true,
+              )
             }
-            deps={[variable.id, variable.type]}
+            deps={[variable.id, variable.type, variable.subType]}
             disabled={disabled}
           />
           <ImperativeMount
