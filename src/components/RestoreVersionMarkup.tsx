@@ -6,6 +6,7 @@ import { useStoreRevision } from "../state/useStore";
 import { DetailsPanel } from "./sidebar/DetailsPanel";
 import { FunctionsPanel } from "./sidebar/FunctionsPanel";
 import { GraphTabs } from "./sidebar/GraphTabs";
+import { PageHeader } from "./PageHeader";
 import { ScriptsPanel } from "./sidebar/ScriptsPanel";
 import { VariablePanel } from "./sidebar/VariablePanel";
 import { VersionRestorePanel } from "./sidebar/VersionRestorePanel";
@@ -41,6 +42,7 @@ export default function RestoreVersionMarkup({
 
   return (
     <div id="app">
+      <PageHeader />
       <div id="toolbar">
         <div className="toolbar-left">
           <span id="toolbar-title">
@@ -59,9 +61,6 @@ export default function RestoreVersionMarkup({
             loadingGraph={loadingGraph}
             restoring={restoring}
           />
-        </div>
-        <div className="toolbar-right">
-          <ThemeToggle />
         </div>
       </div>
       <div id="main-area">
