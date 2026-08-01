@@ -819,8 +819,11 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
     async function onCompileClick(): Promise<void> {
       await scriptEditor.flushDirtyScripts();
+      const graphJson = serializeGraph(store.state.rootGraph);
       try {
-        await deployFlow(projectId, flowId, serializeGraph(store.state.rootGraph));
+        await saveFlowGraph(projectId, flowId, graphJson);
+        lastSavedGraphJsonRef.current = graphJson;
+        await deployFlow(projectId, flowId, graphJson);
       } catch (err) {
         appendLog(i18n.components.app_shell.deploy_error + (err instanceof Error ? err.message : String(err)));
       }

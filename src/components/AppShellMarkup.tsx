@@ -50,6 +50,9 @@ export default function AppShellMarkup({ store, flowName }: { store: Store; flow
           </label>
         </div>
         <div className="toolbar-right">
+          <button id="deploy-button" className="btn btn-ghost">
+            {i18n.components.app_shell_markup.deploy}
+          </button>
           <button id="save-button" className="btn btn-ghost">
             {i18n.components.app_shell_markup.save}
           </button>
@@ -59,9 +62,7 @@ export default function AppShellMarkup({ store, flowName }: { store: Store; flow
           <button id="download-button" className="btn btn-ghost">
             {i18n.components.app_shell_markup.download_graph}
           </button>
-          <button id="deploy-button" className="btn btn-ghost">
-            {i18n.components.app_shell_markup.deploy}
-          </button>
+
           <input id="load-file-input" type="file" accept="application/json" style={{ display: "none" }} />
         </div>
       </div>
