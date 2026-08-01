@@ -60,11 +60,14 @@ registerNode({
     ctx.onReturn?.(inputs);
     return {};
   },
-  // Assigns straight into the compiled function's `result` object (declared by
-  // compiler/codegen.ts's compileFunctionDef) — no exec-out to compileFrom into, since Return is
+  // Assigns straight into the real `let` bindings compiler/codegen.ts's compileFunctionDef
+  // declared for each declared output — no exec-out to compileFrom into, since Return is
   // terminal, mirroring execute()'s own "last one to fire wins" semantics for free (whichever
-  // Return statement runs last in the compiled body simply overwrites the same keys).
-  compileExecute: ({ inputs }) => Object.entries(inputs).map(([pinId, expr]) => `result[${JSON.stringify(pinId)}] = ${expr};`),
+  // Return statement runs last in the compiled body simply overwrites the same bindings).
+  compileExecute: ({ inputs, resolveFunctionOutputRef }) => {
+    if (!resolveFunctionOutputRef) throw new Error("function.return's compileExecute requires resolveFunctionOutputRef (only codegen.ts provides this)");
+    return Object.entries(inputs).map(([pinId, expr]) => `${resolveFunctionOutputRef(pinId)} = ${expr};`);
+  },
 });
 
 registerNode({

@@ -50,6 +50,22 @@ interface CompileState {
    * never need to dedupe against global ones — a local is always a bare `let`, a global is always
    * `this.<name>`, two different namespaces that can't collide even if the text matches. */
   localVariableNamesByGraph: Map<Graph, Map<string, string>>;
+  /** A function body Graph -> its own declared inputs' compiled parameter names — function.entry's
+   * data outputs resolve straight to these (see compileResolveDataPin) instead of a string-keyed
+   * `args` object. Populated once when that function starts compiling, same as the map above. */
+  functionArgNamesByGraph: Map<Graph, Map<string, string>>;
+  /** A function body Graph -> its own declared outputs' compiled `let` binding names — a real
+   * variable per output that function.return's compileExecute (see function.ts) assigns straight
+   * into, instead of a string-keyed `result` object. The compiled method still returns a plain
+   * object built from these bindings so function.call's own call site can read named outputs off
+   * it, same as before. */
+  functionOutputNamesByGraph: Map<Graph, Map<string, string>>;
+  /** A function.call node's id -> its own compiled destructured binding names, one per output pin —
+   * populated when that call site is compiled (see compileFrom's function.call branch) so a later
+   * compileResolveDataPin lookup for the same call resolves straight to the bound name instead of
+   * indexing into a result object. Keyed by node.id (not fn.id) since the same function can be
+   * called from multiple sites, each needing its own distinctly-named bindings. */
+  functionCallOutputNamesByNode: Map<string, Map<string, string>>;
 }
 
 /** Resolves a variable id to the exact JS reference compiled code should use for it — a bare local
@@ -63,6 +79,16 @@ function makeResolveVariableRef(graph: Graph, state: CompileState): (variableId:
     const globalName = state.globalVariableNames.get(variableId);
     if (globalName) return `this.${globalName}`;
     throw new Error(`Variable "${variableId}" isn't declared in any scope visible here — cannot compile this reference`);
+  };
+}
+
+/** Resolves a FunctionDef output's pin id to the `let` binding compiled for it — only ever called
+ * while compiling that same function's own body (see function.ts's function.return). */
+function makeResolveFunctionOutputRef(graph: Graph, state: CompileState): (outputPinId: string) => string {
+  return (outputPinId: string) => {
+    const name = state.functionOutputNamesByGraph.get(graph)?.get(outputPinId);
+    if (!name) throw new Error(`Output "${outputPinId}" isn't declared on the function body being compiled here — cannot compile this reference`);
+    return name;
   };
 }
 
@@ -125,18 +151,21 @@ function compileResolveDataPin(rootGraph: Graph, graph: Graph, nodeId: string, p
 
   const upstreamNode = findNode(graph, conn.fromNode);
 
-  // A function.entry's data outputs are just this compiled function's own `args` object, keyed the
-  // same way as fn.inputs ids — no generic compileEvaluate needed, the expression never depends on
-  // anything but the requested pin id itself.
+  // A function.entry's data outputs are just this compiled function's own real parameters, keyed
+  // the same way as fn.inputs ids — no generic compileEvaluate needed, the expression never depends
+  // on anything but the requested pin id itself.
   if (upstreamNode.type === "function.entry") {
-    return `args[${JSON.stringify(conn.fromPin)}]`;
+    const argName = state.functionArgNamesByGraph.get(graph)?.get(conn.fromPin);
+    if (!argName) throw new Error(`Input "${conn.fromPin}" isn't declared on the function body being compiled here — cannot compile this reference`);
+    return argName;
   }
 
-  // A function.call's data outputs are read off the result object its own compiled statement (see
-  // compileFrom's function.call branch) already assigned to compileResultVar(upstreamNode.id) —
-  // same "reference into a local variable already declared" convention as compileExecuteOutputs.
+  // A function.call's data outputs are just the real bindings its own compiled statement (see
+  // compileFrom's function.call branch) already destructured the call's return value into.
   if (upstreamNode.type === "function.call") {
-    return `${compileResultVar(upstreamNode.id)}[${JSON.stringify(conn.fromPin)}]`;
+    const name = state.functionCallOutputNamesByNode.get(upstreamNode.id)?.get(conn.fromPin);
+    if (!name) throw new Error(`Output "${conn.fromPin}" isn't declared on function call node "${upstreamNode.id}" — cannot compile this reference`);
+    return name;
   }
 
   const upstreamDef = getNodeDef(upstreamNode.type);
@@ -227,8 +256,31 @@ function compileFrom(rootGraph: Graph, graph: Graph, nodeId: string, execInPin: 
       throw new Error(`Function call node "${node.id}" isn't bound to any function — cannot compile this graph yet`);
     }
     const fnName = compileFunctionDef(rootGraph, fn, state);
-    const argEntries = fn.inputs.map((input) => `${JSON.stringify(input.id)}: ${compileResolveDataPin(rootGraph, graph, node.id, input.id, state)}`).join(", ");
-    const statements = [`const ${compileResultVar(node.id)} = await this.${fnName}({ ${argEntries} });`];
+    // Positional, in fn.inputs' declared order — matches the real parameter list compileFunctionDef
+    // generates for this same fn, so no string-keyed args object is needed at the call site either.
+    const argValues = fn.inputs.map((input) => compileResolveDataPin(rootGraph, graph, node.id, input.id, state));
+    const call = `await this.${fnName}(${argValues.join(", ")})`;
+
+    let statements: string[];
+    if (fn.outputs.length === 0) {
+      statements = [`${call};`];
+    } else {
+      // Destructures the call's return value straight into real bound names (one per output pin,
+      // prefixed by compileResultVar(node.id) so they can never collide with another call site's own
+      // bindings, even for two calls to the same function) instead of keeping the returned object
+      // around to index into later. Keyed by the function's own shorthand-returned binding name
+      // (see compileFunctionDef), not the output's pin id.
+      const fnOutputNames = state.functionOutputNamesByGraph.get(fn.body)!;
+      const usedNamesForThisCall = new Set<string>();
+      const callOutputNames = new Map<string, string>();
+      for (const output of fn.outputs) {
+        callOutputNames.set(output.id, uniqueName(`${compileResultVar(node.id)}_${slugify(output.name, "out")}`, usedNamesForThisCall));
+      }
+      state.functionCallOutputNamesByNode.set(node.id, callOutputNames);
+
+      const destructureEntries = fn.outputs.map((output) => `${fnOutputNames.get(output.id)}: ${callOutputNames.get(output.id)}`).join(", ");
+      statements = [`const { ${destructureEntries} } = ${call};`];
+    }
 
     const outgoing = connectionsFrom(graph, node.id, "exec-out");
     if (outgoing.length > 1) {
@@ -263,6 +315,7 @@ function compileFrom(rootGraph: Graph, graph: Graph, nodeId: string, execInPin: 
     inputs,
     graph,
     resolveVariableRef: makeResolveVariableRef(graph, state),
+    resolveFunctionOutputRef: makeResolveFunctionOutputRef(graph, state),
     compileFrom: (execOutPin: string) => {
       // connectPins now enforces "one wire per exec output" itself, so this can't arise
       // through normal editor use — this guard only catches a hand-edited/corrupted graph.
@@ -293,10 +346,30 @@ function compileFunctionDef(rootGraph: Graph, fn: FunctionDef, state: CompileSta
   const fnName = uniqueName(`fn_${slugify(fn.name, "function")}`, state.usedFunctionNames);
   state.functionNames.set(fn.id, fnName);
 
-  // Local variables get real `let` bindings scoped to just this one method — a fresh set per
-  // call for free (ordinary JS function-local semantics), fixing what the old rt.state-keyed
+  // Inputs, outputs and local body variables all share one pool of names — a real JS parameter,
+  // `let` binding, or local declaration respectively, so none of the three kinds can ever collide
+  // with each other even if their (slugified) names happen to match.
+  const usedLocalNames = new Set<string>();
+
+  // Each declared input becomes a real named parameter — function.entry's data outputs resolve
+  // straight to these (see compileResolveDataPin) instead of a string-keyed `args` object.
+  const argNames = new Map<string, string>();
+  for (const input of fn.inputs) {
+    argNames.set(input.id, uniqueName(slugify(input.name, "arg"), usedLocalNames));
+  }
+  state.functionArgNamesByGraph.set(fn.body, argNames);
+
+  // Each declared output becomes a real `let` binding too — fixing what the old rt.state-keyed
   // design got wrong: two concurrent/recursive calls to the same function no longer share a slot.
-  const usedLocalNames = new Set(["args", "result"]);
+  // function.return's compileExecute (see function.ts) assigns straight into these instead of a
+  // string-keyed `result` object; the method still returns a plain object built from them at the
+  // end so function.call's own call site can keep reading named outputs off it, same as before.
+  const outputNames = new Map<string, string>();
+  for (const output of fn.outputs) {
+    outputNames.set(output.id, uniqueName(slugify(output.name, "outVar"), usedLocalNames));
+  }
+  state.functionOutputNamesByGraph.set(fn.body, outputNames);
+
   const localNames = new Map<string, string>();
   for (const variable of fn.body.variables) {
     localNames.set(variable.id, uniqueName(slugify(variable.name, "localVar"), usedLocalNames));
@@ -310,15 +383,16 @@ function compileFunctionDef(rootGraph: Graph, fn: FunctionDef, state: CompileSta
   }
   const bodyStatements = outgoing.length === 0 ? [] : compileFrom(rootGraph, fn.body, outgoing[0].toNode, outgoing[0].toPin, new Set(), state);
 
+  // Declared here with the function's declared defaults so a body that never reaches a Return
+  // still returns something sensible, same as runFunctionCall's own default-then-overwrite behavior.
+  const outputDeclarations = fn.outputs.map((output) => `let ${outputNames.get(output.id)} = ${JSON.stringify(output.defaultValue ?? null)}; // ${output.name}`);
   const localDeclarations = fn.body.variables.map((v) => `let ${localNames.get(v.id)} = ${JSON.stringify(v.defaultValue)}; // ${v.name}`);
+  // Shorthand — each key is exactly the `let` binding declared above, so the call site can
+  // destructure this same name straight back out (see compileFrom's function.call branch).
+  const returnEntries = fn.outputs.map((output) => `    ${outputNames.get(output.id)}, // ${output.name}`).join("\n");
+  const paramList = fn.inputs.map((input) => argNames.get(input.id)).join(", ");
 
-  // Every function.return instance along the way assigns straight into `result` (see
-  // function.ts's compileExecute) — declared here with the function's declared defaults so a body
-  // that never reaches a Return still returns something sensible, same as runFunctionCall's own
-  // default-then-overwrite behavior.
-  const resultEntries = fn.outputs.map((output) => `    ${JSON.stringify(output.id)}: ${JSON.stringify(output.defaultValue ?? null)}, // ${output.name}`).join("\n");
-
-  const source = [`async ${fnName}(args) {`, ...indent(localDeclarations), `  const result = {`, resultEntries, `  };`, ...indent(bodyStatements), `  return result;`, `}`].join("\n");
+  const source = [`async ${fnName}(${paramList}) {`, ...indent(outputDeclarations), ...indent(localDeclarations), ...indent(bodyStatements), `  return {`, returnEntries, `  };`, `}`].join("\n");
 
   state.functionMethods.set(fn.id, source);
   return fnName;
@@ -338,6 +412,9 @@ export function compileGraph(graph: Graph, version = 1, revision = 1): CompileRe
     functionMethods: new Map<string, string>(),
     globalVariableNames: new Map<string, string>(),
     localVariableNamesByGraph: new Map<Graph, Map<string, string>>(),
+    functionArgNamesByGraph: new Map<Graph, Map<string, string>>(),
+    functionOutputNamesByGraph: new Map<Graph, Map<string, string>>(),
+    functionCallOutputNamesByNode: new Map<string, Map<string, string>>(),
   };
 
   // Every global variable becomes a real `this.<name>` class field, named up front so any

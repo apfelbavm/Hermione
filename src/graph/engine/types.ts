@@ -93,6 +93,10 @@ export interface CompileExecArgs {
   compileFrom: (execOutPin: string) => string[];
   /** See CompileEvalArgs.resolveVariableRef's own doc comment. */
   resolveVariableRef?: (variableId: string) => string;
+  /** Resolves a FunctionDef output's pin id to the real `let` binding compiled for it inside the
+   * function body currently being compiled — only ever populated by codegen.ts while compiling a
+   * function body; see function.ts's function.return, the only NodeDef that calls this. */
+  resolveFunctionOutputRef?: (outputPinId: string) => string;
 }
 
 export interface EventTrigger {
