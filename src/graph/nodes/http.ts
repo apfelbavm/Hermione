@@ -1,72 +1,9 @@
 import { registerNode } from "../engine/registry";
-import { compileResultVar } from "../engine/compileUtils";
+import { compileResultVar, FUNCTION_LIBRARY_IMPORT } from "../engine/compileUtils";
 import { enumOptionIds } from "../engine/enumRegistry";
 import { HTTP_METHOD_ENUM_TYPE } from "../enum/common";
+import { httpRequest } from "../../server/functionLibrary";
 import { i18n } from "@i18n";
-
-const HTTP_REQUEST_EXECUTE_SOURCE = `
-async function httpRequestExecute(url, rawMethod, headersJson, auth, body, rawTimeoutMs) {
-  const method = String(rawMethod ?? "GET").toUpperCase();
-  const hasBody = method !== "GET" && method !== "HEAD";
-  const timeoutMs = Math.round(Number(rawTimeoutMs ?? 0));
-
-  const controller = new AbortController();
-  const timer = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
-
-  try {
-    const rawHeaders = String(headersJson ?? "").trim();
-    const headers = rawHeaders ? JSON.parse(rawHeaders) : undefined;
-
-    // See auth.ts — any wired auth node's { header, value } output wins over a same-named entry
-    // typed directly into Headers (JSON), since it's the more explicit/intentional of the two.
-    const mergedHeaders =
-      auth && typeof auth.header === "string" && typeof auth.value === "string"
-        ? { ...(headers ?? {}), [auth.header]: auth.value }
-        : headers;
-
-    const res = await fetch(url, {
-      method: method,
-      headers: mergedHeaders,
-      body: hasBody ? String(body ?? "") : undefined,
-      signal: controller.signal,
-    });
-    const responseBody = await res.text();
-    const responseHeaders = {};
-    res.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
-    });
-
-    return {
-      status: res.status,
-      success: res.ok,
-      responseBody: responseBody,
-      responseHeaders: JSON.stringify(responseHeaders),
-      error: "",
-    };
-  } catch (err) {
-    return {
-      status: 0,
-      success: false,
-      responseBody: "",
-      responseHeaders: "{}",
-      error: err instanceof Error ? err.message : String(err),
-    };
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-`;
-
-interface HttpRequestResult {
-  status: number;
-  success: boolean;
-  responseBody: string;
-  responseHeaders: string;
-  error: string;
-  [key: string]: unknown;
-}
-
-const httpRequestExecute: (url: string, method: string, headersJson: string, auth: { header?: unknown; value?: unknown } | null | undefined, body: string, timeoutMs: number) => Promise<HttpRequestResult> = new Function(`${HTTP_REQUEST_EXECUTE_SOURCE}\nreturn httpRequestExecute;`)();
 
 registerNode({
   type: "http.request",
@@ -90,11 +27,21 @@ registerNode({
   ],
   latent: true,
 
-  execute: async ({ inputs }) => {
-    const result = await httpRequestExecute(String(inputs.url ?? ""), String(inputs.method ?? "GET"), String(inputs.headers ?? ""), inputs.auth as { header?: unknown; value?: unknown } | null | undefined, String(inputs.body ?? ""), Number(inputs.timeoutMs ?? 0));
-    return { nextExec: "exec-out", outputs: result };
-  },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await httpRequestExecute(${inputs.url}, ${inputs.method}, ${inputs.headers}, ${inputs.auth}, ${inputs.body}, ${inputs.timeoutMs});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => ({
+    nextExec: "exec-out",
+    outputs: await httpRequest({
+      url: String(inputs.url ?? ""),
+      method: String(inputs.method ?? "GET"),
+      headersJson: String(inputs.headers ?? ""),
+      auth: inputs.auth as { header?: unknown; value?: unknown } | null | undefined,
+      body: String(inputs.body ?? ""),
+      timeoutMs: Number(inputs.timeoutMs ?? 0),
+    }),
+  }),
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibrary.httpRequest({ url: ${inputs.url}, method: ${inputs.method}, headersJson: ${inputs.headers}, auth: ${inputs.auth}, body: ${inputs.body}, timeoutMs: ${inputs.timeoutMs} });`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -105,5 +52,5 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileHelpers: { httpRequestExecute: HTTP_REQUEST_EXECUTE_SOURCE },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });

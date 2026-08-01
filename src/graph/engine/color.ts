@@ -54,7 +54,7 @@ export const Colors = {
     return {
       exec: surface().textPrimary,
       boolean: "#a5322f",
-      number: "#67c556",
+      number: "#6cb55f",
       string: "#c542a0",
       object: "#4f9bd6",
       date: "#d6a23b",

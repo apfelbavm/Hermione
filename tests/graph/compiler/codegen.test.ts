@@ -1,6 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
@@ -8,6 +6,7 @@ import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/e
 import { connectPins } from "../../../src/graph/engine/graphMutations";
 import { getNodeDef } from "../../../src/graph/engine/registry";
 import { compileGraph } from "../../../src/graph/compiler/codegen";
+import { deployedScriptPath, writeDeployedScriptFile, deleteDeployedScriptFile } from "../../../src/server/deployedScriptFile";
 import { Graph } from "../../../src/graph/engine/graph";
 import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
@@ -61,13 +60,20 @@ function samlCredentialLookup(name: string) {
   };
 }
 
-/** Writes compiled source to a temp file and dynamically imports it — cache-busted so repeat compiles in one test run don't hit a stale module. */
+/** Writes compiled source to the SAME location a real deploy uses (data/deployed-scripts/<flowId>.mjs
+ * — see server/deployedScriptFile.ts) rather than an arbitrary temp directory: a node's compileImports
+ * may now be a real relative import into this repo's own src/ tree (e.g. FUNCTION_LIBRARY_IMPORT),
+ * which only resolves correctly from that fixed location. Cache-busted so repeat compiles in one test
+ * run don't hit a stale module; cleaned up afterward via deleteDeployedScriptFile. */
 async function loadCompiled(code: string): Promise<Record<string, unknown>> {
-  const dir = mkdtempSync(join(tmpdir(), "hermione-compiled-"));
-  const file = join(dir, "graph.compiled.js");
-  writeFileSync(file, code, "utf8");
-  const url = `${pathToFileURL(file).href}?t=${Date.now()}-${Math.random()}`;
-  return import(/* @vite-ignore */ url);
+  const flowId = `test-${randomUUID()}`;
+  writeDeployedScriptFile(flowId, code);
+  try {
+    const url = `${pathToFileURL(deployedScriptPath(flowId)).href}?t=${Date.now()}-${Math.random()}`;
+    return await import(/* @vite-ignore */ url);
+  } finally {
+    deleteDeployedScriptFile(flowId);
+  }
 }
 
 describe("compileGraph", () => {

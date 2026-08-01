@@ -55,7 +55,7 @@ describe("sftp.upload", () => {
     expect(String(ctx.execOutputs.get("req:error"))).toMatch(/compiled output/i);
   });
 
-  it("compileExecute references the compiled-only helper by name with every pin in order", () => {
+  it("compileExecute calls the real functionLibrarySftp.sftpUpload with every pin named in an inputs object", () => {
     const def = getNodeDef("sftp.upload");
     const node = buildGraph().node;
     const statements = def.compileExecute!({
@@ -80,20 +80,19 @@ describe("sftp.upload", () => {
       graph: {} as never,
       compileFrom: () => ["/* continuation */"],
     });
-    expect(statements[0]).toBe("const __result_req = await sftpUploadExecute(h, p, u, pw, pk, pp, fp, c, e, cd, efm, pdt, mra, rdm, t);");
+    expect(statements[0]).toBe(
+      "const __result_req = await functionLibrarySftp.sftpUpload({ host: h, port: p, username: u, password: pw, privateKey: pk, passphrase: pp, filePath: fp, content: c, encoding: e, createDirectory: cd, existingFileMode: efm, preventDirectoryTraversal: pdt, maxReconnectAttempts: mra, reconnectDelayMs: rdm, timeoutMs: t });",
+    );
     expect(statements[1]).toBe("/* continuation */");
   });
 
-  it("compileImports declares the ssh2-sftp-client package the compiled output needs", () => {
+  it("compileImports declares the functionLibrarySftp module the compiled output needs (which itself depends on ssh2-sftp-client)", () => {
     const def = getNodeDef("sftp.upload");
-    expect(def.compileImports).toEqual(['import SftpClient from "ssh2-sftp-client";']);
+    expect(def.compileImports).toEqual(['import * as functionLibrarySftp from "../../src/server/functionLibrarySftp.ts";']);
   });
 
-  it("the compileHelpers source is syntactically valid and exports a function (never actually invoked here)", () => {
-    const def = getNodeDef("sftp.upload");
-    const source = def.compileHelpers!.sftpUploadExecute;
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const fn = new Function(`${source}\nreturn sftpUploadExecute;`)();
-    expect(typeof fn).toBe("function");
+  it("the real sftpUpload function exists in its own isolated module, never imported by any interpreter-facing code", async () => {
+    const { sftpUpload } = await import("../../../src/server/functionLibrarySftp");
+    expect(typeof sftpUpload).toBe("function");
   });
 });

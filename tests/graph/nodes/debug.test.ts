@@ -1,9 +1,7 @@
-import { XMLParser, XMLValidator } from "fast-xml-parser";
-import XMLBuilder from "fast-xml-builder";
-import * as Papa from "papaparse";
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
 import { getNodeDef } from "../../../src/graph/engine/registry";
+import * as functionLibrary from "../../../src/server/functionLibrary";
 
 beforeAll(() => {
   registerBuiltins();
@@ -19,6 +17,9 @@ async function print(message: string, format: string): Promise<string> {
   return logs[0];
 }
 
+/** Runs the exact generated wiring (see debug.ts's compileExecute) against the real functionLibrary
+ * module — proves the compiled call site (`functionLibrary.formatForLog(...)`) actually matches the
+ * real exported function, not a hand re-created stand-in. */
 async function runCompiledPrint(message: string, format: string): Promise<string> {
   const def = getNodeDef("debug.printFormatted");
   const logs: string[] = [];
@@ -31,9 +32,8 @@ async function runCompiledPrint(message: string, format: string): Promise<string
     graph: {} as any,
     compileFrom: () => [],
   });
-  const helperSource = Object.values(def.compileHelpers ?? {}).join("\n");
-  const fn = new AsyncFunction("XMLParser", "XMLValidator", "XMLBuilder", "Papa", "rt", `${helperSource}\n${statements.join("\n")}`);
-  await fn(XMLParser, XMLValidator, XMLBuilder, Papa, {
+  const fn = new AsyncFunction("functionLibrary", "rt", statements.join("\n"));
+  await fn(functionLibrary, {
     log: (m: string) => logs.push(m),
   });
   return logs[0];

@@ -37,7 +37,7 @@ export function drawNodes(
   simulating: boolean = false,
 ): void {
   // Text scales with zoom too — a camera zooming over world-space content, same as everything else.
-  ctx.font = `${13 * camera.zoom}px Segoe UI, sans-serif`;
+  ctx.font = `600 ${13 * camera.zoom}px Segoe UI, sans-serif`;
   ctx.textBaseline = "middle";
 
   for (const node of graph.nodes) {
@@ -96,9 +96,15 @@ export function drawNodes(
       const rampFraction = geo.width > 0 ? Math.min(0.5, rampPx / geo.width) : 0.5;
       const shadeRgb = Colors.HEADER_SHADE_RGB;
       const headerShade = ctx.createLinearGradient(geo.screenX, 0, geo.screenX + geo.width, 0);
-      headerShade.addColorStop(0, `rgba(${shadeRgb}, 0.35)`);
-      headerShade.addColorStop(1 - rampFraction, `rgba(${shadeRgb}, 0.35)`);
-      headerShade.addColorStop(1, `rgba(${shadeRgb}, 0.85)`);
+      if (Colors.IS_LIGHT_THEME) {
+        headerShade.addColorStop(0, `rgba(${shadeRgb}, 0.5)`);
+        // headerShade.addColorStop(1 - rampFraction, `rgba(${shadeRgb}, 0.5)`);
+        headerShade.addColorStop(1, `rgba(${shadeRgb}, 0)`);
+      } else {
+        headerShade.addColorStop(0, `rgba(${shadeRgb}, 0.25)`);
+        headerShade.addColorStop(1 - rampFraction, `rgba(${shadeRgb}, 0.0)`);
+        headerShade.addColorStop(1, `rgba(${shadeRgb}, 0.85)`);
+      }
       ctx.fillStyle = headerShade;
       ctx.fill();
 

@@ -1,5 +1,5 @@
 import { registerNode } from "../engine/registry";
-import { compileResultVar } from "../engine/compileUtils";
+import { compileResultVar, FUNCTION_LIBRARY_SFTP_IMPORT } from "../engine/compileUtils";
 import { enumOptionIds } from "../engine/enumRegistry";
 import { SFTP_EXISTING_FILE_MODE_ENUM_TYPE } from "../enum/sftp";
 import { TEXT_ENCODING_ENUM_TYPE } from "../enum/common";
@@ -14,86 +14,16 @@ const EXISTING_FILE_MODES = enumOptionIds(SFTP_EXISTING_FILE_MODE_ENUM_TYPE);
 // equivalent to fall back to, the way oauth2Saml.ts's live calls merely risk CORS. So this is the
 // one node type in this engine so far whose own execute() (below) is a permanent, honest stub: it
 // always reports failure with a clear explanation instead of pretending to try, and the REAL
-// implementation exists only for the compiled path (compileExecute/compileImports/compileHelpers).
+// implementation exists only for the compiled path.
 // Auth is plain username/password/privateKey/passphrase pins directly on this node, NOT the
 // { header, value } convention http.request's Auth pin uses (see auth.ts) — that shape is
 // HTTP-header-specific and doesn't fit SSH credentials.
 //
-// Written as a plain-JS source string (see http.ts's HTTP_REQUEST_EXECUTE_SOURCE for the same
-// "one implementation, not two hand-kept copies" reasoning) contributed verbatim via
-// compileHelpers below — unlike every other such helper in this codebase, it is NEVER also
-// `new Function`'d for interpreter use (there is no interpreter path to serve, see above), so
-// `SftpClient`/`Buffer` only ever need to resolve in the COMPILED file, where compileImports
-// (below) puts a real `import SftpClient from "ssh2-sftp-client"` above this source and `Buffer`
-// is a plain Node global.
-const SFTP_UPLOAD_EXECUTE_SOURCE = `
-async function sftpUploadExecute(host, rawPort, username, password, privateKey, passphrase, filePath, content, encoding, createDirectory, existingFileMode, preventDirectoryTraversal, rawMaxReconnectAttempts, rawReconnectDelayMs, rawTimeoutMs) {
-  function delay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
-
-  const normalizedPath = String(filePath ?? "").trim();
-  if (!normalizedPath || normalizedPath.endsWith("/")) {
-    return { success: false, skipped: false, attempts: 0, error: "File Path must name a file, not just a directory." };
-  }
-  if (preventDirectoryTraversal && normalizedPath.split("/").some((segment) => segment === "..")) {
-    return { success: false, skipped: false, attempts: 0, error: 'File Path contains a ".." segment — rejected because Prevent Directory Traversal is on.' };
-  }
-
-  const lastSlash = normalizedPath.lastIndexOf("/");
-  const remoteDir = lastSlash > 0 ? normalizedPath.slice(0, lastSlash) : null;
-  const buffer = Buffer.from(String(content ?? ""), encoding === "base64" ? "base64" : "utf8");
-
-  const attemptsCap = Math.max(1, Math.round(Number(rawMaxReconnectAttempts) || 0) + 1);
-  const reconnectDelayMs = Math.max(0, Math.round(Number(rawReconnectDelayMs) || 0));
-  const readyTimeout = Math.round(Number(rawTimeoutMs) || 0) || 10000;
-  const port = Math.round(Number(rawPort) || 0) || 22;
-
-  let lastError = "";
-  for (let attempt = 1; attempt <= attemptsCap; attempt++) {
-    const sftp = new SftpClient();
-    try {
-      await sftp.connect({
-        host: String(host ?? ""),
-        port,
-        username: String(username ?? ""),
-        password: password ? String(password) : undefined,
-        privateKey: privateKey ? String(privateKey) : undefined,
-        passphrase: passphrase ? String(passphrase) : undefined,
-        readyTimeout,
-      });
-
-      if (createDirectory && remoteDir) {
-        await sftp.mkdir(remoteDir, true);
-      }
-
-      const alreadyExists = !!(await sftp.exists(normalizedPath));
-
-      if (alreadyExists && existingFileMode === "Fail") {
-        await sftp.end();
-        return { success: false, skipped: false, attempts: attempt, error: "File already exists at " + normalizedPath + ' (Existing File is set to "Fail").' };
-      }
-      if (alreadyExists && existingFileMode === "Ignore") {
-        await sftp.end();
-        return { success: true, skipped: true, attempts: attempt, error: "" };
-      }
-      if (alreadyExists && existingFileMode === "Append") {
-        await sftp.append(buffer, normalizedPath);
-      } else {
-        await sftp.put(buffer, normalizedPath);
-      }
-
-      await sftp.end();
-      return { success: true, skipped: false, attempts: attempt, error: "" };
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : String(err);
-      try { await sftp.end(); } catch {}
-      if (attempt < attemptsCap) await delay(reconnectDelayMs);
-    }
-  }
-
-  return { success: false, skipped: false, attempts: attemptsCap, error: lastError || "SFTP upload failed" };
-}
-`;
-
+// The real logic lives in src/server/functionLibrarySftp.ts, NOT the shared functionLibrary.ts every
+// other node uses — deliberately, since it depends on "ssh2-sftp-client", a package this project
+// itself never needs installed (nothing here can run it live) and doesn't want pulled into the
+// interpreter/browser bundle. This file therefore never statically imports it; the compiled path
+// reaches it purely via compileImports below, resolved only when the deployed script itself runs.
 registerNode({
   type: "sftp.upload",
   label: i18n.nodes.sftp.upload.label,
@@ -136,7 +66,7 @@ registerNode({
     },
   }),
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await sftpUploadExecute(${inputs.host}, ${inputs.port}, ${inputs.username}, ${inputs.password}, ${inputs.privateKey}, ${inputs.passphrase}, ${inputs.filePath}, ${inputs.content}, ${inputs.encoding}, ${inputs.createDirectory}, ${inputs.existingFileMode}, ${inputs.preventDirectoryTraversal}, ${inputs.maxReconnectAttempts}, ${inputs.reconnectDelayMs}, ${inputs.timeoutMs});`,
+    `const ${compileResultVar(node.id)} = await functionLibrarySftp.sftpUpload({ host: ${inputs.host}, port: ${inputs.port}, username: ${inputs.username}, password: ${inputs.password}, privateKey: ${inputs.privateKey}, passphrase: ${inputs.passphrase}, filePath: ${inputs.filePath}, content: ${inputs.content}, encoding: ${inputs.encoding}, createDirectory: ${inputs.createDirectory}, existingFileMode: ${inputs.existingFileMode}, preventDirectoryTraversal: ${inputs.preventDirectoryTraversal}, maxReconnectAttempts: ${inputs.maxReconnectAttempts}, reconnectDelayMs: ${inputs.reconnectDelayMs}, timeoutMs: ${inputs.timeoutMs} });`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
@@ -149,9 +79,7 @@ registerNode({
     };
   },
   // "ssh2-sftp-client" is a real Node dependency this project itself never needs (nothing here can
-  // run it live) — it only needs to be `npm install`ed alongside the COMPILED .mjs, same convention
-  // as fast-xml-parser/fast-xml-builder's compileImports in dataFormatHelpers.ts, except those two
-  // are ALSO real dependencies of this project (for live interpreter use) and this one isn't.
-  compileImports: ['import SftpClient from "ssh2-sftp-client";'],
-  compileHelpers: { sftpUploadExecute: SFTP_UPLOAD_EXECUTE_SOURCE },
+  // run it live) — it only needs to be `npm install`ed alongside the COMPILED .mjs. functionLibrarySftp.ts
+  // itself imports it directly; this line just makes that module reachable from the compiled script.
+  compileImports: [FUNCTION_LIBRARY_SFTP_IMPORT],
 });

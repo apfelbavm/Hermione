@@ -15,3 +15,18 @@ export const DELAY_HELPER_SOURCE = "function delay(ms) { return new Promise((res
 export function compileResultVar(nodeId: string): string {
   return `__result_${nodeId.replace(/[^a-zA-Z0-9_]/g, "_")}`;
 }
+
+/** Real ESM import of src/server/functionLibrary.ts, the single shared home for every node type's
+ * actual runtime logic — every node's compileImports contributes this exact same string, so
+ * codegen.ts's plain string-equality dedup collapses it to one import line for the whole compiled
+ * file no matter how many distinct nodes/functions are used from it. The relative path assumes a
+ * deployed script always lives at data/deployed-scripts/<flowId>.mjs (see server/deployedScriptFile.ts).
+ * Resolving this at runtime with no separate build step requires the running Node process to have
+ * NODE_OPTIONS=--experimental-strip-types set (see package.json's dev/start scripts). */
+export const FUNCTION_LIBRARY_IMPORT = 'import * as functionLibrary from "../../src/server/functionLibrary.ts";';
+
+/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibrarySftp.ts — kept in its own file
+ * (and its own compileImports entry) rather than folded into functionLibrary.ts because it depends
+ * on "ssh2-sftp-client", a package deliberately NOT installed for the interpreter/browser build (see
+ * that file's own header comment) — no interpreter-facing code may ever import it directly. */
+export const FUNCTION_LIBRARY_SFTP_IMPORT = 'import * as functionLibrarySftp from "../../src/server/functionLibrarySftp.ts";';

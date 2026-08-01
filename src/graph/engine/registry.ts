@@ -3,8 +3,14 @@ import type { NodeDef, PinContainer, PinType } from "./types";
 const registry = new Map<string, NodeDef>();
 
 export function registerNode(def: NodeDef): void {
+  // Overwrite (with a warning) instead of throwing: this module's registrations happen as a long
+  // sequential chain of side-effect imports (see nodes/index.ts). A thrown error here would abort
+  // that import chain partway through, leaving every node type after it unregistered — which is
+  // exactly what happens if Next.js Fast Refresh ever re-executes these imports against the
+  // still-populated registry. A duplicate `type` string across two different node files is still
+  // a real bug, so it's surfaced as a console warning rather than silently ignored.
   if (registry.has(def.type)) {
-    throw new Error(`Node type "${def.type}" is already registered`);
+    console.warn(`Node type "${def.type}" is already registered — overwriting previous definition.`);
   }
   registry.set(def.type, def);
 }
