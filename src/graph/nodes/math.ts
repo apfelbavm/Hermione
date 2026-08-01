@@ -12,26 +12,9 @@ registerNode({
   group: GROUP_ARITHMETIC,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "number",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "number", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) + Number(inputs.b ?? 0),
@@ -48,26 +31,9 @@ registerNode({
   group: GROUP_ARITHMETIC,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "number",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "number", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) - Number(inputs.b ?? 0),
@@ -84,26 +50,9 @@ registerNode({
   group: GROUP_ARITHMETIC,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "number",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "number", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) * Number(inputs.b ?? 0),
@@ -120,26 +69,9 @@ registerNode({
   group: GROUP_ARITHMETIC,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "number",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "number", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) / Number(inputs.b ?? 0),
@@ -156,26 +88,9 @@ registerNode({
   group: GROUP_COMPARISON,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) > Number(inputs.b ?? 0),
@@ -192,26 +107,9 @@ registerNode({
   group: GROUP_COMPARISON,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) >= Number(inputs.b ?? 0),
@@ -228,26 +126,9 @@ registerNode({
   group: GROUP_COMPARISON,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) < Number(inputs.b ?? 0),
@@ -264,26 +145,9 @@ registerNode({
   group: GROUP_COMPARISON,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) <= Number(inputs.b ?? 0),
@@ -300,26 +164,9 @@ registerNode({
   group: GROUP_COMPARISON,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) === Number(inputs.b ?? 0),
@@ -336,26 +183,9 @@ registerNode({
   group: GROUP_COMPARISON,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Number(inputs.a ?? 0) !== Number(inputs.b ?? 0),
@@ -372,26 +202,9 @@ registerNode({
   group: GROUP_ARITHMETIC,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "number",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "number", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Math.min(Number(inputs.a ?? 0), Number(inputs.b ?? 0)),
@@ -408,26 +221,9 @@ registerNode({
   group: GROUP_ARITHMETIC,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "number",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "number", direction: "input", defaultValue: 0 },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "number", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: Math.max(Number(inputs.a ?? 0), Number(inputs.b ?? 0)),
@@ -444,39 +240,13 @@ registerNode({
   group: GROUP_ARITHMETIC,
   colorCategory: NodeColorCategory.Math,
   pins: [
-    {
-      id: "value",
-      label: i18n.nodes.__shared.pin_value,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "min",
-      label: i18n.nodes.__shared.pin_min,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "max",
-      label: i18n.nodes.__shared.pin_max,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "number",
-      direction: "output",
-    },
+    { id: "value", label: i18n.nodes.__shared.pin_value, type: "number", direction: "input", defaultValue: 0 },
+    { id: "min", label: i18n.nodes.__shared.pin_min, type: "number", direction: "input", defaultValue: 0 },
+    { id: "max", label: i18n.nodes.__shared.pin_max, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "number", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
-    result: Math.min(
-      Math.max(Number(inputs.value ?? 0), Number(inputs.min ?? 0)),
-      Number(inputs.max ?? 0),
-    ),
+    result: Math.min(Math.max(Number(inputs.value ?? 0), Number(inputs.min ?? 0)), Number(inputs.max ?? 0)),
   }),
   compileEvaluate: ({ inputs }) => ({
     result: `Math.min(Math.max(Number(${inputs.value}), Number(${inputs.min})), Number(${inputs.max}))`,

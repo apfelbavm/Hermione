@@ -1,18 +1,8 @@
 import { NodeColorCategory, type ExecutionContext } from "../../engine/types";
 import { registerNode } from "../../engine/registry";
 import { GithubManager, type GithubAuth } from "../../lib/githubManager";
-import type {
-  GithubTokenCredentialData,
-  GithubAppCredentialData,
-} from "../../credentials/types";
-import {
-  ISSUE_STRUCT_TYPE,
-  PULL_REQUEST_STRUCT_TYPE,
-  CREATE_RESULT_STRUCT_TYPE,
-  MERGE_RESULT_STRUCT_TYPE,
-  FILE_CONTENT_STRUCT_TYPE,
-  FILE_WRITE_RESULT_STRUCT_TYPE,
-} from "../structs/github";
+import type { GithubTokenCredentialData, GithubAppCredentialData } from "../../credentials/types";
+import { ISSUE_STRUCT_TYPE, PULL_REQUEST_STRUCT_TYPE, CREATE_RESULT_STRUCT_TYPE, MERGE_RESULT_STRUCT_TYPE, FILE_CONTENT_STRUCT_TYPE, FILE_WRITE_RESULT_STRUCT_TYPE } from "../structs/github";
 import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over GithubManager (src/lib/githubManager.ts),
@@ -36,10 +26,7 @@ function credentialNamePin() {
 
 /** Shared by every GitHub node — looks up a named Credential Vault entry and turns either its
  * githubToken or githubApp fields into the GithubAuth shape GithubManager's constructor expects. */
-function resolveGithubCredential(
-  ctx: ExecutionContext,
-  credentialName: string,
-): { ok: true; auth: GithubAuth } | { ok: false; error: string } {
+function resolveGithubCredential(ctx: ExecutionContext, credentialName: string): { ok: true; auth: GithubAuth } | { ok: false; error: string } {
   const credential = ctx.getCredential?.(credentialName);
   if (!credential)
     return {
@@ -125,43 +112,22 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     ...repoPins(),
-    {
-      id: "state",
-      label: i18n.nodes.github.__shared.pin_state,
-      type: "string",
-      direction: "input",
-      defaultValue: STATE_OPTIONS[0],
-      options: STATE_OPTIONS,
-    },
+    { id: "state", label: i18n.nodes.github.__shared.pin_state, type: "string", direction: "input", defaultValue: STATE_OPTIONS[0], options: STATE_OPTIONS },
     execInOutPins().execOut,
     execInOutPins().success,
-    {
-      id: "issues",
-      label: i18n.nodes.github.listIssues.pin_issues,
-      type: "struct",
-      subType: ISSUE_STRUCT_TYPE,
-      container: "array",
-      direction: "output",
-    },
+    { id: "issues", label: i18n.nodes.github.listIssues.pin_issues, type: "struct", subType: ISSUE_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(
-      ctx,
-      String(inputs.credentialName ?? ""),
-    );
+    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, issues: [], error: resolved.error },
       };
     const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.listIssues(
-      String(inputs.owner ?? ""),
-      String(inputs.repo ?? ""),
-      (inputs.state as "open" | "closed" | "all") ?? "open",
-    );
+    const result = await manager.listIssues(String(inputs.owner ?? ""), String(inputs.repo ?? ""), (inputs.state as "open" | "closed" | "all") ?? "open");
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -176,37 +142,16 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     ...repoPins(),
-    {
-      id: "title",
-      label: i18n.nodes.github.__shared.pin_title,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "body",
-      label: i18n.nodes.github.__shared.pin_body,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
+    { id: "title", label: i18n.nodes.github.__shared.pin_title, type: "string", direction: "input", defaultValue: "" },
+    { id: "body", label: i18n.nodes.github.__shared.pin_body, type: "string", direction: "input", defaultValue: "" },
     execInOutPins().execOut,
     execInOutPins().success,
-    {
-      id: "result",
-      label: i18n.nodes.github.createResult.label,
-      type: "struct",
-      subType: CREATE_RESULT_STRUCT_TYPE,
-      direction: "output",
-    },
+    { id: "result", label: i18n.nodes.github.createResult.label, type: "struct", subType: CREATE_RESULT_STRUCT_TYPE, direction: "output" },
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(
-      ctx,
-      String(inputs.credentialName ?? ""),
-    );
+    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
@@ -217,12 +162,7 @@ registerNode({
         },
       };
     const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.createIssue(
-      String(inputs.owner ?? ""),
-      String(inputs.repo ?? ""),
-      String(inputs.title ?? ""),
-      String(inputs.body ?? ""),
-    );
+    const result = await manager.createIssue(String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.title ?? ""), String(inputs.body ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -244,43 +184,22 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     ...repoPins(),
-    {
-      id: "issueNumber",
-      label: i18n.nodes.github.__shared.pin_issue_number,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-      integer: true,
-    },
-    {
-      id: "body",
-      label: i18n.nodes.github.__shared.pin_body,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
+    { id: "issueNumber", label: i18n.nodes.github.__shared.pin_issue_number, type: "number", direction: "input", defaultValue: 0, integer: true },
+    { id: "body", label: i18n.nodes.github.__shared.pin_body, type: "string", direction: "input", defaultValue: "" },
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(
-      ctx,
-      String(inputs.credentialName ?? ""),
-    );
+    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, error: resolved.error },
       };
     const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.commentOnIssue(
-      String(inputs.owner ?? ""),
-      String(inputs.repo ?? ""),
-      Number(inputs.issueNumber ?? 0),
-      String(inputs.body ?? ""),
-    );
+    const result = await manager.commentOnIssue(String(inputs.owner ?? ""), String(inputs.repo ?? ""), Number(inputs.issueNumber ?? 0), String(inputs.body ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -295,43 +214,22 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     ...repoPins(),
-    {
-      id: "state",
-      label: i18n.nodes.github.__shared.pin_state,
-      type: "string",
-      direction: "input",
-      defaultValue: STATE_OPTIONS[0],
-      options: STATE_OPTIONS,
-    },
+    { id: "state", label: i18n.nodes.github.__shared.pin_state, type: "string", direction: "input", defaultValue: STATE_OPTIONS[0], options: STATE_OPTIONS },
     execInOutPins().execOut,
     execInOutPins().success,
-    {
-      id: "pullRequests",
-      label: i18n.nodes.github.listPullRequests.pin_pull_requests,
-      type: "struct",
-      subType: PULL_REQUEST_STRUCT_TYPE,
-      container: "array",
-      direction: "output",
-    },
+    { id: "pullRequests", label: i18n.nodes.github.listPullRequests.pin_pull_requests, type: "struct", subType: PULL_REQUEST_STRUCT_TYPE, container: "array", direction: "output" },
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(
-      ctx,
-      String(inputs.credentialName ?? ""),
-    );
+    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
         outputs: { success: false, pullRequests: [], error: resolved.error },
       };
     const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.listPullRequests(
-      String(inputs.owner ?? ""),
-      String(inputs.repo ?? ""),
-      (inputs.state as "open" | "closed" | "all") ?? "open",
-    );
+    const result = await manager.listPullRequests(String(inputs.owner ?? ""), String(inputs.repo ?? ""), (inputs.state as "open" | "closed" | "all") ?? "open");
     return { nextExec: "exec-out", outputs: result };
   },
 });
@@ -346,51 +244,18 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     ...repoPins(),
-    {
-      id: "title",
-      label: i18n.nodes.github.__shared.pin_title,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "head",
-      label: i18n.nodes.github.createPullRequest.pin_head,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "base",
-      label: i18n.nodes.github.createPullRequest.pin_base,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "body",
-      label: i18n.nodes.github.__shared.pin_body,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
+    { id: "title", label: i18n.nodes.github.__shared.pin_title, type: "string", direction: "input", defaultValue: "" },
+    { id: "head", label: i18n.nodes.github.createPullRequest.pin_head, type: "string", direction: "input", defaultValue: "" },
+    { id: "base", label: i18n.nodes.github.createPullRequest.pin_base, type: "string", direction: "input", defaultValue: "" },
+    { id: "body", label: i18n.nodes.github.__shared.pin_body, type: "string", direction: "input", defaultValue: "" },
     execInOutPins().execOut,
     execInOutPins().success,
-    {
-      id: "result",
-      label: i18n.nodes.github.createResult.label,
-      type: "struct",
-      subType: CREATE_RESULT_STRUCT_TYPE,
-      direction: "output",
-    },
+    { id: "result", label: i18n.nodes.github.createResult.label, type: "struct", subType: CREATE_RESULT_STRUCT_TYPE, direction: "output" },
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(
-      ctx,
-      String(inputs.credentialName ?? ""),
-    );
+    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
@@ -401,14 +266,7 @@ registerNode({
         },
       };
     const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.createPullRequest(
-      String(inputs.owner ?? ""),
-      String(inputs.repo ?? ""),
-      String(inputs.title ?? ""),
-      String(inputs.head ?? ""),
-      String(inputs.base ?? ""),
-      String(inputs.body ?? ""),
-    );
+    const result = await manager.createPullRequest(String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.title ?? ""), String(inputs.head ?? ""), String(inputs.base ?? ""), String(inputs.body ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -430,39 +288,16 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     ...repoPins(),
-    {
-      id: "pullNumber",
-      label: i18n.nodes.github.mergePullRequest.pin_pull_number,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-      integer: true,
-    },
-    {
-      id: "mergeMethod",
-      label: i18n.nodes.github.mergePullRequest.pin_merge_method,
-      type: "string",
-      direction: "input",
-      defaultValue: MERGE_METHOD_OPTIONS[0],
-      options: MERGE_METHOD_OPTIONS,
-    },
+    { id: "pullNumber", label: i18n.nodes.github.mergePullRequest.pin_pull_number, type: "number", direction: "input", defaultValue: 0, integer: true },
+    { id: "mergeMethod", label: i18n.nodes.github.mergePullRequest.pin_merge_method, type: "string", direction: "input", defaultValue: MERGE_METHOD_OPTIONS[0], options: MERGE_METHOD_OPTIONS },
     execInOutPins().execOut,
     execInOutPins().success,
-    {
-      id: "result",
-      label: i18n.nodes.github.mergeResult.label,
-      type: "struct",
-      subType: MERGE_RESULT_STRUCT_TYPE,
-      direction: "output",
-    },
+    { id: "result", label: i18n.nodes.github.mergeResult.label, type: "struct", subType: MERGE_RESULT_STRUCT_TYPE, direction: "output" },
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(
-      ctx,
-      String(inputs.credentialName ?? ""),
-    );
+    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
@@ -473,12 +308,7 @@ registerNode({
         },
       };
     const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.mergePullRequest(
-      String(inputs.owner ?? ""),
-      String(inputs.repo ?? ""),
-      Number(inputs.pullNumber ?? 0),
-      (inputs.mergeMethod as "merge" | "squash" | "rebase") ?? "merge",
-    );
+    const result = await manager.mergePullRequest(String(inputs.owner ?? ""), String(inputs.repo ?? ""), Number(inputs.pullNumber ?? 0), (inputs.mergeMethod as "merge" | "squash" | "rebase") ?? "merge");
     return {
       nextExec: "exec-out",
       outputs: {
@@ -500,37 +330,16 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     ...repoPins(),
-    {
-      id: "path",
-      label: i18n.nodes.github.__shared.pin_path,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "ref",
-      label: i18n.nodes.github.__shared.pin_ref,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
+    { id: "path", label: i18n.nodes.github.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
+    { id: "ref", label: i18n.nodes.github.__shared.pin_ref, type: "string", direction: "input", defaultValue: "" },
     execInOutPins().execOut,
     execInOutPins().success,
-    {
-      id: "result",
-      label: i18n.nodes.github.fileContent.label,
-      type: "struct",
-      subType: FILE_CONTENT_STRUCT_TYPE,
-      direction: "output",
-    },
+    { id: "result", label: i18n.nodes.github.fileContent.label, type: "struct", subType: FILE_CONTENT_STRUCT_TYPE, direction: "output" },
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(
-      ctx,
-      String(inputs.credentialName ?? ""),
-    );
+    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
@@ -542,12 +351,7 @@ registerNode({
       };
     const manager = GithubManager.forAuth(resolved.auth);
     const ref = String(inputs.ref ?? "");
-    const result = await manager.getFileContent(
-      String(inputs.owner ?? ""),
-      String(inputs.repo ?? ""),
-      String(inputs.path ?? ""),
-      ref || undefined,
-    );
+    const result = await manager.getFileContent(String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.path ?? ""), ref || undefined);
     return {
       nextExec: "exec-out",
       outputs: {
@@ -569,58 +373,19 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     ...repoPins(),
-    {
-      id: "path",
-      label: i18n.nodes.github.__shared.pin_path,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "content",
-      label: i18n.nodes.github.__shared.pin_content,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "message",
-      label: i18n.nodes.github.createOrUpdateFile.pin_message,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "branch",
-      label: i18n.nodes.github.createOrUpdateFile.pin_branch,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "sha",
-      label: i18n.nodes.github.__shared.pin_sha,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
+    { id: "path", label: i18n.nodes.github.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
+    { id: "content", label: i18n.nodes.github.__shared.pin_content, type: "string", direction: "input", defaultValue: "" },
+    { id: "message", label: i18n.nodes.github.createOrUpdateFile.pin_message, type: "string", direction: "input", defaultValue: "" },
+    { id: "branch", label: i18n.nodes.github.createOrUpdateFile.pin_branch, type: "string", direction: "input", defaultValue: "" },
+    { id: "sha", label: i18n.nodes.github.__shared.pin_sha, type: "string", direction: "input", defaultValue: "" },
     execInOutPins().execOut,
     execInOutPins().success,
-    {
-      id: "result",
-      label: i18n.nodes.github.fileWriteResult.label,
-      type: "struct",
-      subType: FILE_WRITE_RESULT_STRUCT_TYPE,
-      direction: "output",
-    },
+    { id: "result", label: i18n.nodes.github.fileWriteResult.label, type: "struct", subType: FILE_WRITE_RESULT_STRUCT_TYPE, direction: "output" },
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(
-      ctx,
-      String(inputs.credentialName ?? ""),
-    );
+    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
@@ -633,15 +398,7 @@ registerNode({
     const manager = GithubManager.forAuth(resolved.auth);
     const branch = String(inputs.branch ?? "");
     const sha = String(inputs.sha ?? "");
-    const result = await manager.createOrUpdateFile(
-      String(inputs.owner ?? ""),
-      String(inputs.repo ?? ""),
-      String(inputs.path ?? ""),
-      String(inputs.content ?? ""),
-      String(inputs.message ?? ""),
-      branch || undefined,
-      sha || undefined,
-    );
+    const result = await manager.createOrUpdateFile(String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.path ?? ""), String(inputs.content ?? ""), String(inputs.message ?? ""), branch || undefined, sha || undefined);
     return {
       nextExec: "exec-out",
       outputs: {
@@ -662,36 +419,16 @@ registerNode({
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
-    {
-      id: "route",
-      label: i18n.nodes.github.request.pin_route,
-      type: "string",
-      direction: "input",
-      defaultValue: "GET /repos/{owner}/{repo}",
-    },
-    {
-      id: "paramsJson",
-      label: i18n.nodes.github.request.pin_params,
-      type: "string",
-      direction: "input",
-      defaultValue: "{}",
-    },
+    { id: "route", label: i18n.nodes.github.request.pin_route, type: "string", direction: "input", defaultValue: "GET /repos/{owner}/{repo}" },
+    { id: "paramsJson", label: i18n.nodes.github.request.pin_params, type: "string", direction: "input", defaultValue: "{}" },
     execInOutPins().execOut,
     execInOutPins().success,
-    {
-      id: "data",
-      label: i18n.nodes.__shared.pin_json,
-      type: "object",
-      direction: "output",
-    },
+    { id: "data", label: i18n.nodes.__shared.pin_json, type: "object", direction: "output" },
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(
-      ctx,
-      String(inputs.credentialName ?? ""),
-    );
+    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
