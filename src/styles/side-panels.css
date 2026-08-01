@@ -181,7 +181,7 @@
   color: var(--pp-text);
   border-radius: 3px;
   font-size: 11px;
-  padding: 2px 4px;
+  padding: 4px 8px;
   min-width: 0;
 }
 
@@ -219,7 +219,6 @@
   width: 14px;
   height: 14px;
   padding: 0;
-  accent-color: #5db85c;
 }
 
 .typed-value-type-select {
@@ -233,7 +232,7 @@
   border-radius: 3px;
   font: inherit;
   font-size: 11px;
-  padding: 1px 5px 1px 4px;
+  padding: 4px 8px;
   flex: 0 0 auto;
   cursor: pointer;
 }
@@ -299,6 +298,10 @@
   padding: 4px;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.type-menu .row-context-menu-item {
+  padding: 2px 4px;
 }
 
 .container-icon {
