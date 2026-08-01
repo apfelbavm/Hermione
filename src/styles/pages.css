@@ -372,6 +372,11 @@
   color: #fff;
 }
 
+.run-row-kind-chained {
+  background: var(--pp-surface-hover-alt);
+  color: var(--pp-accent);
+}
+
 .run-entries {
   display: flex;
   flex-direction: column;

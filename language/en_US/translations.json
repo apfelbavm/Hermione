@@ -116,6 +116,7 @@
     "run_row": {
       "simulate": "Simulate",
       "production": "Production",
+      "chained": "Chained",
       "execution_time": "Execution time: ",
       "revision": "Revision: ",
       "entry": "entry",
