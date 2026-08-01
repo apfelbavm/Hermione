@@ -34,17 +34,14 @@
   letter-spacing: 0.02em;
 }
 
-/* Wraps a related run of toolbar buttons in one bordered box — same "reads as one grouped control"
-   language as #canvas-hud-toolbar's own border+background, just inline in the main toolbar instead
-   of floating over the canvas. Currently just the Simulate/Pause/Continue trio. */
+
 .toolbar-button-group {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px;
-  border: 1px solid var(--pp-border-strong);
-  border-radius: 6px;
-  background: var(--pp-bg);
+  padding: 4px 8px;
+  border-left: 1px solid var(--pp-border-strong);
+  border-right: 1px solid var(--pp-border-strong);
 }
 
 #undo-button,

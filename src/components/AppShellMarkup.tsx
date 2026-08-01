@@ -24,14 +24,12 @@ export default function AppShellMarkup({ store }: { store: Store }) {
             <IconManager.ChevronLeftIcon />
             {i18n.components.app_shell_markup.back}
           </button>
-          <div id="history-controls" className="toolbar-button-group">
-            <button id="undo-button" title={i18n.components.app_shell_markup.undo_title}>
-              <IconManager.UndoIcon />
-            </button>
-            <button id="redo-button" title={i18n.components.app_shell_markup.redo_title}>
-              <IconManager.RedoIcon />
-            </button>
-          </div>
+          <button id="undo-button" title={i18n.components.app_shell_markup.undo_title}>
+            <IconManager.UndoIcon />
+          </button>
+          <button id="redo-button" title={i18n.components.app_shell_markup.redo_title}>
+            <IconManager.RedoIcon />
+          </button>
         </div>
         <div id="toolbar-center">
           <div id="simulation-controls" className="toolbar-button-group">
