@@ -2,7 +2,7 @@
  * (src/server/credentials.ts) and browser (the Credential Vault page, the oauth2Saml node's
  * interpreter path) can import this freely, unlike src/server/* itself. */
 
-export type CredentialTypeId = "usernamePassword" | "oauth2SamlBearer" | "dropboxOAuth2" | "githubToken" | "githubApp" | "microsoftGraphClientCredentials";
+export type CredentialTypeId = "usernamePassword" | "oauth2SamlBearer" | "dropboxOAuth2" | "githubToken" | "githubApp" | "microsoftGraphClientCredentials" | "azureStorageConnectionString";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -57,7 +57,22 @@ export interface MicrosoftGraphClientCredentialsData {
   clientSecret: string;
 }
 
-export type CredentialData = UsernamePasswordCredentialData | Oauth2SamlBearerCredentialData | DropboxOAuth2CredentialData | GithubTokenCredentialData | GithubAppCredentialData | MicrosoftGraphClientCredentialsData;
+/** An Azure Storage account's connection string (from Azure Portal > Storage Account > Access keys),
+ * used as-is with BlobServiceClient.fromConnectionString — see lib/azureStorageManager.ts, which
+ * derives every container/blob client from this one string instead of separate account name/key
+ * fields. */
+export interface AzureStorageConnectionStringCredentialData {
+  connectionString: string;
+}
+
+export type CredentialData =
+  | UsernamePasswordCredentialData
+  | Oauth2SamlBearerCredentialData
+  | DropboxOAuth2CredentialData
+  | GithubTokenCredentialData
+  | GithubAppCredentialData
+  | MicrosoftGraphClientCredentialsData
+  | AzureStorageConnectionStringCredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */

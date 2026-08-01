@@ -473,6 +473,106 @@
         "pin_allocated": "Allocated (bytes)"
       }
     },
+    "azureStorage": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_container_name": "Container Name",
+        "pin_blob_name": "Blob Name",
+        "pin_prefix": "Prefix",
+        "pin_encoding": "Encoding",
+        "pin_metadata": "Metadata",
+        "pin_etag": "ETag",
+        "pin_last_modified": "Last Modified",
+        "pin_source_container": "Source Container",
+        "pin_source_blob": "Source Blob",
+        "pin_dest_container": "Destination Container",
+        "pin_dest_blob": "Destination Blob",
+        "pin_permissions": "Permissions",
+        "pin_expires_in_minutes": "Expires In (minutes)",
+        "pin_url": "URL"
+      },
+      "listContainers": {
+        "label": "Azure Storage List Containers",
+        "description": "Lists the containers in an Azure Storage account, optionally filtered by name prefix.",
+        "pin_containers": "Containers"
+      },
+      "createContainer": {
+        "label": "Azure Storage Create Container",
+        "description": "Creates a container in an Azure Storage account if it doesn't already exist.",
+        "pin_access": "Public Access"
+      },
+      "deleteContainer": {
+        "label": "Azure Storage Delete Container",
+        "description": "Deletes a container from an Azure Storage account if it exists."
+      },
+      "getContainerProperties": {
+        "label": "Azure Storage Get Container Properties",
+        "description": "Fetches metadata and properties (ETag, last modified, public access level) for a container.",
+        "pin_public_access": "Public Access"
+      },
+      "setContainerMetadata": {
+        "label": "Azure Storage Set Container Metadata",
+        "description": "Replaces the custom metadata key/value pairs on a container."
+      },
+      "listBlobs": {
+        "label": "Azure Storage List Blobs",
+        "description": "Lists the blobs in a container, optionally filtered by prefix and recursing into virtual folders.",
+        "pin_recursive": "Recursive",
+        "pin_blobs": "Blobs"
+      },
+      "uploadBlob": {
+        "label": "Azure Storage Upload Blob",
+        "description": "Uploads content to a blob in a container, optionally setting its content type.",
+        "pin_content": "Content",
+        "pin_content_type": "Content Type",
+        "pin_overwrite": "Overwrite"
+      },
+      "downloadBlob": {
+        "label": "Azure Storage Download Blob",
+        "description": "Downloads the content of a blob in a container.",
+        "pin_content": "Content"
+      },
+      "deleteBlob": {
+        "label": "Azure Storage Delete Blob",
+        "description": "Deletes a blob from a container if it exists."
+      },
+      "copyBlob": {
+        "label": "Azure Storage Copy Blob",
+        "description": "Copies a blob from one container/path to another, server-side."
+      },
+      "moveBlob": {
+        "label": "Azure Storage Move Blob",
+        "description": "Moves a blob from one container/path to another by copying it then deleting the original."
+      },
+      "getBlobProperties": {
+        "label": "Azure Storage Get Blob Properties",
+        "description": "Fetches metadata and properties (size, content type, ETag, last modified) for a blob, without downloading its content.",
+        "pin_size": "Size (bytes)"
+      },
+      "setBlobMetadata": {
+        "label": "Azure Storage Set Blob Metadata",
+        "description": "Replaces the custom metadata key/value pairs on a blob."
+      },
+      "blobExists": {
+        "label": "Azure Storage Blob Exists",
+        "description": "Checks whether a blob exists in a container.",
+        "pin_exists": "Exists"
+      },
+      "generateBlobSasUrl": {
+        "label": "Azure Storage Generate Blob SAS URL",
+        "description": "Generates a time-limited Shared Access Signature URL granting direct access to a blob, e.g. permissions \"r\" (read) or \"racwd\" (read/add/create/write/delete)."
+      },
+      "generateContainerSasUrl": {
+        "label": "Azure Storage Generate Container SAS URL",
+        "description": "Generates a time-limited Shared Access Signature URL granting direct access to a container."
+      },
+      "getAccountInfo": {
+        "label": "Azure Storage Get Account Info",
+        "description": "Fetches the account kind and SKU name of an Azure Storage account.",
+        "pin_account_kind": "Account Kind",
+        "pin_sku_name": "SKU Name"
+      }
+    },
     "github": {
       "__shared": {
         "pin_credential_name": "Credential Name",

@@ -91,6 +91,19 @@ registerCredentialType({
 });
 
 registerCredentialType({
+  id: "azureStorageConnectionString",
+  label: "Azure Storage (Connection String)",
+  fields: [
+    {
+      id: "connectionString",
+      label: "Connection String",
+      secret: true,
+      help: "From Azure Portal > Storage Account > Access keys > Connection string.",
+    },
+  ],
+});
+
+registerCredentialType({
   id: "microsoftGraphClientCredentials",
   label: "Microsoft Graph (App-only)",
   fields: [
