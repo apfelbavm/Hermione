@@ -118,16 +118,7 @@ interface Oauth2SamlResult {
   [key: string]: unknown;
 }
 
-const oauth2SamlExchange: (
-  idpUrl: string,
-  tokenServiceUrl: string,
-  clientId: string,
-  userId: string,
-  companyId: string,
-  privateKey: string,
-) => Promise<Oauth2SamlResult> = new Function(
-  `${OAUTH2_SAML_EXCHANGE_SOURCE}\nreturn oauth2SamlExchange;`,
-)();
+const oauth2SamlExchange: (idpUrl: string, tokenServiceUrl: string, clientId: string, userId: string, companyId: string, privateKey: string) => Promise<Oauth2SamlResult> = new Function(`${OAUTH2_SAML_EXCHANGE_SOURCE}\nreturn oauth2SamlExchange;`)();
 
 function failResult(error: string): Oauth2SamlResult {
   return {
@@ -148,55 +139,14 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    {
-      id: "credentialName",
-      label: i18n.nodes.auth.oauth2Saml.pin_credential_name,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "exec-out",
-      label: i18n.nodes.__shared.pin_completed,
-      type: "exec",
-      direction: "output",
-    },
-    {
-      id: "success",
-      label: i18n.nodes.__shared.pin_success,
-      type: "boolean",
-      direction: "output",
-    },
-    {
-      id: "auth",
-      label: i18n.nodes.__shared.pin_auth,
-      type: "object",
-      direction: "output",
-    },
-    {
-      id: "accessToken",
-      label: i18n.nodes.auth.oauth2Saml.pin_access_token,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "expiresIn",
-      label: i18n.nodes.auth.oauth2Saml.pin_expires_in,
-      type: "number",
-      direction: "output",
-    },
-    {
-      id: "status",
-      label: i18n.nodes.__shared.pin_status,
-      type: "number",
-      direction: "output",
-    },
-    {
-      id: "error",
-      label: i18n.nodes.__shared.pin_error,
-      type: "string",
-      direction: "output",
-    },
+    { id: "credentialName", label: i18n.nodes.auth.oauth2Saml.pin_credential_name, type: "string", direction: "input", defaultValue: "" },
+    { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
+    { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    { id: "auth", label: i18n.nodes.__shared.pin_auth, type: "object", direction: "output" },
+    { id: "accessToken", label: i18n.nodes.auth.oauth2Saml.pin_access_token, type: "string", direction: "output" },
+    { id: "expiresIn", label: i18n.nodes.auth.oauth2Saml.pin_expires_in, type: "number", direction: "output" },
+    { id: "status", label: i18n.nodes.__shared.pin_status, type: "number", direction: "output" },
+    { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
@@ -205,29 +155,18 @@ registerNode({
     if (!credential) {
       return {
         nextExec: "exec-out",
-        outputs: failResult(
-          `Credential "${credentialName}" not found in the vault`,
-        ),
+        outputs: failResult(`Credential "${credentialName}" not found in the vault`),
       };
     }
     if (credential.type !== "oauth2SamlBearer") {
       return {
         nextExec: "exec-out",
-        outputs: failResult(
-          `Credential "${credentialName}" is not an OAuth2 SAML Bearer credential`,
-        ),
+        outputs: failResult(`Credential "${credentialName}" is not an OAuth2 SAML Bearer credential`),
       };
     }
 
     const data = credential.data as Oauth2SamlBearerCredentialData;
-    const result = await oauth2SamlExchange(
-      data.idpUrl,
-      data.tokenServiceUrl,
-      data.clientId,
-      data.userId,
-      data.companyId,
-      data.privateKey,
-    );
+    const result = await oauth2SamlExchange(data.idpUrl, data.tokenServiceUrl, data.clientId, data.userId, data.companyId, data.privateKey);
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [

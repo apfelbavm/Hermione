@@ -22,84 +22,18 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    {
-      id: "tokenServiceUrl",
-      label: i18n.nodes.auth.oauth2ClientCredentials.pin_token_service_url,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "clientId",
-      label: i18n.nodes.auth.oauth2ClientCredentials.pin_client_id,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "clientSecret",
-      label: i18n.nodes.auth.oauth2ClientCredentials.pin_client_secret,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "scope",
-      label: i18n.nodes.auth.oauth2ClientCredentials.pin_scope,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "sendAs",
-      label: i18n.nodes.auth.oauth2ClientCredentials.pin_send_as,
-      type: "string",
-      direction: "input",
-      defaultValue: SEND_AS_OPTIONS[0],
-      options: SEND_AS_OPTIONS,
-    },
-    {
-      id: "exec-out",
-      label: i18n.nodes.__shared.pin_completed,
-      type: "exec",
-      direction: "output",
-    },
-    {
-      id: "success",
-      label: i18n.nodes.__shared.pin_success,
-      type: "boolean",
-      direction: "output",
-    },
-    {
-      id: "auth",
-      label: i18n.nodes.__shared.pin_auth,
-      type: "object",
-      direction: "output",
-    },
-    {
-      id: "accessToken",
-      label: i18n.nodes.auth.oauth2ClientCredentials.pin_access_token,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "expiresIn",
-      label: i18n.nodes.auth.oauth2ClientCredentials.pin_expires_in,
-      type: "number",
-      direction: "output",
-    },
-    {
-      id: "status",
-      label: i18n.nodes.__shared.pin_status,
-      type: "number",
-      direction: "output",
-    },
-    {
-      id: "error",
-      label: i18n.nodes.__shared.pin_error,
-      type: "string",
-      direction: "output",
-    },
+    { id: "tokenServiceUrl", label: i18n.nodes.auth.oauth2ClientCredentials.pin_token_service_url, type: "string", direction: "input", defaultValue: "" },
+    { id: "clientId", label: i18n.nodes.auth.oauth2ClientCredentials.pin_client_id, type: "string", direction: "input", defaultValue: "" },
+    { id: "clientSecret", label: i18n.nodes.auth.oauth2ClientCredentials.pin_client_secret, type: "string", direction: "input", defaultValue: "" },
+    { id: "scope", label: i18n.nodes.auth.oauth2ClientCredentials.pin_scope, type: "string", direction: "input", defaultValue: "" },
+    { id: "sendAs", label: i18n.nodes.auth.oauth2ClientCredentials.pin_send_as, type: "string", direction: "input", defaultValue: SEND_AS_OPTIONS[0], options: SEND_AS_OPTIONS },
+    { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
+    { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    { id: "auth", label: i18n.nodes.__shared.pin_auth, type: "object", direction: "output" },
+    { id: "accessToken", label: i18n.nodes.auth.oauth2ClientCredentials.pin_access_token, type: "string", direction: "output" },
+    { id: "expiresIn", label: i18n.nodes.auth.oauth2ClientCredentials.pin_expires_in, type: "number", direction: "output" },
+    { id: "status", label: i18n.nodes.__shared.pin_status, type: "number", direction: "output" },
+    { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
@@ -117,26 +51,14 @@ registerNode({
       token_endpoint: tokenUrl,
     };
     const client: oauth.Client = { client_id: clientId };
-    const clientAuth =
-      sendAs === "basicAuthHeader"
-        ? oauth.ClientSecretBasic(clientSecret)
-        : oauth.ClientSecretPost(clientSecret);
+    const clientAuth = sendAs === "basicAuthHeader" ? oauth.ClientSecretBasic(clientSecret) : oauth.ClientSecretPost(clientSecret);
 
     let status = 0;
     try {
-      const response = await oauth.clientCredentialsGrantRequest(
-        as,
-        client,
-        clientAuth,
-        new URLSearchParams(scope ? { scope } : {}),
-      );
+      const response = await oauth.clientCredentialsGrantRequest(as, client, clientAuth, new URLSearchParams(scope ? { scope } : {}));
       status = response.status;
 
-      const result = await oauth.processClientCredentialsResponse(
-        as,
-        client,
-        response,
-      );
+      const result = await oauth.processClientCredentialsResponse(as, client, response);
       return {
         nextExec: "exec-out",
         outputs: {
@@ -152,18 +74,10 @@ registerNode({
         },
       };
     } catch (err) {
-      if (
-        err instanceof oauth.ResponseBodyError ||
-        err instanceof oauth.WWWAuthenticateChallengeError
-      ) {
+      if (err instanceof oauth.ResponseBodyError || err instanceof oauth.WWWAuthenticateChallengeError) {
         status = err.status;
       }
-      const message =
-        err instanceof oauth.ResponseBodyError
-          ? err.error_description || err.error
-          : err instanceof Error
-            ? err.message
-            : String(err);
+      const message = err instanceof oauth.ResponseBodyError ? err.error_description || err.error : err instanceof Error ? err.message : String(err);
       return {
         nextExec: "exec-out",
         outputs: {

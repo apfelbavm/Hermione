@@ -127,15 +127,7 @@ interface ODataV2RequestResult {
   [key: string]: unknown;
 }
 
-const odataV2RequestExecute: (
-  baseUrl: string,
-  pageSize: number,
-  paginationType: string,
-  maxPages: number,
-  headersJson: string,
-  auth: { header?: unknown; value?: unknown } | null | undefined,
-  timeoutMs: number,
-) => Promise<ODataV2RequestResult> = new Function(
+const odataV2RequestExecute: (baseUrl: string, pageSize: number, paginationType: string, maxPages: number, headersJson: string, auth: { header?: unknown; value?: unknown } | null | undefined, timeoutMs: number) => Promise<ODataV2RequestResult> = new Function(
   `${ODATA_V2_REQUEST_EXECUTE_SOURCE}\nreturn odataV2RequestExecute;`,
 )();
 
@@ -146,96 +138,19 @@ registerNode({
   group: "Request",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    {
-      id: "url",
-      label: i18n.nodes.odata.v2Request.pin_url,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "pageSize",
-      label: i18n.nodes.odata.v2Request.pin_page_size,
-      type: "number",
-      direction: "input",
-      defaultValue: 1000,
-      integer: true,
-    },
-    {
-      id: "paginationType",
-      label: i18n.nodes.odata.v2Request.pin_pagination_type,
-      type: "string",
-      direction: "input",
-      defaultValue: PAGINATION_TYPES[0],
-      options: PAGINATION_TYPES,
-    },
-    {
-      id: "maxPages",
-      label: i18n.nodes.odata.v2Request.pin_max_pages,
-      type: "number",
-      direction: "input",
-      defaultValue: 50,
-      integer: true,
-    },
-    {
-      id: "headers",
-      label: i18n.nodes.odata.v2Request.pin_headers,
-      type: "string",
-      direction: "input",
-      defaultValue: "{}",
-    },
-    {
-      id: "auth",
-      label: i18n.nodes.__shared.pin_auth,
-      type: "object",
-      direction: "input",
-      defaultValue: null,
-    },
-    {
-      id: "timeoutMs",
-      label: i18n.nodes.__shared.pin_timeout,
-      type: "number",
-      direction: "input",
-      defaultValue: 10000,
-      integer: true,
-    },
-    {
-      id: "exec-out",
-      label: i18n.nodes.__shared.pin_completed,
-      type: "exec",
-      direction: "output",
-    },
-    {
-      id: "success",
-      label: i18n.nodes.__shared.pin_success,
-      type: "boolean",
-      direction: "output",
-    },
-    {
-      id: "status",
-      label: i18n.nodes.__shared.pin_status,
-      type: "number",
-      direction: "output",
-    },
-    {
-      id: "rows",
-      label: i18n.nodes.odata.v2Request.pin_rows,
-      type: "object",
-      container: "array",
-      direction: "output",
-    },
-    {
-      id: "pageCount",
-      label: i18n.nodes.odata.v2Request.pin_page_count,
-      type: "number",
-      direction: "output",
-    },
-    {
-      id: "error",
-      label: i18n.nodes.__shared.pin_error,
-      type: "string",
-      direction: "output",
-    },
+    { id: "url", label: i18n.nodes.odata.v2Request.pin_url, type: "string", direction: "input", defaultValue: "" },
+    { id: "pageSize", label: i18n.nodes.odata.v2Request.pin_page_size, type: "number", direction: "input", defaultValue: 1000, integer: true },
+    { id: "paginationType", label: i18n.nodes.odata.v2Request.pin_pagination_type, type: "string", direction: "input", defaultValue: PAGINATION_TYPES[0], options: PAGINATION_TYPES },
+    { id: "maxPages", label: i18n.nodes.odata.v2Request.pin_max_pages, type: "number", direction: "input", defaultValue: 50, integer: true },
+    { id: "headers", label: i18n.nodes.odata.v2Request.pin_headers, type: "string", direction: "input", defaultValue: "{}" },
+    { id: "auth", label: i18n.nodes.__shared.pin_auth, type: "object", direction: "input", defaultValue: null },
+    { id: "timeoutMs", label: i18n.nodes.__shared.pin_timeout, type: "number", direction: "input", defaultValue: 10000, integer: true },
+    { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
+    { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    { id: "status", label: i18n.nodes.__shared.pin_status, type: "number", direction: "output" },
+    { id: "rows", label: i18n.nodes.odata.v2Request.pin_rows, type: "object", container: "array", direction: "output" },
+    { id: "pageCount", label: i18n.nodes.odata.v2Request.pin_page_count, type: "number", direction: "output" },
+    { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   // Fires exec-out exactly once, whether every page fetched cleanly or a later page failed midway
@@ -253,10 +168,7 @@ registerNode({
     );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await odataV2RequestExecute(${inputs.url}, ${inputs.pageSize}, ${inputs.paginationType}, ${inputs.maxPages}, ${inputs.headers}, ${inputs.auth}, ${inputs.timeoutMs});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await odataV2RequestExecute(${inputs.url}, ${inputs.pageSize}, ${inputs.paginationType}, ${inputs.maxPages}, ${inputs.headers}, ${inputs.auth}, ${inputs.timeoutMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
