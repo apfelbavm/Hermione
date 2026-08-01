@@ -91,24 +91,6 @@
   gap: 6px;
 }
 
-.multiline-text-editor-buttons button {
-  background: var(--pp-surface-alt);
-  border: 1px solid var(--pp-border-strong);
-  border-radius: 4px;
-  color: var(--pp-text);
-  padding: 4px 12px;
-  cursor: pointer;
-}
-
-.multiline-text-editor-buttons button:hover {
-  background: var(--pp-border-accent);
-  color: #fff;
-}
-
-.multiline-text-editor-save {
-  background: var(--pp-border-accent) !important;
-  border-color: var(--pp-border-accent) !important;
-}
 
 .hover-tooltip {
   position: fixed;
@@ -127,29 +109,11 @@
   white-space: pre-wrap;
 }
 
-/* Per-node instance description (see NodeInstance.description/detailsPanel.ts) — a persistent
-   speech-bubble above the node on the canvas, only ever created for a node that HAS one (see
-   nodeDescriptionOverlay.ts). Same look as .hover-tooltip (it's meant to read as "that same kind
-   of note"), just translucent (per-spec 75% background opacity, letting the grid/wires show
-   through a little) since — unlike the hover tooltip — it's always on screen rather than a
-   transient hint, and it needs its own comic-style tail pointing down at the node it belongs to. */
 .node-description-bubble {
-  /* Set inline per-instance (see nodeDescriptionOverlay.ts) — every calc() below rides on this so
-     padding/border/the tail all scale in lockstep with the font-size/max-width also set inline,
-     instead of staying a fixed screen size while everything else shrinks or grows around zoom. */
   --zoom: 1;
   position: absolute;
-  /* Y only — left/right untouched, so the bubble's own left edge lines up with the node's left
-     edge (see nodeDescriptionOverlay.ts) instead of being centered over it. */
   transform: translateY(-100%);
   z-index: 5;
-  /* Without this, an absolutely-positioned element with only `left` set (no `right`) is
-     shrink-to-fit BOUNDED BY THE CONTAINING BLOCK'S REMAINING WIDTH (#overlay's width minus
-     `left`) per the CSS spec — a bubble sitting far enough right on screen would get squeezed
-     and wrap early no matter how much max-width still allows, and since panning/zooming
-     constantly changes where a node's left edge lands on screen, that squeeze came and went
-     unpredictably. `width: max-content` sizes from the text itself instead, so max-width below
-     is the ONLY thing that ever decides wrapping. */
   width: max-content;
   max-width: 220px;
   background: rgba(247, 246, 243, 0.75);
@@ -165,13 +129,6 @@
   white-space: pre-wrap;
 }
 
-/* The speech-bubble's tail: a border-color triangle (::before) with a slightly smaller,
-   fill-color triangle (::after) laid on top of it, leaving a thin visible rim — the standard
-   two-triangle CSS speech-bubble technique. Both point straight down, offset near the bubble's
-   left edge (matching its own left-aligned position) rather than centered under it. Every length
-   scales with --zoom too, same reasoning as the bubble box itself above — otherwise a
-   fixed-pixel offset/size drifts out of proportion (or off the edge entirely) as the bubble
-   itself grows or shrinks with zoom. */
 .node-description-bubble::before,
 .node-description-bubble::after {
   content: "";
@@ -256,10 +213,6 @@
   margin: 0;
   padding: 4px;
   overflow-y: auto;
-  /* Fills whatever vertical space .node-search-menu's fixed/clamped height leaves after the
-     search input above — min-height: 0 overrides a flex item's default auto min-height, which
-     would otherwise keep this list at its full content size and defeat overflow-y: auto entirely
-     (the menu box would grow instead of this list scrolling). */
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -295,9 +248,6 @@
   gap: 4px;
 }
 
-/** Fixed-width slot shared by every tree row (see nodeSearchMenu.ts) — a group's chevron arrow
- * renders here; a leaf row leaves it empty so its label still starts at this exact same x
- * position, lining up with a group's NAME text rather than with the arrow icon itself. */
 .node-search-row-icon {
   display: inline-flex;
   align-items: center;
@@ -336,15 +286,11 @@
   color: var(--pp-text-muted);
 }
 
-/** Separates pinned rows (e.g. "Return" inside a function body) from the regular grouped/sorted
- * list below them. */
 .node-search-pinned-divider {
   border-bottom: 1px solid var(--pp-border-strong);
 }
 
 .comment-title {
-  /* display: inline-block (not the default block) so an absolutely-positioned title with only
-     left/top set shrink-wraps to its own text instead of stretching to fill available width. */
   display: inline-block;
   box-sizing: border-box;
   min-width: 2em;

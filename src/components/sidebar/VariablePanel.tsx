@@ -132,6 +132,7 @@ export function VariablePanel({ id, title, store, getGraph }: { id?: string; tit
             )}
             <button
               type="button"
+              className="btn btn-gray btn-sm"
               disabled={disabled}
               onClick={() => {
                 removeVariable(graph, store.state.rootGraph.getVisibleVariables(graph), store.state.rootGraph.functions, variable.id);

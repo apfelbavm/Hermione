@@ -70,7 +70,7 @@ export function GraphTabs({ store }: { store: Store }) {
             </span>
             <button
               type="button"
-              className="graph-tab-close"
+              className="graph-tab-close btn btn-ghost btn-sm"
               title={i18n.components.graph_tabs.close_tab}
               disabled={closeDisabled}
               onClick={(e) => {

@@ -46,7 +46,7 @@ export function Sidebar() {
 
   return (
     <nav className="app-sidebar">
-      <button type="button" className="app-sidebar-toggle" onClick={toggleSidebar} title={i18n.components.sidebar.collapse_title}>
+      <button type="button" className="app-sidebar-toggle btn btn-ghost" onClick={toggleSidebar} title={i18n.components.sidebar.collapse_title}>
         <span className="app-sidebar-link-icon">
           <IconManager.CollapseIcon />
         </span>

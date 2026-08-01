@@ -34,7 +34,6 @@
   letter-spacing: 0.02em;
 }
 
-
 .toolbar-button-group {
   display: flex;
   align-items: center;
@@ -44,78 +43,12 @@
   border-right: 1px solid var(--pp-border-strong);
 }
 
-#undo-button,
-#redo-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  color: var(--pp-text-muted);
-  cursor: pointer;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-}
-
-#undo-button:hover:not(:disabled),
-#redo-button:hover:not(:disabled) {
-  background: var(--pp-surface-hover-alt);
-  color: var(--pp-text);
-}
-
 #undo-button:disabled,
 #redo-button:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-#run-button {
-  background: var(--pp-accent);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 6px 14px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-#run-button:hover {
-  background: var(--pp-accent-hover);
-}
-
-#pause-button,
-#continue-button,
-#stop-button,
-#save-button,
-#load-button,
-#download-button,
-#deploy-button {
-  background: var(--pp-button-bg);
-  color: var(--pp-text);
-  border: none;
-  border-radius: 4px;
-  padding: 6px 14px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-#pause-button:hover:not(:disabled),
-#continue-button:hover:not(:disabled),
-#stop-button:hover:not(:disabled),
-#save-button:hover,
-#load-button:hover,
-#download-button:hover,
-#deploy-button:hover {
-  background: var(--pp-button-bg-hover);
-}
-
-/* Restore old version page's toolbar-center controls (see VersionRestorePanel.tsx) — version
-   picker styled like the Projects/Emulate pages' dropdowns, Cancel like the plain toolbar buttons
-   above, Restore like #run-button's accent green. */
 #version-restore-controls select {
   background: var(--pp-surface);
   border: 1px solid var(--pp-border-strong);
@@ -123,29 +56,6 @@
   color: var(--pp-text);
   padding: 7px 10px;
   font-size: 13px;
-}
-
-#version-restore-controls button {
-  background: var(--pp-button-bg);
-  color: var(--pp-text);
-  border: none;
-  border-radius: 4px;
-  padding: 6px 14px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-#version-restore-controls button:hover:not(:disabled) {
-  background: var(--pp-button-bg-hover);
-}
-
-#version-restore-controls .restore-version-button {
-  background: var(--pp-accent);
-  color: #fff;
-}
-
-#version-restore-controls .restore-version-button:hover:not(:disabled) {
-  background: var(--pp-accent-hover);
 }
 
 .toolbar-toggle {

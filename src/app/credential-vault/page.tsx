@@ -99,10 +99,10 @@ function CredentialDialog({ initial, onClose, onSaved }: { initial: DialogState;
         {error && <p className="modal-error">{error}</p>}
 
         <div className="modal-actions">
-          <button type="button" onClick={onClose}>
+          <button type="button" className="btn btn-gray" onClick={onClose}>
             {i18n.pages.credential_vault.modal_cancel}
           </button>
-          <button type="button" onClick={() => void handleSubmit()}>
+          <button type="button" className="btn btn-green" onClick={() => void handleSubmit()}>
             {i18n.pages.credential_vault.modal_save}
           </button>
         </div>
@@ -149,7 +149,7 @@ export default function CredentialVaultPage() {
       <h1>{i18n.pages.credential_vault.title}</h1>
 
       <div className="create-row">
-        <button type="button" onClick={() => setDialog(blankDialogState())}>
+        <button type="button" className="btn btn-green" onClick={() => setDialog(blankDialogState())}>
           {i18n.pages.credential_vault.add}
         </button>
       </div>
@@ -164,10 +164,10 @@ export default function CredentialVaultPage() {
                 {credential.name} <span className="entity-type-tag">{getCredentialTypeDef(credential.type).label}</span>
               </span>
               <div className="entity-actions">
-                <button type="button" onClick={() => void openEditDialog(credential.id)}>
+                <button type="button" className="btn btn-gray btn-sm" onClick={() => void openEditDialog(credential.id)}>
                   {i18n.pages.credential_vault.edit}
                 </button>
-                <button type="button" onClick={() => void handleDelete(credential.id, credential.name)}>
+                <button type="button" className="btn btn-gray btn-sm" onClick={() => void handleDelete(credential.id, credential.name)}>
                   {i18n.pages.credential_vault.delete}
                 </button>
               </div>

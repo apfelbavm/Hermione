@@ -109,6 +109,7 @@ export function ScriptsPanel({ store }: { store: Store }) {
             )}
             <button
               type="button"
+              className="btn btn-gray btn-sm"
               disabled={disabled}
               onClick={() => {
                 closeScriptTab(store.state, script.id);

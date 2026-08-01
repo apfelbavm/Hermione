@@ -99,6 +99,7 @@ export function FunctionsPanel({ store }: { store: Store }) {
             )}
             <button
               type="button"
+              className="btn btn-gray btn-sm"
               disabled={disabled}
               onClick={() => {
                 closeFunctionTab(store.state, fn.id);

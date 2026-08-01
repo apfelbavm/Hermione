@@ -21,7 +21,7 @@ export function ThemeToggle() {
   }
 
   return (
-    <button type="button" className="theme-toggle-button" onClick={toggle} title={i18n.components.theme_toggle.title}>
+    <button type="button" className="theme-toggle-button btn btn-gray btn-pill" onClick={toggle} title={i18n.components.theme_toggle.title}>
       {mounted && (theme === "dark" ? <IconManager.ThemeDarkIcon /> : <IconManager.ThemeLightIcon />)}
       {mounted ? (theme === "dark" ? i18n.components.theme_toggle.dark : i18n.components.theme_toggle.light) : i18n.components.theme_toggle.loading}
     </button>

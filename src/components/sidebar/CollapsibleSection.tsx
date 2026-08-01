@@ -36,7 +36,7 @@ export function CollapsibleSection({
         <span className="panel-header-title">{title}</span>
         <button
           type="button"
-          className="panel-header-add"
+          className="panel-header-add btn btn-blue btn-icon"
           title={addButtonTitle}
           disabled={disabled}
           onClick={(e) => {

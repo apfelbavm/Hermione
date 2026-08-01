@@ -50,19 +50,7 @@
 }
 
 .log-tab-close {
-  background: none;
-  border: none;
-  color: var(--pp-text-muted);
-  cursor: pointer;
-  font-size: 11px;
   padding: 0 2px;
-  border-radius: 3px;
-  line-height: 1;
-}
-
-.log-tab-close:hover {
-  background: var(--pp-button-bg-hover);
-  color: var(--pp-text);
 }
 
 .log-save-status {
@@ -110,29 +98,9 @@
   padding: 6px 10px;
 }
 
-/* Same "reads as interactive without a permanent visual seam" language as .canvas-hud-button, now
-   sitting inline at the tab strip's right edge instead of floating over the log content. */
 .log-clear-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 22px;
   height: 22px;
   margin: auto 8px auto 4px;
-  border: 1px solid var(--pp-border-strong);
-  border-radius: 4px;
-  background: var(--pp-bg);
-  color: var(--pp-text-muted);
   font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-}
-
-.log-clear-button:hover {
-  background: var(--pp-surface-hover-alt);
-  color: var(--pp-text);
-  border-color: var(--pp-border-accent);
 }

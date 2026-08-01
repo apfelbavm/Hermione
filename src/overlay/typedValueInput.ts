@@ -155,7 +155,12 @@ function createContainerListInput(type: PinType, value: unknown, onChange: (valu
       row.className = "typed-value-list-row";
 
       if (container === "map") {
-        const entryObj: MapEntry = isMapEntry(entry) ? entry : { key: DEFAULT_VALUE_BY_TYPE[keyType], value: DEFAULT_VALUE_BY_TYPE[type] };
+        const entryObj: MapEntry = isMapEntry(entry)
+          ? entry
+          : {
+              key: DEFAULT_VALUE_BY_TYPE[keyType],
+              value: DEFAULT_VALUE_BY_TYPE[type],
+            };
         // Reads entries[index] fresh at commit time (not the entryObj snapshot captured above) —
         // editing this row's key then its value never re-renders in between (only Set dedupes
         // trigger a re-render on edit), so committing off the stale entryObj would silently
@@ -187,7 +192,7 @@ function createContainerListInput(type: PinType, value: unknown, onChange: (valu
 
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
-      removeBtn.className = "typed-value-list-remove";
+      removeBtn.className = "typed-value-list-remove btn btn-gray btn-sm";
       removeBtn.textContent = "✕";
       removeBtn.addEventListener("click", () => {
         entries.splice(index, 1);
@@ -201,10 +206,17 @@ function createContainerListInput(type: PinType, value: unknown, onChange: (valu
 
     const addBtn = document.createElement("button");
     addBtn.type = "button";
-    addBtn.className = "typed-value-list-add";
+    addBtn.className = "typed-value-list-add btn btn-blue btn-sm";
     addBtn.textContent = "+ Add";
     addBtn.addEventListener("click", () => {
-      entries.push(container === "map" ? { key: DEFAULT_VALUE_BY_TYPE[keyType], value: DEFAULT_VALUE_BY_TYPE[type] } : DEFAULT_VALUE_BY_TYPE[type]);
+      entries.push(
+        container === "map"
+          ? {
+              key: DEFAULT_VALUE_BY_TYPE[keyType],
+              value: DEFAULT_VALUE_BY_TYPE[type],
+            }
+          : DEFAULT_VALUE_BY_TYPE[type],
+      );
       if (container === "set") dedupeInPlace();
       commit();
       renderRows();

@@ -20,9 +20,10 @@ export function openMultilineTextEditor(screenPos: { x: number; y: number }, cur
   buttons.className = "multiline-text-editor-buttons";
   const saveButton = document.createElement("button");
   saveButton.textContent = "Save";
-  saveButton.className = "multiline-text-editor-save";
+  saveButton.className = "multiline-text-editor-save btn btn-blue";
   const cancelButton = document.createElement("button");
   cancelButton.textContent = "Cancel";
+  cancelButton.className = "btn btn-gray";
 
   buttons.append(saveButton, cancelButton);
   panel.append(textarea, buttons);

@@ -89,7 +89,7 @@ export function CreateFlowDialog({ onClose, onCreate }: { onClose: () => void; o
           ))}
         </div>
         <div className="modal-actions">
-          <button type="button" onClick={onClose} disabled={creatingTemplateId !== null}>
+          <button type="button" className="btn btn-gray" onClick={onClose} disabled={creatingTemplateId !== null}>
             {i18n.pages.project.duplicate_cancel}
           </button>
         </div>

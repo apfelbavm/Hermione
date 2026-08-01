@@ -20,27 +20,29 @@ export default function AppShellMarkup({ store }: { store: Store }) {
       <PageHeader />
       <div id="toolbar">
         <div id="toolbar-left">
-          <button type="button" id="back-to-project-button" title={i18n.components.app_shell_markup.back_title}>
+          <button type="button" id="back-to-project-button" className="btn btn-ghost" title={i18n.components.app_shell_markup.back_title}>
             <IconManager.ChevronLeftIcon />
             {i18n.components.app_shell_markup.back}
           </button>
-          <button id="undo-button" title={i18n.components.app_shell_markup.undo_title}>
+          <button id="undo-button" className="btn btn-ghost btn-icon" title={i18n.components.app_shell_markup.undo_title}>
             <IconManager.UndoIcon />
           </button>
-          <button id="redo-button" title={i18n.components.app_shell_markup.redo_title}>
+          <button id="redo-button" className="btn btn-ghost btn-icon" title={i18n.components.app_shell_markup.redo_title}>
             <IconManager.RedoIcon />
           </button>
         </div>
         <div id="toolbar-center">
           <div id="simulation-controls" className="toolbar-button-group">
-            <button id="run-button">{i18n.components.app_shell_markup.simulate}</button>
-            <button id="pause-button" style={{ display: "none" }} title={i18n.components.app_shell_markup.pause_title}>
+            <button id="run-button" className="btn btn-green">
+              {i18n.components.app_shell_markup.simulate}
+            </button>
+            <button id="pause-button" className="btn btn-gray" style={{ display: "none" }} title={i18n.components.app_shell_markup.pause_title}>
               {i18n.components.app_shell_markup.pause}
             </button>
-            <button id="continue-button" style={{ display: "none" }} title={i18n.components.app_shell_markup.continue_title}>
+            <button id="continue-button" className="btn btn-gray" style={{ display: "none" }} title={i18n.components.app_shell_markup.continue_title}>
               {i18n.components.app_shell_markup.continue}
             </button>
-            <button id="stop-button" style={{ display: "none" }} title={i18n.components.app_shell_markup.stop_title}>
+            <button id="stop-button" className="btn btn-gray" style={{ display: "none" }} title={i18n.components.app_shell_markup.stop_title}>
               {i18n.components.app_shell_markup.stop}
             </button>
             <label id="auto-pan-toggle" className="toolbar-toggle" title={i18n.components.app_shell_markup.auto_pan_title}>
@@ -50,10 +52,18 @@ export default function AppShellMarkup({ store }: { store: Store }) {
           </div>
         </div>
         <div id="toolbar-right">
-          <button id="save-button">{i18n.components.app_shell_markup.save}</button>
-          <button id="load-button">{i18n.components.app_shell_markup.load}</button>
-          <button id="download-button">{i18n.components.app_shell_markup.download_graph}</button>
-          <button id="deploy-button">{i18n.components.app_shell_markup.deploy}</button>
+          <button id="save-button" className="btn btn-gray">
+            {i18n.components.app_shell_markup.save}
+          </button>
+          <button id="load-button" className="btn btn-gray">
+            {i18n.components.app_shell_markup.load}
+          </button>
+          <button id="download-button" className="btn btn-gray">
+            {i18n.components.app_shell_markup.download_graph}
+          </button>
+          <button id="deploy-button" className="btn btn-gray">
+            {i18n.components.app_shell_markup.deploy}
+          </button>
           <input id="load-file-input" type="file" accept="application/json" style={{ display: "none" }} />
         </div>
       </div>
@@ -77,7 +87,7 @@ export default function AppShellMarkup({ store }: { store: Store }) {
                 <input type="checkbox" id="snap-to-grid-checkbox" />
                 {i18n.components.app_shell_markup.snap_to_grid}
               </label>
-              <button id="frame-all-button" className="canvas-hud-button" title="Fit graph to view">
+              <button id="frame-all-button" className="canvas-hud-button btn btn-outline btn-icon" title="Fit graph to view">
                 ⛶
               </button>
             </div>
@@ -93,10 +103,10 @@ export default function AppShellMarkup({ store }: { store: Store }) {
         <div id="log-tab-strip">
           <div id="log-tabs-dynamic" />
           <span id="log-save-status" className="log-save-status" style={{ display: "none" }} />
-          <button id="log-save-button" className="log-clear-button" title="Save script" style={{ display: "none" }}>
+          <button id="log-save-button" className="log-clear-button btn btn-outline btn-icon" title="Save script" style={{ display: "none" }}>
             <IconManager.SaveIcon />
           </button>
-          <button id="log-clear-button" className="log-clear-button" title="Clear log">
+          <button id="log-clear-button" className="log-clear-button btn btn-outline btn-icon" title="Clear log">
             <IconManager.ClearIcon />
           </button>
         </div>

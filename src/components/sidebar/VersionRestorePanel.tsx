@@ -42,10 +42,10 @@ export function VersionRestorePanel({
           ))}
         </select>
       )}
-      <button type="button" onClick={onCancel} disabled={restoring}>
+      <button type="button" className="btn btn-gray" onClick={onCancel} disabled={restoring}>
         {i18n.pages.restore_flow_version.cancel}
       </button>
-      <button type="button" className="restore-version-button" onClick={onRestore} disabled={busy || versions.length === 0}>
+      <button type="button" className="restore-version-button btn btn-green" onClick={onRestore} disabled={busy || versions.length === 0}>
         {restoring ? i18n.pages.restore_flow_version.restoring : i18n.pages.restore_flow_version.restore}
       </button>
     </div>

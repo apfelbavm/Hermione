@@ -27,7 +27,7 @@ export default function AiDocsPage() {
       <p className="page-empty-note">{i18n.pages.ai_docs.description}</p>
 
       <div className="search-create-row">
-        <button type="button" onClick={() => void handleCopy()}>
+        <button type="button" className="btn btn-green" onClick={() => void handleCopy()}>
           {copied ? i18n.pages.ai_docs.copied : i18n.pages.ai_docs.copy}
         </button>
       </div>

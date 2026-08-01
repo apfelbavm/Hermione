@@ -45,7 +45,7 @@ function ProjectRowMenu({ onRename, onDelete }: { onRename: () => void; onDelete
 
   return (
     <div className="entity-menu" ref={wrapperRef}>
-      <button type="button" className="entity-menu-button" onClick={toggle} title="More actions" aria-label="More actions">
+      <button type="button" className="entity-menu-button btn btn-ghost" onClick={toggle} title="More actions" aria-label="More actions">
         ⋯
       </button>
       {open && pos && (
@@ -103,10 +103,10 @@ function CreateProjectDialog({ onClose, onCreate }: { onClose: () => void; onCre
         </label>
         {error && <p className="modal-error">{error}</p>}
         <div className="modal-actions">
-          <button type="button" onClick={onClose} disabled={saving}>
+          <button type="button" className="btn btn-gray" onClick={onClose} disabled={saving}>
             {i18n.pages.projects.create_cancel}
           </button>
-          <button type="button" onClick={() => void handleSubmit()} disabled={saving}>
+          <button type="button" className="btn btn-green" onClick={() => void handleSubmit()} disabled={saving}>
             {saving ? i18n.pages.projects.create_saving : i18n.pages.projects.create_confirm}
           </button>
         </div>
@@ -162,7 +162,7 @@ export default function ProjectsPage() {
 
       <div className="search-create-row">
         <input type="search" className="search-input" placeholder={i18n.pages.projects.search_placeholder} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-        <button type="button" onClick={() => setShowCreateDialog(true)}>
+        <button type="button" className="btn btn-green" onClick={() => setShowCreateDialog(true)}>
           {i18n.pages.projects.create_project}
         </button>
       </div>

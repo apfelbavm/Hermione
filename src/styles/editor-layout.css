@@ -45,19 +45,7 @@
 }
 
 .graph-tab-close {
-  background: none;
-  border: none;
-  color: var(--pp-text-muted);
-  cursor: pointer;
-  font-size: 11px;
   padding: 0 2px;
-  border-radius: 3px;
-  line-height: 1;
-}
-
-.graph-tab-close:hover {
-  background: var(--pp-button-bg-hover);
-  color: var(--pp-text);
 }
 
 #canvas-container {
@@ -66,10 +54,6 @@
   overflow: hidden;
 }
 
-/* Small floating toolbar over the canvas's top-right corner — Snap to Grid (moved out of the main
-   #toolbar) to the left of Frame All / zoom-to-fit (see main.ts's frame-all-button handler,
-   camera.ts's frameRect). Same background/border language as the main toolbar, just compact and
-   layered on top of the canvas instead of docked above it. */
 #canvas-hud-toolbar {
   position: absolute;
   top: 12px;
@@ -83,27 +67,10 @@
   background: var(--pp-surface);
 }
 
-/* Faint by default, same "reads as interactive without a permanent visual seam" idea as .resizer,
-   just fully opaque instead of transparent since it needs to stay legible as an icon at rest. */
 .canvas-hud-button {
   width: 26px;
   height: 26px;
-  border: 1px solid var(--pp-border-strong);
-  border-radius: 4px;
-  background: var(--pp-bg);
-  color: var(--pp-text-muted);
   font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-}
-
-.canvas-hud-button:hover {
-  background: var(--pp-surface-hover-alt);
-  color: var(--pp-text);
-  border-color: var(--pp-border-accent);
 }
 
 .side-panel {
@@ -115,8 +82,6 @@
   font-size: 13px;
 }
 
-/* Each sidebar's border sits on the edge facing the canvas — #left-sidebar is left-of-canvas so
-   its own right edge borders it; #right-sidebar is right-of-canvas so its own left edge does. */
 #left-sidebar {
   border-right: 1px solid var(--pp-border);
 }
@@ -124,10 +89,6 @@
 #right-sidebar {
   border-left: 1px solid var(--pp-border);
 }
-
-/* Drag handles for both sidebars' widths and the log panel's height — see resizablePanels.ts.
-   Transparent by default, colored on hover/drag so they read as interactive without adding a
-   permanent visual seam the rest of the time. */
 .resizer {
   flex: 0 0 auto;
   background: transparent;

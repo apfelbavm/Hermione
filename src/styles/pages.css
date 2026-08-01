@@ -49,18 +49,10 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--pp-text-muted);
   text-decoration: none;
-  font-size: 13px;
   padding: 4px 8px;
-  border-radius: 4px;
   flex: 0 0 auto;
   margin-bottom: 16px;
-}
-
-.back-link:hover {
-  background: var(--pp-button-bg);
-  color: var(--pp-text);
 }
 
 .section-heading {
@@ -129,20 +121,6 @@
   font-size: 13px;
 }
 
-.create-row button {
-  background: var(--pp-accent);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 7px 16px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.create-row button:hover {
-  background: var(--pp-accent-hover);
-}
-
 .create-row select {
   background: var(--pp-surface);
   border: 1px solid var(--pp-border-strong);
@@ -152,8 +130,6 @@
   font-size: 13px;
 }
 
-/* Search bar + "Create" button row on the Projects and Project pages — the button sits at the
-   search bar's top right rather than being full-width like .create-row's old submit button. */
 .search-create-row {
   display: flex;
   align-items: center;
@@ -170,21 +146,6 @@
   color: var(--pp-text);
   padding: 7px 10px;
   font-size: 13px;
-}
-
-.search-create-row button {
-  background: var(--pp-accent);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 7px 16px;
-  cursor: pointer;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.search-create-row button:hover {
-  background: var(--pp-accent-hover);
 }
 
 .emulate-picker-row {
@@ -272,38 +233,10 @@
   flex: 0 0 auto;
 }
 
-.entity-actions button {
-  background: var(--pp-button-bg);
-  color: var(--pp-text);
-  border: none;
-  border-radius: 4px;
-  padding: 5px 10px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.entity-actions button:hover {
-  background: var(--pp-button-bg-hover);
-}
-
-/* Wraps the "⋯" options button + its dropdown (see projects/[projectId]/page.tsx's FlowRowMenu) —
-   the dropdown itself is .row-context-menu, shared with the canvas's own right-click menus, and is
-   `position: fixed` (positioned in JS off the button's own getBoundingClientRect), so this wrapper
-   only needs to establish DOM containment for the outside-click handler, not lay anything out. */
 .entity-menu-button {
-  background: none;
-  border: none;
-  color: var(--pp-text-muted);
   font-size: 16px;
   line-height: 1;
   padding: 5px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.entity-menu-button:hover {
-  background: var(--pp-button-bg-hover);
-  color: var(--pp-text);
 }
 
 .run-list {
@@ -352,16 +285,11 @@
   flex: 1 1 auto;
 }
 
-/* Only present on a production run whose "EventRun" trigger actually ran (see RunLog.executionMs's
-   own doc comment) — light grey and un-bolded so it reads as metadata about the run, not part of
-   the Flow's own name. */
 .run-row-execution-time {
   font-weight: normal;
   color: var(--pp-text-dim);
 }
 
-/* Only rendered by the global Logs page (app/logs/page.tsx) — the per-project one omits it since
-   which project a run belongs to is already implied by the page itself. */
 .run-row-project-name {
   flex: 0 0 auto;
   color: var(--pp-link);
@@ -383,8 +311,6 @@
   flex: 0 0 auto;
 }
 
-/* Distinguishes a Simulate run (interpreted, editor-only) from a production run (the Flow's own
-   compiled output, see api/emulate/run/route.ts) at a glance — see RunLog.kind. */
 .run-row-kind {
   flex: 0 0 auto;
   font-size: 11px;
@@ -431,19 +357,6 @@
   font-family: "Consolas", "Courier New", monospace;
 }
 
-.log-entry-download {
-  background: var(--pp-button-bg);
-  color: var(--pp-text);
-  border: none;
-  border-radius: 4px;
-  padding: 2px 8px;
-  cursor: pointer;
-  font-size: 11px;
-}
-
-.log-entry-download:hover {
-  background: var(--pp-button-bg-hover);
-}
 
 .log-entry-text {
   margin: 0;
@@ -456,8 +369,6 @@
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--pp-text);
-  /* A single huge logged message shouldn't be able to blow out the whole page — clamp it to its
-     own scrollable box instead. */
   max-height: 80vh;
   overflow-y: auto;
 }
@@ -518,8 +429,6 @@
   flex-direction: column;
 }
 
-/* The deployed script's date/version, overlaid top-right of the editor — pointer-events:none so it
-   never intercepts a click meant for Monaco's own scrollbar/gutter underneath it. */
 .emulate-editor-meta {
   position: absolute;
   top: 8px;

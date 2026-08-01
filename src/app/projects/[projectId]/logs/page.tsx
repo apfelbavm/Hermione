@@ -37,7 +37,7 @@ export default function LogsPage() {
           { label: i18n.pages.logs.page_title },
         ]}
       />
-      <Link href={`/projects/${projectId}`} className="back-link">
+      <Link href={`/projects/${projectId}`} className="back-link btn btn-ghost">
         <IconManager.ChevronLeftIcon />
         {i18n.pages.project_logs.back}
       </Link>

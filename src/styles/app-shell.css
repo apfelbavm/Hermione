@@ -3,24 +3,11 @@
    the editor. Uses the exact same `--pp-*` variables as the editor's own toolbar/sidebar above,
    rather than inventing a separate visual language for them. */
 
+/* Color/shape comes from the shared .btn/.btn-ghost classes (see AppShellMarkup.tsx) — this id only
+   carries the tighter padding/gap that sets it apart from the default .btn sizing. */
 #back-to-project-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--pp-text-muted);
-  text-decoration: none;
-  font-size: 13px;
   padding: 4px 8px;
-  border-radius: 4px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-#back-to-project-button:hover {
-  background: var(--pp-button-bg);
-  color: var(--pp-text);
+  gap: 4px;
 }
 
 .page-top-header {
@@ -39,8 +26,7 @@
   border-top: 1px solid var(--pp-border);
 }
 
-/* Same max-width/margin/horizontal-padding as .page-content, so this bar's title/toggle align
-   with the breadcrumbs/back-link/body below regardless of viewport width. */
+
 .page-top-header-inner {
   display: flex;
   align-items: center;
@@ -50,8 +36,6 @@
   padding: 0 32px;
 }
 
-/* The plain-page counterpart of #app: a full-height column with the full-bleed header on top and
-   the sidebar+content row (.page-body) below it. */
 .page-frame {
   height: 100vh;
   overflow: hidden;
@@ -61,17 +45,12 @@
   color: var(--pp-text);
 }
 
-/* Houses the nav Sidebar and the page's own scrollable content side by side — the plain-page
-   counterpart of #main-area. */
 .page-body {
   display: flex;
   flex: 1 1 auto;
   overflow: hidden;
 }
 
-/* height (not min-height) + its own overflow-y, since html/body are overflow: hidden globally (see
-   that rule near the top of this file) — every plain page needs to scroll internally rather than
-   relying on the page/body scrolling, or content taller than the viewport gets clipped. */
 .page-content {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -81,9 +60,6 @@
   padding: 24px 32px 48px;
 }
 
-/* The nav rail (see components/Sidebar.tsx) — collapse state is pure CSS off a `data-sidebar`
-   attribute on <html> (see client/sidebar.ts), never React state, so there's no hydration-mismatch
-   flash to guard against between server and client renders. */
 .app-sidebar {
   flex: 0 0 auto;
   width: 190px;
@@ -100,24 +76,15 @@
   width: 52px;
 }
 
+/* Color comes from the shared .btn-ghost class on the button itself (see Sidebar.tsx) — this class
+   only carries its full-width, left-aligned layout within the sidebar. */
 .app-sidebar-toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   width: 100%;
   padding: 8px 16px;
   margin-bottom: 4px;
-  background: none;
-  border: none;
-  color: var(--pp-text-muted);
-  cursor: pointer;
-  font-size: 13px;
+  gap: 10px;
+  justify-content: flex-start;
   text-align: left;
-}
-
-.app-sidebar-toggle:hover {
-  background: var(--pp-surface-hover);
-  color: var(--pp-text);
 }
 
 .app-sidebar-links {
@@ -195,22 +162,8 @@
   color: var(--pp-text);
 }
 
-.theme-toggle-button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--pp-button-bg);
-  color: var(--pp-text);
-  border: 1px solid var(--pp-border);
-  border-radius: 20px;
-  padding: 6px 14px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.theme-toggle-button:hover {
-  background: var(--pp-button-bg-hover);
-}
+/* Color/shape (pill, bordered, gray) now comes entirely from the shared .btn/.btn-gray/.btn-pill
+   classes on the button itself (see ThemeToggle.tsx) — nothing left to define here. */
 
 .breadcrumbs {
   display: flex;

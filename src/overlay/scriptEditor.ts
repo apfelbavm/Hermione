@@ -207,7 +207,7 @@ export function createScriptEditor(elements: ScriptEditorElements, store: Store)
       });
 
       const closeBtn = document.createElement("button");
-      closeBtn.className = "log-tab-close";
+      closeBtn.className = "log-tab-close btn btn-ghost btn-sm";
       closeBtn.textContent = "✕";
       closeBtn.title = "Close tab";
       closeBtn.addEventListener("click", (e) => {

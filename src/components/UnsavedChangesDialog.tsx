@@ -10,13 +10,13 @@ export function UnsavedChangesDialog({ saving, onCancel, onDiscard, onSaveAndLea
         <h2 className="modal-title">{i18n.components.unsaved_changes_dialog.title}</h2>
         <p>{i18n.components.unsaved_changes_dialog.message}</p>
         <div className="modal-actions">
-          <button type="button" onClick={onCancel} disabled={saving}>
+          <button type="button" className="btn btn-gray" onClick={onCancel} disabled={saving}>
             {i18n.components.unsaved_changes_dialog.cancel}
           </button>
-          <button type="button" onClick={onDiscard} disabled={saving}>
+          <button type="button" className="btn btn-gray" onClick={onDiscard} disabled={saving}>
             {i18n.components.unsaved_changes_dialog.discard}
           </button>
-          <button type="button" onClick={onSaveAndLeave} disabled={saving}>
+          <button type="button" className="btn btn-green" onClick={onSaveAndLeave} disabled={saving}>
             {saving ? i18n.components.unsaved_changes_dialog.saving : i18n.components.unsaved_changes_dialog.save_and_leave}
           </button>
         </div>

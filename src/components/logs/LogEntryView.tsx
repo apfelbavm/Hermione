@@ -63,7 +63,7 @@ export function LogEntryView({ entry }: { entry: LogEntry }) {
       <div className="log-entry-header">
         <span className="log-entry-time">{formatLogTimestamp(entry.timestamp)}</span>
         {downloadable && (
-          <button type="button" className="log-entry-download" onClick={() => downloadLogEntry(entry)}>
+          <button type="button" className="log-entry-download btn btn-gray btn-sm" onClick={() => downloadLogEntry(entry)}>
             {i18n.components.log_entry.download}
           </button>
         )}

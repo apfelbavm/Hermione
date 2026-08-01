@@ -139,6 +139,7 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
 
               <button
                 type="button"
+                className="btn btn-gray btn-sm"
                 disabled={disabled}
                 onClick={() => {
                   removeEntry(store.state.rootGraph, fn!, entry.id);
