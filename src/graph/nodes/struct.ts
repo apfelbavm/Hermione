@@ -46,7 +46,7 @@ registerNode({
   label: i18n.nodes.struct.make.label,
   description: i18n.nodes.struct.make.description,
   group: GROUP,
-  colorCategory: NodeColorCategory.Collections,
+  colorCategory: NodeColorCategory.Default,
   configurableSubType: { kind: "struct" },
   pins: [...fieldPins(FALLBACK_SUBTYPE, "input"), structValuePin(FALLBACK_SUBTYPE, "output")],
   deriveInstancePins: (node) => {
@@ -65,7 +65,7 @@ registerNode({
   label: i18n.nodes.struct.break.label,
   description: i18n.nodes.struct.break.description,
   group: GROUP,
-  colorCategory: NodeColorCategory.Collections,
+  colorCategory: NodeColorCategory.Default,
   configurableSubType: { kind: "struct" },
   pins: [structValuePin(FALLBACK_SUBTYPE, "input"), ...fieldPins(FALLBACK_SUBTYPE, "output")],
   deriveInstancePins: (node) => {
