@@ -383,6 +383,11 @@
   color: var(--pp-link);
 }
 
+.run-row-kind-request {
+  background: var(--pp-surface-hover-alt);
+  color: var(--pp-text-muted-strong);
+}
+
 .run-entries {
   display: flex;
   flex-direction: column;

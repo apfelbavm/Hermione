@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 import { registerBuiltins } from "../../../../../graph/nodes";
+import { nextId } from "../../../../../graph/engine/graphMutations";
 import { getDatabaseManager } from "../../../../../server/DatabaseManager";
 import { applyCredentialEnvVars } from "../../../../../server/credentialEnv";
 import { deployedScriptPath } from "../../../../../server/deployedScriptFile";
+import type { LogEntry, RunLog } from "../../../../../server/models";
 
 // Same reasoning as api/simulate/route.ts and api/emulate/run/route.ts: dynamic-importing a
 // compiled module and running real node implementations needs a genuine Node environment.
@@ -26,7 +29,9 @@ interface RequestFieldDescriptor {
  * was never deployed or has no "On HTTP Request" event, 500 with `{ error }` if the compiled flow
  * itself throws (see code.ts/codegen.ts's compileScriptDef, which now rethrows a script's own
  * errors instead of swallowing them, specifically so a failure here is never silently reported as
- * a 200 with default/empty values). */
+ * a 200 with default/empty values). Also persists its own RunLog (kind "request") the same way
+ * executeDeployedFlow.ts does for a chained call — otherwise a run triggered by an outside HTTP
+ * client would leave no trace on this Flow's own Logs page at all. */
 async function handle(request: Request, { params }: { params: Params }): Promise<Response> {
   const { projectId, flowId } = await params;
   const db = getDatabaseManager();
@@ -55,6 +60,14 @@ async function handle(request: Request, { params }: { params: Params }): Promise
   const declaredFields = (requestTrigger.details.params as RequestFieldDescriptor[] | undefined) ?? [];
   const args = declaredFields.map((field) => (field.name in merged ? merged[field.name] : field.defaultValue));
 
+  const startedAt = new Date().toISOString();
+  const entries: LogEntry[] = [];
+  function record(message: string): void {
+    entries.push({ id: nextId("log"), message, format: "text", timestamp: new Date().toISOString() });
+  }
+
+  let executionMs: number | undefined;
+  let response: Response;
   try {
     applyCredentialEnvVars(db);
 
@@ -64,14 +77,39 @@ async function handle(request: Request, { params }: { params: Params }): Promise
     const url = `${pathToFileURL(deployedScriptPath(flowId)).href}?t=${Date.now()}-${randomUUID()}`;
     const compiled = (await import(/* webpackIgnore: true */ url)) as Record<string, unknown>;
     const CompiledFlow = compiled.CompiledFlow as new (log: (message: string) => void) => Record<string, unknown>;
-    const instance = new CompiledFlow((message: string) => console.log(`[hooks:${flowId}] ${message}`));
+    const instance = new CompiledFlow(record);
     const fn = (instance[requestTrigger.functionName] as (...fieldArgs: unknown[]) => Promise<Record<string, unknown> | void>).bind(instance);
 
-    const returned = await fn(...args);
-    return Response.json(returned && typeof returned === "object" ? returned : {}, { status: 200 });
+    const executionStartedAt = performance.now();
+    let returned: Record<string, unknown> | void;
+    try {
+      returned = await fn(...args);
+    } finally {
+      executionMs = performance.now() - executionStartedAt;
+    }
+    response = Response.json(returned && typeof returned === "object" ? returned : {}, { status: 200 });
   } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    record(`Error: ${message}`);
+    response = Response.json({ error: message }, { status: 500 });
   }
+
+  const runLog: RunLog = {
+    id: nextId("run"),
+    projectId,
+    flowId,
+    flowName: deployed.flowName,
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    entries,
+    kind: "request",
+    executionMs,
+    revision: deployed.revision,
+    version: deployed.version,
+  };
+  db.appendRun(runLog);
+
+  return response;
 }
 
 export const GET = handle;

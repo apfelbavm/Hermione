@@ -120,6 +120,7 @@
       "production": "Production",
       "chained": "Chained",
       "deploy": "Deploy",
+      "request": "Request",
       "execution_time": "Execution time: ",
       "revision": "Revision: ",
       "entry": "entry",
