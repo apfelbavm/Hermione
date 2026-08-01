@@ -2,7 +2,8 @@
   "pages": {
     "logs": {
       "empty": "No runs yet",
-      "page_title": "Logs"
+      "page_title": "Logs",
+      "refresh": "Refresh"
     },
     "ai_docs": {
       "page_title": "AI Docs",
@@ -84,7 +85,8 @@
       "title": "Run Logs",
       "project_fallback": "Project",
       "description": "Showing the latest {max} runs.",
-      "empty": "No runs yet"
+      "empty": "No runs yet",
+      "refresh": "Refresh"
     },
     "restore_flow_version": {
       "title": "Restore old version",

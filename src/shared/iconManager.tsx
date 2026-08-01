@@ -139,4 +139,13 @@ export class IconManager {
       </svg>
     );
   }
+
+  static RefreshIcon() {
+    return (
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M13 8A5 5 0 1 1 11.24 4.24" />
+        <path d="M13 3.5V6.5H10" />
+      </svg>
+    );
+  }
 }

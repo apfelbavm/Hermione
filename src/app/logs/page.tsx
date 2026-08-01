@@ -6,6 +6,7 @@ import type { ProjectSummary, RunLog } from "../../server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 import { RunRow } from "../../components/logs/RunRow";
+import { IconManager } from "../../shared/iconManager";
 import { i18n } from "@i18n";
 
 /** The global counterpart of a project's own Logs page (projects/[projectId]/logs/page.tsx) — same
@@ -15,9 +16,13 @@ export default function GlobalLogsPage() {
   const [runs, setRuns] = useState<RunLog[]>([]);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
 
-  useEffect(() => {
+  function refresh(): void {
     void listAllRuns().then(setRuns);
     void listProjects().then(setProjects);
+  }
+
+  useEffect(() => {
+    refresh();
   }, []);
 
   const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
@@ -25,7 +30,12 @@ export default function GlobalLogsPage() {
   return (
     <PageShell>
       <Breadcrumbs items={[{ label: i18n.pages.logs.page_title }]} />
-      <h1>{i18n.pages.logs.page_title}</h1>
+      <div className="page-header">
+        <h1>{i18n.pages.logs.page_title}</h1>
+        <button type="button" className="btn btn-outline btn-icon" title={i18n.pages.logs.refresh} aria-label={i18n.pages.logs.refresh} onClick={refresh}>
+          <IconManager.RefreshIcon />
+        </button>
+      </div>
       {runs.length === 0 ? (
         <p className="page-empty-note">{i18n.pages.logs.empty}</p>
       ) : (
