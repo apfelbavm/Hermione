@@ -52,16 +52,16 @@ export default function AppShellMarkup({ store }: { store: Store }) {
           </div>
         </div>
         <div id="toolbar-right">
-          <button id="save-button" className="btn btn-gray">
+          <button id="save-button" className="btn btn-ghost">
             {i18n.components.app_shell_markup.save}
           </button>
-          <button id="load-button" className="btn btn-gray">
+          <button id="load-button" className="btn btn-ghost">
             {i18n.components.app_shell_markup.load}
           </button>
-          <button id="download-button" className="btn btn-gray">
+          <button id="download-button" className="btn btn-ghost">
             {i18n.components.app_shell_markup.download_graph}
           </button>
-          <button id="deploy-button" className="btn btn-gray">
+          <button id="deploy-button" className="btn btn-ghost">
             {i18n.components.app_shell_markup.deploy}
           </button>
           <input id="load-file-input" type="file" accept="application/json" style={{ display: "none" }} />
