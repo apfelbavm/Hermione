@@ -19,7 +19,7 @@ export const COMPACT_NODE_SIZE = 24;
  * mirrors the same 10px offset drawNodes.ts draws labels at. */
 export const PIN_LABEL_GAP = 10;
 /** Gap between the end of an input pin's label and the start of its literal-value widget. */
-export const LABEL_WIDGET_GAP = 10;
+export const LABEL_WIDGET_GAP = 24;
 /** Gap held between an input widget's right edge and the start of the reserved output-label zone. */
 export const WIDGET_OUTPUT_GAP = 10;
 /** Width of a string pin's "expand" button (see widgetSync.ts), reserved alongside its normal
