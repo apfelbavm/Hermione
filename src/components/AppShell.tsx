@@ -21,7 +21,8 @@ import { drawWires, drawWireDragPreview } from "../render/drawWires";
 import { drawMarqueeSelection } from "../render/drawMarquee";
 import { createStore, getEditingGraph, getVisibleVariablesForState, openFunctionTab } from "../state/store";
 import { createHistoryManager } from "../state/history";
-import { selectAllCommentBoxes, selectAllNodes, setupPointerInteraction, type WireAnchor } from "../interaction/pointerHandlers";
+import { setupPointerInteraction, type WireAnchor } from "../interaction/pointerHandlers";
+import { selectAllCommentBoxes, selectAllNodes, ShortcutManager } from "../interaction/shortcutManager";
 import { createWidgetSync } from "../overlay/widgetSync";
 import { createNodeDescriptionOverlay } from "../overlay/nodeDescriptionOverlay";
 import { setupNodeHoverTooltip } from "../overlay/nodeTooltip";
@@ -108,6 +109,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
   useEffect(() => {
     const canvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
     const container = document.getElementById("canvas-container") as HTMLDivElement;
+    const mainArea = document.getElementById("main-area") as HTMLDivElement;
     const overlay = document.getElementById("overlay") as HTMLDivElement;
     const logPanel = document.getElementById("log-panel") as HTMLDivElement;
     const logClearButton = document.getElementById("log-clear-button") as HTMLButtonElement;
@@ -313,7 +315,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       store.notify();
     }
 
-    const pointerInteraction = setupPointerInteraction(canvas, store, history, {
+    const pointerInteraction = setupPointerInteraction(canvas, store, {
       onWireDroppedInEmptySpace: (anchors, screenPos) => {
         const shared = anchors[0].pin;
         const candidates = filterCreatableHere(findCompatibleNodeDefs(shared, shared.direction));
@@ -325,6 +327,14 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
           onCancel: () => {},
         });
       },
+    });
+
+    // Only reacts to select-all/undo/redo/copy/cut/paste/etc. while focus last landed inside the
+    // graph canvas or its left/right sidebars (#main-area) — not the toolbar, log/Monaco panel, or
+    // an open dialog.
+    const shortcutManager = new ShortcutManager(store, history, {
+      scopeRoot: mainArea,
+      getCursorScreenPos: () => pointerInteraction.getCursorScreenPos(),
     });
 
     function onCanvasContextMenu(e: MouseEvent): void {
@@ -892,6 +902,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       backButton.removeEventListener("click", onBackButtonClick);
       undoButton.removeEventListener("click", onUndoClick);
       redoButton.removeEventListener("click", onRedoClick);
+      shortcutManager.dispose();
     };
   }, []);
 

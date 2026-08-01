@@ -158,8 +158,8 @@
     "app_shell_markup": {
       "back": "Back",
       "back_title": "Back to the project",
-      "undo_title": "Undo",
-      "redo_title": "Redo",
+      "undo_title": "Undo (Ctrl + Z)",
+      "redo_title": "Redo (Ctrl + Shift + Z)",
       "simulate": "Simulate ▶",
       "pause": "⏸ Pause",
       "pause_title": "Pause the running simulation",

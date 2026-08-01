@@ -16,6 +16,7 @@ import { drawMarqueeSelection } from "../render/drawMarquee";
 import { createStore, getEditingGraph, getVisibleVariablesForState } from "../state/store";
 import { createHistoryManager } from "../state/history";
 import { setupPointerInteraction } from "../interaction/pointerHandlers";
+import { ShortcutManager } from "../interaction/shortcutManager";
 import { createWidgetSync } from "../overlay/widgetSync";
 import { createNodeDescriptionOverlay } from "../overlay/nodeDescriptionOverlay";
 import { setupNodeHoverTooltip } from "../overlay/nodeTooltip";
@@ -126,6 +127,7 @@ export default function RestoreVersionShell({ projectId, flowId }: { projectId: 
   useEffect(() => {
     const canvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
     const container = document.getElementById("canvas-container") as HTMLDivElement;
+    const mainArea = document.getElementById("main-area") as HTMLDivElement;
     const overlay = document.getElementById("overlay") as HTMLDivElement;
     const logPanel = document.getElementById("log-panel") as HTMLDivElement;
     const logClearButton = document.getElementById("log-clear-button") as HTMLButtonElement;
@@ -218,9 +220,16 @@ export default function RestoreVersionShell({ projectId, flowId }: { projectId: 
     resizeObserver.observe(container);
     resizeCanvas();
 
-    setupPointerInteraction(canvas, store, history, {
+    setupPointerInteraction(canvas, store, {
       // Wire-dragging is blocked at the source (readOnly, see pointerHandlers.ts) — this never fires.
       onWireDroppedInEmptySpace: () => {},
+    });
+
+    // readOnly already blocks every mutating shortcut (delete/undo/cut/paste/wrap-in-comment) at
+    // the source — this only needs to scope select-all/copy to the graph canvas and its sidebars.
+    const shortcutManager = new ShortcutManager(store, history, {
+      scopeRoot: mainArea,
+      getCursorScreenPos: () => ({ x: 0, y: 0 }), // paste/wrap-in-comment never reach the cursor in read-only mode
     });
 
     function onCanvasContextMenu(e: MouseEvent): void {
@@ -265,6 +274,7 @@ export default function RestoreVersionShell({ projectId, flowId }: { projectId: 
       unsubscribe();
       canvas.removeEventListener("contextmenu", onCanvasContextMenu);
       frameAllButton.removeEventListener("click", onFrameAllClick);
+      shortcutManager.dispose();
     };
   }, []);
 

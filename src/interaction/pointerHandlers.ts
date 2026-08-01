@@ -1,14 +1,12 @@
-import { cloneNodesForClipboard, parseClipboardPayload, pasteNodesIntoGraph, pasteVariableIntoGraph, serializeNodesClipboardPayload, serializeVariableClipboardPayload } from "../engine/clipboard";
-import { addCommentBox, connectPins, disconnectPin, nextId, removeCommentBox } from "../engine/graphMutations";
+import { connectPins, disconnectPin } from "../engine/graphMutations";
 import { connectionsTouchingPin } from "../engine/graphQueries";
 import { getNodeDef, isPinTypeCompatible } from "../engine/registry";
 import { CodeScriptDef, CommentBox, FunctionDef, PinDef, Variable } from "../engine/types";
-import { COMMENT_HEADER_HEIGHT, COMMENT_MIN_SIZE, DEFAULT_COMMENT_COLOR, DEFAULT_COMMENT_HEIGHT, DEFAULT_COMMENT_WIDTH, rectContains, rectIntersects, type WorldRect } from "../render/commentGeometry";
+import { COMMENT_HEADER_HEIGHT, COMMENT_MIN_SIZE, rectContains, rectIntersects, type WorldRect } from "../render/commentGeometry";
 import { snapPositionToGrid } from "../render/drawGrid";
 import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGeometry";
 import { hitTestCommentHeader, hitTestCommentResizeHandle, hitTestNode, hitTestNodeAddButton, hitTestPin, type CommentCorner, type PinHit } from "../render/hitTest";
 import { getEditingGraph, getVisibleVariablesForState, openFunctionTab, openScriptTab, type MarqueeSelectionState, type Store } from "../state/store";
-import type { HistoryManager } from "../state/history";
 import { Graph } from "../engine/graph";
 
 type DragMode =
@@ -60,14 +58,6 @@ export interface PointerInteractionCallbacks {
 
 function findConnectionToInput(graph: Graph, nodeId: string, pinId: string) {
   return graph.connections.find((c) => c.toNode === nodeId && c.toPin === pinId);
-}
-
-/** Every node id in `graph` — used by both the global Ctrl+A shortcut below and the node right-click
- * menu's own "Select All" item (see main.ts's contextmenu handler), so both mean exactly the same
- * thing. Callers still assign the result to store.state.selectedNodeIds and notify themselves —
- * this only computes WHAT gets selected (see selectAllCommentBoxes below for its sibling). */
-export function selectAllNodes(graph: Graph): Set<string> {
-  return new Set(graph.nodes.map((n) => n.id));
 }
 
 /** Connects every anchor to `target` (all sharing the same direction/type, guaranteed by however
@@ -155,24 +145,20 @@ function computeMarqueeSelectedCommentIds(graph: Graph, marquee: MarqueeSelectio
   return new Set(touched.map((b) => b.id));
 }
 
-/** Every comment box id in `graph` — the comment-box counterpart of selectAllNodes above, used by
- * both the global Ctrl+A shortcut below and the node right-click menu's own "Select All" item (see
- * main.ts's contextmenu handler), so Ctrl+A always means "everything," nodes and comment boxes
- * alike. */
-export function selectAllCommentBoxes(graph: Graph): Set<string> {
-  return new Set(graph.commentBoxes.map((b) => b.id));
-}
-
 export interface PointerInteraction {
   /** True if a right-drag pan just moved the camera — consumed once, so the trailing native
    * "contextmenu" event knows to suppress the node-creation menu instead of opening it at the
    * release point. A plain right-click with no drag still opens the menu as normal. */
   shouldSuppressContextMenu: () => boolean;
+  /** Cursor position in canvas-local screen space, last observed on "mousemove" — consumed by
+   * ShortcutManager to place pasted nodes/new comment boxes at the cursor, since keydown events
+   * carry no pointer coordinates of their own. */
+  getCursorScreenPos: () => { x: number; y: number };
 }
 
-export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store, history: HistoryManager, callbacks: PointerInteractionCallbacks): PointerInteraction {
+export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store, callbacks: PointerInteractionCallbacks): PointerInteraction {
   let drag: DragMode = { kind: "none" };
-  // Tracked continuously so the "C" comment-box shortcut knows where the cursor is —
+  // Tracked continuously so ShortcutManager's comment-box/paste shortcuts know where the cursor is —
   // keydown events carry no pointer coordinates of their own.
   let lastMouseScreenPos = { x: 0, y: 0 };
   // Set once a right-drag pan actually moves; consumed by shouldSuppressContextMenu so a
@@ -799,222 +785,8 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
     { passive: false },
   );
 
-  window.addEventListener("keydown", (e) => {
-    if (store.state.simulating) return; // graph is locked for the duration of a Simulate run
-
-    // Don't hijack text-field editing — covers plain <input>s, but just as importantly every
-    // <textarea> (the multiline pin-value popup, and — most visibly — Monaco's own hidden
-    // "inputarea" textarea it routes all keyboard input through, see scriptEditor.ts) and any
-    // contenteditable region. Without this, e.g. Ctrl+C/Ctrl+V while typing in the Code node's
-    // editor never reached Monaco at all: this handler ran first, called preventDefault(), and
-    // wrote/read the GRAPH's own clipboard payload instead — Monaco's native copy/paste silently
-    // never got a chance to fire.
-    const active = document.activeElement;
-    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || (active instanceof HTMLElement && active.isContentEditable)) {
-      return;
-    }
-    const graph = getEditingGraph(store.state);
-
-    if (e.key === "Delete" || e.key === "Backspace") {
-      if (store.state.readOnly) return;
-      const { selectedNodeIds, selectedCommentIds } = store.state;
-      if (selectedNodeIds.size === 0 && selectedCommentIds.size === 0) return;
-      const variables = getVisibleVariablesForState(store.state);
-      const functions = store.state.rootGraph.functions;
-      const scripts = store.state.rootGraph.scripts;
-      for (const nodeId of selectedNodeIds) {
-        graph.removeNode(variables, functions, nodeId, scripts);
-      }
-      for (const commentId of selectedCommentIds) {
-        removeCommentBox(graph, commentId);
-      }
-      store.state.selectedNodeIds = new Set();
-      store.state.selectedCommentIds = new Set();
-      store.notify();
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
-      e.preventDefault();
-      store.state.selectedNodeIds = selectAllNodes(graph);
-      store.state.selectedCommentIds = selectAllCommentBoxes(graph);
-      store.notify();
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-      if (store.state.readOnly) return;
-      e.preventDefault();
-      if (e.shiftKey) history.redo();
-      else history.undo();
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
-      // A real text selection anchored INSIDE the log panel means the user dragged across log
-      // lines to copy that text — let the browser's native copy handle it instead of hijacking
-      // Ctrl+C into a no-op graph-clipboard write. Deliberately scoped to the log panel specifically
-      // rather than "any selection exists anywhere on the page": dragging a marquee box over the
-      // canvas to multi-select nodes can itself leave the browser with an incidental, invisible
-      // text selection elsewhere (nothing here sets user-select: none on the whole page — see
-      // style.css's ".resizing" comment, which blocks exactly this during a panel-resize drag) —
-      // treating THAT as "copy the selection" would silently break ordinary graph-node copying.
-      const selection = window.getSelection();
-      const logPanel = document.getElementById("log-panel");
-      const copyingLogText = !!selection && !selection.isCollapsed && selection.toString().length > 0 && !!logPanel && !!selection.anchorNode && logPanel.contains(selection.anchorNode);
-      if (copyingLogText) return;
-
-      e.preventDefault();
-      const { selectedNodeIds, sidebarSelection } = store.state;
-      if (selectedNodeIds.size > 0) {
-        const { nodes, connections } = cloneNodesForClipboard(graph, selectedNodeIds);
-        if (nodes.length > 0) {
-          navigator.clipboard.writeText(serializeNodesClipboardPayload(nodes, connections)).catch(() => {});
-        }
-      } else if (sidebarSelection?.kind === "variable") {
-        const variable = getVisibleVariablesForState(store.state).find((v) => v.id === sidebarSelection.variableId);
-        if (variable) navigator.clipboard.writeText(serializeVariableClipboardPayload(variable)).catch(() => {});
-      }
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "x") {
-      if (store.state.readOnly) return;
-      // Same log-panel-text-selection carve-out as Ctrl+C above — a Ctrl+X while the user's mid-way
-      // through selecting log text for the browser's own native cut should leave that alone (moot in
-      // practice for our own read-only log lines, but keeps the two shortcuts' guards consistent).
-      const selection = window.getSelection();
-      const logPanel = document.getElementById("log-panel");
-      const cuttingLogText = !!selection && !selection.isCollapsed && selection.toString().length > 0 && !!logPanel && !!selection.anchorNode && logPanel.contains(selection.anchorNode);
-      if (cuttingLogText) return;
-
-      e.preventDefault();
-      const { selectedNodeIds } = store.state;
-      if (selectedNodeIds.size === 0) return;
-
-      const { nodes, connections } = cloneNodesForClipboard(graph, selectedNodeIds);
-      if (nodes.length === 0) return; // selection was entirely undeletable nodes (Entry/Return) — nothing to cut
-      navigator.clipboard.writeText(serializeNodesClipboardPayload(nodes, connections)).catch(() => {});
-
-      const variables = getVisibleVariablesForState(store.state);
-      const functions = store.state.rootGraph.functions;
-      const scripts = store.state.rootGraph.scripts;
-      // removeNode itself refuses to remove Entry/Return (see Graph.UNDELETABLE_NODE_TYPES), so
-      // iterating the full selection here — rather than just `nodes`' own copyable ids — is safe and
-      // matches the Delete-key handler above exactly.
-      for (const nodeId of selectedNodeIds) {
-        graph.removeNode(variables, functions, nodeId, scripts);
-      }
-      store.state.selectedNodeIds = new Set();
-      store.notify();
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
-      if (store.state.readOnly) return;
-      e.preventDefault();
-      navigator.clipboard
-        .readText()
-        .then((text) => {
-          const payload = parseClipboardPayload(text);
-          if (!payload) return; // not our own copied data (or nothing/garbage on the clipboard) — no-op
-
-          const pasteGraph = getEditingGraph(store.state);
-          if (payload.kind === "nodes") {
-            // Event nodes can't go inside a function body, and at most one instance of each event
-            // type may exist per graph — drop any pasted node that would violate that (also
-            // guarding against pasting two of the same event type in one go).
-            const isFunctionBody = store.state.activeFunctionId !== null;
-            const seenEventTypes = new Set<string>();
-            const placeableNodes = payload.nodes.filter((n) => {
-              if (!pasteGraph.canPlaceNodeType(n.type, isFunctionBody)) return false;
-              if (getNodeDef(n.type).eventTrigger) {
-                if (seenEventTypes.has(n.type)) return false;
-                seenEventTypes.add(n.type);
-              }
-              return true;
-            });
-            const placeablePayload = { ...payload, nodes: placeableNodes };
-
-            const rawTarget = store.state.camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y);
-            const targetTopLeft = store.state.snapToGrid ? snapPositionToGrid(rawTarget) : rawTarget;
-            const newIds = pasteNodesIntoGraph(pasteGraph, placeablePayload, targetTopLeft);
-            if (newIds.length > 0) {
-              store.state.selectedNodeIds = new Set(newIds);
-              store.state.selectedCommentIds = new Set();
-              store.state.sidebarSelection = null;
-              store.notify();
-            }
-          } else {
-            const newVariable = pasteVariableIntoGraph(pasteGraph, payload.variable);
-            store.state.sidebarSelection = {
-              kind: "variable",
-              variableId: newVariable.id,
-            };
-            store.notify();
-          }
-        })
-        .catch(() => {}); // clipboard permission denied/unavailable — fail silently, nothing to paste
-      return;
-    }
-
-    if (e.key.toLowerCase() === "c" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      if (store.state.readOnly) return;
-      const { camera, selectedNodeIds } = store.state;
-      const variables = getVisibleVariablesForState(store.state);
-      const functions = store.state.rootGraph.functions;
-      const scripts = store.state.rootGraph.scripts;
-
-      if (selectedNodeIds.size > 0) {
-        // Nodes selected: wrap them, Unreal-style.
-        const rects = [...selectedNodeIds]
-          .map((id) => graph.nodes.find((n) => n.id === id))
-          .filter((n): n is NonNullable<typeof n> => !!n)
-          .map((n) => computeNodeWorldRect(n, n.resolvePinDefs(variables, functions, scripts), variables, functions, scripts));
-
-        const minX = Math.min(...rects.map((r) => r.x));
-        const minY = Math.min(...rects.map((r) => r.y));
-        const maxX = Math.max(...rects.map((r) => r.x + r.width));
-        const maxY = Math.max(...rects.map((r) => r.y + r.height));
-        const PAD = 30;
-        const HEADER_PAD = COMMENT_HEADER_HEIGHT + 16;
-
-        const box: CommentBox = {
-          id: nextId("comment"),
-          text: "Comment",
-          position: { x: minX - PAD, y: minY - HEADER_PAD },
-          size: {
-            width: maxX - minX + PAD * 2,
-            height: maxY - minY + HEADER_PAD + PAD,
-          },
-          containedNodeIds: [...selectedNodeIds],
-          color: DEFAULT_COMMENT_COLOR,
-        };
-        addCommentBox(graph, box);
-        store.state.selectedCommentIds = new Set([box.id]);
-        store.notify();
-      } else {
-        // Nothing selected: drop a default-sized empty box at the cursor.
-        const worldPos = camera.screenToWorld(lastMouseScreenPos.x, lastMouseScreenPos.y);
-        const box: CommentBox = {
-          id: nextId("comment"),
-          text: "Comment",
-          position: { x: worldPos.x, y: worldPos.y },
-          size: {
-            width: DEFAULT_COMMENT_WIDTH,
-            height: DEFAULT_COMMENT_HEIGHT,
-          },
-          containedNodeIds: [],
-          color: DEFAULT_COMMENT_COLOR,
-        };
-        addCommentBox(graph, box);
-        store.state.selectedCommentIds = new Set([box.id]);
-        store.notify();
-      }
-    }
-  });
-
   return {
+    getCursorScreenPos: () => lastMouseScreenPos,
     shouldSuppressContextMenu: () => {
       const moved = rightDragMoved;
       rightDragMoved = false;
