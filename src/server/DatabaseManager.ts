@@ -520,10 +520,10 @@ export class DatabaseManager {
 
   /** One row per Flow — a redeploy overwrites the previous snapshot (same `id`) rather than growing
    * a history, matching "Deploy" as "replace what's currently live," not an audit log. `version`
-   * starts at 1 and increments by one on every redeploy of this same Flow (see
-   * DeployedScript.version's own doc comment). */
-  upsertDeployedScript(input: { projectId: string; flowId: string; flowName: string; code: string; manifest: { triggers: TriggerDescriptor[] }; revision: number }): DeployedScript {
-    const existing = this.db.prepare<[string], { id: string; version: number }>("SELECT id, version FROM deployed_scripts WHERE flow_id = ?").get(input.flowId);
+   * is the Flow's own `version` at the moment it was compiled/deployed (see
+   * DeployedScript.version's own doc comment), not an independent counter. */
+  upsertDeployedScript(input: { projectId: string; flowId: string; flowName: string; code: string; manifest: { triggers: TriggerDescriptor[] }; version: number; revision: number }): DeployedScript {
+    const existing = this.db.prepare<[string], { id: string }>("SELECT id FROM deployed_scripts WHERE flow_id = ?").get(input.flowId);
     const record: DeployedScript = {
       id: existing?.id ?? nextId("deployment"),
       projectId: input.projectId,
@@ -531,7 +531,7 @@ export class DatabaseManager {
       flowName: input.flowName,
       code: input.code,
       manifest: input.manifest,
-      version: (existing?.version ?? 0) + 1,
+      version: input.version,
       revision: input.revision,
       deployedAt: new Date().toISOString(),
     };

@@ -41,7 +41,7 @@ export async function POST(request: Request, { params }: { params: Params }): Pr
   }
 
   writeDeployedScriptFile(flowId, code);
-  const deployed = db.upsertDeployedScript({ projectId, flowId, flowName: flow.name, code, manifest, revision: flow.revision });
+  const deployed = db.upsertDeployedScript({ projectId, flowId, flowName: flow.name, code, manifest, version: flow.version, revision: flow.revision });
 
   return Response.json({ manifest: deployed.manifest, version: deployed.version, revision: deployed.revision, deployedAt: deployed.deployedAt });
 }

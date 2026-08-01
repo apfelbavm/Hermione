@@ -71,6 +71,7 @@ export interface DeployedScriptSummary {
   flowId: string;
   flowName: string;
   manifest: { triggers: TriggerDescriptor[] };
+  /** The Flow's own `version` at the moment it was compiled/deployed — passed into compileGraph. */
   version: number;
   /** The Flow's own `revision` at the moment it was compiled/deployed — passed into compileGraph. */
   revision: number;
