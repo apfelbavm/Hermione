@@ -4,7 +4,26 @@ import { createExecutionContext, runExecFrom } from "../../src/engine/executor";
 import { getNodeDef } from "../../src/engine/registry";
 import { Graph } from "../../src/engine/graph";
 import { NodeInstance } from "../../src/engine/nodeInstance";
-import type { CredentialRecord, MicrosoftGraphClientCredentialsData } from "../../src/credentials/types";
+import type {
+  CredentialRecord,
+  MicrosoftGraphClientCredentialsData,
+} from "../../src/credentials/types";
+import { ClientSecretCredential } from "@azure/identity";
+
+/** GraphManager authenticates via @azure/identity's ClientSecretCredential, which acquires tokens
+ * through MSAL's own network layer rather than global fetch — mocked here so tests never hit the
+ * real token endpoint and only need to stub the actual Graph API calls made through the SDK client
+ * (which does use global fetch, see HTTPMessageHandler). */
+vi.mock("@azure/identity", () => ({
+  ClientSecretCredential: vi.fn().mockImplementation(() => ({
+    getToken: vi
+      .fn()
+      .mockResolvedValue({
+        token: "tok-live",
+        expiresOnTimestamp: Date.now() + 3600_000,
+      }),
+  })),
+}));
 
 beforeAll(() => {
   registerBuiltins();
@@ -14,10 +33,19 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function buildGraph(type: string, id: string, pinValues: Record<string, unknown> = {}) {
+function buildGraph(
+  type: string,
+  id: string,
+  pinValues: Record<string, unknown> = {},
+) {
   const graph: Graph = new Graph("g", "test");
   const def = getNodeDef(type);
-  const node = NodeInstance.createNodeInstance(type, { x: 0, y: 0 }, def.pins, id);
+  const node = NodeInstance.createNodeInstance(
+    type,
+    { x: 0, y: 0 },
+    def.pins,
+    id,
+  );
   for (const [pinId, value] of Object.entries(pinValues)) {
     node.pins[pinId].value = value;
   }
@@ -49,36 +77,24 @@ function freshCredential(): {
   };
   return {
     name: credential.name,
-    getCredential: (name) => (name === credential.name ? credential : undefined),
+    getCredential: (name) =>
+      name === credential.name ? credential : undefined,
   };
 }
 
-/** Every real Graph request first mints an app-only access token via the client credentials grant
- * against Azure AD's token endpoint — this stubs that first hop so callers only need to mock the
- * actual Graph API call. */
-function withTokenRefresh(handleOp: (url: string, init?: RequestInit) => Response | Promise<Response>) {
-  return vi.fn(async (url: string, init?: RequestInit) => {
-    if (String(url).includes("/oauth2/v2.0/token")) {
-      return new Response(
-        JSON.stringify({
-          access_token: "tok-live",
-          token_type: "Bearer",
-          expires_in: 3600,
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-    return handleOp(url, init);
-  });
+/** Graph client SDK calls go through global fetch (see HTTPMessageHandler); token acquisition is
+ * mocked separately via the @azure/identity mock above, so this just wraps the Graph API handler
+ * as a vi.fn spy. */
+function mockGraphFetch(
+  handleOp: (url: string, init?: RequestInit) => Response | Promise<Response>,
+) {
+  return vi.fn(handleOp);
 }
 
 describe("microsoft365.listUsers", () => {
   it("lists users and reports success", async () => {
     const { name, getCredential } = freshCredential();
-    const fetchMock = withTokenRefresh(async (url) => {
+    const fetchMock = mockGraphFetch(async (url) => {
       expect(String(url)).toContain("/users?");
       return new Response(
         JSON.stringify({
@@ -140,7 +156,7 @@ describe("microsoft365.listUsers", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(
+      mockGraphFetch(
         async () =>
           new Response(
             JSON.stringify({
@@ -158,7 +174,9 @@ describe("microsoft365.listUsers", () => {
     await runExecFrom("lu", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lu:success")).toBe(false);
-    expect(ctx.execOutputs.get("lu:error")).toBe("Forbidden: Insufficient privileges");
+    expect(ctx.execOutputs.get("lu:error")).toBe(
+      "Forbidden: Insufficient privileges",
+    );
   });
 });
 
@@ -167,7 +185,7 @@ describe("microsoft365.getUser", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url) => {
+      mockGraphFetch(async (url) => {
         expect(String(url)).toContain("/users/ada%40contoso.com");
         return new Response(
           JSON.stringify({
@@ -202,10 +220,12 @@ describe("microsoft365.sendMail", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url, init) => {
+      mockGraphFetch(async (url, init) => {
         expect(String(url)).toContain("/users/ada%40contoso.com/sendMail");
         const body = JSON.parse(String(init?.body));
-        expect(body.message.toRecipients).toEqual([{ emailAddress: { address: "bob@contoso.com" } }]);
+        expect(body.message.toRecipients).toEqual([
+          { emailAddress: { address: "bob@contoso.com" } },
+        ]);
         return new Response(null, { status: 202 });
       }),
     );
@@ -230,8 +250,10 @@ describe("microsoft365.uploadFile / downloadFile", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url) => {
-        expect(String(url)).toContain("/drive/root:/reports/report.csv:/content");
+      mockGraphFetch(async (url) => {
+        expect(String(url)).toContain(
+          "/drive/root:/reports/report.csv:/content",
+        );
         return new Response(JSON.stringify({ id: "item-1" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -255,7 +277,7 @@ describe("microsoft365.uploadFile / downloadFile", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(
+      mockGraphFetch(
         async () =>
           new Response(new TextEncoder().encode("hello"), {
             status: 200,
@@ -282,7 +304,7 @@ describe("microsoft365.request", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url) => {
+      mockGraphFetch(async (url) => {
         expect(String(url)).toContain("/me/drive");
         return new Response(JSON.stringify({ id: "drive-1" }), {
           status: 200,
@@ -305,30 +327,19 @@ describe("microsoft365.request", () => {
 });
 
 describe("microsoft365 token reuse", () => {
-  it("only requests a token once across multiple calls sharing the same credential", async () => {
+  it("only builds one credential/client across multiple calls sharing the same credential", async () => {
     const { name, getCredential } = freshCredential();
-    let tokenRequests = 0;
-    const fetchMock = vi.fn(async (url: string) => {
-      if (String(url).includes("/oauth2/v2.0/token")) {
-        tokenRequests += 1;
-        return new Response(
-          JSON.stringify({
-            access_token: "tok-live",
-            token_type: "Bearer",
-            expires_in: 3600,
-          }),
-          {
+    vi.mocked(ClientSecretCredential).mockClear();
+    vi.stubGlobal(
+      "fetch",
+      mockGraphFetch(
+        async () =>
+          new Response(JSON.stringify({ value: [] }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
-          },
-        );
-      }
-      return new Response(JSON.stringify({ value: [] }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    });
-    vi.stubGlobal("fetch", fetchMock);
+          }),
+      ),
+    );
 
     const { graph: g1 } = buildGraph("microsoft365.listUsers", "lu1", {
       credentialName: name,
@@ -344,7 +355,7 @@ describe("microsoft365 token reuse", () => {
 
     expect(ctx1.execOutputs.get("lu1:success")).toBe(true);
     expect(ctx2.execOutputs.get("lu2:success")).toBe(true);
-    expect(tokenRequests).toBe(1);
+    expect(vi.mocked(ClientSecretCredential)).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -353,7 +364,7 @@ describe("microsoft365.listChannels", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url) => {
+      mockGraphFetch(async (url) => {
         expect(String(url)).toContain("/teams/team-1/channels");
         return new Response(
           JSON.stringify({
@@ -375,7 +386,9 @@ describe("microsoft365.listChannels", () => {
     await runExecFrom("lc", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lc:success")).toBe(true);
-    expect(ctx.execOutputs.get("lc:channels")).toEqual([{ id: "c1", displayName: "General", description: "" }]);
+    expect(ctx.execOutputs.get("lc:channels")).toEqual([
+      { id: "c1", displayName: "General", description: "" },
+    ]);
   });
 });
 
@@ -384,7 +397,7 @@ describe("microsoft365.listSites", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url) => {
+      mockGraphFetch(async (url) => {
         expect(String(url)).toContain("/sites?search=");
         return new Response(
           JSON.stringify({
@@ -427,7 +440,7 @@ describe("microsoft365.createFolder", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url, init) => {
+      mockGraphFetch(async (url, init) => {
         expect(String(url)).toContain("/drive/root:/reports:/children");
         const body = JSON.parse(String(init?.body));
         expect(body.name).toBe("archive");
@@ -457,8 +470,10 @@ describe("microsoft365.getWorksheetRange / setWorksheetRange", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url) => {
-        expect(String(url)).toContain("/workbook/worksheets/Sheet1/range(address='A1%3AB2')");
+      mockGraphFetch(async (url) => {
+        expect(String(url)).toContain(
+          "/workbook/worksheets/Sheet1/range(address='A1%3AB2')",
+        );
         return new Response(JSON.stringify({ values: [[1, 2]] }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -484,8 +499,10 @@ describe("microsoft365.getWorksheetRange / setWorksheetRange", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url, init) => {
-        expect(String(url)).toContain("/workbook/worksheets/Sheet1/range(address='A1%3AB2')");
+      mockGraphFetch(async (url, init) => {
+        expect(String(url)).toContain(
+          "/workbook/worksheets/Sheet1/range(address='A1%3AB2')",
+        );
         const body = JSON.parse(String(init?.body));
         expect(body.values).toEqual([[1, 2]]);
         return new Response(null, { status: 200 });
@@ -512,7 +529,7 @@ describe("microsoft365.listPlannerTasks", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url) => {
+      mockGraphFetch(async (url) => {
         expect(String(url)).toContain("/planner/plans/plan-1/tasks");
         return new Response(
           JSON.stringify({
@@ -534,7 +551,9 @@ describe("microsoft365.listPlannerTasks", () => {
     await runExecFrom("lp", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lp:success")).toBe(true);
-    expect(ctx.execOutputs.get("lp:tasks")).toEqual([{ id: "t1", title: "Write spec", percentComplete: 50 }]);
+    expect(ctx.execOutputs.get("lp:tasks")).toEqual([
+      { id: "t1", title: "Write spec", percentComplete: 50 },
+    ]);
   });
 });
 
@@ -543,7 +562,7 @@ describe("microsoft365.listContacts", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url) => {
+      mockGraphFetch(async (url) => {
         expect(String(url)).toContain("/users/ada%40contoso.com/contacts");
         return new Response(
           JSON.stringify({
@@ -571,7 +590,9 @@ describe("microsoft365.listContacts", () => {
     await runExecFrom("lct", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lct:success")).toBe(true);
-    expect(ctx.execOutputs.get("lct:contacts")).toEqual([{ id: "ct1", displayName: "Bob", email: "bob@contoso.com" }]);
+    expect(ctx.execOutputs.get("lct:contacts")).toEqual([
+      { id: "ct1", displayName: "Bob", email: "bob@contoso.com" },
+    ]);
   });
 });
 
@@ -580,8 +601,8 @@ describe("microsoft365.listApplications", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url) => {
-        expect(String(url)).toContain("/applications?");
+      mockGraphFetch(async (url) => {
+        expect(String(url)).toContain("/applications");
         return new Response(
           JSON.stringify({
             value: [{ id: "a1", displayName: "My App", appId: "app-guid" }],
@@ -601,7 +622,9 @@ describe("microsoft365.listApplications", () => {
     await runExecFrom("la", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("la:success")).toBe(true);
-    expect(ctx.execOutputs.get("la:applications")).toEqual([{ id: "a1", displayName: "My App", appId: "app-guid" }]);
+    expect(ctx.execOutputs.get("la:applications")).toEqual([
+      { id: "a1", displayName: "My App", appId: "app-guid" },
+    ]);
   });
 });
 
@@ -610,7 +633,7 @@ describe("microsoft365.createSubscription", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(async (url, init) => {
+      mockGraphFetch(async (url, init) => {
         expect(String(url)).toContain("/subscriptions");
         const body = JSON.parse(String(init?.body));
         expect(body.resource).toBe("/me/mailFolders('Inbox')/messages");
