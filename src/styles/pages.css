@@ -345,7 +345,8 @@
 }
 
 .run-row-time,
-.run-row-count {
+.run-row-count,
+.run-row-revision {
   color: var(--pp-text-muted);
   font-size: 12px;
   flex: 0 0 auto;

@@ -133,7 +133,7 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
         labelEl.textContent = row.node.name;
         li.addEventListener("mousedown", (e) => {
           e.preventDefault();
-          toggleGroup(row.node as MenuNode & { kind: "group" });
+          toggleGroup(row.node as NodeMenuNode & { kind: "group" });
         });
       } else {
         const def = row.node.item;

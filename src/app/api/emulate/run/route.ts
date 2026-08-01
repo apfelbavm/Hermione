@@ -107,6 +107,8 @@ export async function POST(request: Request): Promise<Response> {
     entries,
     kind: "production",
     executionMs,
+    revision: deployed.revision,
+    version: deployed.version,
   };
   db.appendRun(runLog);
 

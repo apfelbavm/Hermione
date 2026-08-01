@@ -26,6 +26,7 @@ interface FlowRow {
   name: string;
   graph_json: string | null;
   version: number;
+  revision: number;
   created_at: string;
   updated_at: string;
 }
@@ -40,6 +41,8 @@ interface RunRow {
   entries_json: string;
   kind: string;
   execution_ms: number | null;
+  revision: number | null;
+  version: number | null;
 }
 
 interface FlowVersionRow {
@@ -68,6 +71,7 @@ interface DeployedScriptRow {
   code: string;
   manifest_json: string;
   version: number;
+  revision: number;
   deployed_at: string;
 }
 
@@ -105,6 +109,7 @@ export class DatabaseManager {
         name TEXT NOT NULL,
         graph_json TEXT,
         version INTEGER NOT NULL DEFAULT 1,
+        revision INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -131,7 +136,9 @@ export class DatabaseManager {
         finished_at TEXT,
         entries_json TEXT NOT NULL,
         kind TEXT NOT NULL DEFAULT 'simulate',
-        execution_ms REAL
+        execution_ms REAL,
+        revision INTEGER,
+        version INTEGER
       );
       CREATE INDEX IF NOT EXISTS idx_runs_project_id ON runs (project_id, started_at);
 
@@ -152,6 +159,7 @@ export class DatabaseManager {
         code TEXT NOT NULL,
         manifest_json TEXT NOT NULL,
         version INTEGER NOT NULL DEFAULT 1,
+        revision INTEGER NOT NULL DEFAULT 1,
         deployed_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_deployed_scripts_project_id ON deployed_scripts (project_id);
@@ -176,6 +184,7 @@ export class DatabaseManager {
       projectId: row.project_id,
       name: row.name,
       version: row.version,
+      revision: row.revision,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -192,6 +201,8 @@ export class DatabaseManager {
       entries: JSON.parse(row.entries_json) as LogEntry[],
       kind: (row.kind as RunKind) || "simulate",
       executionMs: row.execution_ms ?? undefined,
+      revision: row.revision ?? undefined,
+      version: row.version ?? undefined,
     };
   }
 
@@ -236,6 +247,7 @@ export class DatabaseManager {
         triggers: TriggerDescriptor[];
       },
       version: row.version,
+      revision: row.revision,
       deployedAt: row.deployed_at,
     };
   }
@@ -317,10 +329,11 @@ export class DatabaseManager {
       projectId,
       name,
       version: 1,
+      revision: 1,
       createdAt: now,
       updatedAt: now,
     };
-    this.db.prepare("INSERT INTO flows (id, project_id, name, graph_json, version, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?)").run(flow.id, flow.projectId, flow.name, flow.version, flow.createdAt, flow.updatedAt);
+    this.db.prepare("INSERT INTO flows (id, project_id, name, graph_json, version, revision, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)").run(flow.id, flow.projectId, flow.name, flow.version, flow.revision, flow.createdAt, flow.updatedAt);
     this.touchProject(projectId, now);
     return flow;
   }
@@ -384,7 +397,7 @@ export class DatabaseManager {
       const target = this.db.prepare<[string, string], FlowVersionRow>("SELECT * FROM flow_versions WHERE flow_id = ? AND id = ?").get(fId, vId);
       if (!current || !target) return undefined;
       this.db.prepare("INSERT INTO flow_versions (id, flow_id, version, name, graph_json, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(nextId("flow_version"), current.id, current.version, current.name, current.graph_json, now);
-      this.db.prepare("UPDATE flows SET name = ?, graph_json = ?, version = ?, updated_at = ? WHERE project_id = ? AND id = ?").run(target.name, target.graph_json, current.version + 1, now, pId, fId);
+      this.db.prepare("UPDATE flows SET name = ?, graph_json = ?, version = ?, revision = revision + 1, updated_at = ? WHERE project_id = ? AND id = ?").run(target.name, target.graph_json, current.version + 1, now, pId, fId);
       this.touchProject(pId, now);
       return this.getFlow(pId, fId);
     });
@@ -400,11 +413,13 @@ export class DatabaseManager {
     return row?.graph_json ?? null;
   }
 
+  /** Bumps `revision` on every save — unlike `version` (only bumped by "Save new version"/restore),
+   * `revision` tracks every time the graph's own content is persisted, autosave included. */
   saveFlowGraphJson(flowId: string, graphJson: string): void {
     const now = new Date().toISOString();
     const save = this.db.transaction((fId: string, json: string, ts: string) => {
       const row = this.db.prepare<[string], { project_id: string }>("SELECT project_id FROM flows WHERE id = ?").get(fId);
-      this.db.prepare("UPDATE flows SET graph_json = ?, updated_at = ? WHERE id = ?").run(json, ts, fId);
+      this.db.prepare("UPDATE flows SET graph_json = ?, revision = revision + 1, updated_at = ? WHERE id = ?").run(json, ts, fId);
       if (row) this.touchProject(row.project_id, ts);
     });
     save(flowId, graphJson, now);
@@ -430,8 +445,8 @@ export class DatabaseManager {
   appendRun(run: RunLog): void {
     const insertAndCap = this.db.transaction((r: RunLog) => {
       this.db
-        .prepare("INSERT INTO runs (id, project_id, flow_id, flow_name, started_at, finished_at, entries_json, kind, execution_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(r.id, r.projectId, r.flowId, r.flowName, r.startedAt, r.finishedAt ?? null, JSON.stringify(r.entries), r.kind, r.executionMs ?? null);
+        .prepare("INSERT INTO runs (id, project_id, flow_id, flow_name, started_at, finished_at, entries_json, kind, execution_ms, revision, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(r.id, r.projectId, r.flowId, r.flowName, r.startedAt, r.finishedAt ?? null, JSON.stringify(r.entries), r.kind, r.executionMs ?? null, r.revision ?? null, r.version ?? null);
 
       const staleIds = this.db.prepare<[string, number], { id: string }>("SELECT id FROM runs WHERE project_id = ? ORDER BY started_at DESC LIMIT -1 OFFSET ?").all(r.projectId, MAX_RUNS_PER_PROJECT);
       if (staleIds.length > 0) {
@@ -507,7 +522,7 @@ export class DatabaseManager {
    * a history, matching "Deploy" as "replace what's currently live," not an audit log. `version`
    * starts at 1 and increments by one on every redeploy of this same Flow (see
    * DeployedScript.version's own doc comment). */
-  upsertDeployedScript(input: { projectId: string; flowId: string; flowName: string; code: string; manifest: { triggers: TriggerDescriptor[] } }): DeployedScript {
+  upsertDeployedScript(input: { projectId: string; flowId: string; flowName: string; code: string; manifest: { triggers: TriggerDescriptor[] }; revision: number }): DeployedScript {
     const existing = this.db.prepare<[string], { id: string; version: number }>("SELECT id, version FROM deployed_scripts WHERE flow_id = ?").get(input.flowId);
     const record: DeployedScript = {
       id: existing?.id ?? nextId("deployment"),
@@ -517,12 +532,13 @@ export class DatabaseManager {
       code: input.code,
       manifest: input.manifest,
       version: (existing?.version ?? 0) + 1,
+      revision: input.revision,
       deployedAt: new Date().toISOString(),
     };
     this.db
       .prepare(
-        `INSERT INTO deployed_scripts (id, project_id, flow_id, flow_name, code, manifest_json, version, deployed_at) VALUES (@id, @projectId, @flowId, @flowName, @code, @manifestJson, @version, @deployedAt)
-         ON CONFLICT(flow_id) DO UPDATE SET flow_name = @flowName, code = @code, manifest_json = @manifestJson, version = @version, deployed_at = @deployedAt`,
+        `INSERT INTO deployed_scripts (id, project_id, flow_id, flow_name, code, manifest_json, version, revision, deployed_at) VALUES (@id, @projectId, @flowId, @flowName, @code, @manifestJson, @version, @revision, @deployedAt)
+         ON CONFLICT(flow_id) DO UPDATE SET flow_name = @flowName, code = @code, manifest_json = @manifestJson, version = @version, revision = @revision, deployed_at = @deployedAt`,
       )
       .run({
         id: record.id,
@@ -532,6 +548,7 @@ export class DatabaseManager {
         code: record.code,
         manifestJson: JSON.stringify(record.manifest),
         version: record.version,
+        revision: record.revision,
         deployedAt: record.deployedAt,
       });
     return record;

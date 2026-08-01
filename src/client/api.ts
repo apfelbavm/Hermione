@@ -126,7 +126,7 @@ export function restoreFlowVersion(projectId: string, flowId: string, versionId:
  * DeployedScript row (see api/projects/[projectId]/flows/[flowId]/deploy/route.ts), replacing any
  * previous deployment. No longer triggers a file download of its own — the compiled script only
  * ever runs from the Emulate page now (see getDeployedScript below). */
-export function deployFlow(projectId: string, flowId: string, graphJson: string): Promise<{ version: number; deployedAt: string }> {
+export function deployFlow(projectId: string, flowId: string, graphJson: string): Promise<{ version: number; revision: number; deployedAt: string }> {
   return requestJson(`/api/projects/${projectId}/flows/${flowId}/deploy`, {
     method: "POST",
     headers: JSON_HEADERS,

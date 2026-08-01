@@ -34,16 +34,16 @@ export async function POST(request: Request, { params }: { params: Params }): Pr
   let manifest: { triggers: { nodeId: string; kind: string; functionName: string; details: Record<string, unknown> }[] };
   try {
     const graph = deserializeGraph(body.graph);
-    ({ code, manifest } = compileGraph(graph));
+    ({ code, manifest } = compileGraph(graph, flow.version, flow.revision));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return Response.json({ error: `Compile error: ${message}` }, { status: 400 });
   }
 
   writeDeployedScriptFile(flowId, code);
-  const deployed = db.upsertDeployedScript({ projectId, flowId, flowName: flow.name, code, manifest });
+  const deployed = db.upsertDeployedScript({ projectId, flowId, flowName: flow.name, code, manifest, revision: flow.revision });
 
-  return Response.json({ manifest: deployed.manifest, version: deployed.version, deployedAt: deployed.deployedAt });
+  return Response.json({ manifest: deployed.manifest, version: deployed.version, revision: deployed.revision, deployedAt: deployed.deployedAt });
 }
 
 export async function GET(_request: Request, { params }: { params: Params }): Promise<Response> {

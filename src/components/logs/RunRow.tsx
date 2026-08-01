@@ -53,6 +53,18 @@ export function RunRow({ run, project }: { run: RunLog; project?: { name: string
           )}
         </span>
         <span className={`run-row-kind run-row-kind-${run.kind}`}>{run.kind === "simulate" ? i18n.components.run_row.simulate : i18n.components.run_row.production}</span>
+        {run.version !== undefined && (
+          <span className="entity-version-badge">
+            {i18n.pages.project.flow_version_prefix}
+            {run.version}
+          </span>
+        )}
+        {run.revision !== undefined && (
+          <span className="run-row-revision">
+            {i18n.components.run_row.revision}
+            {run.revision}
+          </span>
+        )}
         <span className="run-row-time">{new Date(run.startedAt).toLocaleString()}</span>
         <span className="run-row-count">
           {run.entries.length} {run.entries.length === 1 ? i18n.components.run_row.entry : i18n.components.run_row.entries}

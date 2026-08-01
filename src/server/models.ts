@@ -18,6 +18,9 @@ export interface FlowSummary {
   projectId: string;
   name: string;
   version: number;
+  /** Bumped every time the graph itself is saved (autosave/Save), independent of `version` (which
+   * only bumps on an explicit "Save new version" / restore) — see DatabaseManager.saveFlowGraphJson. */
+  revision: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +59,10 @@ export interface RunLog {
   entries: LogEntry[];
   kind: RunKind;
   executionMs?: number;
+  /** The Flow's `revision` (production) or the deployed script's own `revision` at the time this ran. */
+  revision?: number;
+  /** The Flow's `version` (production: the deployed script's own `version`) at the time this ran. */
+  version?: number;
 }
 
 export interface DeployedScriptSummary {
@@ -65,6 +72,8 @@ export interface DeployedScriptSummary {
   flowName: string;
   manifest: { triggers: TriggerDescriptor[] };
   version: number;
+  /** The Flow's own `revision` at the moment it was compiled/deployed — passed into compileGraph. */
+  revision: number;
   deployedAt: string;
 }
 

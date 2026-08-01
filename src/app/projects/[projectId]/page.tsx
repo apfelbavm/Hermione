@@ -268,6 +268,10 @@ export default function ProjectPage() {
                 {flow.version}
               </span>
               <span className="entity-meta">
+                {i18n.components.run_row.revision}
+                {flow.revision}
+              </span>
+              <span className="entity-meta">
                 {i18n.pages.project.meta_created.replace("{date}", new Date(flow.createdAt).toLocaleString())}
                 {" · "}
                 {i18n.pages.project.meta_updated.replace("{date}", new Date(flow.updatedAt).toLocaleString())}

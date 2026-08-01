@@ -177,6 +177,7 @@ export default function EmulatePage() {
           <div className="emulate-editor-meta">
             <span>{formatLogTimestamp(scriptDetail.deployedAt)}</span>
             <span>{i18n.pages.emulate.version + scriptDetail.version}</span>
+            <span>{i18n.pages.emulate.revision + scriptDetail.revision}</span>
           </div>
           <Editor height="100%" language="typescript" path={scriptDetail.flowId} value={scriptDetail.code} theme={monacoTheme} options={{ readOnly: true, minimap: { enabled: false }, fontSize: 13, domReadOnly: true }} />
         </div>
