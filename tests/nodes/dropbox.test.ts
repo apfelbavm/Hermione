@@ -4,10 +4,7 @@ import { createExecutionContext, runExecFrom } from "../../src/engine/executor";
 import { getNodeDef } from "../../src/engine/registry";
 import { Graph } from "../../src/engine/graph";
 import { NodeInstance } from "../../src/engine/nodeInstance";
-import type {
-  CredentialRecord,
-  DropboxOAuth2CredentialData,
-} from "../../src/credentials/types";
+import type { CredentialRecord, DropboxOAuth2CredentialData } from "../../src/credentials/types";
 
 beforeAll(() => {
   registerBuiltins();
@@ -17,19 +14,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function buildGraph(
-  type: string,
-  id: string,
-  pinValues: Record<string, unknown> = {},
-) {
+function buildGraph(type: string, id: string, pinValues: Record<string, unknown> = {}) {
   const graph: Graph = new Graph("g", "test");
   const def = getNodeDef(type);
-  const node = NodeInstance.createNodeInstance(
-    type,
-    { x: 0, y: 0 },
-    def.pins,
-    id,
-  );
+  const node = NodeInstance.createNodeInstance(type, { x: 0, y: 0 }, def.pins, id);
   for (const [pinId, value] of Object.entries(pinValues)) {
     node.pins[pinId].value = value;
   }
@@ -81,26 +69,20 @@ function freshCredential(): {
   };
   return {
     name: credential.name,
-    getCredential: (name) =>
-      name === credential.name ? credential : undefined,
+    getCredential: (name) => (name === credential.name ? credential : undefined),
   };
 }
 
 /** Every real Dropbox request first goes through DropboxAuth.checkAndRefreshAccessToken, which
  * (since these tests never pre-seed an access token) always fetches one from /oauth2/token before
  * the actual API call — this stubs that first hop so callers only need to mock the real operation. */
-function withTokenRefresh(
-  handleOp: (url: string, init?: RequestInit) => Response | Promise<Response>,
-) {
+function withTokenRefresh(handleOp: (url: string, init?: RequestInit) => Response | Promise<Response>) {
   return vi.fn(async (url: string, init?: RequestInit) => {
     if (String(url).includes("/oauth2/token")) {
-      return new Response(
-        JSON.stringify({ access_token: "tok-live", expires_in: 14400 }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ access_token: "tok-live", expires_in: 14400 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     return handleOp(url, init);
   });
@@ -136,9 +118,11 @@ describe("dropbox.authorize", () => {
     await runExecFrom("az", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("az:success")).toBe(true);
-    expect(ctx.execOutputs.get("az:accessToken")).toBe("tok-1");
-    expect(ctx.execOutputs.get("az:refreshToken")).toBe("refresh-fresh");
-    expect(ctx.execOutputs.get("az:expiresIn")).toBe(14400);
+    expect(ctx.execOutputs.get("az:tokens")).toEqual({
+      accessToken: "tok-1",
+      refreshToken: "refresh-fresh",
+      expiresIn: 14400,
+    });
     expect(ctx.execOutputs.get("az:error")).toBe("");
   });
 
@@ -167,10 +151,12 @@ describe("dropbox.authorize", () => {
     await runExecFrom("az", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("az:success")).toBe(false);
-    expect(ctx.execOutputs.get("az:refreshToken")).toBe("");
-    expect(ctx.execOutputs.get("az:error")).toBe(
-      "invalid_grant: code has expired",
-    );
+    expect(ctx.execOutputs.get("az:tokens")).toEqual({
+      accessToken: "",
+      refreshToken: "",
+      expiresIn: 0,
+    });
+    expect(ctx.execOutputs.get("az:error")).toBe("invalid_grant: code has expired");
   });
 
   it("reports an error and never calls fetch when the named credential doesn't exist", async () => {
@@ -197,9 +183,7 @@ describe("dropbox.upload", () => {
     const { name, getCredential } = freshCredential();
     const fetchMock = withTokenRefresh(async (url, init) => {
       expect(String(url)).toContain("/files/upload");
-      expect(
-        (init?.headers as Record<string, string>)["Dropbox-API-Arg"],
-      ).toContain('"path":"/report.csv"');
+      expect((init?.headers as Record<string, string>)["Dropbox-API-Arg"]).toContain('"path":"/report.csv"');
       return new Response(JSON.stringify({ name: "report.csv" }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -223,13 +207,7 @@ describe("dropbox.upload", () => {
     const { name, getCredential } = freshCredential();
     vi.stubGlobal(
       "fetch",
-      withTokenRefresh(
-        async () =>
-          new Response(
-            JSON.stringify({ error_summary: "path/conflict/file/..." }),
-            { status: 409 },
-          ),
-      ),
+      withTokenRefresh(async () => new Response(JSON.stringify({ error_summary: "path/conflict/file/..." }), { status: 409 })),
     );
 
     const { graph } = buildGraph("dropbox.upload", "up", {
@@ -357,10 +335,7 @@ describe("dropbox.listFolders", () => {
     await runExecFrom("lf", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lf:success")).toBe(true);
-    expect(ctx.execOutputs.get("lf:folders")).toEqual([
-      "/root/Sub A",
-      "/root/Sub B",
-    ]);
+    expect(ctx.execOutputs.get("lf:folders")).toEqual(["/root/Sub A", "/root/Sub B"]);
     expect(ctx.execOutputs.get("lf:error")).toBe("");
   });
 
@@ -404,10 +379,7 @@ describe("dropbox.listFolders", () => {
     await runExecFrom("lf", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lf:success")).toBe(true);
-    expect(ctx.execOutputs.get("lf:folders")).toEqual([
-      "/root/Sub A",
-      "/root/Sub B",
-    ]);
+    expect(ctx.execOutputs.get("lf:folders")).toEqual(["/root/Sub A", "/root/Sub B"]);
   });
 
   it("reports a Dropbox API error via the error output instead of throwing", async () => {
@@ -441,9 +413,7 @@ describe.each(["move", "copy", "rename"])("dropbox.%s", (op) => {
   it("sends from_path/to_path and reports success", async () => {
     const { name, getCredential } = freshCredential();
     const fetchMock = withTokenRefresh(async (url, init) => {
-      expect(String(url)).toContain(
-        op === "copy" ? "/files/copy_v2" : "/files/move_v2",
-      );
+      expect(String(url)).toContain(op === "copy" ? "/files/copy_v2" : "/files/move_v2");
       const body = JSON.parse(String(init?.body));
       expect(body.from_path).toBe("/a.txt");
       expect(body.to_path).toBe("/b.txt");

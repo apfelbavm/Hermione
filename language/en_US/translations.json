@@ -367,6 +367,9 @@
         "pin_refresh_token": "Refresh Token",
         "pin_expires_in": "Expires In (s)"
       },
+      "authTokens": {
+        "label": "Dropbox Auth Tokens"
+      },
       "upload": {
         "label": "Dropbox Upload",
         "description": "Uploads content to a path in Dropbox.",
@@ -412,6 +415,9 @@
         "pin_content_hash": "Content Hash",
         "pin_server_modified": "Server Modified"
       },
+      "metadata": {
+        "label": "Dropbox Metadata"
+      },
       "search": {
         "label": "Dropbox Search",
         "description": "Searches file and folder names/content across Dropbox (or under a given path) for a query.",
@@ -424,6 +430,12 @@
         "description": "Lists the historical revisions of a file at a path in Dropbox.",
         "pin_limit": "Limit",
         "pin_revisions": "Revisions"
+      },
+      "revision": {
+        "label": "Dropbox Revision",
+        "pin_rev": "Revision",
+        "pin_size": "Size (bytes)",
+        "pin_server_modified": "Server Modified"
       },
       "restore": {
         "label": "Dropbox Restore",
@@ -481,11 +493,17 @@
         "pin_account_id": "Account ID",
         "pin_name": "Name"
       },
+      "account": {
+        "label": "Dropbox Account"
+      },
       "getSpaceUsage": {
         "label": "Dropbox Get Space Usage",
         "description": "Fetches the used and allocated storage space (bytes) for a Dropbox account.",
         "pin_used": "Used (bytes)",
         "pin_allocated": "Allocated (bytes)"
+      },
+      "spaceUsage": {
+        "label": "Dropbox Space Usage"
       }
     },
     "azureStorage": {
@@ -626,9 +644,15 @@
         "description": "Lists issues in a GitHub repository, optionally filtered by state.",
         "pin_issues": "Issues"
       },
+      "issue": {
+        "label": "GitHub Issue"
+      },
       "createIssue": {
         "label": "GitHub Create Issue",
         "description": "Creates a new issue in a GitHub repository."
+      },
+      "createResult": {
+        "label": "GitHub Create Result"
       },
       "commentOnIssue": {
         "label": "GitHub Comment On Issue",
@@ -638,6 +662,9 @@
         "label": "GitHub List Pull Requests",
         "description": "Lists pull requests in a GitHub repository, optionally filtered by state.",
         "pin_pull_requests": "Pull Requests"
+      },
+      "pullRequest": {
+        "label": "GitHub Pull Request"
       },
       "createPullRequest": {
         "label": "GitHub Create Pull Request",
@@ -652,10 +679,16 @@
         "pin_merge_method": "Merge Method",
         "pin_merged": "Merged"
       },
+      "mergeResult": {
+        "label": "GitHub Merge Result"
+      },
       "getFileContent": {
         "label": "GitHub Get File Content",
         "description": "Fetches the decoded text content of a file at a path in a GitHub repository, optionally at a specific branch/tag/commit.",
         "pin_content": "Content"
+      },
+      "fileContent": {
+        "label": "GitHub File Content"
       },
       "createOrUpdateFile": {
         "label": "GitHub Create Or Update File",
@@ -664,6 +697,9 @@
         "pin_branch": "Branch",
         "pin_result_sha": "File SHA",
         "pin_commit_sha": "Commit SHA"
+      },
+      "fileWriteResult": {
+        "label": "GitHub File Write Result"
       },
       "request": {
         "label": "GitHub Request",
@@ -700,7 +736,20 @@
         "pin_address": "Address (e.g. A1:B2)",
         "pin_values_json": "Values (JSON, 2D array)",
         "pin_title": "Title",
-        "pin_name": "Name"
+        "pin_name": "Name",
+        "pin_is_folder": "Is Folder",
+        "pin_size": "Size (bytes)",
+        "pin_created_date_time": "Created Date/Time",
+        "pin_topic": "Topic",
+        "pin_chat_type": "Chat Type",
+        "pin_web_url": "Web URL",
+        "pin_percent_complete": "Percent Complete",
+        "pin_status": "Status",
+        "pin_email": "Email",
+        "pin_app_id": "App ID"
+      },
+      "graphUser": {
+        "label": "Microsoft 365 User"
       },
       "listUsers": {
         "label": "Microsoft 365 List Users",
@@ -710,6 +759,9 @@
       "getUser": {
         "label": "Microsoft 365 Get User",
         "description": "Fetches a single user's profile by ID or user principal name (UPN)."
+      },
+      "graphGroup": {
+        "label": "Microsoft 365 Group"
       },
       "createUser": {
         "label": "Microsoft 365 Create User",
@@ -757,6 +809,12 @@
         "description": "Lists messages in a user's mailbox, optionally filtered with an OData $filter expression.",
         "pin_messages": "Messages"
       },
+      "graphMessage": {
+        "label": "Microsoft 365 Message"
+      },
+      "graphMessageDetail": {
+        "label": "Microsoft 365 Message Detail"
+      },
       "getMessage": {
         "label": "Microsoft 365 Get Message",
         "description": "Fetches a single email message's subject, sender and body content by ID.",
@@ -772,6 +830,9 @@
         "label": "Microsoft 365 List Events",
         "description": "Lists events on a user's calendar.",
         "pin_events": "Events"
+      },
+      "graphEvent": {
+        "label": "Microsoft 365 Event"
       },
       "createEvent": {
         "label": "Microsoft 365 Create Event",
@@ -790,6 +851,9 @@
         "description": "Lists the files and folders under a path in a user's OneDrive, or the root if left blank.",
         "pin_items": "Items"
       },
+      "graphDriveItem": {
+        "label": "Microsoft 365 Drive Item"
+      },
       "downloadFile": {
         "label": "Microsoft 365 Download File",
         "description": "Downloads the content of a file at a path in a user's OneDrive."
@@ -807,6 +871,9 @@
         "description": "Lists the Microsoft Teams teams a user is a member of.",
         "pin_teams": "Teams"
       },
+      "graphTeam": {
+        "label": "Microsoft 365 Team"
+      },
       "sendChannelMessage": {
         "label": "Microsoft 365 Send Channel Message",
         "description": "Posts a message to a channel in a Microsoft Teams team.",
@@ -818,6 +885,9 @@
         "description": "Lists the channels in a Microsoft Teams team.",
         "pin_channels": "Channels"
       },
+      "graphChannel": {
+        "label": "Microsoft 365 Channel"
+      },
       "createChannel": {
         "label": "Microsoft 365 Create Channel",
         "description": "Creates a new channel in a Microsoft Teams team."
@@ -826,6 +896,9 @@
         "label": "Microsoft 365 List Channel Messages",
         "description": "Lists recent messages posted in a Microsoft Teams channel.",
         "pin_messages": "Messages"
+      },
+      "graphChannelMessage": {
+        "label": "Microsoft 365 Channel Message"
       },
       "listChats": {
         "label": "Microsoft 365 List Chats",
@@ -837,21 +910,33 @@
         "description": "Posts a message to a Microsoft Teams 1:1 or group chat.",
         "pin_chat_id": "Chat ID"
       },
+      "graphChat": {
+        "label": "Microsoft 365 Chat"
+      },
       "listSites": {
         "label": "Microsoft 365 List Sites",
         "description": "Searches for SharePoint sites in the tenant, or lists all sites if left blank.",
         "pin_search": "Search",
         "pin_sites": "Sites"
       },
+      "graphSite": {
+        "label": "Microsoft 365 Site"
+      },
       "listSiteLists": {
         "label": "Microsoft 365 List Site Lists",
         "description": "Lists the SharePoint lists in a site.",
         "pin_lists": "Lists"
       },
+      "graphSiteList": {
+        "label": "Microsoft 365 Site List"
+      },
       "listListItems": {
         "label": "Microsoft 365 List List Items",
         "description": "Lists the items in a SharePoint list, with each item's fields as a JSON string.",
         "pin_items": "Items"
+      },
+      "graphListItem": {
+        "label": "Microsoft 365 List Item"
       },
       "createListItem": {
         "label": "Microsoft 365 Create List Item",
@@ -889,6 +974,9 @@
         "description": "Lists the worksheets in an Excel workbook stored in a user's OneDrive.",
         "pin_worksheets": "Worksheets"
       },
+      "graphWorksheet": {
+        "label": "Microsoft 365 Worksheet"
+      },
       "getWorksheetRange": {
         "label": "Microsoft 365 Get Worksheet Range",
         "description": "Reads a cell range from a worksheet in an Excel workbook as a JSON 2D array."
@@ -902,6 +990,9 @@
         "description": "Lists the tables in an Excel workbook stored in a user's OneDrive.",
         "pin_tables": "Tables"
       },
+      "graphTable": {
+        "label": "Microsoft 365 Table"
+      },
       "addTableRow": {
         "label": "Microsoft 365 Add Table Row",
         "description": "Appends a row of values, given as a JSON array, to an Excel table.",
@@ -911,6 +1002,9 @@
         "label": "Microsoft 365 List Planner Plans",
         "description": "Lists the Microsoft Planner plans owned by a group.",
         "pin_plans": "Plans"
+      },
+      "graphPlannerPlan": {
+        "label": "Microsoft 365 Planner Plan"
       },
       "createPlannerTask": {
         "label": "Microsoft 365 Create Planner Task",
@@ -923,10 +1017,16 @@
         "description": "Lists the tasks in a Microsoft Planner plan.",
         "pin_tasks": "Tasks"
       },
+      "graphPlannerTask": {
+        "label": "Microsoft 365 Planner Task"
+      },
       "listTodoLists": {
         "label": "Microsoft 365 List To Do Lists",
         "description": "Lists a user's Microsoft To Do task lists.",
         "pin_lists": "Lists"
+      },
+      "graphTodoList": {
+        "label": "Microsoft 365 To Do List"
       },
       "createTodoTask": {
         "label": "Microsoft 365 Create To Do Task",
@@ -937,10 +1037,16 @@
         "description": "Lists the tasks in a user's Microsoft To Do list.",
         "pin_tasks": "Tasks"
       },
+      "graphTodoTask": {
+        "label": "Microsoft 365 To Do Task"
+      },
       "listContacts": {
         "label": "Microsoft 365 List Contacts",
         "description": "Lists a user's Outlook contacts.",
         "pin_contacts": "Contacts"
+      },
+      "graphContact": {
+        "label": "Microsoft 365 Contact"
       },
       "createContact": {
         "label": "Microsoft 365 Create Contact",
@@ -956,10 +1062,16 @@
         "description": "Lists the app registrations in the Azure AD tenant, optionally filtered with an OData $filter expression.",
         "pin_applications": "Applications"
       },
+      "graphApplication": {
+        "label": "Microsoft 365 Application"
+      },
       "listDirectoryRoles": {
         "label": "Microsoft 365 List Directory Roles",
         "description": "Lists the directory roles that are activated in the Azure AD tenant.",
         "pin_roles": "Roles"
+      },
+      "graphDirectoryRole": {
+        "label": "Microsoft 365 Directory Role"
       },
       "listUserLicenses": {
         "label": "Microsoft 365 List User Licenses",
@@ -983,6 +1095,9 @@
         "label": "Microsoft 365 List Trending Documents",
         "description": "Lists documents trending around a user, based on Microsoft Graph insights.",
         "pin_documents": "Documents"
+      },
+      "graphTrendingDocument": {
+        "label": "Microsoft 365 Trending Document"
       },
       "request": {
         "label": "Microsoft 365 Request",

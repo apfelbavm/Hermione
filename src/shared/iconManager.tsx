@@ -119,7 +119,7 @@ export class IconManager {
 
   static UndoIcon() {
     return (
-      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <svg viewBox="0 1.5 16 17.5" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M3 8H11.5A3.5 3.5 0 0 1 15 11.5A3.5 3.5 0 0 1 11.5 15H7" />
         <path d="M6 4.5 2.5 8 6 11.5" />
       </svg>
@@ -128,7 +128,7 @@ export class IconManager {
 
   static RedoIcon() {
     return (
-      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <svg viewBox="0 1.5 16 17.5" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M13 8H4.5A3.5 3.5 0 0 0 1 11.5A3.5 3.5 0 0 0 4.5 15H9" />
         <path d="M10 4.5 13.5 8 10 11.5" />
       </svg>

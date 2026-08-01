@@ -136,8 +136,10 @@ describe("github.createIssue", () => {
     await runExecFrom("ci", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("ci:success")).toBe(true);
-    expect(ctx.execOutputs.get("ci:number")).toBe(42);
-    expect(ctx.execOutputs.get("ci:url")).toBe("https://github.com/acme/widgets/issues/42");
+    expect(ctx.execOutputs.get("ci:result")).toEqual({
+      number: 42,
+      url: "https://github.com/acme/widgets/issues/42",
+    });
   });
 
   it("surfaces a GitHub API error via the error output instead of throwing", async () => {
@@ -188,8 +190,10 @@ describe("github.mergePullRequest", () => {
     await runExecFrom("mp", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("mp:success")).toBe(true);
-    expect(ctx.execOutputs.get("mp:merged")).toBe(true);
-    expect(ctx.execOutputs.get("mp:sha")).toBe("abc123");
+    expect(ctx.execOutputs.get("mp:result")).toEqual({
+      merged: true,
+      sha: "abc123",
+    });
   });
 });
 
@@ -219,8 +223,10 @@ describe("github.getFileContent", () => {
     await runExecFrom("gf", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("gf:success")).toBe(true);
-    expect(ctx.execOutputs.get("gf:content")).toBe("hello world");
-    expect(ctx.execOutputs.get("gf:sha")).toBe("file-sha-1");
+    expect(ctx.execOutputs.get("gf:result")).toEqual({
+      content: "hello world",
+      sha: "file-sha-1",
+    });
   });
 });
 

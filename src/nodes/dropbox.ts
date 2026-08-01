@@ -1,5 +1,6 @@
 import { NodeColorCategory, type ExecutionContext } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { registerStructType } from "../engine/structRegistry";
 import { DropboxManager } from "../lib/dropboxManager";
 import type { DropboxOAuth2CredentialData } from "../credentials/types";
 import { i18n } from "@i18n";
@@ -19,6 +20,139 @@ const ACCESS_LEVEL_OPTIONS = ["editor", "viewer"];
 const ENCODING_OPTIONS = ["utf8", "base64"];
 const WRITE_MODE_OPTIONS = ["add", "overwrite"];
 const GROUP_NAME = "Request.Dropbox";
+
+// Same struct-output-pin pattern as nodes/azureStorage.ts: any result with 2+ non-success/error
+// fields gets a single struct-typed output pin instead of a loose pin per field.
+const AUTH_TOKENS_STRUCT_TYPE = "dropboxAuthTokens";
+const METADATA_STRUCT_TYPE = "dropboxMetadata";
+const REVISION_STRUCT_TYPE = "dropboxRevision";
+const ACCOUNT_STRUCT_TYPE = "dropboxAccount";
+const SPACE_USAGE_STRUCT_TYPE = "dropboxSpaceUsage";
+
+registerStructType({
+  id: AUTH_TOKENS_STRUCT_TYPE,
+  label: i18n.nodes.dropbox.authTokens.label,
+  fields: [
+    {
+      id: "accessToken",
+      label: i18n.nodes.dropbox.__shared.pin_access_token,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "refreshToken",
+      label: i18n.nodes.dropbox.authorize.pin_refresh_token,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "expiresIn",
+      label: i18n.nodes.dropbox.authorize.pin_expires_in,
+      type: "number",
+      defaultValue: 0,
+    },
+  ],
+});
+
+registerStructType({
+  id: METADATA_STRUCT_TYPE,
+  label: i18n.nodes.dropbox.metadata.label,
+  fields: [
+    {
+      id: "isFolder",
+      label: i18n.nodes.dropbox.getMetadata.pin_is_folder,
+      type: "boolean",
+      defaultValue: false,
+    },
+    {
+      id: "size",
+      label: i18n.nodes.dropbox.getMetadata.pin_size,
+      type: "number",
+      defaultValue: 0,
+    },
+    {
+      id: "contentHash",
+      label: i18n.nodes.dropbox.getMetadata.pin_content_hash,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "serverModified",
+      label: i18n.nodes.dropbox.getMetadata.pin_server_modified,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: REVISION_STRUCT_TYPE,
+  label: i18n.nodes.dropbox.revision.label,
+  fields: [
+    {
+      id: "rev",
+      label: i18n.nodes.dropbox.revision.pin_rev,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "size",
+      label: i18n.nodes.dropbox.revision.pin_size,
+      type: "number",
+      defaultValue: 0,
+    },
+    {
+      id: "serverModified",
+      label: i18n.nodes.dropbox.revision.pin_server_modified,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: ACCOUNT_STRUCT_TYPE,
+  label: i18n.nodes.dropbox.account.label,
+  fields: [
+    {
+      id: "accountId",
+      label: i18n.nodes.dropbox.getCurrentAccount.pin_account_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "name",
+      label: i18n.nodes.dropbox.getCurrentAccount.pin_name,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "email",
+      label: i18n.nodes.dropbox.addFolderMember.pin_email,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: SPACE_USAGE_STRUCT_TYPE,
+  label: i18n.nodes.dropbox.spaceUsage.label,
+  fields: [
+    {
+      id: "used",
+      label: i18n.nodes.dropbox.getSpaceUsage.pin_used,
+      type: "number",
+      defaultValue: 0,
+    },
+    {
+      id: "allocated",
+      label: i18n.nodes.dropbox.getSpaceUsage.pin_allocated,
+      type: "number",
+      defaultValue: 0,
+    },
+  ],
+});
 
 function credentialNamePin() {
   return {
@@ -75,21 +209,10 @@ registerNode({
       direction: "output",
     },
     {
-      id: "accessToken",
-      label: i18n.nodes.dropbox.__shared.pin_access_token,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "refreshToken",
-      label: i18n.nodes.dropbox.authorize.pin_refresh_token,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "expiresIn",
-      label: i18n.nodes.dropbox.authorize.pin_expires_in,
-      type: "number",
+      id: "tokens",
+      label: i18n.nodes.dropbox.authTokens.label,
+      type: "struct",
+      subType: AUTH_TOKENS_STRUCT_TYPE,
       direction: "output",
     },
     {
@@ -107,15 +230,24 @@ registerNode({
         nextExec: "exec-out",
         outputs: {
           success: false,
-          accessToken: "",
-          refreshToken: "",
-          expiresIn: 0,
+          tokens: { accessToken: "", refreshToken: "", expiresIn: 0 },
           error: resolved.error,
         },
       };
     }
     const result = await DropboxManager.exchangeAuthCode(resolved.data.authCode, resolved.data.appKey, resolved.data.appSecret);
-    return { nextExec: "exec-out", outputs: result };
+    return {
+      nextExec: "exec-out",
+      outputs: {
+        success: result.success,
+        tokens: {
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+          expiresIn: result.expiresIn,
+        },
+        error: result.error,
+      },
+    };
   },
 });
 
@@ -527,27 +659,10 @@ registerNode({
       direction: "output",
     },
     {
-      id: "isFolder",
-      label: i18n.nodes.dropbox.getMetadata.pin_is_folder,
-      type: "boolean",
-      direction: "output",
-    },
-    {
-      id: "size",
-      label: i18n.nodes.dropbox.getMetadata.pin_size,
-      type: "number",
-      direction: "output",
-    },
-    {
-      id: "contentHash",
-      label: i18n.nodes.dropbox.getMetadata.pin_content_hash,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "serverModified",
-      label: i18n.nodes.dropbox.getMetadata.pin_server_modified,
-      type: "string",
+      id: "metadata",
+      label: i18n.nodes.dropbox.metadata.label,
+      type: "struct",
+      subType: METADATA_STRUCT_TYPE,
       direction: "output",
     },
     {
@@ -563,11 +678,32 @@ registerNode({
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
+        outputs: {
+          success: false,
+          metadata: {
+            isFolder: false,
+            size: 0,
+            contentHash: "",
+            serverModified: "",
+          },
+          error: resolved.error,
+        },
       };
     const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
     const result = await manager.getMetadata(String(inputs.path ?? ""));
-    return { nextExec: "exec-out", outputs: result };
+    return {
+      nextExec: "exec-out",
+      outputs: {
+        success: result.success,
+        metadata: {
+          isFolder: result.isFolder,
+          size: result.size,
+          contentHash: result.contentHash,
+          serverModified: result.serverModified,
+        },
+        error: result.error,
+      },
+    };
   },
 });
 
@@ -681,7 +817,8 @@ registerNode({
     {
       id: "revisions",
       label: i18n.nodes.dropbox.listRevisions.pin_revisions,
-      type: "object",
+      type: "struct",
+      subType: REVISION_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -1298,21 +1435,10 @@ registerNode({
       direction: "output",
     },
     {
-      id: "accountId",
-      label: i18n.nodes.dropbox.getCurrentAccount.pin_account_id,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.dropbox.getCurrentAccount.pin_name,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "email",
-      label: i18n.nodes.dropbox.addFolderMember.pin_email,
-      type: "string",
+      id: "account",
+      label: i18n.nodes.dropbox.account.label,
+      type: "struct",
+      subType: ACCOUNT_STRUCT_TYPE,
       direction: "output",
     },
     {
@@ -1328,11 +1454,26 @@ registerNode({
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
+        outputs: {
+          success: false,
+          account: { accountId: "", name: "", email: "" },
+          error: resolved.error,
+        },
       };
     const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
     const result = await manager.getCurrentAccount();
-    return { nextExec: "exec-out", outputs: result };
+    return {
+      nextExec: "exec-out",
+      outputs: {
+        success: result.success,
+        account: {
+          accountId: result.accountId,
+          name: result.name,
+          email: result.email,
+        },
+        error: result.error,
+      },
+    };
   },
 });
 
@@ -1358,15 +1499,10 @@ registerNode({
       direction: "output",
     },
     {
-      id: "used",
-      label: i18n.nodes.dropbox.getSpaceUsage.pin_used,
-      type: "number",
-      direction: "output",
-    },
-    {
-      id: "allocated",
-      label: i18n.nodes.dropbox.getSpaceUsage.pin_allocated,
-      type: "number",
+      id: "spaceUsage",
+      label: i18n.nodes.dropbox.spaceUsage.label,
+      type: "struct",
+      subType: SPACE_USAGE_STRUCT_TYPE,
       direction: "output",
     },
     {
@@ -1382,10 +1518,21 @@ registerNode({
     if (!resolved.ok)
       return {
         nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
+        outputs: {
+          success: false,
+          spaceUsage: { used: 0, allocated: 0 },
+          error: resolved.error,
+        },
       };
     const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
     const result = await manager.getSpaceUsage();
-    return { nextExec: "exec-out", outputs: result };
+    return {
+      nextExec: "exec-out",
+      outputs: {
+        success: result.success,
+        spaceUsage: { used: result.used, allocated: result.allocated },
+        error: result.error,
+      },
+    };
   },
 });

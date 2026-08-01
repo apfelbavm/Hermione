@@ -1,5 +1,6 @@
 import { NodeColorCategory, type ExecutionContext } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { registerStructType } from "../engine/structRegistry";
 import { GraphManager } from "../lib/graphManager";
 import type { MicrosoftGraphClientCredentialsData } from "../credentials/types";
 import { i18n } from "@i18n";
@@ -24,6 +25,596 @@ const GROUP_NAME_ADMIN = "Request.Microsoft365 Admin";
 const BODY_TYPE_OPTIONS = ["text", "html"];
 const SHARING_LINK_TYPE_OPTIONS = ["view", "edit"];
 const SHARING_LINK_SCOPE_OPTIONS = ["anonymous", "organization"];
+
+// Same struct-array pattern as nodes/azureStorage.ts/dropbox.ts/github.ts: every "list X" result
+// is an array of same-shaped Graph resource objects (see graphManager.ts's Graph* interfaces), so
+// each gets a registered struct type instead of an opaque "object" array element type.
+const USER_STRUCT_TYPE = "graphUser";
+const GROUP_STRUCT_TYPE = "graphGroup";
+const MESSAGE_STRUCT_TYPE = "graphMessage";
+const EVENT_STRUCT_TYPE = "graphEvent";
+const DRIVE_ITEM_STRUCT_TYPE = "graphDriveItem";
+const TEAM_STRUCT_TYPE = "graphTeam";
+const CHANNEL_STRUCT_TYPE = "graphChannel";
+const CHANNEL_MESSAGE_STRUCT_TYPE = "graphChannelMessage";
+const CHAT_STRUCT_TYPE = "graphChat";
+const SITE_STRUCT_TYPE = "graphSite";
+const SITE_LIST_STRUCT_TYPE = "graphSiteList";
+const LIST_ITEM_STRUCT_TYPE = "graphListItem";
+const WORKSHEET_STRUCT_TYPE = "graphWorksheet";
+const TABLE_STRUCT_TYPE = "graphTable";
+const PLANNER_PLAN_STRUCT_TYPE = "graphPlannerPlan";
+const PLANNER_TASK_STRUCT_TYPE = "graphPlannerTask";
+const TODO_LIST_STRUCT_TYPE = "graphTodoList";
+const TODO_TASK_STRUCT_TYPE = "graphTodoTask";
+const CONTACT_STRUCT_TYPE = "graphContact";
+const APPLICATION_STRUCT_TYPE = "graphApplication";
+const DIRECTORY_ROLE_STRUCT_TYPE = "graphDirectoryRole";
+const TRENDING_DOCUMENT_STRUCT_TYPE = "graphTrendingDocument";
+const MESSAGE_DETAIL_STRUCT_TYPE = "graphMessageDetail";
+
+registerStructType({
+  id: USER_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphUser.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "displayName",
+      label: i18n.nodes.microsoft365.__shared.pin_display_name,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "userPrincipalName",
+      label: i18n.nodes.microsoft365.__shared.pin_user_principal_name,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "mail",
+      label: i18n.nodes.microsoft365.__shared.pin_mail,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: GROUP_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphGroup.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "displayName",
+      label: i18n.nodes.microsoft365.__shared.pin_display_name,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "mailNickname",
+      label: i18n.nodes.microsoft365.__shared.pin_mail_nickname,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: MESSAGE_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphMessage.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "subject",
+      label: i18n.nodes.microsoft365.__shared.pin_subject,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "from",
+      label: i18n.nodes.microsoft365.getMessage.pin_from,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "receivedDateTime",
+      label: i18n.nodes.microsoft365.getMessage.pin_received_date_time,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: EVENT_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphEvent.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "subject",
+      label: i18n.nodes.microsoft365.__shared.pin_subject,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "start",
+      label: i18n.nodes.microsoft365.createEvent.pin_start,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "end",
+      label: i18n.nodes.microsoft365.createEvent.pin_end,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: DRIVE_ITEM_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphDriveItem.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "name",
+      label: i18n.nodes.microsoft365.__shared.pin_name,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "isFolder",
+      label: i18n.nodes.microsoft365.__shared.pin_is_folder,
+      type: "boolean",
+      defaultValue: false,
+    },
+    {
+      id: "size",
+      label: i18n.nodes.microsoft365.__shared.pin_size,
+      type: "number",
+      defaultValue: 0,
+    },
+  ],
+});
+
+registerStructType({
+  id: TEAM_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphTeam.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "displayName",
+      label: i18n.nodes.microsoft365.__shared.pin_display_name,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: CHANNEL_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphChannel.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "displayName",
+      label: i18n.nodes.microsoft365.__shared.pin_display_name,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "description",
+      label: i18n.nodes.microsoft365.__shared.pin_description,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: CHANNEL_MESSAGE_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphChannelMessage.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "from",
+      label: i18n.nodes.microsoft365.getMessage.pin_from,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "content",
+      label: i18n.nodes.microsoft365.__shared.pin_content,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "createdDateTime",
+      label: i18n.nodes.microsoft365.__shared.pin_created_date_time,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: CHAT_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphChat.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "topic",
+      label: i18n.nodes.microsoft365.__shared.pin_topic,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "chatType",
+      label: i18n.nodes.microsoft365.__shared.pin_chat_type,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: SITE_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphSite.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "name",
+      label: i18n.nodes.microsoft365.__shared.pin_name,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "webUrl",
+      label: i18n.nodes.microsoft365.__shared.pin_web_url,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: SITE_LIST_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphSiteList.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "name",
+      label: i18n.nodes.microsoft365.__shared.pin_name,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: LIST_ITEM_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphListItem.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "fieldsJson",
+      label: i18n.nodes.microsoft365.createListItem.pin_fields_json,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: WORKSHEET_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphWorksheet.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "name",
+      label: i18n.nodes.microsoft365.__shared.pin_name,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: TABLE_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphTable.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "name",
+      label: i18n.nodes.microsoft365.__shared.pin_name,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: PLANNER_PLAN_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphPlannerPlan.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "title",
+      label: i18n.nodes.microsoft365.__shared.pin_title,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: PLANNER_TASK_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphPlannerTask.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "title",
+      label: i18n.nodes.microsoft365.__shared.pin_title,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "percentComplete",
+      label: i18n.nodes.microsoft365.__shared.pin_percent_complete,
+      type: "number",
+      defaultValue: 0,
+    },
+  ],
+});
+
+registerStructType({
+  id: TODO_LIST_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphTodoList.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "displayName",
+      label: i18n.nodes.microsoft365.__shared.pin_display_name,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: TODO_TASK_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphTodoTask.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "title",
+      label: i18n.nodes.microsoft365.__shared.pin_title,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "status",
+      label: i18n.nodes.microsoft365.__shared.pin_status,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: CONTACT_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphContact.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "displayName",
+      label: i18n.nodes.microsoft365.__shared.pin_display_name,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "email",
+      label: i18n.nodes.microsoft365.__shared.pin_email,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: APPLICATION_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphApplication.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "displayName",
+      label: i18n.nodes.microsoft365.__shared.pin_display_name,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "appId",
+      label: i18n.nodes.microsoft365.__shared.pin_app_id,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: DIRECTORY_ROLE_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphDirectoryRole.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "displayName",
+      label: i18n.nodes.microsoft365.__shared.pin_display_name,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: TRENDING_DOCUMENT_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphTrendingDocument.label,
+  fields: [
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "name",
+      label: i18n.nodes.microsoft365.__shared.pin_name,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "webUrl",
+      label: i18n.nodes.microsoft365.__shared.pin_web_url,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
+
+registerStructType({
+  id: MESSAGE_DETAIL_STRUCT_TYPE,
+  label: i18n.nodes.microsoft365.graphMessageDetail.label,
+  fields: [
+    {
+      id: "subject",
+      label: i18n.nodes.microsoft365.__shared.pin_subject,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "from",
+      label: i18n.nodes.microsoft365.getMessage.pin_from,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "bodyContent",
+      label: i18n.nodes.microsoft365.getMessage.pin_body_content,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      id: "receivedDateTime",
+      label: i18n.nodes.microsoft365.getMessage.pin_received_date_time,
+      type: "string",
+      defaultValue: "",
+    },
+  ],
+});
 
 function credentialNamePin() {
   return {
@@ -126,7 +717,8 @@ registerNode({
     {
       id: "users",
       label: i18n.nodes.microsoft365.listUsers.pin_users,
-      type: "object",
+      type: "struct",
+      subType: USER_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -159,27 +751,10 @@ registerNode({
     execInOutPins().execOut,
     execInOutPins().success,
     {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "userPrincipalName",
-      label: i18n.nodes.microsoft365.__shared.pin_user_principal_name,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "mail",
-      label: i18n.nodes.microsoft365.__shared.pin_mail,
-      type: "string",
+      id: "user",
+      label: i18n.nodes.microsoft365.graphUser.label,
+      type: "struct",
+      subType: USER_STRUCT_TYPE,
       direction: "output",
     },
     execInOutPins().error,
@@ -192,16 +767,25 @@ registerNode({
         nextExec: "exec-out",
         outputs: {
           success: false,
-          id: "",
-          displayName: "",
-          userPrincipalName: "",
-          mail: "",
+          user: { id: "", displayName: "", userPrincipalName: "", mail: "" },
           error: resolved.error,
         },
       };
     }
     const result = await managerFor(resolved.data).getUser(String(inputs.userId ?? ""));
-    return { nextExec: "exec-out", outputs: result };
+    return {
+      nextExec: "exec-out",
+      outputs: {
+        success: result.success,
+        user: {
+          id: result.id,
+          displayName: result.displayName,
+          userPrincipalName: result.userPrincipalName,
+          mail: result.mail,
+        },
+        error: result.error,
+      },
+    };
   },
 });
 
@@ -357,7 +941,8 @@ registerNode({
     {
       id: "groups",
       label: i18n.nodes.microsoft365.listGroups.pin_groups,
-      type: "object",
+      type: "struct",
+      subType: GROUP_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -615,7 +1200,8 @@ registerNode({
     {
       id: "messages",
       label: i18n.nodes.microsoft365.listMessages.pin_messages,
-      type: "object",
+      type: "struct",
+      subType: MESSAGE_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -655,27 +1241,10 @@ registerNode({
     execInOutPins().execOut,
     execInOutPins().success,
     {
-      id: "subject",
-      label: i18n.nodes.microsoft365.__shared.pin_subject,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "from",
-      label: i18n.nodes.microsoft365.getMessage.pin_from,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "bodyContent",
-      label: i18n.nodes.microsoft365.getMessage.pin_body_content,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "receivedDateTime",
-      label: i18n.nodes.microsoft365.getMessage.pin_received_date_time,
-      type: "string",
+      id: "message",
+      label: i18n.nodes.microsoft365.graphMessageDetail.label,
+      type: "struct",
+      subType: MESSAGE_DETAIL_STRUCT_TYPE,
       direction: "output",
     },
     execInOutPins().error,
@@ -688,16 +1257,30 @@ registerNode({
         nextExec: "exec-out",
         outputs: {
           success: false,
-          subject: "",
-          from: "",
-          bodyContent: "",
-          receivedDateTime: "",
+          message: {
+            subject: "",
+            from: "",
+            bodyContent: "",
+            receivedDateTime: "",
+          },
           error: resolved.error,
         },
       };
     }
     const result = await managerFor(resolved.data).getMessage(String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
-    return { nextExec: "exec-out", outputs: result };
+    return {
+      nextExec: "exec-out",
+      outputs: {
+        success: result.success,
+        message: {
+          subject: result.subject,
+          from: result.from,
+          bodyContent: result.bodyContent,
+          receivedDateTime: result.receivedDateTime,
+        },
+        error: result.error,
+      },
+    };
   },
 });
 
@@ -758,7 +1341,8 @@ registerNode({
     {
       id: "events",
       label: i18n.nodes.microsoft365.listEvents.pin_events,
-      type: "object",
+      type: "struct",
+      subType: EVENT_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -920,7 +1504,8 @@ registerNode({
     {
       id: "items",
       label: i18n.nodes.microsoft365.listDriveItems.pin_items,
-      type: "object",
+      type: "struct",
+      subType: DRIVE_ITEM_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -1089,7 +1674,8 @@ registerNode({
     {
       id: "teams",
       label: i18n.nodes.microsoft365.listJoinedTeams.pin_teams,
-      type: "object",
+      type: "struct",
+      subType: TEAM_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -1244,7 +1830,8 @@ registerNode({
     {
       id: "channels",
       label: i18n.nodes.microsoft365.listChannels.pin_channels,
-      type: "object",
+      type: "struct",
+      subType: CHANNEL_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -1353,7 +1940,8 @@ registerNode({
     {
       id: "messages",
       label: i18n.nodes.microsoft365.listChannelMessages.pin_messages,
-      type: "object",
+      type: "struct",
+      subType: CHANNEL_MESSAGE_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -1388,7 +1976,8 @@ registerNode({
     {
       id: "chats",
       label: i18n.nodes.microsoft365.listChats.pin_chats,
-      type: "object",
+      type: "struct",
+      subType: CHAT_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -1470,7 +2059,8 @@ registerNode({
     {
       id: "sites",
       label: i18n.nodes.microsoft365.listSites.pin_sites,
-      type: "object",
+      type: "struct",
+      subType: SITE_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -1511,7 +2101,8 @@ registerNode({
     {
       id: "lists",
       label: i18n.nodes.microsoft365.listSiteLists.pin_lists,
-      type: "object",
+      type: "struct",
+      subType: SITE_LIST_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -1559,7 +2150,8 @@ registerNode({
     {
       id: "items",
       label: i18n.nodes.microsoft365.listListItems.pin_items,
-      type: "object",
+      type: "struct",
+      subType: LIST_ITEM_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -1851,7 +2443,8 @@ registerNode({
     {
       id: "items",
       label: i18n.nodes.microsoft365.listDriveItems.pin_items,
-      type: "object",
+      type: "struct",
+      subType: DRIVE_ITEM_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -1893,7 +2486,8 @@ registerNode({
     {
       id: "worksheets",
       label: i18n.nodes.microsoft365.listWorksheets.pin_worksheets,
-      type: "object",
+      type: "struct",
+      subType: WORKSHEET_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -2046,7 +2640,8 @@ registerNode({
     {
       id: "tables",
       label: i18n.nodes.microsoft365.listTables.pin_tables,
-      type: "object",
+      type: "struct",
+      subType: TABLE_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -2136,7 +2731,8 @@ registerNode({
     {
       id: "plans",
       label: i18n.nodes.microsoft365.listPlannerPlans.pin_plans,
-      type: "object",
+      type: "struct",
+      subType: PLANNER_PLAN_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -2231,7 +2827,8 @@ registerNode({
     {
       id: "tasks",
       label: i18n.nodes.microsoft365.listPlannerTasks.pin_tasks,
-      type: "object",
+      type: "struct",
+      subType: PLANNER_TASK_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -2266,7 +2863,8 @@ registerNode({
     {
       id: "lists",
       label: i18n.nodes.microsoft365.listTodoLists.pin_lists,
-      type: "object",
+      type: "struct",
+      subType: TODO_LIST_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -2356,7 +2954,8 @@ registerNode({
     {
       id: "tasks",
       label: i18n.nodes.microsoft365.listTodoTasks.pin_tasks,
-      type: "object",
+      type: "struct",
+      subType: TODO_TASK_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -2391,7 +2990,8 @@ registerNode({
     {
       id: "contacts",
       label: i18n.nodes.microsoft365.listContacts.pin_contacts,
-      type: "object",
+      type: "struct",
+      subType: CONTACT_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -2515,7 +3115,8 @@ registerNode({
     {
       id: "applications",
       label: i18n.nodes.microsoft365.listApplications.pin_applications,
-      type: "object",
+      type: "struct",
+      subType: APPLICATION_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -2549,7 +3150,8 @@ registerNode({
     {
       id: "roles",
       label: i18n.nodes.microsoft365.listDirectoryRoles.pin_roles,
-      type: "object",
+      type: "struct",
+      subType: DIRECTORY_ROLE_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
@@ -2714,7 +3316,8 @@ registerNode({
     {
       id: "documents",
       label: i18n.nodes.microsoft365.listTrendingDocuments.pin_documents,
-      type: "object",
+      type: "struct",
+      subType: TRENDING_DOCUMENT_STRUCT_TYPE,
       container: "array",
       direction: "output",
     },
