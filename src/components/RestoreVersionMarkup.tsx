@@ -50,18 +50,8 @@ export default function RestoreVersionMarkup({
             {flowName ? ` — ${flowName}` : ""}
           </span>
         </div>
-        <div className="toolbar-center">
-          <VersionRestorePanel
-            versions={versions}
-            selectedVersionId={selectedVersionId}
-            onSelectVersion={onSelectVersion}
-            onRestore={onRestore}
-            onCancel={onCancel}
-            loadingVersions={loadingVersions}
-            loadingGraph={loadingGraph}
-            restoring={restoring}
-          />
-        </div>
+
+        <VersionRestorePanel versions={versions} selectedVersionId={selectedVersionId} onSelectVersion={onSelectVersion} onRestore={onRestore} onCancel={onCancel} loadingVersions={loadingVersions} loadingGraph={loadingGraph} restoring={restoring} />
       </div>
       <div id="main-area">
         <div id="left-sidebar" className="side-panel">

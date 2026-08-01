@@ -28,7 +28,7 @@ export function VersionRestorePanel({
   const busy = loadingVersions || loadingGraph || restoring;
 
   return (
-    <div id="version-restore-controls" className="toolbar-button-group">
+    <div id="version-restore-controls" className="toolbar-center">
       {loadingVersions ? (
         <span className="page-empty-note">{i18n.pages.restore_flow_version.loading}</span>
       ) : versions.length === 0 ? (
