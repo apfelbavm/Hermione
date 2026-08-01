@@ -42,7 +42,7 @@ export default function RestoreVersionMarkup({
 
   return (
     <div id="app">
-      <PageHeader />
+      <PageHeader centerText={flowName ? `${i18n.pages.restore_flow_version.restore_prefix}${flowName}` : undefined} />
       <div id="toolbar">
         <div className="toolbar-left">
           <span id="toolbar-title">

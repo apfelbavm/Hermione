@@ -2,11 +2,12 @@ import type { ReactNode } from "react";
 import { ThemeToggle } from "./ThemeToggle";
 import { Sidebar } from "./Sidebar";
 
-export function PageHeader() {
+export function PageHeader({ centerText }: { centerText?: string } = {}) {
   return (
     <header className="page-top-header">
       <div className="page-top-header-inner">
         <span className="page-top-header-title">Hermione</span>
+        {centerText && <span className="page-top-header-center">{centerText} Flow</span>}
         <ThemeToggle />
       </div>
     </header>

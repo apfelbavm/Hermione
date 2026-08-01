@@ -26,11 +26,11 @@
   border-top: 1px solid var(--pp-border);
 }
 
-
 .page-top-header-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
   width: 100%;
   margin: 0 auto;
   padding: 0 32px;
@@ -160,6 +160,17 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--pp-text);
+}
+
+/* Absolutely centered so it stays in the middle of the bar regardless of the title's/toggle's
+ * widths on either side (see PageHeader.tsx's centerText prop). */
+.page-top-header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--pp-text-muted);
+  font-size: 26px;
+  font-weight: 600;
 }
 
 /* Color/shape (pill, bordered, gray) now comes entirely from the shared .btn/.btn-gray/.btn-pill

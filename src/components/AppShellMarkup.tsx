@@ -10,14 +10,14 @@ import { ScriptsPanel } from "./sidebar/ScriptsPanel";
 import { VariablePanel } from "./sidebar/VariablePanel";
 import { IconManager } from "../shared/iconManager";
 
-export default function AppShellMarkup({ store }: { store: Store }) {
+export default function AppShellMarkup({ store, flowName }: { store: Store; flowName: string }) {
   useStoreRevision(store);
 
   const activeFunction: FunctionDef | null = store.state.activeFunctionId ? (store.state.rootGraph.functions.find((f) => f.id === store.state.activeFunctionId) ?? null) : null;
 
   return (
     <div id="app">
-      <PageHeader />
+      <PageHeader centerText={flowName} />
       <div id="toolbar">
         <div className="toolbar-left">
           <button type="button" id="back-to-project-button" className="btn btn-ghost" title={i18n.components.app_shell_markup.back_title}>

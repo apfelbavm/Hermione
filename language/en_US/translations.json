@@ -87,6 +87,7 @@
     },
     "restore_flow_version": {
       "title": "Restore old version",
+      "restore_prefix": "Restore: ",
       "loading": "Loading versions…",
       "no_versions": "No older versions saved yet — use \"Save new version\" first.",
       "version_option": "Version {version} — {date}",

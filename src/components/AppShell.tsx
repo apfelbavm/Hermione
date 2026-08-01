@@ -102,6 +102,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
   const router = useRouter();
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [savingBeforeLeave, setSavingBeforeLeave] = useState(false);
+  const [flowName, setFlowName] = useState("");
   // Snapshot of the graph as last loaded/saved — compared against the current graph to decide
   // whether the back-to-project button needs to warn about unsaved changes (see onBackButtonClick).
   const lastSavedGraphJsonRef = useRef<string | null>(null);
@@ -142,6 +143,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         const { flow, graphJson } = await getFlowWithGraph(projectId, flowId);
         if (cancelledLoad) return;
         flowName = flow.name;
+        setFlowName(flow.name);
         store.state.rootGraph = graphJson ? deserializeGraph(graphJson) : buildDemoGraph();
         lastSavedGraphJsonRef.current = serializeGraph(store.state.rootGraph);
         history.reset();
@@ -922,7 +924,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
   return (
     <>
-      <AppShellMarkup store={store} />
+      <AppShellMarkup store={store} flowName={flowName} />
       {showUnsavedDialog && (
         <UnsavedChangesDialog
           saving={savingBeforeLeave}
