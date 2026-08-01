@@ -29,7 +29,6 @@ export default function GlobalLogsPage() {
     <PageShell>
       <Breadcrumbs items={[{ label: i18n.pages.logs.page_title }]} />
       <h1>{i18n.pages.logs.page_title}</h1>
-      <p className="page-empty-note">{i18n.pages.logs.title}</p>
       {runs.length === 0 ? (
         <p className="page-empty-note">{i18n.pages.logs.empty}</p>
       ) : (

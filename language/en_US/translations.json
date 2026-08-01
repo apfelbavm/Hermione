@@ -1,7 +1,6 @@
 {
   "pages": {
     "logs": {
-      "title": "Every run across every project.",
       "empty": "No runs yet",
       "page_title": "Logs"
     },
@@ -13,7 +12,7 @@
     },
     "emulate": {
       "loading_editor": "Loading editor…",
-      "empty_note": "Runs a Flow's deployed compiled output directly on this machine — the same snapshot the editor's \"Deploy\" button last persisted — instead of the editor's interpreted Simulate.",
+      "empty_note": "Run the last successfully compiled and deployed Flow directly on this machine",
       "loading_project": "Loading projects…",
       "no_projects": "No projects yet.",
       "loading_deployed_flows": "Loading deployed Flows…",
