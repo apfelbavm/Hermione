@@ -518,6 +518,17 @@ function openGroupedPicker<T>(screenPos: { x: number; y: number }, entries: T[],
   document.body.appendChild(menu);
   render();
   search.focus();
+
+  // Clamp into the viewport (this menu is `position: fixed` on document.body, so screenPos is
+  // already viewport-relative) now that it has a real, laid-out size to measure — only pulls it
+  // INWARD from whichever edge(s) it would overflow, never repositions it away from the cursor
+  // otherwise.
+  const menuRect = menu.getBoundingClientRect();
+  const maxLeft = Math.max(0, window.innerWidth - menuRect.width);
+  const maxTop = Math.max(0, window.innerHeight - menuRect.height);
+  menu.style.left = `${Math.min(screenPos.x, maxLeft)}px`;
+  menu.style.top = `${Math.min(screenPos.y, maxTop)}px`;
+
   setTimeout(() => document.addEventListener("mousedown", onOutside, true), 0);
 }
 
