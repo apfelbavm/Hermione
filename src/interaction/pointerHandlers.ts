@@ -290,6 +290,15 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
   canvas.addEventListener("dragstart", (e) => e.preventDefault());
 
   canvas.addEventListener("mousedown", (e) => {
+    if (e.button === 2) {
+      // Right-drag pans the camera; a right-click with no drag still opens the context menu
+      // (see shouldSuppressContextMenu, consumed by main.ts's "contextmenu" listener). Left
+      // available during a Simulate run too — it only moves the camera, never the locked graph.
+      rightDragMoved = false;
+      drag = { kind: "pan", lastX: e.clientX, lastY: e.clientY };
+      return;
+    }
+
     if (store.state.simulating) return; // graph is locked for the duration of a Simulate run
 
     // Any click inside the graph view — regardless of what it hits — stands down whatever
@@ -307,13 +316,6 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
     // clear signal focus has moved to the graph, so clear it here.
     window.getSelection()?.removeAllRanges();
 
-    if (e.button === 2) {
-      // Right-drag pans the camera; a right-click with no drag still opens the context menu
-      // (see shouldSuppressContextMenu, consumed by main.ts's "contextmenu" listener).
-      rightDragMoved = false;
-      drag = { kind: "pan", lastX: e.clientX, lastY: e.clientY };
-      return;
-    }
     if (e.button !== 0) return; // ignore middle-click etc.
 
     const graph = getEditingGraph(store.state);
@@ -776,7 +778,7 @@ export function setupPointerInteraction(canvas: HTMLCanvasElement, store: Store,
     "wheel",
     (e) => {
       e.preventDefault();
-      if (store.state.simulating) return;
+      // Zooming, like panning, only moves the camera — allowed during a Simulate run.
       const rect = canvas.getBoundingClientRect();
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
       store.state.camera.zoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
