@@ -1,6 +1,8 @@
 import * as oauth from "oauth4webapi";
 import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { enumOptionIds } from "../engine/enumRegistry";
+import { OAUTH2_SEND_AS_ENUM_TYPE } from "../enum/oauth2ClientCredentials";
 import { i18n } from "@i18n";
 
 // OAuth2 Client Credentials (RFC 6749 §4.4) — the standard app-only / service-to-service grant:
@@ -11,8 +13,6 @@ import { i18n } from "@i18n";
 // this node only supports what that library supports: a plain token endpoint URL (no
 // provider-specific endpoint derivation) and either of the two client-secret-based authentication
 // methods it exposes a ready-made helper for, ClientSecretBasic and ClientSecretPost.
-
-const SEND_AS_OPTIONS = ["body", "basicAuthHeader"];
 
 registerNode({
   type: "auth.oauth2ClientCredentials",
@@ -26,7 +26,7 @@ registerNode({
     { id: "clientId", label: i18n.nodes.auth.oauth2ClientCredentials.pin_client_id, type: "string", direction: "input", defaultValue: "" },
     { id: "clientSecret", label: i18n.nodes.auth.oauth2ClientCredentials.pin_client_secret, type: "string", direction: "input", defaultValue: "" },
     { id: "scope", label: i18n.nodes.auth.oauth2ClientCredentials.pin_scope, type: "string", direction: "input", defaultValue: "" },
-    { id: "sendAs", label: i18n.nodes.auth.oauth2ClientCredentials.pin_send_as, type: "string", direction: "input", defaultValue: SEND_AS_OPTIONS[0], options: SEND_AS_OPTIONS },
+    { id: "sendAs", label: i18n.nodes.auth.oauth2ClientCredentials.pin_send_as, type: "enum", subType: OAUTH2_SEND_AS_ENUM_TYPE, direction: "input", defaultValue: "body", options: enumOptionIds(OAUTH2_SEND_AS_ENUM_TYPE) },
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "auth", label: i18n.nodes.__shared.pin_auth, type: "object", direction: "output" },
@@ -41,7 +41,7 @@ registerNode({
     const clientId = String(inputs.clientId ?? "");
     const clientSecret = String(inputs.clientSecret ?? "");
     const scope = String(inputs.scope ?? "").trim();
-    const sendAs = String(inputs.sendAs ?? SEND_AS_OPTIONS[0]);
+    const sendAs = String(inputs.sendAs ?? "body");
 
     // issuer/token_endpoint both point at the same URL: this node talks straight to a known token
     // endpoint rather than performing full OIDC discovery, so there's no separate issuer identity

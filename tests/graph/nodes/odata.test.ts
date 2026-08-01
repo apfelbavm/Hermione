@@ -36,7 +36,7 @@ describe("odata.v2Request", () => {
   it("exposes Pagination Type as a string pin matching the Integration Suite's own paging modes", () => {
     const def = getNodeDef("odata.v2Request");
     const pin = def.pins.find((p) => p.id === "paginationType")!;
-    expect(pin.type).toBe("string");
+    expect(pin.type).toBe("enum");
     expect(pin.options).toEqual(["Client", "Server"]);
   });
 

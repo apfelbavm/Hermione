@@ -3,7 +3,10 @@ import { registerNode } from "../engine/registry";
 import { AzureStorageManager } from "../../lib/azureStorageManager";
 import type { AzureStorageBlobUploadOptions } from "../../lib/azureStorageManager";
 import type { AzureStorageConnectionStringCredentialData } from "../../credentials/types";
-import { TIER_OPTIONS, UPLOAD_OPTIONS_STRUCT_TYPE, CONTAINER_PROPERTIES_STRUCT_TYPE, BLOB_PROPERTIES_STRUCT_TYPE, ACCOUNT_INFO_STRUCT_TYPE } from "../structs/azureStorage";
+import { UPLOAD_OPTIONS_STRUCT_TYPE, CONTAINER_PROPERTIES_STRUCT_TYPE, BLOB_PROPERTIES_STRUCT_TYPE, ACCOUNT_INFO_STRUCT_TYPE } from "../structs/azureStorage";
+import { AZURE_STORAGE_CONTAINER_ACCESS_ENUM_TYPE } from "../enum/azureStorage";
+import { TEXT_ENCODING_ENUM_TYPE } from "../enum/common";
+import { enumOptionIds } from "../engine/enumRegistry";
 import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over AzureStorageManager (src/lib/azureStorageManager.ts),
@@ -15,8 +18,6 @@ import { i18n } from "@i18n";
 // resolves the named vault entry and hands its connection string to AzureStorageManager.forCredential,
 // which caches the underlying BlobServiceClient — see azureStorageManager.ts.
 
-const ENCODING_OPTIONS = ["utf8", "base64"];
-const ACCESS_OPTIONS = ["private", "blob", "container"];
 const GROUP_NAME = "Request.AzureStorage";
 
 interface MapEntry {
@@ -179,7 +180,15 @@ registerNode({
   description: i18n.nodes.azureStorage.createContainer.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), { id: "access", label: i18n.nodes.azureStorage.createContainer.pin_access, type: "string", direction: "input", defaultValue: ACCESS_OPTIONS[0], options: ACCESS_OPTIONS }, execOutPin(), successPin(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    containerNamePin(),
+    { id: "access", label: i18n.nodes.azureStorage.createContainer.pin_access, type: "enum", subType: AZURE_STORAGE_CONTAINER_ACCESS_ENUM_TYPE, direction: "input", defaultValue: "private", options: enumOptionIds(AZURE_STORAGE_CONTAINER_ACCESS_ENUM_TYPE) },
+    execOutPin(),
+    successPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs, ctx }) => {
     const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
@@ -317,7 +326,7 @@ registerNode({
     containerNamePin(),
     blobNamePin(),
     { id: "content", label: i18n.nodes.azureStorage.uploadBlob.pin_content, type: "string", direction: "input", defaultValue: "" },
-    { id: "encoding", label: i18n.nodes.azureStorage.__shared.pin_encoding, type: "string", direction: "input", defaultValue: ENCODING_OPTIONS[0], options: ENCODING_OPTIONS },
+    { id: "encoding", label: i18n.nodes.azureStorage.__shared.pin_encoding, type: "enum", subType: TEXT_ENCODING_ENUM_TYPE, direction: "input", defaultValue: "utf8", options: enumOptionIds(TEXT_ENCODING_ENUM_TYPE) },
     {
       id: "options",
       label: i18n.nodes.azureStorage.uploadOptions.label,
@@ -330,7 +339,7 @@ registerNode({
         contentEncoding: "",
         contentLanguage: "",
         contentDisposition: "",
-        tier: TIER_OPTIONS[0],
+        tier: "",
         metadata: [],
       },
     },
@@ -373,7 +382,7 @@ registerNode({
     credentialNamePin(),
     containerNamePin(),
     blobNamePin(),
-    { id: "encoding", label: i18n.nodes.azureStorage.__shared.pin_encoding, type: "string", direction: "input", defaultValue: ENCODING_OPTIONS[0], options: ENCODING_OPTIONS },
+    { id: "encoding", label: i18n.nodes.azureStorage.__shared.pin_encoding, type: "enum", subType: TEXT_ENCODING_ENUM_TYPE, direction: "input", defaultValue: "utf8", options: enumOptionIds(TEXT_ENCODING_ENUM_TYPE) },
     execOutPin(),
     successPin(),
     { id: "content", label: i18n.nodes.azureStorage.downloadBlob.pin_content, type: "string", direction: "output" },

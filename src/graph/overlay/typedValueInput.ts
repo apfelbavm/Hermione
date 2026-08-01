@@ -63,12 +63,26 @@ function createTypeDot(type: PinType): HTMLSpanElement {
  * used to be in full before container support existed. Reused both for a "single" container value
  * and for each row's own per-element/per-key/per-value editor inside a list (see
  * createContainerListInput). */
-function createScalarInput(type: PinType, value: unknown, onChange: (value: unknown) => void): HTMLElement {
+function createScalarInput(type: PinType, value: unknown, onChange: (value: unknown) => void, subType?: string): HTMLElement {
   if (type === "object" || type === "exec" || type === "struct") {
     const span = document.createElement("span");
     span.className = "typed-value-placeholder";
     span.textContent = "—";
     return span;
+  }
+
+  if (type === "enum" && subType) {
+    const select = document.createElement("select");
+    select.className = "typed-value-input";
+    for (const enumValue of tryGetEnumTypeDef(subType)?.values ?? []) {
+      const option = document.createElement("option");
+      option.value = enumValue.id;
+      option.textContent = enumValue.label;
+      select.appendChild(option);
+    }
+    select.value = value == null ? "" : String(value);
+    select.addEventListener("change", () => onChange(select.value));
+    return select;
   }
 
   const input = document.createElement("input");
@@ -130,7 +144,7 @@ function createScalarInput(type: PinType, value: unknown, onChange: (value: unkn
  * "+ Add" row. Backing storage is always a plain array (Array<T> -> T[], Set<T> -> T[] deduped on
  * every edit, Map<K,V> -> {key,value}[]) — see the plan's rationale for why real Map/Set instances
  * are never used (they don't survive JSON.stringify, breaking save/load). */
-function createContainerListInput(type: PinType, value: unknown, onChange: (value: unknown) => void, container: PinContainer, keyType: PinType): HTMLElement {
+function createContainerListInput(type: PinType, value: unknown, onChange: (value: unknown) => void, container: PinContainer, keyType: PinType, subType?: string): HTMLElement {
   const list = document.createElement("div");
   list.className = "typed-value-list";
   const entries: unknown[] = Array.isArray(value) ? value.slice() : [];
@@ -174,23 +188,33 @@ function createContainerListInput(type: PinType, value: unknown, onChange: (valu
           entries[index] = { key: k, value: currentEntry().value };
           commit();
         });
-        const valueInput = createScalarInput(type, entryObj.value, (v) => {
-          entries[index] = { key: currentEntry().key, value: v };
-          commit();
-        });
+        const valueInput = createScalarInput(
+          type,
+          entryObj.value,
+          (v) => {
+            entries[index] = { key: currentEntry().key, value: v };
+            commit();
+          },
+          subType,
+        );
         // Value field first, then Key field — matches the Details panel's own header row order
         // for a map variable (Type/value-type select, then Container, then Key Type select last),
         // so the entry list reads left-to-right consistently with the controls above it.
         row.append(valueInput, keyInput);
       } else {
-        const elInput = createScalarInput(type, entry, (v) => {
-          entries[index] = v;
-          commit();
-          if (container === "set") {
-            dedupeInPlace();
-            renderRows();
-          }
-        });
+        const elInput = createScalarInput(
+          type,
+          entry,
+          (v) => {
+            entries[index] = v;
+            commit();
+            if (container === "set") {
+              dedupeInPlace();
+              renderRows();
+            }
+          },
+          subType,
+        );
         row.append(elInput);
       }
 
@@ -238,11 +262,11 @@ function createContainerListInput(type: PinType, value: unknown, onChange: (valu
  * not per-keystroke, so a live re-render triggered elsewhere never yanks focus mid-edit. When
  * `container` is not "single", renders an expandable list editor instead (see
  * createContainerListInput) — `keyType` is only meaningful (and required in practice) for "map". */
-export function createTypedValueInput(type: PinType, value: unknown, onChange: (value: unknown) => void, container: PinContainer = "single", keyType: PinType = "string"): HTMLElement {
+export function createTypedValueInput(type: PinType, value: unknown, onChange: (value: unknown) => void, container: PinContainer = "single", keyType: PinType = "string", subType?: string): HTMLElement {
   if (container !== "single") {
-    return createContainerListInput(type, value, onChange, container, keyType);
+    return createContainerListInput(type, value, onChange, container, keyType, subType);
   }
-  return createScalarInput(type, value, onChange);
+  return createScalarInput(type, value, onChange, subType);
 }
 
 /** A tiny floating menu of `options`, each row built by `renderItem` — shared open/close/outside-

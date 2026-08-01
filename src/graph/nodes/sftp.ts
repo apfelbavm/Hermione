@@ -1,8 +1,11 @@
 import { registerNode } from "../engine/registry";
 import { compileResultVar } from "../engine/compileUtils";
+import { enumOptionIds } from "../engine/enumRegistry";
+import { SFTP_EXISTING_FILE_MODE_ENUM_TYPE } from "../enum/sftp";
+import { TEXT_ENCODING_ENUM_TYPE } from "../enum/common";
 import { i18n } from "@i18n";
 
-const EXISTING_FILE_MODES = ["Overwrite", "Append", "Fail", "Ignore"];
+const EXISTING_FILE_MODES = enumOptionIds(SFTP_EXISTING_FILE_MODE_ENUM_TYPE);
 
 // Uploads a file to an SFTP server — a real TCP/SSH connection, which a browser tab has no API for
 // at all (no raw sockets, no SSH), unlike http.request (`fetch`) or the XML/CSV nodes (pure JS
@@ -106,9 +109,9 @@ registerNode({
     { id: "passphrase", label: i18n.nodes.sftp.upload.pin_passphrase, type: "string", direction: "input", defaultValue: "" },
     { id: "filePath", label: i18n.nodes.sftp.upload.pin_file_path, type: "string", direction: "input", defaultValue: "" },
     { id: "content", label: i18n.nodes.sftp.upload.pin_content, type: "string", direction: "input", defaultValue: "" },
-    { id: "encoding", label: i18n.nodes.sftp.upload.pin_encoding, type: "string", direction: "input", defaultValue: "utf8", options: ["utf8", "base64"] },
+    { id: "encoding", label: i18n.nodes.sftp.upload.pin_encoding, type: "enum", subType: TEXT_ENCODING_ENUM_TYPE, direction: "input", defaultValue: "utf8", options: enumOptionIds(TEXT_ENCODING_ENUM_TYPE) },
     { id: "createDirectory", label: i18n.nodes.sftp.upload.pin_create_directory, type: "boolean", direction: "input", defaultValue: true },
-    { id: "existingFileMode", label: i18n.nodes.sftp.upload.pin_existing_file, type: "string", direction: "input", defaultValue: EXISTING_FILE_MODES[0], options: EXISTING_FILE_MODES },
+    { id: "existingFileMode", label: i18n.nodes.sftp.upload.pin_existing_file, type: "enum", subType: SFTP_EXISTING_FILE_MODE_ENUM_TYPE, direction: "input", defaultValue: EXISTING_FILE_MODES[0], options: EXISTING_FILE_MODES },
     { id: "preventDirectoryTraversal", label: i18n.nodes.sftp.upload.pin_prevent_traversal, type: "boolean", direction: "input", defaultValue: true },
     { id: "maxReconnectAttempts", label: i18n.nodes.sftp.upload.pin_max_reconnect, type: "number", direction: "input", defaultValue: 3, integer: true },
     { id: "reconnectDelayMs", label: i18n.nodes.sftp.upload.pin_reconnect_delay, type: "number", direction: "input", defaultValue: 1000, integer: true },

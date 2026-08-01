@@ -1,7 +1,8 @@
 import { registerStructType } from "../engine/structRegistry";
+import { AZURE_STORAGE_BLOB_TIER_ENUM_TYPE } from "../enum/azureStorage";
+import { enumOptionIds } from "../engine/enumRegistry";
 import { i18n } from "@i18n";
 
-export const TIER_OPTIONS = ["", "Hot", "Cool", "Cold", "Archive"];
 export const UPLOAD_OPTIONS_STRUCT_TYPE = "azureStorageBlobUploadOptions";
 export const CONTAINER_PROPERTIES_STRUCT_TYPE = "azureStorageContainerProperties";
 export const BLOB_PROPERTIES_STRUCT_TYPE = "azureStorageBlobProperties";
@@ -17,7 +18,7 @@ registerStructType({
     { id: "contentEncoding", label: i18n.nodes.azureStorage.uploadOptions.pin_content_encoding, type: "string", defaultValue: "" },
     { id: "contentLanguage", label: i18n.nodes.azureStorage.uploadOptions.pin_content_language, type: "string", defaultValue: "" },
     { id: "contentDisposition", label: i18n.nodes.azureStorage.uploadOptions.pin_content_disposition, type: "string", defaultValue: "" },
-    { id: "tier", label: i18n.nodes.azureStorage.uploadOptions.pin_tier, type: "string", defaultValue: TIER_OPTIONS[0], options: TIER_OPTIONS },
+    { id: "tier", label: i18n.nodes.azureStorage.uploadOptions.pin_tier, type: "enum", subType: AZURE_STORAGE_BLOB_TIER_ENUM_TYPE, defaultValue: "", options: enumOptionIds(AZURE_STORAGE_BLOB_TIER_ENUM_TYPE) },
     { id: "metadata", label: i18n.nodes.azureStorage.__shared.pin_metadata, type: "string", container: "map", keyType: "string", defaultValue: [] },
   ],
 });

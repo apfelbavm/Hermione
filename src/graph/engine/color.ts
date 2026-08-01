@@ -54,11 +54,11 @@ export const Colors = {
     return {
       exec: surface().textPrimary,
       boolean: "#a5322f",
-      number: "#3b8a5c",
+      number: "#67c556",
       string: "#c542a0",
       object: "#4f9bd6",
       date: "#d6a23b",
-      enum: "#1f6b45",
+      enum: "#1c5f3e",
       struct: "#142f9c",
     };
   },

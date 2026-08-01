@@ -1,8 +1,8 @@
 import { registerNode } from "../engine/registry";
 import { compileResultVar } from "../engine/compileUtils";
+import { enumOptionIds } from "../engine/enumRegistry";
+import { HTTP_METHOD_ENUM_TYPE } from "../enum/common";
 import { i18n } from "@i18n";
-
-const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
 const HTTP_REQUEST_EXECUTE_SOURCE = `
 async function httpRequestExecute(url, rawMethod, headersJson, auth, body, rawTimeoutMs) {
@@ -75,7 +75,7 @@ registerNode({
   group: "Request",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "method", label: i18n.nodes.http.request.pin_method, type: "string", direction: "input", defaultValue: "GET", options: HTTP_METHODS },
+    { id: "method", label: i18n.nodes.http.request.pin_method, type: "enum", subType: HTTP_METHOD_ENUM_TYPE, direction: "input", defaultValue: "GET", options: enumOptionIds(HTTP_METHOD_ENUM_TYPE) },
     { id: "url", label: i18n.nodes.http.request.pin_url, type: "string", direction: "input", defaultValue: "" },
     { id: "headers", label: i18n.nodes.http.request.pin_headers, type: "string", direction: "input", defaultValue: "{}" },
     { id: "auth", label: i18n.nodes.__shared.pin_auth, type: "object", direction: "input", defaultValue: null },

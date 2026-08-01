@@ -27,6 +27,9 @@ import {
   TRENDING_DOCUMENT_STRUCT_TYPE,
   MESSAGE_DETAIL_STRUCT_TYPE,
 } from "../structs/microsoft365";
+import { MICROSOFT365_BODY_TYPE_ENUM_TYPE, MICROSOFT365_SHARING_LINK_TYPE_ENUM_TYPE, MICROSOFT365_SHARING_LINK_SCOPE_ENUM_TYPE, MICROSOFT365_HTTP_METHOD_ENUM_TYPE } from "../enum/microsoft365";
+import { TEXT_ENCODING_ENUM_TYPE } from "../enum/common";
+import { enumOptionIds } from "../engine/enumRegistry";
 import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over GraphManager (src/lib/graphManager.ts),
@@ -46,9 +49,6 @@ const GROUP_NAME_SHAREPOINT = "Request.Microsoft365 SharePoint";
 const GROUP_NAME_EXCEL = "Request.Microsoft365 Excel";
 const GROUP_NAME_TASKS = "Request.Microsoft365 Tasks";
 const GROUP_NAME_ADMIN = "Request.Microsoft365 Admin";
-const BODY_TYPE_OPTIONS = ["text", "html"];
-const SHARING_LINK_TYPE_OPTIONS = ["view", "edit"];
-const SHARING_LINK_SCOPE_OPTIONS = ["anonymous", "organization"];
 
 function credentialNamePin() {
   return {
@@ -383,7 +383,7 @@ registerNode({
     { id: "to", label: i18n.nodes.microsoft365.sendMail.pin_to, type: "string", container: "array", direction: "input", defaultValue: [] },
     { id: "subject", label: i18n.nodes.microsoft365.__shared.pin_subject, type: "string", direction: "input", defaultValue: "" },
     { id: "body", label: i18n.nodes.microsoft365.__shared.pin_body, type: "string", direction: "input", defaultValue: "" },
-    { id: "bodyType", label: i18n.nodes.microsoft365.__shared.pin_body_type, type: "string", direction: "input", defaultValue: BODY_TYPE_OPTIONS[0], options: BODY_TYPE_OPTIONS },
+    { id: "bodyType", label: i18n.nodes.microsoft365.__shared.pin_body_type, type: "enum", subType: MICROSOFT365_BODY_TYPE_ENUM_TYPE, direction: "input", defaultValue: "text", options: enumOptionIds(MICROSOFT365_BODY_TYPE_ENUM_TYPE) },
     { id: "saveToSentItems", label: i18n.nodes.microsoft365.sendMail.pin_save_to_sent_items, type: "boolean", direction: "input", defaultValue: true },
     execInOutPins().execOut,
     execInOutPins().success,
@@ -641,7 +641,7 @@ registerNode({
     credentialNamePin(),
     userIdPin(),
     { id: "filePath", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
-    { id: "encoding", label: i18n.nodes.microsoft365.__shared.pin_encoding, type: "string", direction: "input", defaultValue: "utf8", options: ["utf8", "base64"] },
+    { id: "encoding", label: i18n.nodes.microsoft365.__shared.pin_encoding, type: "enum", subType: TEXT_ENCODING_ENUM_TYPE, direction: "input", defaultValue: "utf8", options: enumOptionIds(TEXT_ENCODING_ENUM_TYPE) },
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "content", label: i18n.nodes.microsoft365.__shared.pin_content, type: "string", direction: "output" },
@@ -673,7 +673,7 @@ registerNode({
     userIdPin(),
     { id: "filePath", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "content", label: i18n.nodes.microsoft365.__shared.pin_content, type: "string", direction: "input", defaultValue: "" },
-    { id: "encoding", label: i18n.nodes.microsoft365.__shared.pin_encoding, type: "string", direction: "input", defaultValue: "utf8", options: ["utf8", "base64"] },
+    { id: "encoding", label: i18n.nodes.microsoft365.__shared.pin_encoding, type: "enum", subType: TEXT_ENCODING_ENUM_TYPE, direction: "input", defaultValue: "utf8", options: enumOptionIds(TEXT_ENCODING_ENUM_TYPE) },
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
@@ -773,7 +773,7 @@ registerNode({
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
-    { id: "method", label: i18n.nodes.microsoft365.request.pin_method, type: "string", direction: "input", defaultValue: "GET", options: ["GET", "POST", "PATCH", "PUT", "DELETE"] },
+    { id: "method", label: i18n.nodes.microsoft365.request.pin_method, type: "enum", subType: MICROSOFT365_HTTP_METHOD_ENUM_TYPE, direction: "input", defaultValue: "GET", options: enumOptionIds(MICROSOFT365_HTTP_METHOD_ENUM_TYPE) },
     { id: "path", label: i18n.nodes.microsoft365.request.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "bodyJson", label: i18n.nodes.microsoft365.request.pin_body_json, type: "string", direction: "input", defaultValue: "" },
     execInOutPins().execOut,
@@ -1169,8 +1169,8 @@ registerNode({
     credentialNamePin(),
     userIdPin(),
     { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
-    { id: "type", label: i18n.nodes.microsoft365.createSharingLink.pin_type, type: "string", direction: "input", defaultValue: SHARING_LINK_TYPE_OPTIONS[0], options: SHARING_LINK_TYPE_OPTIONS },
-    { id: "scope", label: i18n.nodes.microsoft365.createSharingLink.pin_scope, type: "string", direction: "input", defaultValue: SHARING_LINK_SCOPE_OPTIONS[1], options: SHARING_LINK_SCOPE_OPTIONS },
+    { id: "type", label: i18n.nodes.microsoft365.createSharingLink.pin_type, type: "enum", subType: MICROSOFT365_SHARING_LINK_TYPE_ENUM_TYPE, direction: "input", defaultValue: "view", options: enumOptionIds(MICROSOFT365_SHARING_LINK_TYPE_ENUM_TYPE) },
+    { id: "scope", label: i18n.nodes.microsoft365.createSharingLink.pin_scope, type: "enum", subType: MICROSOFT365_SHARING_LINK_SCOPE_ENUM_TYPE, direction: "input", defaultValue: "organization", options: enumOptionIds(MICROSOFT365_SHARING_LINK_SCOPE_ENUM_TYPE) },
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "link", label: i18n.nodes.microsoft365.createSharingLink.pin_link, type: "string", direction: "output" },

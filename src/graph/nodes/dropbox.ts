@@ -3,12 +3,11 @@ import { registerNode } from "../engine/registry";
 import { DropboxManager } from "../../lib/dropboxManager";
 import type { DropboxOAuth2CredentialData } from "../../credentials/types";
 import { AUTH_TOKENS_STRUCT_TYPE, METADATA_STRUCT_TYPE, REVISION_STRUCT_TYPE, ACCOUNT_STRUCT_TYPE, SPACE_USAGE_STRUCT_TYPE } from "../structs/dropbox";
+import { DROPBOX_WRITE_MODE_ENUM_TYPE, DROPBOX_ACCESS_LEVEL_ENUM_TYPE } from "../enum/dropbox";
+import { TEXT_ENCODING_ENUM_TYPE } from "../enum/common";
+import { enumOptionIds } from "../engine/enumRegistry";
 import { i18n } from "@i18n";
 
-const ACCESS_LEVEL_OPTIONS = ["editor", "viewer"];
-
-const ENCODING_OPTIONS = ["utf8", "base64"];
-const WRITE_MODE_OPTIONS = ["add", "overwrite"];
 const GROUP_NAME = "Request.Dropbox";
 
 function credentialNamePin() {
@@ -90,8 +89,8 @@ registerNode({
     credentialNamePin(),
     { id: "path", label: i18n.nodes.dropbox.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "content", label: i18n.nodes.dropbox.upload.pin_content, type: "string", direction: "input", defaultValue: "" },
-    { id: "encoding", label: i18n.nodes.dropbox.__shared.pin_encoding, type: "string", direction: "input", defaultValue: ENCODING_OPTIONS[0], options: ENCODING_OPTIONS },
-    { id: "mode", label: i18n.nodes.dropbox.upload.pin_mode, type: "string", direction: "input", defaultValue: WRITE_MODE_OPTIONS[0], options: WRITE_MODE_OPTIONS },
+    { id: "encoding", label: i18n.nodes.dropbox.__shared.pin_encoding, type: "enum", subType: TEXT_ENCODING_ENUM_TYPE, direction: "input", defaultValue: "utf8", options: enumOptionIds(TEXT_ENCODING_ENUM_TYPE) },
+    { id: "mode", label: i18n.nodes.dropbox.upload.pin_mode, type: "enum", subType: DROPBOX_WRITE_MODE_ENUM_TYPE, direction: "input", defaultValue: "add", options: enumOptionIds(DROPBOX_WRITE_MODE_ENUM_TYPE) },
     { id: "autorename", label: i18n.nodes.dropbox.__shared.pin_autorename, type: "boolean", direction: "input", defaultValue: false },
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
@@ -121,7 +120,7 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "path", label: i18n.nodes.dropbox.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
-    { id: "encoding", label: i18n.nodes.dropbox.__shared.pin_encoding, type: "string", direction: "input", defaultValue: ENCODING_OPTIONS[0], options: ENCODING_OPTIONS },
+    { id: "encoding", label: i18n.nodes.dropbox.__shared.pin_encoding, type: "enum", subType: TEXT_ENCODING_ENUM_TYPE, direction: "input", defaultValue: "utf8", options: enumOptionIds(TEXT_ENCODING_ENUM_TYPE) },
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "content", label: i18n.nodes.dropbox.download.pin_content, type: "string", direction: "output" },
@@ -652,7 +651,7 @@ registerNode({
     credentialNamePin(),
     { id: "sharedFolderId", label: i18n.nodes.dropbox.shareFolder.pin_shared_folder_id, type: "string", direction: "input", defaultValue: "" },
     { id: "email", label: i18n.nodes.dropbox.addFolderMember.pin_email, type: "string", direction: "input", defaultValue: "" },
-    { id: "accessLevel", label: i18n.nodes.dropbox.addFolderMember.pin_access_level, type: "string", direction: "input", defaultValue: ACCESS_LEVEL_OPTIONS[0], options: ACCESS_LEVEL_OPTIONS },
+    { id: "accessLevel", label: i18n.nodes.dropbox.addFolderMember.pin_access_level, type: "enum", subType: DROPBOX_ACCESS_LEVEL_ENUM_TYPE, direction: "input", defaultValue: "editor", options: enumOptionIds(DROPBOX_ACCESS_LEVEL_ENUM_TYPE) },
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
@@ -666,7 +665,7 @@ registerNode({
         outputs: { success: false, error: resolved.error },
       };
     const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.addFolderMember(String(inputs.sharedFolderId ?? ""), String(inputs.email ?? ""), String(inputs.accessLevel ?? ACCESS_LEVEL_OPTIONS[0]));
+    const result = await manager.addFolderMember(String(inputs.sharedFolderId ?? ""), String(inputs.email ?? ""), String(inputs.accessLevel ?? "editor"));
     return { nextExec: "exec-out", outputs: result };
   },
 });

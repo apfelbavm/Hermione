@@ -5,6 +5,8 @@ import { registerNode } from "../engine/registry";
 import { NodeColorCategory } from "../engine/types";
 import type { LogFormat } from "../engine/types";
 import { XML_BUILDER_IMPORT_LINE, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, XML_PRETTY_BUILD_OPTIONS_LITERAL } from "./dataFormatHelpers";
+import { enumOptionIds } from "../engine/enumRegistry";
+import { DEBUG_LOG_FORMAT_ENUM_TYPE } from "../enum/debug";
 import { i18n } from "@i18n";
 
 registerNode({
@@ -25,7 +27,7 @@ registerNode({
   compileExecute: ({ inputs, compileFrom }) => [`rt.log(String(${inputs.message}));`, ...compileFrom("exec-out")],
 });
 
-const FORMATS = ["json", "xml", "csv"];
+const FORMATS = enumOptionIds(DEBUG_LOG_FORMAT_ENUM_TYPE);
 
 const FORMAT_FOR_LOG_SOURCE = `
 function formatCsvTable(csv) {
@@ -63,7 +65,7 @@ registerNode({
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "message", label: i18n.nodes.debug.printFormatted.pin_message, type: "string", direction: "input", defaultValue: "" },
-    { id: "format", label: i18n.nodes.debug.printFormatted.pin_format, type: "string", direction: "input", defaultValue: FORMATS[0], options: FORMATS },
+    { id: "format", label: i18n.nodes.debug.printFormatted.pin_format, type: "enum", subType: DEBUG_LOG_FORMAT_ENUM_TYPE, direction: "input", defaultValue: FORMATS[0], options: FORMATS },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
   execute: ({ inputs, ctx }) => {

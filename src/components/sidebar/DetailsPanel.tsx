@@ -81,6 +81,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
                 },
                 variable.container ?? "single",
                 variable.keyType ?? "string",
+                variable.subType,
               )
             }
             deps={[variable.id, variable.type, variable.container, variable.keyType, variable.defaultValue]}
@@ -173,10 +174,17 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
             <span className="variable-name">{prop.label}</span>
             <ImperativeMount
               build={() =>
-                createTypedValueInput(prop.type, node.pins[prop.id]?.value, (newValue) => {
-                  setPinLiteralValue(getEditingGraph(store.state), node.id, prop.id, newValue);
-                  store.notify();
-                })
+                createTypedValueInput(
+                  prop.type,
+                  node.pins[prop.id]?.value,
+                  (newValue) => {
+                    setPinLiteralValue(getEditingGraph(store.state), node.id, prop.id, newValue);
+                    store.notify();
+                  },
+                  "single",
+                  "string",
+                  prop.subType,
+                )
               }
               deps={[node.id, prop.id, node.pins[prop.id]?.value]}
               disabled={disabled}

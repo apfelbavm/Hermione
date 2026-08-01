@@ -2,16 +2,12 @@ import { Graph } from "./graph";
 import { NodeInstance } from "./nodeInstance";
 import type { CredentialRecord } from "../../credentials/types";
 
-/** "enum" is a literal-only config knob (a PinDef with `options` set) — never wireable in either
- * direction, on purpose (see isPinTypeCompatible), and drawn in its own dark-green color (see
- * Colors.PIN_COLORS) so it visually reads as "pick one," not "plug something in," matching
- * Unreal's own enum pins — minus Unreal's "you can still wire two of the same enum together"
- * allowance, since this engine has no real enum *classes* to match on, just an ad hoc options
- * list per pin.
- *
- * "struct" is the opposite: a real class DOES exist for it (see structRegistry.ts's StructTypeDef,
- * looked up by PinDef.subType) — two struct pins are wireable exactly when their subType also
- * matches (see isPinTypeCompatible), same as Unreal's own struct pins. */
+/** "enum" and "struct" both back onto a real registered CLASS looked up by PinDef.subType (see
+ * enumRegistry.ts's EnumTypeDef, structRegistry.ts's StructTypeDef) — two pins of either type are
+ * wireable exactly when their subType also matches (see isPinTypeCompatible), same as Unreal's own
+ * enum/struct pins. An "enum" pin also always shows its own literal dropdown widget (its
+ * EnumTypeDef's values — see widgetSync.ts), drawn in its own dark-green color (see
+ * Colors.PIN_COLORS) so it visually reads as "pick one, or wire one in." */
 export type PinType = "exec" | "number" | "boolean" | "string" | "object" | "date" | "enum" | "struct";
 
 /** Same 4 values debug.ts's "Print (Formatted)" node resolves its own Format pin to (see FORMATS
@@ -258,9 +254,8 @@ export interface Variable {
   container?: PinContainer;
   /** Only meaningful when container === "map". */
   keyType?: PinType;
-  /** Only meaningful when `type` is "enum" or "struct" — see PinDef.subType's own doc comment. Not
-   * yet exposed by the Add Variable UI (createTypeSelect's options don't include "struct"/"enum"),
-   * so this is currently write-only plumbing for a future struct/enum-typed variable. */
+  /** Only meaningful when `type` is "enum" or "struct" — see PinDef.subType's own doc comment.
+   * Edited via the Add Variable UI's type select (see createTypeSelect's includeStructsAndEnums). */
   subType?: string;
 }
 

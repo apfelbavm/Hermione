@@ -1,8 +1,10 @@
 import { registerNode } from "../engine/registry";
 import { compileResultVar } from "../engine/compileUtils";
+import { enumOptionIds } from "../engine/enumRegistry";
+import { ODATA_PAGINATION_TYPE_ENUM_TYPE } from "../enum/odata";
 import { i18n } from "@i18n";
 
-const PAGINATION_TYPES = ["Client", "Server"];
+const PAGINATION_TYPES = enumOptionIds(ODATA_PAGINATION_TYPE_ENUM_TYPE);
 
 // Fetches EVERY page of an OData v2 GET request and returns the combined rows — unlike
 // http.request (one call, one response), pagination inherently needs a loop across several
@@ -140,7 +142,7 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "url", label: i18n.nodes.odata.v2Request.pin_url, type: "string", direction: "input", defaultValue: "" },
     { id: "pageSize", label: i18n.nodes.odata.v2Request.pin_page_size, type: "number", direction: "input", defaultValue: 1000, integer: true },
-    { id: "paginationType", label: i18n.nodes.odata.v2Request.pin_pagination_type, type: "string", direction: "input", defaultValue: PAGINATION_TYPES[0], options: PAGINATION_TYPES },
+    { id: "paginationType", label: i18n.nodes.odata.v2Request.pin_pagination_type, type: "enum", subType: ODATA_PAGINATION_TYPE_ENUM_TYPE, direction: "input", defaultValue: PAGINATION_TYPES[0], options: PAGINATION_TYPES },
     { id: "maxPages", label: i18n.nodes.odata.v2Request.pin_max_pages, type: "number", direction: "input", defaultValue: 50, integer: true },
     { id: "headers", label: i18n.nodes.odata.v2Request.pin_headers, type: "string", direction: "input", defaultValue: "{}" },
     { id: "auth", label: i18n.nodes.__shared.pin_auth, type: "object", direction: "input", defaultValue: null },

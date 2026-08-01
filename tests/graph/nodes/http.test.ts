@@ -28,7 +28,7 @@ describe("http.request", () => {
   it("exposes Method as a string pin restricted to a fixed dropdown of HTTP verbs", () => {
     const def = getNodeDef("http.request");
     const method = def.pins.find((p) => p.id === "method")!;
-    expect(method.type).toBe("string");
+    expect(method.type).toBe("enum");
     expect(method.options).toEqual(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
   });
 

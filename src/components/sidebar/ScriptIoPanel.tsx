@@ -174,6 +174,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
                     },
                     entry.container ?? "single",
                     entry.keyType ?? "string",
+                    entry.subType,
                   )
                 }
                 deps={[entry.id, entry.type, entry.container, entry.keyType, entry.defaultValue]}

@@ -172,6 +172,7 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
                     },
                     entry.container ?? "single",
                     entry.keyType ?? "string",
+                    entry.subType,
                   )
                 }
                 deps={[entry.id, entry.type, entry.container, entry.keyType, entry.defaultValue]}

@@ -2,15 +2,13 @@ import forge from "node-forge";
 import * as openpgp from "openpgp";
 import { compileResultVar } from "../engine/compileUtils";
 import { registerNode } from "../engine/registry";
+import { enumOptionIds } from "../engine/enumRegistry";
+import { PGP_SYMMETRIC_ALGORITHM_ENUM_TYPE, PGP_COMPRESSION_ALGORITHM_ENUM_TYPE, PGP_AEAD_ALGORITHM_ENUM_TYPE, PKCS7_CIPHER_ALGORITHM_ENUM_TYPE } from "../enum/crypto";
 import { i18n } from "@i18n";
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
-
-const PGP_SYMMETRIC_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.symmetric);
-const PGP_COMPRESSION_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.compression);
-const PGP_AEAD_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.aead).filter((k) => k !== "experimentalGCM");
 
 registerNode({
   type: "crypto.pgpEncrypt",
@@ -22,10 +20,10 @@ registerNode({
     { id: "plaintext", label: i18n.nodes.__shared.pin_plaintext, type: "string", direction: "input", defaultValue: "" },
     { id: "publicKeyArmored", label: i18n.nodes.crypto.pgpEncrypt.pin_public_key, type: "string", direction: "input", defaultValue: "" },
     { id: "autoDetectSettings", label: i18n.nodes.__shared.pin_auto_detect, type: "boolean", direction: "input", defaultValue: true },
-    { id: "symmetricAlgorithm", label: i18n.nodes.crypto.pgpEncrypt.pin_symmetric_algorithm, type: "enum", direction: "input", defaultValue: "aes256", options: PGP_SYMMETRIC_ALGORITHM_OPTIONS },
-    { id: "compressionAlgorithm", label: i18n.nodes.crypto.pgpEncrypt.pin_compression, type: "enum", direction: "input", defaultValue: "uncompressed", options: PGP_COMPRESSION_ALGORITHM_OPTIONS },
+    { id: "symmetricAlgorithm", label: i18n.nodes.crypto.pgpEncrypt.pin_symmetric_algorithm, type: "enum", subType: PGP_SYMMETRIC_ALGORITHM_ENUM_TYPE, direction: "input", defaultValue: "aes256", options: enumOptionIds(PGP_SYMMETRIC_ALGORITHM_ENUM_TYPE) },
+    { id: "compressionAlgorithm", label: i18n.nodes.crypto.pgpEncrypt.pin_compression, type: "enum", subType: PGP_COMPRESSION_ALGORITHM_ENUM_TYPE, direction: "input", defaultValue: "uncompressed", options: enumOptionIds(PGP_COMPRESSION_ALGORITHM_ENUM_TYPE) },
     { id: "aeadProtect", label: i18n.nodes.crypto.pgpEncrypt.pin_use_aead, type: "boolean", direction: "input", defaultValue: openpgp.config.aeadProtect },
-    { id: "aeadAlgorithm", label: i18n.nodes.crypto.pgpEncrypt.pin_aead_algorithm, type: "enum", direction: "input", defaultValue: "gcm", options: PGP_AEAD_ALGORITHM_OPTIONS },
+    { id: "aeadAlgorithm", label: i18n.nodes.crypto.pgpEncrypt.pin_aead_algorithm, type: "enum", subType: PGP_AEAD_ALGORITHM_ENUM_TYPE, direction: "input", defaultValue: "gcm", options: enumOptionIds(PGP_AEAD_ALGORITHM_ENUM_TYPE) },
     { id: "showVersion", label: i18n.nodes.crypto.pgpEncrypt.pin_show_version, type: "boolean", direction: "input", defaultValue: openpgp.config.showVersion },
     { id: "versionString", label: i18n.nodes.crypto.pgpEncrypt.pin_version_comment, type: "string", direction: "input", defaultValue: openpgp.config.versionString },
     { id: "showComment", label: i18n.nodes.crypto.pgpEncrypt.pin_show_comment, type: "boolean", direction: "input", defaultValue: openpgp.config.showComment },
@@ -189,7 +187,6 @@ registerNode({
   compileImports: ['import * as openpgp from "openpgp";'],
 });
 
-const PKCS7_CIPHER_OPTIONS = ["aes128", "aes192", "aes256", "3des"];
 const PKCS7_CIPHER_OID_NAMES: Record<string, string> = {
   aes128: "aes128-CBC",
   aes192: "aes192-CBC",
@@ -207,7 +204,7 @@ registerNode({
     { id: "plaintext", label: i18n.nodes.__shared.pin_plaintext, type: "string", direction: "input", defaultValue: "" },
     { id: "recipientCertPem", label: i18n.nodes.crypto.pkcs7Encrypt.pin_recipient_cert, type: "string", direction: "input", defaultValue: "" },
     { id: "autoDetectSettings", label: i18n.nodes.__shared.pin_auto_detect, type: "boolean", direction: "input", defaultValue: true },
-    { id: "cipherAlgorithm", label: i18n.nodes.crypto.pkcs7Encrypt.pin_cipher_algorithm, type: "enum", direction: "input", defaultValue: "aes256", options: PKCS7_CIPHER_OPTIONS },
+    { id: "cipherAlgorithm", label: i18n.nodes.crypto.pkcs7Encrypt.pin_cipher_algorithm, type: "enum", subType: PKCS7_CIPHER_ALGORITHM_ENUM_TYPE, direction: "input", defaultValue: "aes256", options: enumOptionIds(PKCS7_CIPHER_ALGORITHM_ENUM_TYPE) },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
     { id: "envelopedDataPem", label: i18n.nodes.crypto.pkcs7Encrypt.pin_enveloped_data, type: "string", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },

@@ -24,7 +24,7 @@ describe("sftp.upload", () => {
   it("exposes Existing File as a string pin restricted to the four conflict-resolution modes", () => {
     const def = getNodeDef("sftp.upload");
     const pin = def.pins.find((p) => p.id === "existingFileMode")!;
-    expect(pin.type).toBe("string");
+    expect(pin.type).toBe("enum");
     expect(pin.options).toEqual(["Overwrite", "Append", "Fail", "Ignore"]);
   });
 

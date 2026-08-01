@@ -32,3 +32,10 @@ export function tryGetEnumTypeDef(id: string): EnumTypeDef | undefined {
 export function allEnumTypeDefs(): EnumTypeDef[] {
   return [...registry.values()];
 }
+
+/** The value ids of a registered enum type, in declaration order — the single source of truth for
+ * an enum pin's `options` list (see PinDef.options), so a pin never hand-duplicates the same list
+ * its own registered EnumTypeDef already carries. */
+export function enumOptionIds(id: string): string[] {
+  return (tryGetEnumTypeDef(id)?.values ?? []).map((v) => v.id);
+}

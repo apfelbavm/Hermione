@@ -46,10 +46,6 @@ export function hitTestPin(graph: Graph, geometries: ReadonlyMap<string, NodeScr
     const geo = geometries.get(node.id);
     if (!geo) continue;
     for (const pinLayout of geo.layout.pins) {
-      // An "enum" pin is never wireable (see isPinTypeCompatible) and always shows its own literal
-      // dropdown widget — excluding it here means a click/hover right on its dot falls through to
-      // whatever's next (the node body), instead of starting a wire-drag that could only ever fail.
-      if (pinLayout.pin.type === "enum") continue;
       const pos = geo.pinScreen[pinLayout.pin.id];
       const dx = pos.x - screenX;
       const dy = pos.y - screenY;

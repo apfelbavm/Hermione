@@ -3,6 +3,8 @@ import { registerNode } from "../engine/registry";
 import { GithubManager, type GithubAuth } from "../../lib/githubManager";
 import type { GithubTokenCredentialData, GithubAppCredentialData } from "../../credentials/types";
 import { ISSUE_STRUCT_TYPE, PULL_REQUEST_STRUCT_TYPE, CREATE_RESULT_STRUCT_TYPE, MERGE_RESULT_STRUCT_TYPE, FILE_CONTENT_STRUCT_TYPE, FILE_WRITE_RESULT_STRUCT_TYPE } from "../structs/github";
+import { GITHUB_STATE_ENUM_TYPE, GITHUB_MERGE_METHOD_ENUM_TYPE } from "../enum/github";
+import { enumOptionIds } from "../engine/enumRegistry";
 import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over GithubManager (src/lib/githubManager.ts),
@@ -10,8 +12,6 @@ import { i18n } from "@i18n";
 // method arguments and method results back to pins. Interpreter-only for now (no compileExecute/
 // compileImports), same deferral as dropbox.ts.
 
-const STATE_OPTIONS = ["open", "closed", "all"];
-const MERGE_METHOD_OPTIONS = ["merge", "squash", "rebase"];
 const GROUP_NAME = "Request.GitHub";
 
 function credentialNamePin() {
@@ -112,7 +112,7 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     ...repoPins(),
-    { id: "state", label: i18n.nodes.github.__shared.pin_state, type: "string", direction: "input", defaultValue: STATE_OPTIONS[0], options: STATE_OPTIONS },
+    { id: "state", label: i18n.nodes.github.__shared.pin_state, type: "enum", subType: GITHUB_STATE_ENUM_TYPE, direction: "input", defaultValue: "open", options: enumOptionIds(GITHUB_STATE_ENUM_TYPE) },
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "issues", label: i18n.nodes.github.listIssues.pin_issues, type: "struct", subType: ISSUE_STRUCT_TYPE, container: "array", direction: "output" },
@@ -214,7 +214,7 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     ...repoPins(),
-    { id: "state", label: i18n.nodes.github.__shared.pin_state, type: "string", direction: "input", defaultValue: STATE_OPTIONS[0], options: STATE_OPTIONS },
+    { id: "state", label: i18n.nodes.github.__shared.pin_state, type: "enum", subType: GITHUB_STATE_ENUM_TYPE, direction: "input", defaultValue: "open", options: enumOptionIds(GITHUB_STATE_ENUM_TYPE) },
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "pullRequests", label: i18n.nodes.github.listPullRequests.pin_pull_requests, type: "struct", subType: PULL_REQUEST_STRUCT_TYPE, container: "array", direction: "output" },
@@ -289,7 +289,7 @@ registerNode({
     credentialNamePin(),
     ...repoPins(),
     { id: "pullNumber", label: i18n.nodes.github.mergePullRequest.pin_pull_number, type: "number", direction: "input", defaultValue: 0, integer: true },
-    { id: "mergeMethod", label: i18n.nodes.github.mergePullRequest.pin_merge_method, type: "string", direction: "input", defaultValue: MERGE_METHOD_OPTIONS[0], options: MERGE_METHOD_OPTIONS },
+    { id: "mergeMethod", label: i18n.nodes.github.mergePullRequest.pin_merge_method, type: "enum", subType: GITHUB_MERGE_METHOD_ENUM_TYPE, direction: "input", defaultValue: "merge", options: enumOptionIds(GITHUB_MERGE_METHOD_ENUM_TYPE) },
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "result", label: i18n.nodes.github.mergeResult.label, type: "struct", subType: MERGE_RESULT_STRUCT_TYPE, direction: "output" },
