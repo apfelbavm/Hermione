@@ -19,7 +19,7 @@ export default function AppShellMarkup({ store }: { store: Store }) {
     <div id="app">
       <PageHeader />
       <div id="toolbar">
-        <div id="toolbar-left">
+        <div className="toolbar-left">
           <button type="button" id="back-to-project-button" className="btn btn-ghost" title={i18n.components.app_shell_markup.back_title}>
             <IconManager.ChevronLeftIcon />
             {i18n.components.app_shell_markup.back}
@@ -31,27 +31,25 @@ export default function AppShellMarkup({ store }: { store: Store }) {
             <IconManager.RedoIcon />
           </button>
         </div>
-        <div id="toolbar-center">
-          <div id="simulation-controls" className="toolbar-button-group">
-            <button id="run-button" className="btn btn-green">
-              {i18n.components.app_shell_markup.simulate}
-            </button>
-            <button id="pause-button" className="btn btn-gray" style={{ display: "none" }} title={i18n.components.app_shell_markup.pause_title}>
-              {i18n.components.app_shell_markup.pause}
-            </button>
-            <button id="continue-button" className="btn btn-gray" style={{ display: "none" }} title={i18n.components.app_shell_markup.continue_title}>
-              {i18n.components.app_shell_markup.continue}
-            </button>
-            <button id="stop-button" className="btn btn-gray" style={{ display: "none" }} title={i18n.components.app_shell_markup.stop_title}>
-              {i18n.components.app_shell_markup.stop}
-            </button>
-            <label id="auto-pan-toggle" className="toolbar-toggle" title={i18n.components.app_shell_markup.auto_pan_title}>
-              <input type="checkbox" id="auto-pan-checkbox" />
-              {i18n.components.app_shell_markup.auto_pan}
-            </label>
-          </div>
+        <div id="simulation-controls" className="toolbar-center">
+          <button id="run-button" className="btn btn-green">
+            {i18n.components.app_shell_markup.simulate}
+          </button>
+          <button id="pause-button" className="btn btn-gray" style={{ display: "none" }} title={i18n.components.app_shell_markup.pause_title}>
+            {i18n.components.app_shell_markup.pause}
+          </button>
+          <button id="continue-button" className="btn btn-gray" style={{ display: "none" }} title={i18n.components.app_shell_markup.continue_title}>
+            {i18n.components.app_shell_markup.continue}
+          </button>
+          <button id="stop-button" className="btn btn-gray" style={{ display: "none" }} title={i18n.components.app_shell_markup.stop_title}>
+            {i18n.components.app_shell_markup.stop}
+          </button>
+          <label id="auto-pan-toggle" className="toolbar-toggle" title={i18n.components.app_shell_markup.auto_pan_title}>
+            <input type="checkbox" id="auto-pan-checkbox" />
+            {i18n.components.app_shell_markup.auto_pan}
+          </label>
         </div>
-        <div id="toolbar-right">
+        <div className="toolbar-right">
           <button id="save-button" className="btn btn-ghost">
             {i18n.components.app_shell_markup.save}
           </button>

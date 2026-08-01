@@ -4,45 +4,42 @@
   align-items: center;
   height: 40px;
   flex: 0 0 auto;
-  padding: 0 12px;
+  /* padding: 0 12px; */
   background: var(--pp-surface);
   border-bottom: 1px solid var(--pp-border);
 }
 
-#toolbar-left,
-#toolbar-center,
-#toolbar-right {
+.toolbar-left,
+.toolbar-center,
+.toolbar-right {
+  padding: 4px 8px;
+  height: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-#toolbar-left {
+.toolbar-left {
   justify-self: start;
+  border-right: 1px solid var(--pp-border-strong);
 }
 
-#toolbar-center {
+.toolbar-center {
   justify-self: center;
-}
 
-#toolbar-right {
-  justify-self: end;
-}
-
-#toolbar-title {
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.toolbar-button-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
   border-left: 1px solid var(--pp-border-strong);
   border-right: 1px solid var(--pp-border-strong);
 }
 
+.toolbar-right {
+  justify-self: end;
+  border-left: 1px solid var(--pp-border-strong);
+}
+
+.toolbar-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 #undo-button:disabled,
 #redo-button:disabled {
   opacity: 0.4;

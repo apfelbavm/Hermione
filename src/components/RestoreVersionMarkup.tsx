@@ -42,13 +42,13 @@ export default function RestoreVersionMarkup({
   return (
     <div id="app">
       <div id="toolbar">
-        <div id="toolbar-left">
+        <div className="toolbar-left">
           <span id="toolbar-title">
             {i18n.pages.restore_flow_version.title}
             {flowName ? ` — ${flowName}` : ""}
           </span>
         </div>
-        <div id="toolbar-center">
+        <div className="toolbar-center">
           <VersionRestorePanel
             versions={versions}
             selectedVersionId={selectedVersionId}
@@ -60,7 +60,7 @@ export default function RestoreVersionMarkup({
             restoring={restoring}
           />
         </div>
-        <div id="toolbar-right">
+        <div className="toolbar-right">
           <ThemeToggle />
         </div>
       </div>
