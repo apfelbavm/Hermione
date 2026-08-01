@@ -51,8 +51,8 @@ async function runCompiled(node: Partial<NodeInstance>, inputs: Record<string, s
     graph: { scripts } as any,
     compileFrom: () => [],
   });
-  const fn = new AsyncFunction("rt", statements.join("\n"));
-  await fn({ log: (m: string) => logs.push(m) });
+  const fn = new AsyncFunction(statements.join("\n"));
+  await fn.call({ log: (m: string) => logs.push(m) });
   return logs;
 }
 
@@ -76,8 +76,8 @@ async function runCompiledWithOutputs(node: Partial<NodeInstance>, inputs: Recor
   const returnExpr = `{ ${Object.entries(outputExprs)
     .map(([id, expr]) => `${JSON.stringify(id)}: ${expr}`)
     .join(", ")} }`;
-  const fn = new AsyncFunction("rt", [...statements, `return ${returnExpr};`].join("\n"));
-  const outputs = await fn({ log: () => {} });
+  const fn = new AsyncFunction([...statements, `return ${returnExpr};`].join("\n"));
+  const outputs = await fn.call({ log: () => {} });
   return outputs as Record<string, unknown>;
 }
 

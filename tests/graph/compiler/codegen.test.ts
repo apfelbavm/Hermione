@@ -77,6 +77,19 @@ async function loadCompiled(code: string): Promise<Record<string, unknown>> {
   }
 }
 
+/** Constructs a fresh CompiledFlow instance from a compileGraph()-produced module — every test
+ * below runs exactly one trigger against exactly one instance, mirroring how a real run starts,
+ * runs, and gets discarded (see codegen.ts's own doc comment on CompiledFlow). */
+function instantiate(compiled: Record<string, unknown>, log: (message: string) => void): Record<string, unknown> {
+  const CompiledFlow = compiled.CompiledFlow as new (log: (message: string) => void) => Record<string, unknown>;
+  return new CompiledFlow(log);
+}
+
+/** Calls the named trigger method on `instance`, preserving `this` binding. */
+function invokeTrigger(instance: Record<string, unknown>, functionName: string): Promise<void> {
+  return (instance[functionName] as () => Promise<void>).call(instance);
+}
+
 describe("compileGraph", () => {
   it("compiled output logs identically to the interpreter for Start -> Add -> Compare -> Branch -> Print", async () => {
     const graph = new Graph("g1", "test");
@@ -132,14 +145,9 @@ describe("compileGraph", () => {
     expect(manifest.triggers[0].kind).toBe("manual");
 
     const compiled = await loadCompiled(code);
-    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
-    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
-
     const compiledLogs: string[] = [];
-    await trigger({
-      state: eventInitialize(),
-      log: (m: string) => compiledLogs.push(m),
-    });
+    const instance = instantiate(compiled, (m) => compiledLogs.push(m));
+    await invokeTrigger(instance, manifest.triggers[0].functionName);
 
     expect(compiledLogs).toEqual(interpreterLogs);
     expect(compiledLogs).toEqual(["5 is greater than 4"]);
@@ -209,14 +217,9 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
-    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
-
     const logs: string[] = [];
-    await trigger({
-      state: eventInitialize(),
-      log: (m: string) => logs.push(m),
-    });
+    const instance = instantiate(compiled, (m) => logs.push(m));
+    await invokeTrigger(instance, manifest.triggers[0].functionName);
 
     expect(logs).toEqual(["1", "2"]);
   });
@@ -269,14 +272,13 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
-    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
+    const condField = manifest.variables.find((v) => v.id === "cond")!.fieldName;
 
     for (const condValue of [true, false]) {
-      const state = eventInitialize() as Record<string, unknown>;
-      state["cond"] = condValue;
       const logs: string[] = [];
-      await trigger({ state, log: (m: string) => logs.push(m) });
+      const instance = instantiate(compiled, (m) => logs.push(m));
+      instance[condField] = condValue;
+      await invokeTrigger(instance, manifest.triggers[0].functionName);
       expect(logs).toEqual(["reached shared"]);
     }
   });
@@ -404,14 +406,9 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
-    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
-
     const logs: string[] = [];
-    await trigger({
-      state: eventInitialize(),
-      log: (m: string) => logs.push(m),
-    });
+    const instance = instantiate(compiled, (m) => logs.push(m));
+    await invokeTrigger(instance, manifest.triggers[0].functionName);
 
     expect(logs).toEqual(["second"]); // print1 (disabled) is skipped, but print2 downstream still runs
   });
@@ -451,14 +448,9 @@ describe("compileGraph", () => {
     // only splices in the compiled chain for its disabledNextExec pin(s) (see codegen.ts).
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
-    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
-
     const logs: string[] = [];
-    await trigger({
-      state: eventInitialize(),
-      log: (m: string) => logs.push(m),
-    });
+    const instance = instantiate(compiled, (m) => logs.push(m));
+    await invokeTrigger(instance, manifest.triggers[0].functionName);
 
     expect(logs).toEqual(["done"]); // loop-body's "body" print never runs, not even once
   });
@@ -517,14 +509,9 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
-    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
-
     const logs: string[] = [];
-    await trigger({
-      state: eventInitialize(),
-      log: (m: string) => logs.push(m),
-    });
+    const instance = instantiate(compiled, (m) => logs.push(m));
+    await invokeTrigger(instance, manifest.triggers[0].functionName);
 
     expect(logs).toEqual(["fast", "slow", "Done"]);
   });
@@ -568,14 +555,9 @@ describe("compileGraph", () => {
 
     const { code, manifest } = compileGraph(graph);
     const compiled = await loadCompiled(code);
-    const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
-    const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
-
     const logs: string[] = [];
-    await trigger({
-      state: eventInitialize(),
-      log: (m: string) => logs.push(m),
-    });
+    const instance = instantiate(compiled, (m) => logs.push(m));
+    await invokeTrigger(instance, manifest.triggers[0].functionName);
 
     expect(logs).toEqual(["Done"]);
   });
@@ -640,14 +622,9 @@ describe("compileGraph", () => {
     async function runCompiledSaml(graph: Graph): Promise<string[]> {
       const { code, manifest } = compileGraph(graph);
       const compiled = await loadCompiled(code);
-      const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
-      const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
-
       const logs: string[] = [];
-      await trigger({
-        state: eventInitialize(),
-        log: (m: string) => logs.push(m),
-      });
+      const instance = instantiate(compiled, (m) => logs.push(m));
+      await invokeTrigger(instance, manifest.triggers[0].functionName);
       return logs;
     }
 
@@ -734,8 +711,6 @@ describe("compileGraph", () => {
 
       const { code, manifest } = compileGraph(graph);
       const compiled = await loadCompiled(code);
-      const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
-      const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
       vi.stubGlobal(
         "fetch",
@@ -743,10 +718,8 @@ describe("compileGraph", () => {
       );
 
       const logs: string[] = [];
-      await trigger({
-        state: eventInitialize(),
-        log: (m: string) => logs.push(m),
-      });
+      const instance = instantiate(compiled, (m) => logs.push(m));
+      await invokeTrigger(instance, manifest.triggers[0].functionName);
       expect(logs).toEqual(["hello from the API"]);
     });
 
@@ -796,8 +769,6 @@ describe("compileGraph", () => {
 
       const { code, manifest } = compileGraph(graph);
       const compiled = await loadCompiled(code);
-      const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
-      const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
 
       let capturedAuthHeader: string | null = null;
       vi.stubGlobal(
@@ -816,10 +787,8 @@ describe("compileGraph", () => {
       );
 
       const logs: string[] = [];
-      await trigger({
-        state: eventInitialize(),
-        log: (m: string) => logs.push(m),
-      });
+      const instance = instantiate(compiled, (m) => logs.push(m));
+      await invokeTrigger(instance, manifest.triggers[0].functionName);
 
       expect(capturedAuthHeader).toBe("Bearer tok-1");
       expect(logs).toEqual(["protected data"]);
@@ -869,14 +838,13 @@ describe("compileGraph", () => {
 
       const { code, manifest } = compileGraph(rootGraph);
       const compiled = await loadCompiled(code);
-      const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
-      const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
+      const outField = manifest.variables.find((v) => v.id === outVar.id)!.fieldName;
 
-      const rt = { state: eventInitialize(), log: () => {} };
-      await trigger(rt);
+      const instance = instantiate(compiled, () => {});
+      await invokeTrigger(instance, manifest.triggers[0].functionName);
 
-      expect(rt.state[outVar.id]).toBe(interpreterResult);
-      expect(rt.state[outVar.id]).toBe(17);
+      expect(instance[outField]).toBe(interpreterResult);
+      expect(instance[outField]).toBe(17);
     });
   });
 });

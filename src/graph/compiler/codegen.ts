@@ -12,22 +12,58 @@ export interface TriggerDescriptor {
   details: Record<string, unknown>;
 }
 
+/** A graph global variable's compiled class-field name, exposed alongside TriggerDescriptor so a
+ * caller that needs to seed/read a variable from outside (tests, tooling) can find its real
+ * `this.<fieldName>` without reimplementing the compiler's own name-slugging. */
+export interface VariableDescriptor {
+  id: string;
+  name: string;
+  fieldName: string;
+}
+
 export interface CompileResult {
   code: string;
-  manifest: { triggers: TriggerDescriptor[] };
+  manifest: { triggers: TriggerDescriptor[]; variables: VariableDescriptor[] };
 }
 
 /** Mutable state threaded through the whole compile — shared across the root graph and every
  * function body compiled along the way, so helpers/imports dedupe file-wide and each FunctionDef
- * only ever gets compiled to its own top-level JS function once regardless of how many call sites
- * (across the root graph and other function bodies) invoke it. */
+ * only ever gets compiled to its own class method once regardless of how many call sites (across
+ * the root graph and other function bodies) invoke it. */
 interface CompileState {
   helpers: Map<string, string>;
   imports: Set<string>;
-  /** fn.id -> its generated top-level JS function name, registered BEFORE compiling its body so a
-   * function that calls itself resolves via normal JS function-declaration hoisting. */
+  /** fn.id -> its generated method name, registered BEFORE compiling its body so a function that
+   * calls itself resolves fine (every method is reachable via `this.<name>` regardless of order). */
   functionNames: Map<string, string>;
   usedFunctionNames: Set<string>;
+  /** fn.id -> its full compiled method source (unindented) — collected separately from `helpers`
+   * since these are emitted INSIDE the generated class, not as top-level file helpers. */
+  functionMethods: Map<string, string>;
+  /** Variable.id -> its compiled class-field name — every global variable, computed once up front
+   * so any reference anywhere in the class (a trigger method or a custom function's own method)
+   * resolves to the exact same `this.<name>`. */
+  globalVariableNames: Map<string, string>;
+  /** A function body Graph -> its own LOCAL variables' compiled names, populated once when that
+   * function starts compiling. Keyed by object identity (not fn.id) so the root graph, which is
+   * never a value here, unambiguously falls through to globalVariableNames instead. Local names
+   * never need to dedupe against global ones — a local is always a bare `let`, a global is always
+   * `this.<name>`, two different namespaces that can't collide even if the text matches. */
+  localVariableNamesByGraph: Map<Graph, Map<string, string>>;
+}
+
+/** Resolves a variable id to the exact JS reference compiled code should use for it — a bare local
+ * name if `graph` (whichever body is currently being compiled) declares it as its own, else the
+ * global class field. Shared by every compileEvaluate/compileExecute call the compiler makes so no
+ * NodeDef needs to know the local-vs-global distinction itself (see variable.ts). */
+function makeResolveVariableRef(graph: Graph, state: CompileState): (variableId: string) => string {
+  return (variableId: string) => {
+    const localName = state.localVariableNamesByGraph.get(graph)?.get(variableId);
+    if (localName) return localName;
+    const globalName = state.globalVariableNames.get(variableId);
+    if (globalName) return `this.${globalName}`;
+    throw new Error(`Variable "${variableId}" isn't declared in any scope visible here — cannot compile this reference`);
+  };
 }
 
 function findNode(graph: Graph, nodeId: string): NodeInstance {
@@ -138,6 +174,7 @@ function compileResolveDataPin(rootGraph: Graph, graph: Graph, nodeId: string, p
     node: upstreamNode,
     inputs: upstreamInputs,
     graph,
+    resolveVariableRef: makeResolveVariableRef(graph, state),
   });
   const expr = outputs[conn.fromPin];
   if (expr === undefined) {
@@ -181,7 +218,7 @@ function compileFrom(rootGraph: Graph, graph: Graph, nodeId: string, execInPin: 
   }
 
   // function.call needs to compile a DIFFERENT graph (the target FunctionDef's own body) into its
-  // own top-level JS function and then just invoke it — outside the shape any single NodeDef's
+  // own class method and then just invoke it — outside the shape any single NodeDef's
   // compileExecute (node/inputs/graph/compileFrom, all scoped to the CURRENT graph) can express, so
   // it's handled directly here instead, the same way disabled-node handling is above.
   if (node.type === "function.call") {
@@ -191,7 +228,7 @@ function compileFrom(rootGraph: Graph, graph: Graph, nodeId: string, execInPin: 
     }
     const fnName = compileFunctionDef(rootGraph, fn, state);
     const argEntries = fn.inputs.map((input) => `${JSON.stringify(input.id)}: ${compileResolveDataPin(rootGraph, graph, node.id, input.id, state)}`).join(", ");
-    const statements = [`const ${compileResultVar(node.id)} = await ${fnName}({ ${argEntries} });`];
+    const statements = [`const ${compileResultVar(node.id)} = await this.${fnName}({ ${argEntries} });`];
 
     const outgoing = connectionsFrom(graph, node.id, "exec-out");
     if (outgoing.length > 1) {
@@ -225,6 +262,7 @@ function compileFrom(rootGraph: Graph, graph: Graph, nodeId: string, execInPin: 
     node,
     inputs,
     graph,
+    resolveVariableRef: makeResolveVariableRef(graph, state),
     compileFrom: (execOutPin: string) => {
       // connectPins now enforces "one wire per exec output" itself, so this can't arise
       // through normal editor use — this guard only catches a hand-edited/corrupted graph.
@@ -242,17 +280,28 @@ function compileFrom(rootGraph: Graph, graph: Graph, nodeId: string, execInPin: 
   return statements;
 }
 
-/** Compiles a FunctionDef's body into its own top-level `async function`, memoized by fn.id in
+/** Compiles a FunctionDef's body into its own class method, memoized by fn.id in
  * state.functionNames (registered before recursing into the body, so a function that calls itself
- * resolves fine via normal JS function-declaration hoisting) — every function.call site just
- * invokes the shared function by name afterward instead of re-inlining its body, so calling the
- * same function more than once never risks colliding on Entry/Return's compiled variable names. */
+ * resolves fine — every method is reachable via `this.<name>` regardless of declaration order) —
+ * every function.call site just invokes `this.<name>(...)` afterward instead of re-inlining its
+ * body, so calling the same function more than once never risks colliding on Entry/Return's
+ * compiled variable names. */
 function compileFunctionDef(rootGraph: Graph, fn: FunctionDef, state: CompileState): string {
   const existing = state.functionNames.get(fn.id);
   if (existing) return existing;
 
   const fnName = uniqueName(`fn_${slugify(fn.name, "function")}`, state.usedFunctionNames);
   state.functionNames.set(fn.id, fnName);
+
+  // Local variables get real `let` bindings scoped to just this one method — a fresh set per
+  // call for free (ordinary JS function-local semantics), fixing what the old rt.state-keyed
+  // design got wrong: two concurrent/recursive calls to the same function no longer share a slot.
+  const usedLocalNames = new Set(["args", "result"]);
+  const localNames = new Map<string, string>();
+  for (const variable of fn.body.variables) {
+    localNames.set(variable.id, uniqueName(slugify(variable.name, "localVar"), usedLocalNames));
+  }
+  state.localVariableNamesByGraph.set(fn.body, localNames);
 
   const entryNode = fn.body.nodes.find((n) => n.type === "function.entry" && n.functionId === fn.id);
   const outgoing = entryNode ? connectionsFrom(fn.body, entryNode.id, "exec-out") : [];
@@ -261,15 +310,17 @@ function compileFunctionDef(rootGraph: Graph, fn: FunctionDef, state: CompileSta
   }
   const bodyStatements = outgoing.length === 0 ? [] : compileFrom(rootGraph, fn.body, outgoing[0].toNode, outgoing[0].toPin, new Set(), state);
 
+  const localDeclarations = fn.body.variables.map((v) => `let ${localNames.get(v.id)} = ${JSON.stringify(v.defaultValue)}; // ${v.name}`);
+
   // Every function.return instance along the way assigns straight into `result` (see
   // function.ts's compileExecute) — declared here with the function's declared defaults so a body
   // that never reaches a Return still returns something sensible, same as runFunctionCall's own
   // default-then-overwrite behavior.
   const resultEntries = fn.outputs.map((output) => `    ${JSON.stringify(output.id)}: ${JSON.stringify(output.defaultValue ?? null)}, // ${output.name}`).join("\n");
 
-  const source = [`async function ${fnName}(args) {`, `  const result = {`, resultEntries, `  };`, ...indent(bodyStatements), `  return result;`, `}`].join("\n");
+  const source = [`async ${fnName}(args) {`, ...indent(localDeclarations), `  const result = {`, resultEntries, `  };`, ...indent(bodyStatements), `  return result;`, `}`].join("\n");
 
-  state.helpers.set(`fn:${fn.id}`, source);
+  state.functionMethods.set(fn.id, source);
   return fnName;
 }
 
@@ -284,10 +335,22 @@ export function compileGraph(graph: Graph, version = 1, revision = 1): CompileRe
     imports: new Set<string>(),
     functionNames: new Map<string, string>(),
     usedFunctionNames: new Set<string>(),
+    functionMethods: new Map<string, string>(),
+    globalVariableNames: new Map<string, string>(),
+    localVariableNamesByGraph: new Map<Graph, Map<string, string>>(),
   };
+
+  // Every global variable becomes a real `this.<name>` class field, named up front so any
+  // reference anywhere in the class — a trigger method or a custom function's own method —
+  // resolves to the exact same field regardless of compile order.
+  const usedGlobalNames = new Set<string>(["log"]);
+  for (const variable of graph.variables) {
+    state.globalVariableNames.set(variable.id, uniqueName(slugify(variable.name, "variable"), usedGlobalNames));
+  }
+
   const usedNames = new Set<string>();
   const triggers: TriggerDescriptor[] = [];
-  const functionBlocks: string[] = [];
+  const triggerMethods: string[] = [];
 
   for (const node of graph.nodes) {
     const def = getNodeDef(node.type);
@@ -307,7 +370,7 @@ export function compileGraph(graph: Graph, version = 1, revision = 1): CompileRe
             return compileFrom(graph, graph, conn.toNode, conn.toPin, new Set(), state);
           })();
 
-    functionBlocks.push([`export async function ${functionName}(rt) {`, ...indent(body), `}`].join("\n"));
+    triggerMethods.push([`async ${functionName}() {`, ...indent(body), `}`].join("\n"));
 
     triggers.push({
       nodeId: node.id,
@@ -317,7 +380,19 @@ export function compileGraph(graph: Graph, version = 1, revision = 1): CompileRe
     });
   }
 
-  const stateEntries = graph.variables.map((v) => `    ${JSON.stringify(v.id)}: ${JSON.stringify(v.defaultValue)}, // ${v.name}`).join("\n");
+  const variables: VariableDescriptor[] = graph.variables.map((v) => ({ id: v.id, name: v.name, fieldName: state.globalVariableNames.get(v.id)! }));
+
+  const fieldAssignments = graph.variables.map((v) => `this.${state.globalVariableNames.get(v.id)} = ${JSON.stringify(v.defaultValue)}; // ${v.name}`);
+  const constructorLines = [`constructor(log) {`, ...indent(["this.log = log;", ...fieldAssignments]), `}`];
+
+  // Every custom function and every trigger becomes one method on this single class — a global
+  // variable is just a class field, a local variable is just a plain `let` inside whichever
+  // method declared it, and calling a custom function from anywhere is just `this.<name>(...)`.
+  // A fresh instance (see the constructor above) is exactly one "run": the caller constructs one,
+  // invokes whichever trigger method fired, and discards it — nothing here is meant to outlive
+  // that single run, the same way a plain script starts, runs, and exits.
+  const methodBlocks = [...state.functionMethods.values(), ...triggerMethods];
+  const classLines = [`export class CompiledFlow {`, ...indent(constructorLines), "", ...indent(methodBlocks.join("\n\n").split("\n")), `}`];
 
   const parts: string[] = [
     `// Generated by Hermione from graph "${graph.name}" (Version ${version}, Revision ${revision}) — do not edit by hand.`,
@@ -325,19 +400,10 @@ export function compileGraph(graph: Graph, version = 1, revision = 1): CompileRe
     "",
     ...[...state.helpers.values()],
     "",
-    // Callers build rt = { state: eventInitialize(), log } themselves and pass the SAME
-    // rt into every exported trigger function they invoke, so variable state persists across
-    // firings — mirroring how the in-editor Run button shares one ExecutionContext across roots.
-    `export function eventInitialize() {`,
-    `  return {`,
-    stateEntries,
-    `  };`,
-    `}`,
-    "",
-    ...functionBlocks,
+    ...classLines,
     "",
     `export const manifest = ${JSON.stringify({ triggers }, null, 2)};`,
   ];
 
-  return { code: parts.join("\n"), manifest: { triggers } };
+  return { code: parts.join("\n"), manifest: { triggers, variables } };
 }

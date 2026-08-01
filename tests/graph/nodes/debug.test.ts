@@ -32,10 +32,8 @@ async function runCompiledPrint(message: string, format: string): Promise<string
     graph: {} as any,
     compileFrom: () => [],
   });
-  const fn = new AsyncFunction("functionLibrary", "rt", statements.join("\n"));
-  await fn(functionLibrary, {
-    log: (m: string) => logs.push(m),
-  });
+  const fn = new AsyncFunction("functionLibrary", statements.join("\n"));
+  await fn.call({ log: (m: string) => logs.push(m) }, functionLibrary);
   return logs[0];
 }
 

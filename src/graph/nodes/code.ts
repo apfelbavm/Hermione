@@ -163,10 +163,10 @@ registerNode({
       ...script.compiledJs.split("\n").map((line) => `    ${line}`),
       "    return run;",
       "  })();",
-      `  const __ret = await __run(rt.log, ${inputsObjExpr});`,
+      `  const __ret = await __run(this.log, ${inputsObjExpr});`,
       `  ${resultVar} = (__ret && typeof __ret === "object") ? __ret : {};`,
       "} catch (__err) {",
-      '  rt.log("Error: " + (__err instanceof Error ? __err.message : String(__err)));',
+      '  this.log("Error: " + (__err instanceof Error ? __err.message : String(__err)));',
       "}",
       ...compileFrom("exec-out"),
     ];

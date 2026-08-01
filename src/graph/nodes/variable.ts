@@ -34,9 +34,12 @@ registerNode({
   evaluate: ({ node, ctx }) => ({
     value: node.variableId ? getVariableValue(ctx, node.variableId) : undefined,
   }),
-  compileEvaluate: ({ node, graph }) => ({
-    value: `rt.state[${JSON.stringify(node.variableId)}] /* ${variableName(graph, node.variableId)} */`,
-  }),
+  compileEvaluate: ({ node, graph, resolveVariableRef }) => {
+    if (!resolveVariableRef) throw new Error("variable.get's compileEvaluate requires resolveVariableRef (only codegen.ts provides this)");
+    return {
+      value: node.variableId ? `${resolveVariableRef(node.variableId)} /* ${variableName(graph, node.variableId)} */` : "undefined",
+    };
+  },
 });
 
 registerNode({
@@ -56,5 +59,8 @@ registerNode({
     if (node.variableId) setVariableValue(ctx, node.variableId, inputs.value);
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ node, inputs, graph, compileFrom }) => [`rt.state[${JSON.stringify(node.variableId)}] = ${inputs.value}; /* ${variableName(graph, node.variableId)} */`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, graph, compileFrom, resolveVariableRef }) => {
+    if (!resolveVariableRef) throw new Error("variable.set's compileExecute requires resolveVariableRef (only codegen.ts provides this)");
+    return [...(node.variableId ? [`${resolveVariableRef(node.variableId)} = ${inputs.value}; // ${variableName(graph, node.variableId)}`] : []), ...compileFrom("exec-out")];
+  },
 });

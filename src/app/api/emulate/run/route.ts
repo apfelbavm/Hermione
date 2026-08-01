@@ -70,16 +70,16 @@ export async function POST(request: Request): Promise<Response> {
       // so bundlers must leave this import() alone and defer it to Node's real ESM loader.
       const compiled = (await import(/* webpackIgnore: true */ url)) as Record<string, unknown>;
 
-      const rt = {
-        state: (compiled.eventInitialize as () => Record<string, unknown>)(),
-        // Unlike the interpreter's ExecutionContext.log(message, format), compiled output's rt.log
-        // only ever takes one already-formatted string (see debug.ts's compileExecute, which bakes
-        // formatForLog's output into the call site) — so every entry here is plain "text".
-        log: (message: string) => recordLogEntry(message),
-      };
-      const fn = compiled[runTrigger.functionName] as (rt: unknown) => Promise<void>;
+      // Unlike the interpreter's ExecutionContext.log(message, format), compiled output's log
+      // only ever takes one already-formatted string (see debug.ts's compileExecute, which bakes
+      // formatForLog's output into the call site) — so every entry here is plain "text". A fresh
+      // instance is exactly one run (see codegen.ts's CompiledFlow doc comment) — global variables
+      // start over at their declared defaults every time, same as re-launching a plain script.
+      const CompiledFlow = compiled.CompiledFlow as new (log: (message: string) => void) => Record<string, unknown>;
+      const instance = new CompiledFlow((message: string) => recordLogEntry(message));
+      const fn = (instance[runTrigger.functionName] as () => Promise<void>).bind(instance);
 
-      // Measures only the compiled script's own execution (the fn(rt) call itself) — not module
+      // Measures only the compiled script's own execution (the fn() call itself) — not module
       // resolution/import above, which is run-harness overhead, not the script's own work. Recorded
       // in a finally so a run that throws still reports how long it ran before failing; the outer
       // catch below still records the failure itself as a log line. This is metadata ABOUT the run
@@ -87,7 +87,7 @@ export async function POST(request: Request): Promise<Response> {
       // RunLog directly rather than pushed into `entries`.
       const executionStartedAt = performance.now();
       try {
-        await fn(rt);
+        await fn();
       } finally {
         executionMs = performance.now() - executionStartedAt;
       }

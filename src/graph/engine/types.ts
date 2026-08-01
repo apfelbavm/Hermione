@@ -78,6 +78,11 @@ export interface CompileEvalArgs {
   node: NodeInstance;
   inputs: Record<string, string>;
   graph: Graph;
+  /** Resolves a Variable.id to the exact JS reference compiled code should use for it — `this.<field>`
+   * for a global, a bare local `let` name for a variable local to the function body currently being
+   * compiled. Only ever populated by codegen.ts itself; see variable.ts, the only NodeDef that calls
+   * this — every other NodeDef can safely ignore it. */
+  resolveVariableRef?: (variableId: string) => string;
 }
 
 export interface CompileExecArgs {
@@ -86,6 +91,8 @@ export interface CompileExecArgs {
   graph: Graph;
   /** Compiles whatever is wired to this node's given exec-out pin into statements. */
   compileFrom: (execOutPin: string) => string[];
+  /** See CompileEvalArgs.resolveVariableRef's own doc comment. */
+  resolveVariableRef?: (variableId: string) => string;
 }
 
 export interface EventTrigger {

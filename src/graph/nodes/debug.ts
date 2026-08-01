@@ -22,7 +22,7 @@ registerNode({
     ctx.log(String(inputs.message ?? ""));
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ inputs, compileFrom }) => [`rt.log(String(${inputs.message}));`, ...compileFrom("exec-out")],
+  compileExecute: ({ inputs, compileFrom }) => [`this.log(String(${inputs.message}));`, ...compileFrom("exec-out")],
 });
 
 const FORMATS = enumOptionIds(DEBUG_LOG_FORMAT_ENUM_TYPE);
@@ -44,6 +44,6 @@ registerNode({
     ctx.log(formatForLog(String(inputs.message ?? ""), format), format);
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ inputs, compileFrom }) => [`rt.log(functionLibrary.formatForLog(String(${inputs.message}), String(${inputs.format})));`, ...compileFrom("exec-out")],
+  compileExecute: ({ inputs, compileFrom }) => [`this.log(functionLibrary.formatForLog(String(${inputs.message}), String(${inputs.format})));`, ...compileFrom("exec-out")],
   compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
