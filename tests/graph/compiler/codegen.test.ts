@@ -3,12 +3,13 @@ import { pathToFileURL } from "node:url";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
 import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
-import { connectPins } from "../../../src/graph/engine/graphMutations";
+import { addFunctionInput, addFunctionOutput, addVariable, connectPins, createFunctionDef, nextId } from "../../../src/graph/engine/graphMutations";
 import { getNodeDef } from "../../../src/graph/engine/registry";
 import { compileGraph } from "../../../src/graph/compiler/codegen";
 import { deployedScriptPath, writeDeployedScriptFile, deleteDeployedScriptFile } from "../../../src/server/deployedScriptFile";
 import { Graph } from "../../../src/graph/engine/graph";
 import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import type { Variable } from "../../../src/graph/engine/types";
 
 function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);
@@ -822,6 +823,60 @@ describe("compileGraph", () => {
 
       expect(capturedAuthHeader).toBe("Bearer tok-1");
       expect(logs).toEqual(["protected data"]);
+    });
+  });
+
+  describe("function.call (Entry/Return compiled as a shared top-level function)", () => {
+    it("compiles Start -> Call(AddTen) -> Set Variable, matching the interpreter's result", async () => {
+      const rootGraph = new Graph("g19", "test");
+      const fn = createFunctionDef("AddTen");
+      rootGraph.functions.push(fn);
+
+      const xInput = { id: nextId("io"), name: "x", type: "number" as const, defaultValue: 0 };
+      const resultOutput = { id: nextId("io"), name: "result", type: "number" as const, defaultValue: -1 };
+      addFunctionInput(fn, xInput);
+      addFunctionOutput(fn, resultOutput);
+
+      const entryNode = fn.body.nodes.find((n) => n.type === "function.entry")!;
+      const add = addBuiltinNode(fn.body, "math.add", { x: 0, y: 0 }, "add");
+      add.pins.b.value = 10;
+      const returnDef = getNodeDef("function.return");
+      const returnNode = NodeInstance.createNodeInstance("function.return", { x: 100, y: 0 }, returnDef.deriveFunctionPins!(fn), "ret", undefined, fn.id);
+      fn.body.nodes.push(returnNode);
+
+      connectPins(fn.body, fn.body.variables, rootGraph.functions, { fromNode: entryNode.id, fromPin: xInput.id, toNode: add.id, toPin: "a" });
+      connectPins(fn.body, fn.body.variables, rootGraph.functions, { fromNode: add.id, fromPin: "result", toNode: returnNode.id, toPin: resultOutput.id });
+      connectPins(fn.body, fn.body.variables, rootGraph.functions, { fromNode: entryNode.id, fromPin: "exec-out", toNode: returnNode.id, toPin: "exec-in" });
+
+      const outVar: Variable = { id: nextId("var"), name: "out", type: "number", defaultValue: 0 };
+      addVariable(rootGraph, outVar);
+
+      const start = addBuiltinNode(rootGraph, "event.start", { x: 0, y: 0 }, "start");
+      const callDef = getNodeDef("function.call");
+      const callNode = NodeInstance.createNodeInstance("function.call", { x: 100, y: 0 }, callDef.deriveFunctionPins!(fn), "call", undefined, fn.id);
+      rootGraph.nodes.push(callNode);
+      callNode.pins[xInput.id].value = 7;
+      const setVar = addBuiltinNode(rootGraph, "variable.set", { x: 200, y: 0 }, "setVar");
+      setVar.variableId = outVar.id;
+
+      connectPins(rootGraph, rootGraph.variables, rootGraph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: callNode.id, toPin: "exec-in" });
+      connectPins(rootGraph, rootGraph.variables, rootGraph.functions, { fromNode: callNode.id, fromPin: "exec-out", toNode: setVar.id, toPin: "exec-in" });
+      connectPins(rootGraph, rootGraph.variables, rootGraph.functions, { fromNode: callNode.id, fromPin: resultOutput.id, toNode: setVar.id, toPin: "value" });
+
+      const interpreterCtx = createExecutionContext(rootGraph, { log: () => {} });
+      await runExecFrom("start", "exec-out", interpreterCtx);
+      const interpreterResult = interpreterCtx.variableValues.get(outVar.id);
+
+      const { code, manifest } = compileGraph(rootGraph);
+      const compiled = await loadCompiled(code);
+      const eventInitialize = compiled.eventInitialize as () => Record<string, unknown>;
+      const trigger = compiled[manifest.triggers[0].functionName] as (rt: unknown) => Promise<void>;
+
+      const rt = { state: eventInitialize(), log: () => {} };
+      await trigger(rt);
+
+      expect(rt.state[outVar.id]).toBe(interpreterResult);
+      expect(rt.state[outVar.id]).toBe(17);
     });
   });
 });

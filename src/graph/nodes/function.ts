@@ -3,9 +3,10 @@ import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
 import { i18n } from "@i18n";
 
-// Compiler support (compileExecute/compileEvaluate) for these three node types is intentionally
-// out of scope for now — interpreter + editor first. Compiling a graph containing one throws the
-// existing "no compileExecute" error, which is an honest, clear failure mode until that lands.
+// function.entry's data outputs and function.call's whole compiled call (a target FunctionDef's
+// body is a different Graph, outside what any single node's compileExecute/compileEvaluate can
+// express) are special-cased directly in compiler/codegen.ts instead of via NodeDef fields here.
+// function.return is a normal terminal exec node, so it gets an ordinary compileExecute below.
 
 registerNode({
   type: "function.entry",
@@ -59,6 +60,11 @@ registerNode({
     ctx.onReturn?.(inputs);
     return {};
   },
+  // Assigns straight into the compiled function's `result` object (declared by
+  // compiler/codegen.ts's compileFunctionDef) — no exec-out to compileFrom into, since Return is
+  // terminal, mirroring execute()'s own "last one to fire wins" semantics for free (whichever
+  // Return statement runs last in the compiled body simply overwrites the same keys).
+  compileExecute: ({ inputs }) => Object.entries(inputs).map(([pinId, expr]) => `result[${JSON.stringify(pinId)}] = ${expr};`),
 });
 
 registerNode({
