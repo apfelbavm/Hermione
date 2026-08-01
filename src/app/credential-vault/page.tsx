@@ -58,7 +58,7 @@ function CredentialDialog({ initial, onClose, onSaved }: { initial: DialogState;
 
         <label className="modal-field-row">
           <span className="modal-field-label">{i18n.pages.credential_vault.modal_name_label}</span>
-          <input type="text" value={state.name} onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))} autoFocus />
+          <input type="text" value={state.name} onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))} disabled={state.id !== null} autoFocus />
         </label>
 
         <label className="modal-field-row">
