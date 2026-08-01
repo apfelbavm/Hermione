@@ -112,11 +112,7 @@ export async function POST(request: Request): Promise<Response> {
           recordLogEntry(message, format);
         },
         getCredential: (name) => db.getCredentialByName(name),
-        executeFlow: (targetProjectId, targetFlowId) =>
-          executeDeployedFlow(targetProjectId, targetFlowId, (message) => {
-            send("log", { message });
-            recordLogEntry(message);
-          }),
+        executeFlow: (targetProjectId, targetFlowId, params) => executeDeployedFlow(targetProjectId, targetFlowId, params),
         onNodeStart: async (nodeId) => {
           if (aborted) throw new Error("Simulation aborted by client");
           send("node-start", { nodeId });

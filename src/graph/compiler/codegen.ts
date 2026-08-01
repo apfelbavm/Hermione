@@ -631,7 +631,11 @@ export function compileGraph(graph: Graph, version = 1, revision = 1): CompileRe
     // returns something sensible — same reasoning as compileFunctionDef's own outputDeclarations.
     const flowOutputNames = state.functionOutputNamesByGraph.get(graph);
     const outputDeclarations = flowOutputNames ? flowOutputs.map((output) => `let ${flowOutputNames.get(output.id)} = ${JSON.stringify(output.defaultValue ?? null)}; // ${output.name}`) : [];
-    const returnStatement = flowOutputNames ? [`return {`, ...flowOutputs.map((output) => `  ${flowOutputNames.get(output.id)}, // ${output.name}`), `};`] : [];
+    // Keyed explicitly by the output's own declared NAME, not shorthand — a shorthand `{ x }`
+    // would key the returned object by the internal (slugified/deduped) variable name instead,
+    // which callers reading it by name (flow.executeFlow's compileExecuteOutputs, the hooks route)
+    // never see if it differs from the declared name (e.g. spaces, or a collision suffix).
+    const returnStatement = flowOutputNames ? [`return {`, ...flowOutputs.map((output) => `  ${JSON.stringify(output.name)}: ${flowOutputNames.get(output.id)},`), `};`] : [];
 
     const paramList = (node.outputEntries ?? []).map((entry) => argNames.get(entry.id)).join(", ");
     triggerMethods.push([`async ${functionName}(${paramList}) {`, ...indent([...outputDeclarations, ...body, ...returnStatement]), `}`].join("\n"));

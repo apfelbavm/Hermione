@@ -1,7 +1,5 @@
 import { NodeColorCategory } from "../engine/types";
 import { registerNode } from "../engine/registry";
-import { addNodeOutputEntry, nextId } from "../engine/graphMutations";
-import type { NodeInstance } from "../engine/nodeInstance";
 import { i18n } from "@i18n";
 
 registerNode({
@@ -63,19 +61,6 @@ registerNode({
   eventTrigger: { kind: "deploy" },
 });
 
-/** A brand-new request field, seeded the same way flow.ts's addOutputEntry seeds a fresh Execute
- * Flow/Return Flow Values output: an unused "Param_N" name, type "string" (the common case for a
- * request field), its own default value. Shared by event.request and event.execute — both are
- * identically-shaped "fields" events, just fed by a different caller (an HTTP client vs. another
- * Flow's flow.executeFlow). */
-function addRequestFieldEntry(node: NodeInstance): void {
-  const entries = node.outputEntries ?? [];
-  const taken = new Set(entries.map((e) => e.name));
-  let i = entries.length + 1;
-  while (taken.has(`Param_${i}`)) i++;
-  addNodeOutputEntry(node, { id: nextId("io"), name: `Param_${i}`, type: "string", defaultValue: "" });
-}
-
 registerNode({
   type: "event.request",
   label: i18n.nodes.event.request.label,
@@ -97,7 +82,8 @@ registerNode({
       subType: entry.subType,
     })),
   ],
-  addInstancePinEntry: addRequestFieldEntry,
+  // Fields are only ever added/removed via the Details panel's Outputs section (NodeOutputsPanel)
+  // — no canvas "+" affordance for this node type.
   // Simulating locally has no real HTTP request to read from — each declared field just reports
   // its own default value, same as any other not-yet-fed data pin.
   execute: ({ node }) => ({
@@ -136,7 +122,8 @@ registerNode({
       subType: entry.subType,
     })),
   ],
-  addInstancePinEntry: addRequestFieldEntry,
+  // Fields are only ever added/removed via the Details panel's Outputs section (NodeOutputsPanel)
+  // — no canvas "+" affordance for this node type.
   // Simulating locally has no real calling Flow to read from — each declared field just reports
   // its own default value, same as event.request.
   execute: ({ node }) => ({

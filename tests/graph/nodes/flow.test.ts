@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
 import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
-import { connectPins, removeInstancePin } from "../../../src/graph/engine/graphMutations";
+import { connectPins, removeInstancePin, addNodeOutputEntry, nextId } from "../../../src/graph/engine/graphMutations";
 import { getNodeDef } from "../../../src/graph/engine/registry";
 import { Graph } from "../../../src/graph/engine/graph";
 import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
@@ -413,12 +413,13 @@ describe("flow.parallel", () => {
 });
 
 describe("flow.executeFlow / flow.return", () => {
-  it("adds/removes output entries as both a real pin and a NodeInstance.outputEntries entry", () => {
+  it("adds/removes output entries as both a real pin and a NodeInstance.outputEntries entry (added via the Details panel, not a canvas '+')", () => {
     const def = getNodeDef("flow.executeFlow");
     const node = NodeInstance.createNodeInstance("flow.executeFlow", { x: 0, y: 0 }, def.pins, "exe");
     expect(node.outputEntries).toEqual([]);
+    expect(def.addInstancePinEntry).toBeUndefined();
 
-    def.addInstancePinEntry!(node);
+    addNodeOutputEntry(node, { id: nextId("io"), name: "NewOutput_1", type: "number", defaultValue: 0 });
     expect(node.outputEntries).toHaveLength(1);
     const [entry] = node.outputEntries!;
     expect(entry.name).toBe("NewOutput_1");
@@ -444,9 +445,8 @@ describe("flow.executeFlow / flow.return", () => {
     const node = addBuiltinNode(graph, "flow.executeFlow", "exe");
     node.targetProjectId = "proj-1";
     node.targetFlowId = "flow-1";
-    getNodeDef("flow.executeFlow").addInstancePinEntry!(node);
+    addNodeOutputEntry(node, { id: nextId("io"), name: "total", type: "number", defaultValue: 0 });
     const [entry] = node.outputEntries!;
-    entry.name = "total";
 
     const calls: Array<[string, string]> = [];
     const ctx = createExecutionContext(graph, {
@@ -467,9 +467,8 @@ describe("flow.executeFlow / flow.return", () => {
     const graph = new Graph("g", "test");
     const node = addBuiltinNode(graph, "flow.executeFlow", "exe");
     node.targetFlowId = "flow-1";
-    getNodeDef("flow.executeFlow").addInstancePinEntry!(node);
+    addNodeOutputEntry(node, { id: nextId("io"), name: "total", type: "number", defaultValue: -1 });
     const [entry] = node.outputEntries!;
-    entry.defaultValue = -1;
 
     const ctx = createExecutionContext(graph, { executeFlow: async () => ({ success: false, error: "boom", outputs: {} }) });
     await runExecFrom("exe", "exec-in", ctx);

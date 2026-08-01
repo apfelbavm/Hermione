@@ -53,6 +53,10 @@ export class NodeInstance {
    * (sibling of CodeScriptDef.outputs/FunctionDef.outputs, just living directly on the instance
    * instead of a shared definition, since neither node type binds to one). */
   outputEntries?: PinSignatureEntry[];
+  /** Sibling of outputEntries for a node whose own editable INPUT signature lives directly on the
+   * instance (see NodeDef.editableInputs) — currently flow.executeFlow's user-mapped params, sent
+   * to the target Flow's "On Execute" event fields by name (see server/executeDeployedFlow.ts). */
+  inputEntries?: PinSignatureEntry[];
 
   constructor(id: string, type: string, position: { x: number; y: number }, pins: Record<string, Pin>, variableId?: string, functionId?: string, scriptId?: string) {
     this.id = id;

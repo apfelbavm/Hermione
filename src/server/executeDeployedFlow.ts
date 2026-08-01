@@ -22,13 +22,17 @@ export interface ExecuteFlowResult {
  * exact function directly (see compileUtils.ts's EXECUTE_FLOW_IMPORT) instead of re-implementing
  * this lookup inline in generated code. Fires the target's "On Execute" event (nodes/event.ts's
  * event.execute, manifest kind "execute") — NOT "On Run" (kind "run"), which only ever fires from
- * the Emulate page's own Run button (see api/emulate/run/route.ts). Never throws: every failure
- * mode (never deployed, no "On Execute" event, the deployed script itself throwing) is reported as
- * `{ success: false, error }` instead, since a calling flow reads success/error off real output pins
- * rather than a try/catch. Also persists its own RunLog (kind "chained") for the triggered flow
- * itself — otherwise its log output would only ever show up buried inside the CALLING flow's own
- * run, under the caller's own flowId, with no trace of it under the triggered flow's own Logs. */
-export async function executeDeployedFlow(projectId: string, flowId: string, log: (message: string) => void): Promise<ExecuteFlowResult> {
+ * the Emulate page's own Run button (see api/emulate/run/route.ts). `params` are flow.executeFlow's
+ * own user-mapped inputs (by name) — matched against the target's declared fields the exact same
+ * way api/hooks/[projectId]/[flowId]/route.ts matches an HTTP request's merged query/body params,
+ * falling back to that field's own default when the caller didn't map it. Never throws: every
+ * failure mode (never deployed, no "On Execute" event, the deployed script itself throwing) is
+ * reported as `{ success: false, error }` instead, since a calling flow reads success/error off
+ * real output pins rather than a try/catch. Also persists its own RunLog (kind "chained") for the
+ * triggered flow itself — otherwise its log output would only ever show up buried inside the
+ * CALLING flow's own run, under the caller's own flowId, with no trace of it under the triggered
+ * flow's own Logs — NOT the calling flow's, whose log should only ever show its own steps. */
+export async function executeDeployedFlow(projectId: string, flowId: string, params: Record<string, unknown> = {}): Promise<ExecuteFlowResult> {
   if (!flowId) {
     return { success: false, error: "No Flow selected — nothing to execute.", outputs: {} };
   }
@@ -43,7 +47,6 @@ export async function executeDeployedFlow(projectId: string, flowId: string, log
   const entries: LogEntry[] = [];
   function record(message: string): void {
     entries.push({ id: nextId("log"), message, format: "text", timestamp: new Date().toISOString() });
-    log(message);
   }
 
   let executionMs: number | undefined;
@@ -64,11 +67,10 @@ export async function executeDeployedFlow(projectId: string, flowId: string, log
       const fn = (instance[executeTrigger.functionName] as (...fieldArgs: unknown[]) => Promise<Record<string, unknown> | void>).bind(instance);
 
       // Declared by event.execute's own describeInstance, in the exact same order codegen.ts
-      // compiled its trigger method's real parameters (see eventTriggerArgNamesByNode). A chained
-      // call has no caller-supplied values of its own (unlike an HTTP request's body/query params),
-      // so every declared field is fed its own default value.
-      const declaredFields = (executeTrigger.details.params as { defaultValue: unknown }[] | undefined) ?? [];
-      const args = declaredFields.map((field) => field.defaultValue);
+      // compiled its trigger method's real parameters (see eventTriggerArgNamesByNode) — matched
+      // by name against the caller's own params, same as the hooks route's merged query/body object.
+      const declaredFields = (executeTrigger.details.params as { name: string; defaultValue: unknown }[] | undefined) ?? [];
+      const args = declaredFields.map((field) => (field.name in params ? params[field.name] : field.defaultValue));
 
       const executionStartedAt = performance.now();
       try {

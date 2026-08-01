@@ -36,6 +36,7 @@ function reviveNode(node: NodeInstance): NodeInstance {
   // A save from before this node type could have editable outputs is simply missing the field
   // (same defaulting-IS-the-migration story as reviveGraph's own doc comment below).
   revived.outputEntries = node.outputEntries ? [...node.outputEntries] : node.outputEntries;
+  revived.inputEntries = node.inputEntries ? [...node.inputEntries] : node.inputEntries;
   return revived;
 }
 

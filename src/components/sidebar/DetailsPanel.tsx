@@ -16,6 +16,7 @@ import { useStoreRevision } from "../../state/useStore";
 import { FunctionIoPanel } from "./FunctionIoPanel";
 import { ImperativeMount } from "./ImperativeMount";
 import { NodeOutputsPanel } from "./NodeOutputsPanel";
+import { NodeInputsPanel } from "./NodeInputsPanel";
 import { ScriptIoPanel } from "./ScriptIoPanel";
 
 /** Only rendered for a "flow.executeFlow" node (see NodeDef.editableOutputs/nodes/flow.ts) — the
@@ -362,6 +363,7 @@ export function DetailsPanel({ store }: { store: Store }) {
       <div className="details-header">{i18n.components.details_panel.header}</div>
       {variable && <VariableDetails store={store} variable={variable} />}
       {selectedNode && <NodeDetails store={store} node={selectedNode} properties={nodeProperties ?? []} />}
+      {selectedNode && getNodeDef(selectedNode.type).editableInputs && <NodeInputsPanel store={store} getSelectedNode={() => selectedNode!} />}
       {selectedNode && getNodeDef(selectedNode.type).editableOutputs && <NodeOutputsPanel store={store} getSelectedNode={() => selectedNode!} />}
       {selectedComment && <CommentDetails store={store} comment={selectedComment} />}
       {fn && (

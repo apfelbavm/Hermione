@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
+import { addNodeOutputEntry, nextId } from "../../../src/graph/engine/graphMutations";
 import { getNodeDef } from "../../../src/graph/engine/registry";
 import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
@@ -65,12 +66,13 @@ describe("event.request", () => {
     expect(def.editableOutputs).toBe(true);
   });
 
-  it("adds a request field via addInstancePinEntry, as both a real pin and an outputEntries entry", () => {
+  it("adds a request field via addNodeOutputEntry, as both a real pin and an outputEntries entry (fields are only ever added via the Details panel, not a canvas '+')", () => {
     const def = getNodeDef("event.request");
     const node = NodeInstance.createNodeInstance("event.request", { x: 0, y: 0 }, def.pins, "req");
     expect(node.outputEntries).toEqual([]);
+    expect(def.addInstancePinEntry).toBeUndefined();
 
-    def.addInstancePinEntry!(node);
+    addNodeOutputEntry(node, { id: nextId("io"), name: "Param_1", type: "string", defaultValue: "" });
     expect(node.outputEntries).toHaveLength(1);
     const [entry] = node.outputEntries!;
     expect(entry.name).toBe("Param_1");
@@ -85,9 +87,8 @@ describe("event.request", () => {
   it("execute() reports each declared field's own default value (no real request while Simulating)", async () => {
     const def = getNodeDef("event.request");
     const node = NodeInstance.createNodeInstance("event.request", { x: 0, y: 0 }, def.pins, "req");
-    def.addInstancePinEntry!(node);
+    addNodeOutputEntry(node, { id: nextId("io"), name: "Param_1", type: "string", defaultValue: "fallback" });
     const [entry] = node.outputEntries!;
-    entry.defaultValue = "fallback";
 
     const result = await def.execute!({ node, inputs: {}, ctx: {} as never });
     expect(result.nextExec).toBe("exec-out");
@@ -97,13 +98,8 @@ describe("event.request", () => {
   it("describeInstance reports declared fields by name, in order, for the compiled manifest/hooks route", () => {
     const def = getNodeDef("event.request");
     const node = NodeInstance.createNodeInstance("event.request", { x: 0, y: 0 }, def.pins, "req");
-    def.addInstancePinEntry!(node);
-    def.addInstancePinEntry!(node);
-    const [first, second] = node.outputEntries!;
-    first.name = "userId";
-    second.name = "amount";
-    second.type = "number";
-    second.defaultValue = 0;
+    addNodeOutputEntry(node, { id: nextId("io"), name: "userId", type: "string", defaultValue: "" });
+    addNodeOutputEntry(node, { id: nextId("io"), name: "amount", type: "number", defaultValue: 0 });
 
     expect(def.eventTrigger!.kind).toBe("request");
     expect(def.eventTrigger!.describeInstance!(node)).toEqual({

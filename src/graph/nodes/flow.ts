@@ -2,8 +2,7 @@ import { registerNode } from "../engine/registry";
 import { DELAY_HELPER_SOURCE, EXECUTE_FLOW_IMPORT, compileResultVar, indent } from "../engine/compileUtils";
 import { runExecFrom } from "../engine/executor";
 import { connectionsFrom } from "../engine/graphQueries";
-import { cloneDefaultValue, nextId } from "../engine/graphMutations";
-import type { PinDef, PinSignatureEntry } from "../engine/types";
+import type { PinDef } from "../engine/types";
 import { NodeInstance } from "../engine/nodeInstance";
 import { i18n } from "@i18n";
 
@@ -210,20 +209,6 @@ registerNode({
   },
 });
 
-/** A brand-new output entry, seeded the same way ScriptIoPanel/FunctionIoPanel seed a fresh
- * input/output: an unused "NewOutput_N" name, type "number", its own type's default value —
- * added via the canvas "+" affordance (NodeDef.addInstancePinEntry); renamed/retyped afterward via
- * NodeOutputsPanel in the Details sidebar (see NodeDef.editableOutputs). */
-function addOutputEntry(node: NodeInstance): void {
-  const entries = node.outputEntries ?? (node.outputEntries = []);
-  const taken = new Set(entries.map((e) => e.name));
-  let i = entries.length + 1;
-  while (taken.has(`NewOutput_${i}`)) i++;
-  const entry: PinSignatureEntry = { id: nextId("io"), name: `NewOutput_${i}`, type: "number", defaultValue: 0 };
-  entries.push(entry);
-  node.pins[entry.id] = { value: cloneDefaultValue(entry.defaultValue) };
-}
-
 registerNode({
   type: "flow.return",
   label: i18n.nodes.flow.return.label,
@@ -244,7 +229,8 @@ registerNode({
       subType: entry.subType,
     })),
   ],
-  addInstancePinEntry: addOutputEntry,
+  // Values are only ever added/removed via the Details panel's Outputs section (NodeOutputsPanel)
+  // — no canvas "+" affordance for this node type.
   // Terminal — no exec-out, same as function.return. Only meaningful to the interpreter as a log
   // line (there's no caller waiting on a return value while Simulating this flow itself in the
   // editor — a real caller only ever sees these values via the DEPLOYED path, see flow.executeFlow
@@ -274,13 +260,26 @@ registerNode({
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
-  ], // any further output pins below are derived per-instance from this node's own outputEntries
+  ], // any further input/output pins below are derived per-instance from this node's own inputEntries/outputEntries
   editableOutputs: true,
+  // The target Flow's own "On Execute" event (see nodes/event.ts's event.execute) reads these by
+  // name — same relationship as event.request's fields to an actual HTTP request's body/query.
+  editableInputs: true,
   // Latent: dynamic-imports and awaits the target Flow's own DEPLOYED script (see
   // server/executeDeployedFlow.ts) — genuinely spans real time, same reasoning as Delay/HTTP Request.
   latent: true,
   deriveInstancePins: (node) => [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
+    ...(node.inputEntries ?? []).map((entry) => ({
+      id: entry.id,
+      label: entry.name,
+      type: entry.type,
+      direction: "input" as const,
+      defaultValue: entry.defaultValue,
+      container: entry.container,
+      keyType: entry.keyType,
+      subType: entry.subType,
+    })),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
@@ -294,15 +293,20 @@ registerNode({
       subType: entry.subType,
     })),
   ],
-  addInstancePinEntry: addOutputEntry,
-  execute: async ({ node, ctx }) => {
+  // Params/outputs are only ever added/removed via the Details panel's Inputs/Outputs sections
+  // (NodeInputsPanel/NodeOutputsPanel) — no canvas "+" affordance for this node type.
+  execute: async ({ node, inputs, ctx }) => {
     if (!node.targetFlowId || !ctx.executeFlow) {
       return { nextExec: "exec-out", outputs: mappedOutputs(node, false, "Script not compiled, couldn't execute.", {}) };
     }
-    const result = await ctx.executeFlow(node.targetProjectId ?? "", node.targetFlowId);
+    const params = Object.fromEntries((node.inputEntries ?? []).map((entry) => [entry.name, inputs[entry.id]]));
+    const result = await ctx.executeFlow(node.targetProjectId ?? "", node.targetFlowId, params);
     return { nextExec: "exec-out", outputs: mappedOutputs(node, result.success, result.error, result.outputs) };
   },
-  compileExecute: ({ node, compileFrom }) => [`const ${compileResultVar(node.id)} = await executeDeployedFlow(${JSON.stringify(node.targetProjectId ?? "")}, ${JSON.stringify(node.targetFlowId ?? "")}, (m) => this.log(m));`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => {
+    const paramsLiteral = `{ ${(node.inputEntries ?? []).map((entry) => `${JSON.stringify(entry.name)}: ${inputs[entry.id]}`).join(", ")} }`;
+    return [`const ${compileResultVar(node.id)} = await executeDeployedFlow(${JSON.stringify(node.targetProjectId ?? "")}, ${JSON.stringify(node.targetFlowId ?? "")}, ${paramsLiteral});`, ...compileFrom("exec-out")];
+  },
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     const outputs: Record<string, string> = { success: `${v}.success`, error: `${v}.error` };

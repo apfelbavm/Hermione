@@ -154,6 +154,10 @@ export interface NodeDef {
    * derives from that same `outputEntries` array — sibling of configurableElementType/
    * configurableSubType, just for a whole editable signature instead of one picked type. */
   editableOutputs?: boolean;
+  /** Sibling of editableOutputs for a node whose own editable INPUT signature lives directly on
+   * the instance (see NodeInstance.inputEntries) \u2014 currently flow.executeFlow's user-mapped
+   * params. Shown as its own Inputs panel in the Details sidebar (see NodeInputsPanel). */
+  editableInputs?: boolean;
   /** Instance-level configuration edited in the sidebar Details panel when this node is selected
    * on the canvas (see detailsPanel.ts) — e.g. On Interval's interval duration — instead of as a
    * wireable pin. Storage still goes through NodeInstance.pins (same as any other pin's value);
@@ -377,8 +381,10 @@ export interface ExecutionContext {
    * server/executeDeployedFlow.ts, wired in by /api/simulate/route.ts). The COMPILED path has no
    * equivalent need for this: a deployed flow's own compiled flow.executeFlow calls
    * executeDeployedFlow directly (see compileUtils.ts's EXECUTE_FLOW_IMPORT) instead of going
-   * through this context hook. */
-  executeFlow?: (projectId: string, flowId: string) => Promise<{ success: boolean; error: string; outputs: Record<string, unknown> }>;
+   * through this context hook. `params` are flow.executeFlow's own user-mapped inputs (by name),
+   * fed to the target's "On Execute" event fields the same way an HTTP request feeds "On HTTP
+   * Request" (see event.ts's event.execute/event.request). */
+  executeFlow?: (projectId: string, flowId: string, params: Record<string, unknown>) => Promise<{ success: boolean; error: string; outputs: Record<string, unknown> }>;
   /** Fired whenever a node's data OUTPUT pins get a fresh value — both when an exec node's own
    * execute() produces them, and when a pure/data node's evaluate() runs to satisfy some downstream
    * pin read (see executor.ts's runExecFrom/resolveDataPin) — so a client watching a live run can

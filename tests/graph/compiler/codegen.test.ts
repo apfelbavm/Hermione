@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
 import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
-import { addFunctionInput, addFunctionOutput, addVariable, connectPins, createFunctionDef, nextId } from "../../../src/graph/engine/graphMutations";
+import { addFunctionInput, addFunctionOutput, addNodeOutputEntry, addVariable, connectPins, createFunctionDef, nextId } from "../../../src/graph/engine/graphMutations";
 import { getNodeDef } from "../../../src/graph/engine/registry";
 import { compileGraph } from "../../../src/graph/compiler/codegen";
 import { deployedScriptPath, writeDeployedScriptFile, deleteDeployedScriptFile } from "../../../src/server/deployedScriptFile";
@@ -859,9 +859,8 @@ describe("compileGraph", () => {
       const returnDef = getNodeDef("flow.return");
       const returnNode = NodeInstance.createNodeInstance("flow.return", { x: 200, y: 0 }, returnDef.pins, "ret");
       graph.nodes.push(returnNode);
-      returnDef.addInstancePinEntry!(returnNode);
+      addNodeOutputEntry(returnNode, { id: nextId("io"), name: "sum", type: "number", defaultValue: 0 });
       const [entry] = returnNode.outputEntries!;
-      entry.name = "sum";
 
       connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: returnNode.id, toPin: "exec-in" });
       connectPins(graph, graph.variables, graph.functions, { fromNode: add.id, fromPin: "result", toNode: returnNode.id, toPin: entry.id });
@@ -876,6 +875,34 @@ describe("compileGraph", () => {
       const returned = await fn();
 
       expect(returned).toEqual({ sum: 5 });
+    });
+
+    it("returns an object keyed by the output's own declared name, even when it differs from the compiled internal variable name", async () => {
+      const graph = new Graph("g20b", "test");
+      const start = addBuiltinNode(graph, "event.run", { x: 0, y: 0 }, "start");
+      const add = addBuiltinNode(graph, "math.add", { x: 100, y: 0 }, "add");
+      add.pins.a.value = 2;
+      add.pins.b.value = 3;
+
+      const returnDef = getNodeDef("flow.return");
+      const returnNode = NodeInstance.createNodeInstance("flow.return", { x: 200, y: 0 }, returnDef.pins, "ret");
+      graph.nodes.push(returnNode);
+      // A name that slugifies to a different identifier ("Total Sum" -> "totalSum") — the returned
+      // object must still be keyed by the literal declared name "Total Sum", not "totalSum".
+      addNodeOutputEntry(returnNode, { id: nextId("io"), name: "Total Sum", type: "number", defaultValue: 0 });
+      const [entry] = returnNode.outputEntries!;
+
+      connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: returnNode.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: add.id, fromPin: "result", toNode: returnNode.id, toPin: entry.id });
+
+      const { code, manifest } = compileGraph(graph);
+
+      const compiled = await loadCompiled(code);
+      const instance = instantiate(compiled, () => {});
+      const fn = (instance[manifest.triggers[0].functionName] as () => Promise<Record<string, unknown>>).bind(instance);
+      const returned = await fn();
+
+      expect(returned).toEqual({ "Total Sum": 5 });
     });
 
     it("still compiles a trigger with no return statement when the graph has no flow.return node", async () => {
@@ -899,21 +926,15 @@ describe("compileGraph", () => {
       const requestDef = getNodeDef("event.request");
       const request = NodeInstance.createNodeInstance("event.request", { x: 0, y: 0 }, requestDef.pins, "req");
       graph.nodes.push(request);
-      requestDef.addInstancePinEntry!(request);
-      requestDef.addInstancePinEntry!(request);
-      const [userId, amount] = request.outputEntries!;
-      userId.name = "userId";
-      amount.name = "amount";
-      amount.type = "number";
-      amount.defaultValue = 0;
+      addNodeOutputEntry(request, { id: nextId("io"), name: "userId", type: "string", defaultValue: "" });
+      addNodeOutputEntry(request, { id: nextId("io"), name: "amount", type: "number", defaultValue: 0 });
+      const [userId] = request.outputEntries!;
 
       const returnDef = getNodeDef("flow.return");
       const returnNode = NodeInstance.createNodeInstance("flow.return", { x: 200, y: 0 }, returnDef.pins, "ret");
       graph.nodes.push(returnNode);
-      returnDef.addInstancePinEntry!(returnNode);
+      addNodeOutputEntry(returnNode, { id: nextId("io"), name: "echoedUserId", type: "string", defaultValue: null });
       const [echoed] = returnNode.outputEntries!;
-      echoed.name = "echoedUserId";
-      echoed.type = "string";
 
       connectPins(graph, graph.variables, graph.functions, { fromNode: request.id, fromPin: "exec-out", toNode: returnNode.id, toPin: "exec-in" });
       connectPins(graph, graph.variables, graph.functions, { fromNode: request.id, fromPin: userId.id, toNode: returnNode.id, toPin: echoed.id });
@@ -937,16 +958,15 @@ describe("compileGraph", () => {
       const requestDef = getNodeDef("event.request");
       const request = NodeInstance.createNodeInstance("event.request", { x: 0, y: 0 }, requestDef.pins, "req");
       graph.nodes.push(request);
-      requestDef.addInstancePinEntry!(request);
+      addNodeOutputEntry(request, { id: nextId("io"), name: "field", type: "string", defaultValue: "" });
       const [field] = request.outputEntries!;
 
       const run = addBuiltinNode(graph, "event.run", { x: 0, y: 100 }, "start");
       const returnDef = getNodeDef("flow.return");
       const returnNode = NodeInstance.createNodeInstance("flow.return", { x: 200, y: 100 }, returnDef.pins, "ret");
       graph.nodes.push(returnNode);
-      returnDef.addInstancePinEntry!(returnNode);
+      addNodeOutputEntry(returnNode, { id: nextId("io"), name: "echoed", type: "string", defaultValue: null });
       const [echoed] = returnNode.outputEntries!;
-      echoed.type = "string";
 
       // Wires event.run's own exec chain to Return, but the DATA pin feeding Return comes from
       // event.request's field — only ever valid inside event.request's own trigger method.

@@ -643,3 +643,44 @@ export function updateNodeOutputEntry(graph: Graph, node: NodeInstance, entryId:
     graph.connections = graph.connections.filter((c) => !(c.fromNode === node.id && c.fromPin === entryId));
   }
 }
+
+// --- Node-instance input entries (NodeDef.editableInputs) ----------------------------------------
+// Sibling of the output-entry helpers above, but for a node type whose own declared INPUT
+// signature lives directly on ONE NodeInstance (see NodeInstance.inputEntries) — currently
+// flow.executeFlow's user-mapped params. Disconnects any wire FEEDING the pin (unlike the output
+// side, which disconnects wires leaving it), since an input pin is what THIS node reads from.
+
+export function addNodeInputEntry(node: NodeInstance, entry: PinSignatureEntry): void {
+  (node.inputEntries ??= []).push(entry);
+  node.pins[entry.id] = { value: cloneDefaultValue(entry.defaultValue) };
+}
+
+export function removeNodeInputEntry(graph: Graph, node: NodeInstance, entryId: string): void {
+  node.inputEntries = (node.inputEntries ?? []).filter((e) => e.id !== entryId);
+  delete node.pins[entryId];
+  graph.connections = graph.connections.filter((c) => !(c.toNode === node.id && c.toPin === entryId));
+}
+
+export function moveNodeInputEntry(node: NodeInstance, entryId: string, targetEntryId: string, position: "before" | "after"): void {
+  moveInArray(node.inputEntries ?? [], entryId, targetEntryId, position);
+}
+
+/** Renames/retypes/revalues one of this node's own input entries — a type/container/keyType/subType
+ * change disconnects any wire feeding that pin, same reasoning as updateNodeOutputEntry. */
+export function updateNodeInputEntry(graph: Graph, node: NodeInstance, entryId: string, patch: TypedEntryPatch): void {
+  const entry = (node.inputEntries ?? []).find((e) => e.id === entryId);
+  if (!entry) return;
+
+  const signatureChanged = (patch.type !== undefined && patch.type !== entry.type) || (patch.container !== undefined && patch.container !== entry.container) || (patch.keyType !== undefined && patch.keyType !== entry.keyType) || (patch.subType !== undefined && patch.subType !== entry.subType);
+  if (patch.name !== undefined) entry.name = patch.name;
+  if (patch.type !== undefined) entry.type = patch.type;
+  if (patch.container !== undefined) entry.container = patch.container;
+  if (patch.keyType !== undefined) entry.keyType = patch.keyType;
+  if (patch.subType !== undefined) entry.subType = patch.subType;
+  if (patch.defaultValue !== undefined) entry.defaultValue = patch.defaultValue;
+  else if (signatureChanged) entry.defaultValue = defaultValueFor(entry.type, entry.container, entry.subType);
+
+  if (signatureChanged) {
+    graph.connections = graph.connections.filter((c) => !(c.toNode === node.id && c.toPin === entryId));
+  }
+}

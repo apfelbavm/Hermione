@@ -141,6 +141,7 @@
       "node_description_placeholder": "Shown as a speech bubble above this node on the canvas",
       "function_description_placeholder": "Shown as a tooltip when hovering this function",
       "node_outputs_title": "Outputs",
+      "node_inputs_title": "Inputs",
       "target_project": "Project",
       "target_flow": "Deployed Flow",
       "no_project_selected": "Select a project…",
