@@ -119,6 +119,176 @@ export interface GraphRequestResult extends GraphOpResult {
   data: unknown;
 }
 
+export interface GraphChannel {
+  id: string;
+  displayName: string;
+  description: string;
+}
+
+export interface GraphListChannelsResult extends GraphOpResult {
+  channels: GraphChannel[];
+}
+
+export interface GraphChannelMessage {
+  id: string;
+  from: string;
+  content: string;
+  createdDateTime: string;
+}
+
+export interface GraphListChannelMessagesResult extends GraphOpResult {
+  messages: GraphChannelMessage[];
+}
+
+export interface GraphChat {
+  id: string;
+  topic: string;
+  chatType: string;
+}
+
+export interface GraphListChatsResult extends GraphOpResult {
+  chats: GraphChat[];
+}
+
+export interface GraphSite {
+  id: string;
+  name: string;
+  webUrl: string;
+}
+
+export interface GraphListSitesResult extends GraphOpResult {
+  sites: GraphSite[];
+}
+
+export interface GraphSiteList {
+  id: string;
+  name: string;
+}
+
+export interface GraphListSiteListsResult extends GraphOpResult {
+  lists: GraphSiteList[];
+}
+
+export interface GraphListItem {
+  id: string;
+  fieldsJson: string;
+}
+
+export interface GraphListListItemsResult extends GraphOpResult {
+  items: GraphListItem[];
+}
+
+export interface GraphSharingLinkResult extends GraphOpResult {
+  link: string;
+}
+
+export interface GraphWorksheet {
+  id: string;
+  name: string;
+}
+
+export interface GraphListWorksheetsResult extends GraphOpResult {
+  worksheets: GraphWorksheet[];
+}
+
+export interface GraphRangeResult extends GraphOpResult {
+  valuesJson: string;
+}
+
+export interface GraphTable {
+  id: string;
+  name: string;
+}
+
+export interface GraphListTablesResult extends GraphOpResult {
+  tables: GraphTable[];
+}
+
+export interface GraphPlannerPlan {
+  id: string;
+  title: string;
+}
+
+export interface GraphListPlannerPlansResult extends GraphOpResult {
+  plans: GraphPlannerPlan[];
+}
+
+export interface GraphPlannerTask {
+  id: string;
+  title: string;
+  percentComplete: number;
+}
+
+export interface GraphListPlannerTasksResult extends GraphOpResult {
+  tasks: GraphPlannerTask[];
+}
+
+export interface GraphTodoList {
+  id: string;
+  displayName: string;
+}
+
+export interface GraphListTodoListsResult extends GraphOpResult {
+  lists: GraphTodoList[];
+}
+
+export interface GraphTodoTask {
+  id: string;
+  title: string;
+  status: string;
+}
+
+export interface GraphListTodoTasksResult extends GraphOpResult {
+  tasks: GraphTodoTask[];
+}
+
+export interface GraphContact {
+  id: string;
+  displayName: string;
+  email: string;
+}
+
+export interface GraphListContactsResult extends GraphOpResult {
+  contacts: GraphContact[];
+}
+
+export interface GraphApplication {
+  id: string;
+  displayName: string;
+  appId: string;
+}
+
+export interface GraphListApplicationsResult extends GraphOpResult {
+  applications: GraphApplication[];
+}
+
+export interface GraphDirectoryRole {
+  id: string;
+  displayName: string;
+}
+
+export interface GraphListDirectoryRolesResult extends GraphOpResult {
+  roles: GraphDirectoryRole[];
+}
+
+export interface GraphListLicensesResult extends GraphOpResult {
+  skuIds: string[];
+}
+
+export interface GraphDriveItemResult extends GraphOpResult {
+  id: string;
+}
+
+export interface GraphTrendingDocument {
+  id: string;
+  name: string;
+  webUrl: string;
+}
+
+export interface GraphListTrendingDocumentsResult extends GraphOpResult {
+  documents: GraphTrendingDocument[];
+}
+
 const managerCache = new Map<string, GraphManager>();
 
 export class GraphManager {
@@ -466,6 +636,370 @@ export class GraphManager {
       body: { contentType: "html", content: message },
     });
     return res.ok ? { success: true, error: "" } : { success: false, error: res.error };
+  }
+
+  async listChannels(teamId: string): Promise<GraphListChannelsResult> {
+    const res = await this.request<{
+      value: { id: string; displayName?: string; description?: string }[];
+    }>("GET", `/teams/${encodeURIComponent(teamId)}/channels`);
+    if (!res.ok) return { success: false, channels: [], error: res.error };
+    const channels = res.data.value.map((c) => ({
+      id: c.id,
+      displayName: c.displayName ?? "",
+      description: c.description ?? "",
+    }));
+    return { success: true, channels, error: "" };
+  }
+
+  async createChannel(teamId: string, displayName: string, description: string): Promise<GraphDriveItemResult> {
+    const res = await this.request<{ id: string }>("POST", `/teams/${encodeURIComponent(teamId)}/channels`, {
+      displayName,
+      description,
+    });
+    if (!res.ok) return { success: false, id: "", error: res.error };
+    return { success: true, id: res.data.id, error: "" };
+  }
+
+  async listChannelMessages(teamId: string, channelId: string, top: number): Promise<GraphListChannelMessagesResult> {
+    const query = new URLSearchParams({ $top: String(top || 25) });
+    const res = await this.request<{
+      value: {
+        id: string;
+        from?: { user?: { displayName?: string } };
+        body?: { content?: string };
+        createdDateTime?: string;
+      }[];
+    }>("GET", `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages?${query}`);
+    if (!res.ok) return { success: false, messages: [], error: res.error };
+    const messages = res.data.value.map((m) => ({
+      id: m.id,
+      from: m.from?.user?.displayName ?? "",
+      content: m.body?.content ?? "",
+      createdDateTime: m.createdDateTime ?? "",
+    }));
+    return { success: true, messages, error: "" };
+  }
+
+  async listChats(userId: string): Promise<GraphListChatsResult> {
+    const res = await this.request<{
+      value: { id: string; topic?: string; chatType?: string }[];
+    }>("GET", `/users/${encodeURIComponent(userId)}/chats`);
+    if (!res.ok) return { success: false, chats: [], error: res.error };
+    const chats = res.data.value.map((c) => ({
+      id: c.id,
+      topic: c.topic ?? "",
+      chatType: c.chatType ?? "",
+    }));
+    return { success: true, chats, error: "" };
+  }
+
+  async sendChatMessage(chatId: string, message: string): Promise<GraphOpResult> {
+    const res = await this.request("POST", `/chats/${encodeURIComponent(chatId)}/messages`, {
+      body: { contentType: "html", content: message },
+    });
+    return res.ok ? { success: true, error: "" } : { success: false, error: res.error };
+  }
+
+  async listSites(search: string): Promise<GraphListSitesResult> {
+    const path = search ? `/sites?search=${encodeURIComponent(search)}` : "/sites?search=*";
+    const res = await this.request<{
+      value: { id: string; name?: string; webUrl?: string }[];
+    }>("GET", path);
+    if (!res.ok) return { success: false, sites: [], error: res.error };
+    const sites = res.data.value.map((s) => ({
+      id: s.id,
+      name: s.name ?? "",
+      webUrl: s.webUrl ?? "",
+    }));
+    return { success: true, sites, error: "" };
+  }
+
+  async listSiteLists(siteId: string): Promise<GraphListSiteListsResult> {
+    const res = await this.request<{ value: { id: string; name?: string }[] }>("GET", `/sites/${encodeURIComponent(siteId)}/lists`);
+    if (!res.ok) return { success: false, lists: [], error: res.error };
+    const lists = res.data.value.map((l) => ({ id: l.id, name: l.name ?? "" }));
+    return { success: true, lists, error: "" };
+  }
+
+  async listListItems(siteId: string, listId: string): Promise<GraphListListItemsResult> {
+    const res = await this.request<{
+      value: { id: string; fields?: unknown }[];
+    }>("GET", `/sites/${encodeURIComponent(siteId)}/lists/${encodeURIComponent(listId)}/items?expand=fields`);
+    if (!res.ok) return { success: false, items: [], error: res.error };
+    const items = res.data.value.map((i) => ({
+      id: i.id,
+      fieldsJson: JSON.stringify(i.fields ?? {}),
+    }));
+    return { success: true, items, error: "" };
+  }
+
+  async createListItem(siteId: string, listId: string, fieldsJson: string): Promise<GraphDriveItemResult> {
+    const res = await this.request<{ id: string }>("POST", `/sites/${encodeURIComponent(siteId)}/lists/${encodeURIComponent(listId)}/items`, {
+      fields: JSON.parse(fieldsJson || "{}"),
+    });
+    if (!res.ok) return { success: false, id: "", error: res.error };
+    return { success: true, id: res.data.id, error: "" };
+  }
+
+  async createFolder(userId: string, parentPath: string, name: string): Promise<GraphDriveItemResult> {
+    const res = await this.request<{ id: string }>("POST", `/users/${encodeURIComponent(userId)}/drive${this.driveItemPath(parentPath)}/children`, {
+      name,
+      folder: {},
+      "@microsoft.graph.conflictBehavior": "rename",
+    });
+    if (!res.ok) return { success: false, id: "", error: res.error };
+    return { success: true, id: res.data.id, error: "" };
+  }
+
+  async moveDriveItem(userId: string, path: string, destinationFolderPath: string): Promise<GraphOpResult> {
+    const res = await this.request("PATCH", `/users/${encodeURIComponent(userId)}/drive${this.driveItemPath(path)}`, {
+      parentReference: {
+        path: `/drive${this.driveItemPath(destinationFolderPath)}`,
+      },
+    });
+    return res.ok ? { success: true, error: "" } : { success: false, error: res.error };
+  }
+
+  async copyDriveItem(userId: string, path: string, destinationFolderPath: string, newName: string): Promise<GraphOpResult> {
+    const res = await this.request("POST", `/users/${encodeURIComponent(userId)}/drive${this.driveItemPath(path)}/copy`, {
+      parentReference: {
+        path: `/drive${this.driveItemPath(destinationFolderPath)}`,
+      },
+      ...(newName ? { name: newName } : {}),
+    });
+    return res.ok ? { success: true, error: "" } : { success: false, error: res.error };
+  }
+
+  async createSharingLink(userId: string, path: string, type: string, scope: string): Promise<GraphSharingLinkResult> {
+    const res = await this.request<{ link?: { webUrl?: string } }>("POST", `/users/${encodeURIComponent(userId)}/drive${this.driveItemPath(path)}/createLink`, {
+      type: type || "view",
+      scope: scope || "organization",
+    });
+    if (!res.ok) return { success: false, link: "", error: res.error };
+    return { success: true, link: res.data.link?.webUrl ?? "", error: "" };
+  }
+
+  async searchDriveItems(userId: string, query: string): Promise<GraphListDriveItemsResult> {
+    const res = await this.request<{
+      value: { id: string; name?: string; folder?: unknown; size?: number }[];
+    }>("GET", `/users/${encodeURIComponent(userId)}/drive/root/search(q='${encodeURIComponent(query)}')`);
+    if (!res.ok) return { success: false, items: [], error: res.error };
+    const items = res.data.value.map((i) => ({
+      id: i.id,
+      name: i.name ?? "",
+      isFolder: i.folder !== undefined,
+      size: i.size ?? 0,
+    }));
+    return { success: true, items, error: "" };
+  }
+
+  /** Graph addresses Excel worksheets/ranges through the workbook API, rooted at the file's drive
+   * item — every call below hangs off that same driveItemPath helper used for plain file ops. */
+  async listWorksheets(userId: string, path: string): Promise<GraphListWorksheetsResult> {
+    const res = await this.request<{ value: { id: string; name?: string }[] }>("GET", `/users/${encodeURIComponent(userId)}/drive${this.driveItemPath(path)}/workbook/worksheets`);
+    if (!res.ok) return { success: false, worksheets: [], error: res.error };
+    const worksheets = res.data.value.map((w) => ({
+      id: w.id,
+      name: w.name ?? "",
+    }));
+    return { success: true, worksheets, error: "" };
+  }
+
+  async getWorksheetRange(userId: string, path: string, worksheetName: string, address: string): Promise<GraphRangeResult> {
+    const res = await this.request<{ values?: unknown }>("GET", `/users/${encodeURIComponent(userId)}/drive${this.driveItemPath(path)}/workbook/worksheets/${encodeURIComponent(worksheetName)}/range(address='${encodeURIComponent(address)}')`);
+    if (!res.ok) return { success: false, valuesJson: "", error: res.error };
+    return {
+      success: true,
+      valuesJson: JSON.stringify(res.data.values ?? []),
+      error: "",
+    };
+  }
+
+  async setWorksheetRange(userId: string, path: string, worksheetName: string, address: string, valuesJson: string): Promise<GraphOpResult> {
+    const res = await this.request("PATCH", `/users/${encodeURIComponent(userId)}/drive${this.driveItemPath(path)}/workbook/worksheets/${encodeURIComponent(worksheetName)}/range(address='${encodeURIComponent(address)}')`, {
+      values: JSON.parse(valuesJson || "[]"),
+    });
+    return res.ok ? { success: true, error: "" } : { success: false, error: res.error };
+  }
+
+  async listTables(userId: string, path: string): Promise<GraphListTablesResult> {
+    const res = await this.request<{ value: { id: string; name?: string }[] }>("GET", `/users/${encodeURIComponent(userId)}/drive${this.driveItemPath(path)}/workbook/tables`);
+    if (!res.ok) return { success: false, tables: [], error: res.error };
+    const tables = res.data.value.map((t) => ({
+      id: t.id,
+      name: t.name ?? "",
+    }));
+    return { success: true, tables, error: "" };
+  }
+
+  async addTableRow(userId: string, path: string, tableName: string, valuesJson: string): Promise<GraphOpResult> {
+    const res = await this.request("POST", `/users/${encodeURIComponent(userId)}/drive${this.driveItemPath(path)}/workbook/tables/${encodeURIComponent(tableName)}/rows`, {
+      values: [JSON.parse(valuesJson || "[]")],
+    });
+    return res.ok ? { success: true, error: "" } : { success: false, error: res.error };
+  }
+
+  async listPlannerPlans(groupId: string): Promise<GraphListPlannerPlansResult> {
+    const res = await this.request<{ value: { id: string; title?: string }[] }>("GET", `/groups/${encodeURIComponent(groupId)}/planner/plans`);
+    if (!res.ok) return { success: false, plans: [], error: res.error };
+    const plans = res.data.value.map((p) => ({
+      id: p.id,
+      title: p.title ?? "",
+    }));
+    return { success: true, plans, error: "" };
+  }
+
+  async createPlannerTask(planId: string, bucketId: string, title: string): Promise<GraphDriveItemResult> {
+    const res = await this.request<{ id: string }>("POST", "/planner/tasks", {
+      planId,
+      ...(bucketId ? { bucketId } : {}),
+      title,
+    });
+    if (!res.ok) return { success: false, id: "", error: res.error };
+    return { success: true, id: res.data.id, error: "" };
+  }
+
+  async listPlannerTasks(planId: string): Promise<GraphListPlannerTasksResult> {
+    const res = await this.request<{
+      value: { id: string; title?: string; percentComplete?: number }[];
+    }>("GET", `/planner/plans/${encodeURIComponent(planId)}/tasks`);
+    if (!res.ok) return { success: false, tasks: [], error: res.error };
+    const tasks = res.data.value.map((t) => ({
+      id: t.id,
+      title: t.title ?? "",
+      percentComplete: t.percentComplete ?? 0,
+    }));
+    return { success: true, tasks, error: "" };
+  }
+
+  async listTodoLists(userId: string): Promise<GraphListTodoListsResult> {
+    const res = await this.request<{
+      value: { id: string; displayName?: string }[];
+    }>("GET", `/users/${encodeURIComponent(userId)}/todo/lists`);
+    if (!res.ok) return { success: false, lists: [], error: res.error };
+    const lists = res.data.value.map((l) => ({
+      id: l.id,
+      displayName: l.displayName ?? "",
+    }));
+    return { success: true, lists, error: "" };
+  }
+
+  async createTodoTask(userId: string, listId: string, title: string): Promise<GraphDriveItemResult> {
+    const res = await this.request<{ id: string }>("POST", `/users/${encodeURIComponent(userId)}/todo/lists/${encodeURIComponent(listId)}/tasks`, { title });
+    if (!res.ok) return { success: false, id: "", error: res.error };
+    return { success: true, id: res.data.id, error: "" };
+  }
+
+  async listTodoTasks(userId: string, listId: string): Promise<GraphListTodoTasksResult> {
+    const res = await this.request<{
+      value: { id: string; title?: string; status?: string }[];
+    }>("GET", `/users/${encodeURIComponent(userId)}/todo/lists/${encodeURIComponent(listId)}/tasks`);
+    if (!res.ok) return { success: false, tasks: [], error: res.error };
+    const tasks = res.data.value.map((t) => ({
+      id: t.id,
+      title: t.title ?? "",
+      status: t.status ?? "",
+    }));
+    return { success: true, tasks, error: "" };
+  }
+
+  async listContacts(userId: string): Promise<GraphListContactsResult> {
+    const res = await this.request<{
+      value: {
+        id: string;
+        displayName?: string;
+        emailAddresses?: { address?: string }[];
+      }[];
+    }>("GET", `/users/${encodeURIComponent(userId)}/contacts`);
+    if (!res.ok) return { success: false, contacts: [], error: res.error };
+    const contacts = res.data.value.map((c) => ({
+      id: c.id,
+      displayName: c.displayName ?? "",
+      email: c.emailAddresses?.[0]?.address ?? "",
+    }));
+    return { success: true, contacts, error: "" };
+  }
+
+  async createContact(userId: string, displayName: string, email: string): Promise<GraphDriveItemResult> {
+    const res = await this.request<{ id: string }>("POST", `/users/${encodeURIComponent(userId)}/contacts`, {
+      displayName,
+      emailAddresses: email ? [{ address: email, name: displayName }] : [],
+    });
+    if (!res.ok) return { success: false, id: "", error: res.error };
+    return { success: true, id: res.data.id, error: "" };
+  }
+
+  async deleteContact(userId: string, contactId: string): Promise<GraphOpResult> {
+    const res = await this.request("DELETE", `/users/${encodeURIComponent(userId)}/contacts/${encodeURIComponent(contactId)}`);
+    return res.ok ? { success: true, error: "" } : { success: false, error: res.error };
+  }
+
+  async listApplications(filter: string): Promise<GraphListApplicationsResult> {
+    const query = new URLSearchParams(filter ? { $filter: filter } : {});
+    const res = await this.request<{
+      value: { id: string; displayName?: string; appId?: string }[];
+    }>("GET", `/applications?${query}`);
+    if (!res.ok) return { success: false, applications: [], error: res.error };
+    const applications = res.data.value.map((a) => ({
+      id: a.id,
+      displayName: a.displayName ?? "",
+      appId: a.appId ?? "",
+    }));
+    return { success: true, applications, error: "" };
+  }
+
+  async listDirectoryRoles(): Promise<GraphListDirectoryRolesResult> {
+    const res = await this.request<{
+      value: { id: string; displayName?: string }[];
+    }>("GET", "/directoryRoles");
+    if (!res.ok) return { success: false, roles: [], error: res.error };
+    const roles = res.data.value.map((r) => ({
+      id: r.id,
+      displayName: r.displayName ?? "",
+    }));
+    return { success: true, roles, error: "" };
+  }
+
+  async listUserLicenses(userId: string): Promise<GraphListLicensesResult> {
+    const res = await this.request<{
+      assignedLicenses?: { skuId?: string }[];
+    }>("GET", `/users/${encodeURIComponent(userId)}?$select=assignedLicenses`);
+    if (!res.ok) return { success: false, skuIds: [], error: res.error };
+    const skuIds = (res.data.assignedLicenses ?? []).map((l) => l.skuId ?? "").filter(Boolean);
+    return { success: true, skuIds, error: "" };
+  }
+
+  async createSubscription(resource: string, changeType: string, notificationUrl: string, expirationDateTime: string): Promise<GraphDriveItemResult> {
+    const res = await this.request<{ id: string }>("POST", "/subscriptions", {
+      changeType,
+      notificationUrl,
+      resource,
+      expirationDateTime,
+    });
+    if (!res.ok) return { success: false, id: "", error: res.error };
+    return { success: true, id: res.data.id, error: "" };
+  }
+
+  async deleteSubscription(subscriptionId: string): Promise<GraphOpResult> {
+    const res = await this.request("DELETE", `/subscriptions/${encodeURIComponent(subscriptionId)}`);
+    return res.ok ? { success: true, error: "" } : { success: false, error: res.error };
+  }
+
+  async listTrendingDocuments(userId: string): Promise<GraphListTrendingDocumentsResult> {
+    const res = await this.request<{
+      value: {
+        resourceVisualization?: { title?: string };
+        resourceReference?: { webUrl?: string };
+        id?: string;
+      }[];
+    }>("GET", `/users/${encodeURIComponent(userId)}/insights/trending`);
+    if (!res.ok) return { success: false, documents: [], error: res.error };
+    const documents = res.data.value.map((d) => ({
+      id: d.id ?? "",
+      name: d.resourceVisualization?.title ?? "",
+      webUrl: d.resourceReference?.webUrl ?? "",
+    }));
+    return { success: true, documents, error: "" };
   }
 
   /** Escape hatch for any Graph endpoint not wrapped above — thin pass-through with the same

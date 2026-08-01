@@ -560,7 +560,15 @@
         "pin_event_id": "Event ID",
         "pin_path": "Path",
         "pin_content": "Content",
-        "pin_encoding": "Encoding"
+        "pin_encoding": "Encoding",
+        "pin_site_id": "Site ID",
+        "pin_list_id": "List ID",
+        "pin_destination_folder_path": "Destination Folder Path",
+        "pin_worksheet_name": "Worksheet Name",
+        "pin_address": "Address (e.g. A1:B2)",
+        "pin_values_json": "Values (JSON, 2D array)",
+        "pin_title": "Title",
+        "pin_name": "Name"
       },
       "listUsers": {
         "label": "Microsoft 365 List Users",
@@ -672,6 +680,177 @@
         "description": "Posts a message to a channel in a Microsoft Teams team.",
         "pin_team_id": "Team ID",
         "pin_channel_id": "Channel ID"
+      },
+      "listChannels": {
+        "label": "Microsoft 365 List Channels",
+        "description": "Lists the channels in a Microsoft Teams team.",
+        "pin_channels": "Channels"
+      },
+      "createChannel": {
+        "label": "Microsoft 365 Create Channel",
+        "description": "Creates a new channel in a Microsoft Teams team."
+      },
+      "listChannelMessages": {
+        "label": "Microsoft 365 List Channel Messages",
+        "description": "Lists recent messages posted in a Microsoft Teams channel.",
+        "pin_messages": "Messages"
+      },
+      "listChats": {
+        "label": "Microsoft 365 List Chats",
+        "description": "Lists the 1:1 and group chats a user is a participant in.",
+        "pin_chats": "Chats"
+      },
+      "sendChatMessage": {
+        "label": "Microsoft 365 Send Chat Message",
+        "description": "Posts a message to a Microsoft Teams 1:1 or group chat.",
+        "pin_chat_id": "Chat ID"
+      },
+      "listSites": {
+        "label": "Microsoft 365 List Sites",
+        "description": "Searches for SharePoint sites in the tenant, or lists all sites if left blank.",
+        "pin_search": "Search",
+        "pin_sites": "Sites"
+      },
+      "listSiteLists": {
+        "label": "Microsoft 365 List Site Lists",
+        "description": "Lists the SharePoint lists in a site.",
+        "pin_lists": "Lists"
+      },
+      "listListItems": {
+        "label": "Microsoft 365 List List Items",
+        "description": "Lists the items in a SharePoint list, with each item's fields as a JSON string.",
+        "pin_items": "Items"
+      },
+      "createListItem": {
+        "label": "Microsoft 365 Create List Item",
+        "description": "Creates a new item in a SharePoint list from a JSON object of field values.",
+        "pin_fields_json": "Fields (JSON)"
+      },
+      "createFolder": {
+        "label": "Microsoft 365 Create Folder",
+        "description": "Creates a new folder at a path in a user's OneDrive.",
+        "pin_parent_path": "Parent Path"
+      },
+      "moveDriveItem": {
+        "label": "Microsoft 365 Move Drive Item",
+        "description": "Moves a file or folder in a user's OneDrive to a different folder."
+      },
+      "copyDriveItem": {
+        "label": "Microsoft 365 Copy Drive Item",
+        "description": "Copies a file or folder in a user's OneDrive to a different folder.",
+        "pin_new_name": "New Name"
+      },
+      "createSharingLink": {
+        "label": "Microsoft 365 Create Sharing Link",
+        "description": "Creates a sharing link for a file or folder in a user's OneDrive.",
+        "pin_type": "Link Type",
+        "pin_scope": "Scope",
+        "pin_link": "Link"
+      },
+      "searchDriveItems": {
+        "label": "Microsoft 365 Search Drive Items",
+        "description": "Searches a user's OneDrive for files and folders matching a query.",
+        "pin_query": "Query"
+      },
+      "listWorksheets": {
+        "label": "Microsoft 365 List Worksheets",
+        "description": "Lists the worksheets in an Excel workbook stored in a user's OneDrive.",
+        "pin_worksheets": "Worksheets"
+      },
+      "getWorksheetRange": {
+        "label": "Microsoft 365 Get Worksheet Range",
+        "description": "Reads a cell range from a worksheet in an Excel workbook as a JSON 2D array."
+      },
+      "setWorksheetRange": {
+        "label": "Microsoft 365 Set Worksheet Range",
+        "description": "Writes a JSON 2D array of values into a cell range on a worksheet in an Excel workbook."
+      },
+      "listTables": {
+        "label": "Microsoft 365 List Tables",
+        "description": "Lists the tables in an Excel workbook stored in a user's OneDrive.",
+        "pin_tables": "Tables"
+      },
+      "addTableRow": {
+        "label": "Microsoft 365 Add Table Row",
+        "description": "Appends a row of values, given as a JSON array, to an Excel table.",
+        "pin_table_name": "Table Name"
+      },
+      "listPlannerPlans": {
+        "label": "Microsoft 365 List Planner Plans",
+        "description": "Lists the Microsoft Planner plans owned by a group.",
+        "pin_plans": "Plans"
+      },
+      "createPlannerTask": {
+        "label": "Microsoft 365 Create Planner Task",
+        "description": "Creates a new task in a Microsoft Planner plan, optionally in a specific bucket.",
+        "pin_plan_id": "Plan ID",
+        "pin_bucket_id": "Bucket ID"
+      },
+      "listPlannerTasks": {
+        "label": "Microsoft 365 List Planner Tasks",
+        "description": "Lists the tasks in a Microsoft Planner plan.",
+        "pin_tasks": "Tasks"
+      },
+      "listTodoLists": {
+        "label": "Microsoft 365 List To Do Lists",
+        "description": "Lists a user's Microsoft To Do task lists.",
+        "pin_lists": "Lists"
+      },
+      "createTodoTask": {
+        "label": "Microsoft 365 Create To Do Task",
+        "description": "Creates a new task in a user's Microsoft To Do list."
+      },
+      "listTodoTasks": {
+        "label": "Microsoft 365 List To Do Tasks",
+        "description": "Lists the tasks in a user's Microsoft To Do list.",
+        "pin_tasks": "Tasks"
+      },
+      "listContacts": {
+        "label": "Microsoft 365 List Contacts",
+        "description": "Lists a user's Outlook contacts.",
+        "pin_contacts": "Contacts"
+      },
+      "createContact": {
+        "label": "Microsoft 365 Create Contact",
+        "description": "Creates a new contact in a user's Outlook contacts."
+      },
+      "deleteContact": {
+        "label": "Microsoft 365 Delete Contact",
+        "description": "Deletes a contact from a user's Outlook contacts by ID.",
+        "pin_contact_id": "Contact ID"
+      },
+      "listApplications": {
+        "label": "Microsoft 365 List Applications",
+        "description": "Lists the app registrations in the Azure AD tenant, optionally filtered with an OData $filter expression.",
+        "pin_applications": "Applications"
+      },
+      "listDirectoryRoles": {
+        "label": "Microsoft 365 List Directory Roles",
+        "description": "Lists the directory roles that are activated in the Azure AD tenant.",
+        "pin_roles": "Roles"
+      },
+      "listUserLicenses": {
+        "label": "Microsoft 365 List User Licenses",
+        "description": "Lists the license SKU IDs assigned to a user.",
+        "pin_sku_ids": "SKU IDs"
+      },
+      "createSubscription": {
+        "label": "Microsoft 365 Create Subscription",
+        "description": "Creates a Microsoft Graph change notification subscription (webhook) for a resource.",
+        "pin_resource": "Resource",
+        "pin_change_type": "Change Type",
+        "pin_notification_url": "Notification URL",
+        "pin_expiration_date_time": "Expiration (ISO 8601)"
+      },
+      "deleteSubscription": {
+        "label": "Microsoft 365 Delete Subscription",
+        "description": "Deletes a Microsoft Graph change notification subscription by ID.",
+        "pin_subscription_id": "Subscription ID"
+      },
+      "listTrendingDocuments": {
+        "label": "Microsoft 365 List Trending Documents",
+        "description": "Lists documents trending around a user, based on Microsoft Graph insights.",
+        "pin_documents": "Documents"
       },
       "request": {
         "label": "Microsoft 365 Request",

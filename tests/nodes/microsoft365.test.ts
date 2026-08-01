@@ -347,3 +347,291 @@ describe("microsoft365 token reuse", () => {
     expect(tokenRequests).toBe(1);
   });
 });
+
+describe("microsoft365.listChannels", () => {
+  it("lists the channels in a team", async () => {
+    const { name, getCredential } = freshCredential();
+    vi.stubGlobal(
+      "fetch",
+      withTokenRefresh(async (url) => {
+        expect(String(url)).toContain("/teams/team-1/channels");
+        return new Response(
+          JSON.stringify({
+            value: [{ id: "c1", displayName: "General", description: "" }],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }),
+    );
+
+    const { graph } = buildGraph("microsoft365.listChannels", "lc", {
+      credentialName: name,
+      teamId: "team-1",
+    });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    await runExecFrom("lc", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("lc:success")).toBe(true);
+    expect(ctx.execOutputs.get("lc:channels")).toEqual([{ id: "c1", displayName: "General", description: "" }]);
+  });
+});
+
+describe("microsoft365.listSites", () => {
+  it("searches SharePoint sites", async () => {
+    const { name, getCredential } = freshCredential();
+    vi.stubGlobal(
+      "fetch",
+      withTokenRefresh(async (url) => {
+        expect(String(url)).toContain("/sites?search=");
+        return new Response(
+          JSON.stringify({
+            value: [
+              {
+                id: "s1",
+                name: "Team Site",
+                webUrl: "https://contoso.sharepoint.com/sites/team",
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }),
+    );
+
+    const { graph } = buildGraph("microsoft365.listSites", "ls", {
+      credentialName: name,
+      search: "team",
+    });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    await runExecFrom("ls", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("ls:success")).toBe(true);
+    expect(ctx.execOutputs.get("ls:sites")).toEqual([
+      {
+        id: "s1",
+        name: "Team Site",
+        webUrl: "https://contoso.sharepoint.com/sites/team",
+      },
+    ]);
+  });
+});
+
+describe("microsoft365.createFolder", () => {
+  it("creates a folder in a user's OneDrive", async () => {
+    const { name, getCredential } = freshCredential();
+    vi.stubGlobal(
+      "fetch",
+      withTokenRefresh(async (url, init) => {
+        expect(String(url)).toContain("/drive/root:/reports:/children");
+        const body = JSON.parse(String(init?.body));
+        expect(body.name).toBe("archive");
+        return new Response(JSON.stringify({ id: "folder-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const { graph } = buildGraph("microsoft365.createFolder", "cf", {
+      credentialName: name,
+      userId: "ada@contoso.com",
+      parentPath: "reports",
+      name: "archive",
+    });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    await runExecFrom("cf", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("cf:success")).toBe(true);
+    expect(ctx.execOutputs.get("cf:id")).toBe("folder-1");
+  });
+});
+
+describe("microsoft365.getWorksheetRange / setWorksheetRange", () => {
+  it("reads a range as JSON", async () => {
+    const { name, getCredential } = freshCredential();
+    vi.stubGlobal(
+      "fetch",
+      withTokenRefresh(async (url) => {
+        expect(String(url)).toContain("/workbook/worksheets/Sheet1/range(address='A1%3AB2')");
+        return new Response(JSON.stringify({ values: [[1, 2]] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const { graph } = buildGraph("microsoft365.getWorksheetRange", "gr", {
+      credentialName: name,
+      userId: "ada@contoso.com",
+      path: "book.xlsx",
+      worksheetName: "Sheet1",
+      address: "A1:B2",
+    });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    await runExecFrom("gr", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("gr:success")).toBe(true);
+    expect(ctx.execOutputs.get("gr:valuesJson")).toBe(JSON.stringify([[1, 2]]));
+  });
+
+  it("writes a range from JSON", async () => {
+    const { name, getCredential } = freshCredential();
+    vi.stubGlobal(
+      "fetch",
+      withTokenRefresh(async (url, init) => {
+        expect(String(url)).toContain("/workbook/worksheets/Sheet1/range(address='A1%3AB2')");
+        const body = JSON.parse(String(init?.body));
+        expect(body.values).toEqual([[1, 2]]);
+        return new Response(null, { status: 200 });
+      }),
+    );
+
+    const { graph } = buildGraph("microsoft365.setWorksheetRange", "sr", {
+      credentialName: name,
+      userId: "ada@contoso.com",
+      path: "book.xlsx",
+      worksheetName: "Sheet1",
+      address: "A1:B2",
+      valuesJson: "[[1,2]]",
+    });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    await runExecFrom("sr", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("sr:success")).toBe(true);
+  });
+});
+
+describe("microsoft365.listPlannerTasks", () => {
+  it("lists tasks in a Planner plan", async () => {
+    const { name, getCredential } = freshCredential();
+    vi.stubGlobal(
+      "fetch",
+      withTokenRefresh(async (url) => {
+        expect(String(url)).toContain("/planner/plans/plan-1/tasks");
+        return new Response(
+          JSON.stringify({
+            value: [{ id: "t1", title: "Write spec", percentComplete: 50 }],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }),
+    );
+
+    const { graph } = buildGraph("microsoft365.listPlannerTasks", "lp", {
+      credentialName: name,
+      planId: "plan-1",
+    });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    await runExecFrom("lp", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("lp:success")).toBe(true);
+    expect(ctx.execOutputs.get("lp:tasks")).toEqual([{ id: "t1", title: "Write spec", percentComplete: 50 }]);
+  });
+});
+
+describe("microsoft365.listContacts", () => {
+  it("lists a user's Outlook contacts", async () => {
+    const { name, getCredential } = freshCredential();
+    vi.stubGlobal(
+      "fetch",
+      withTokenRefresh(async (url) => {
+        expect(String(url)).toContain("/users/ada%40contoso.com/contacts");
+        return new Response(
+          JSON.stringify({
+            value: [
+              {
+                id: "ct1",
+                displayName: "Bob",
+                emailAddresses: [{ address: "bob@contoso.com" }],
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }),
+    );
+
+    const { graph } = buildGraph("microsoft365.listContacts", "lct", {
+      credentialName: name,
+      userId: "ada@contoso.com",
+    });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    await runExecFrom("lct", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("lct:success")).toBe(true);
+    expect(ctx.execOutputs.get("lct:contacts")).toEqual([{ id: "ct1", displayName: "Bob", email: "bob@contoso.com" }]);
+  });
+});
+
+describe("microsoft365.listApplications", () => {
+  it("lists app registrations in the tenant", async () => {
+    const { name, getCredential } = freshCredential();
+    vi.stubGlobal(
+      "fetch",
+      withTokenRefresh(async (url) => {
+        expect(String(url)).toContain("/applications?");
+        return new Response(
+          JSON.stringify({
+            value: [{ id: "a1", displayName: "My App", appId: "app-guid" }],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }),
+    );
+
+    const { graph } = buildGraph("microsoft365.listApplications", "la", {
+      credentialName: name,
+    });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    await runExecFrom("la", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("la:success")).toBe(true);
+    expect(ctx.execOutputs.get("la:applications")).toEqual([{ id: "a1", displayName: "My App", appId: "app-guid" }]);
+  });
+});
+
+describe("microsoft365.createSubscription", () => {
+  it("creates a change notification subscription", async () => {
+    const { name, getCredential } = freshCredential();
+    vi.stubGlobal(
+      "fetch",
+      withTokenRefresh(async (url, init) => {
+        expect(String(url)).toContain("/subscriptions");
+        const body = JSON.parse(String(init?.body));
+        expect(body.resource).toBe("/me/mailFolders('Inbox')/messages");
+        return new Response(JSON.stringify({ id: "sub-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const { graph } = buildGraph("microsoft365.createSubscription", "cs", {
+      credentialName: name,
+      resource: "/me/mailFolders('Inbox')/messages",
+      changeType: "updated",
+      notificationUrl: "https://example.com/notify",
+      expirationDateTime: "2026-08-02T00:00:00Z",
+    });
+    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    await runExecFrom("cs", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("cs:success")).toBe(true);
+    expect(ctx.execOutputs.get("cs:id")).toBe("sub-1");
+  });
+});

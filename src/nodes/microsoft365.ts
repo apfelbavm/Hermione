@@ -17,7 +17,13 @@ const GROUP_NAME = "Request.Microsoft365";
 const GROUP_NAME_ONEDRIVE = "Request.Microsoft365 OneDrive";
 const GROUP_NAME_TEAMS = "Request.Microsoft365 Teams";
 const GROUP_NAME_MAIL = "Request.Microsoft365 Mail";
+const GROUP_NAME_SHAREPOINT = "Request.Microsoft365 SharePoint";
+const GROUP_NAME_EXCEL = "Request.Microsoft365 Excel";
+const GROUP_NAME_TASKS = "Request.Microsoft365 Tasks";
+const GROUP_NAME_ADMIN = "Request.Microsoft365 Admin";
 const BODY_TYPE_OPTIONS = ["text", "html"];
+const SHARING_LINK_TYPE_OPTIONS = ["view", "edit"];
+const SHARING_LINK_SCOPE_OPTIONS = ["anonymous", "organization"];
 
 function credentialNamePin() {
   return {
@@ -1213,6 +1219,1517 @@ registerNode({
       };
     }
     const result = await managerFor(resolved.data).rawRequest(String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.bodyJson ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listChannels",
+  label: i18n.nodes.microsoft365.listChannels.label,
+  description: i18n.nodes.microsoft365.listChannels.description,
+  group: GROUP_NAME_TEAMS,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "teamId",
+      label: i18n.nodes.microsoft365.sendChannelMessage.pin_team_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "channels",
+      label: i18n.nodes.microsoft365.listChannels.pin_channels,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, channels: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listChannels(String(inputs.teamId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.createChannel",
+  label: i18n.nodes.microsoft365.createChannel.label,
+  description: i18n.nodes.microsoft365.createChannel.description,
+  group: GROUP_NAME_TEAMS,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "teamId",
+      label: i18n.nodes.microsoft365.sendChannelMessage.pin_team_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "displayName",
+      label: i18n.nodes.microsoft365.__shared.pin_display_name,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "description",
+      label: i18n.nodes.microsoft365.__shared.pin_description,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, id: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).createChannel(String(inputs.teamId ?? ""), String(inputs.displayName ?? ""), String(inputs.description ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listChannelMessages",
+  label: i18n.nodes.microsoft365.listChannelMessages.label,
+  description: i18n.nodes.microsoft365.listChannelMessages.description,
+  group: GROUP_NAME_TEAMS,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "teamId",
+      label: i18n.nodes.microsoft365.sendChannelMessage.pin_team_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "channelId",
+      label: i18n.nodes.microsoft365.sendChannelMessage.pin_channel_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "top",
+      label: i18n.nodes.microsoft365.__shared.pin_top,
+      type: "number",
+      direction: "input",
+      defaultValue: 25,
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "messages",
+      label: i18n.nodes.microsoft365.listChannelMessages.pin_messages,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, messages: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listChannelMessages(String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), Number(inputs.top ?? 25));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listChats",
+  label: i18n.nodes.microsoft365.listChats.label,
+  description: i18n.nodes.microsoft365.listChats.description,
+  group: GROUP_NAME_TEAMS,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "chats",
+      label: i18n.nodes.microsoft365.listChats.pin_chats,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, chats: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listChats(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.sendChatMessage",
+  label: i18n.nodes.microsoft365.sendChatMessage.label,
+  description: i18n.nodes.microsoft365.sendChatMessage.description,
+  group: GROUP_NAME_TEAMS,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "chatId",
+      label: i18n.nodes.microsoft365.sendChatMessage.pin_chat_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "message",
+      label: i18n.nodes.microsoft365.__shared.pin_body,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).sendChatMessage(String(inputs.chatId ?? ""), String(inputs.message ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listSites",
+  label: i18n.nodes.microsoft365.listSites.label,
+  description: i18n.nodes.microsoft365.listSites.description,
+  group: GROUP_NAME_SHAREPOINT,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "search",
+      label: i18n.nodes.microsoft365.listSites.pin_search,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "sites",
+      label: i18n.nodes.microsoft365.listSites.pin_sites,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, sites: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listSites(String(inputs.search ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listSiteLists",
+  label: i18n.nodes.microsoft365.listSiteLists.label,
+  description: i18n.nodes.microsoft365.listSiteLists.description,
+  group: GROUP_NAME_SHAREPOINT,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "siteId",
+      label: i18n.nodes.microsoft365.__shared.pin_site_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "lists",
+      label: i18n.nodes.microsoft365.listSiteLists.pin_lists,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, lists: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listSiteLists(String(inputs.siteId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listListItems",
+  label: i18n.nodes.microsoft365.listListItems.label,
+  description: i18n.nodes.microsoft365.listListItems.description,
+  group: GROUP_NAME_SHAREPOINT,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "siteId",
+      label: i18n.nodes.microsoft365.__shared.pin_site_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "listId",
+      label: i18n.nodes.microsoft365.__shared.pin_list_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "items",
+      label: i18n.nodes.microsoft365.listListItems.pin_items,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, items: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listListItems(String(inputs.siteId ?? ""), String(inputs.listId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.createListItem",
+  label: i18n.nodes.microsoft365.createListItem.label,
+  description: i18n.nodes.microsoft365.createListItem.description,
+  group: GROUP_NAME_SHAREPOINT,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "siteId",
+      label: i18n.nodes.microsoft365.__shared.pin_site_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "listId",
+      label: i18n.nodes.microsoft365.__shared.pin_list_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "fieldsJson",
+      label: i18n.nodes.microsoft365.createListItem.pin_fields_json,
+      type: "string",
+      direction: "input",
+      defaultValue: "{}",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, id: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).createListItem(String(inputs.siteId ?? ""), String(inputs.listId ?? ""), String(inputs.fieldsJson ?? "{}"));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.createFolder",
+  label: i18n.nodes.microsoft365.createFolder.label,
+  description: i18n.nodes.microsoft365.createFolder.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "parentPath",
+      label: i18n.nodes.microsoft365.createFolder.pin_parent_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "name",
+      label: i18n.nodes.microsoft365.__shared.pin_name,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, id: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).createFolder(String(inputs.userId ?? ""), String(inputs.parentPath ?? ""), String(inputs.name ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.moveDriveItem",
+  label: i18n.nodes.microsoft365.moveDriveItem.label,
+  description: i18n.nodes.microsoft365.moveDriveItem.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "path",
+      label: i18n.nodes.microsoft365.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "destinationFolderPath",
+      label: i18n.nodes.microsoft365.__shared.pin_destination_folder_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).moveDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.copyDriveItem",
+  label: i18n.nodes.microsoft365.copyDriveItem.label,
+  description: i18n.nodes.microsoft365.copyDriveItem.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "path",
+      label: i18n.nodes.microsoft365.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "destinationFolderPath",
+      label: i18n.nodes.microsoft365.__shared.pin_destination_folder_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "newName",
+      label: i18n.nodes.microsoft365.copyDriveItem.pin_new_name,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).copyDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""), String(inputs.newName ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.createSharingLink",
+  label: i18n.nodes.microsoft365.createSharingLink.label,
+  description: i18n.nodes.microsoft365.createSharingLink.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "path",
+      label: i18n.nodes.microsoft365.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "type",
+      label: i18n.nodes.microsoft365.createSharingLink.pin_type,
+      type: "string",
+      direction: "input",
+      defaultValue: SHARING_LINK_TYPE_OPTIONS[0],
+      options: SHARING_LINK_TYPE_OPTIONS,
+    },
+    {
+      id: "scope",
+      label: i18n.nodes.microsoft365.createSharingLink.pin_scope,
+      type: "string",
+      direction: "input",
+      defaultValue: SHARING_LINK_SCOPE_OPTIONS[1],
+      options: SHARING_LINK_SCOPE_OPTIONS,
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "link",
+      label: i18n.nodes.microsoft365.createSharingLink.pin_link,
+      type: "string",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, link: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).createSharingLink(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.type ?? "view"), String(inputs.scope ?? "organization"));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.searchDriveItems",
+  label: i18n.nodes.microsoft365.searchDriveItems.label,
+  description: i18n.nodes.microsoft365.searchDriveItems.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "query",
+      label: i18n.nodes.microsoft365.searchDriveItems.pin_query,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "items",
+      label: i18n.nodes.microsoft365.listDriveItems.pin_items,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, items: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).searchDriveItems(String(inputs.userId ?? ""), String(inputs.query ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listWorksheets",
+  label: i18n.nodes.microsoft365.listWorksheets.label,
+  description: i18n.nodes.microsoft365.listWorksheets.description,
+  group: GROUP_NAME_EXCEL,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "path",
+      label: i18n.nodes.microsoft365.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "worksheets",
+      label: i18n.nodes.microsoft365.listWorksheets.pin_worksheets,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, worksheets: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listWorksheets(String(inputs.userId ?? ""), String(inputs.path ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.getWorksheetRange",
+  label: i18n.nodes.microsoft365.getWorksheetRange.label,
+  description: i18n.nodes.microsoft365.getWorksheetRange.description,
+  group: GROUP_NAME_EXCEL,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "path",
+      label: i18n.nodes.microsoft365.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "worksheetName",
+      label: i18n.nodes.microsoft365.__shared.pin_worksheet_name,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "address",
+      label: i18n.nodes.microsoft365.__shared.pin_address,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "valuesJson",
+      label: i18n.nodes.microsoft365.__shared.pin_values_json,
+      type: "string",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, valuesJson: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).getWorksheetRange(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.setWorksheetRange",
+  label: i18n.nodes.microsoft365.setWorksheetRange.label,
+  description: i18n.nodes.microsoft365.setWorksheetRange.description,
+  group: GROUP_NAME_EXCEL,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "path",
+      label: i18n.nodes.microsoft365.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "worksheetName",
+      label: i18n.nodes.microsoft365.__shared.pin_worksheet_name,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "address",
+      label: i18n.nodes.microsoft365.__shared.pin_address,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "valuesJson",
+      label: i18n.nodes.microsoft365.__shared.pin_values_json,
+      type: "string",
+      direction: "input",
+      defaultValue: "[]",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).setWorksheetRange(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""), String(inputs.valuesJson ?? "[]"));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listTables",
+  label: i18n.nodes.microsoft365.listTables.label,
+  description: i18n.nodes.microsoft365.listTables.description,
+  group: GROUP_NAME_EXCEL,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "path",
+      label: i18n.nodes.microsoft365.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "tables",
+      label: i18n.nodes.microsoft365.listTables.pin_tables,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, tables: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listTables(String(inputs.userId ?? ""), String(inputs.path ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.addTableRow",
+  label: i18n.nodes.microsoft365.addTableRow.label,
+  description: i18n.nodes.microsoft365.addTableRow.description,
+  group: GROUP_NAME_EXCEL,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "path",
+      label: i18n.nodes.microsoft365.__shared.pin_path,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "tableName",
+      label: i18n.nodes.microsoft365.addTableRow.pin_table_name,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "valuesJson",
+      label: i18n.nodes.microsoft365.__shared.pin_values_json,
+      type: "string",
+      direction: "input",
+      defaultValue: "[]",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).addTableRow(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.tableName ?? ""), String(inputs.valuesJson ?? "[]"));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listPlannerPlans",
+  label: i18n.nodes.microsoft365.listPlannerPlans.label,
+  description: i18n.nodes.microsoft365.listPlannerPlans.description,
+  group: GROUP_NAME_TASKS,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "groupId",
+      label: i18n.nodes.microsoft365.__shared.pin_group_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "plans",
+      label: i18n.nodes.microsoft365.listPlannerPlans.pin_plans,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, plans: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listPlannerPlans(String(inputs.groupId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.createPlannerTask",
+  label: i18n.nodes.microsoft365.createPlannerTask.label,
+  description: i18n.nodes.microsoft365.createPlannerTask.description,
+  group: GROUP_NAME_TASKS,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "planId",
+      label: i18n.nodes.microsoft365.createPlannerTask.pin_plan_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "bucketId",
+      label: i18n.nodes.microsoft365.createPlannerTask.pin_bucket_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "title",
+      label: i18n.nodes.microsoft365.__shared.pin_title,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, id: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).createPlannerTask(String(inputs.planId ?? ""), String(inputs.bucketId ?? ""), String(inputs.title ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listPlannerTasks",
+  label: i18n.nodes.microsoft365.listPlannerTasks.label,
+  description: i18n.nodes.microsoft365.listPlannerTasks.description,
+  group: GROUP_NAME_TASKS,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "planId",
+      label: i18n.nodes.microsoft365.createPlannerTask.pin_plan_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "tasks",
+      label: i18n.nodes.microsoft365.listPlannerTasks.pin_tasks,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, tasks: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listPlannerTasks(String(inputs.planId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listTodoLists",
+  label: i18n.nodes.microsoft365.listTodoLists.label,
+  description: i18n.nodes.microsoft365.listTodoLists.description,
+  group: GROUP_NAME_TASKS,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "lists",
+      label: i18n.nodes.microsoft365.listTodoLists.pin_lists,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, lists: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listTodoLists(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.createTodoTask",
+  label: i18n.nodes.microsoft365.createTodoTask.label,
+  description: i18n.nodes.microsoft365.createTodoTask.description,
+  group: GROUP_NAME_TASKS,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "listId",
+      label: i18n.nodes.microsoft365.__shared.pin_list_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "title",
+      label: i18n.nodes.microsoft365.__shared.pin_title,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, id: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).createTodoTask(String(inputs.userId ?? ""), String(inputs.listId ?? ""), String(inputs.title ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listTodoTasks",
+  label: i18n.nodes.microsoft365.listTodoTasks.label,
+  description: i18n.nodes.microsoft365.listTodoTasks.description,
+  group: GROUP_NAME_TASKS,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "listId",
+      label: i18n.nodes.microsoft365.__shared.pin_list_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "tasks",
+      label: i18n.nodes.microsoft365.listTodoTasks.pin_tasks,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, tasks: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listTodoTasks(String(inputs.userId ?? ""), String(inputs.listId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listContacts",
+  label: i18n.nodes.microsoft365.listContacts.label,
+  description: i18n.nodes.microsoft365.listContacts.description,
+  group: GROUP_NAME_MAIL,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "contacts",
+      label: i18n.nodes.microsoft365.listContacts.pin_contacts,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, contacts: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listContacts(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.createContact",
+  label: i18n.nodes.microsoft365.createContact.label,
+  description: i18n.nodes.microsoft365.createContact.description,
+  group: GROUP_NAME_MAIL,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "displayName",
+      label: i18n.nodes.microsoft365.__shared.pin_display_name,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "email",
+      label: i18n.nodes.microsoft365.__shared.pin_mail,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, id: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).createContact(String(inputs.userId ?? ""), String(inputs.displayName ?? ""), String(inputs.email ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.deleteContact",
+  label: i18n.nodes.microsoft365.deleteContact.label,
+  description: i18n.nodes.microsoft365.deleteContact.description,
+  group: GROUP_NAME_MAIL,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    {
+      id: "contactId",
+      label: i18n.nodes.microsoft365.deleteContact.pin_contact_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).deleteContact(String(inputs.userId ?? ""), String(inputs.contactId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listApplications",
+  label: i18n.nodes.microsoft365.listApplications.label,
+  description: i18n.nodes.microsoft365.listApplications.description,
+  group: GROUP_NAME_ADMIN,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "filter",
+      label: i18n.nodes.microsoft365.__shared.pin_filter,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "applications",
+      label: i18n.nodes.microsoft365.listApplications.pin_applications,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, applications: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listApplications(String(inputs.filter ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listDirectoryRoles",
+  label: i18n.nodes.microsoft365.listDirectoryRoles.label,
+  description: i18n.nodes.microsoft365.listDirectoryRoles.description,
+  group: GROUP_NAME_ADMIN,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "roles",
+      label: i18n.nodes.microsoft365.listDirectoryRoles.pin_roles,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, roles: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listDirectoryRoles();
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listUserLicenses",
+  label: i18n.nodes.microsoft365.listUserLicenses.label,
+  description: i18n.nodes.microsoft365.listUserLicenses.description,
+  group: GROUP_NAME_ADMIN,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "skuIds",
+      label: i18n.nodes.microsoft365.listUserLicenses.pin_sku_ids,
+      type: "string",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, skuIds: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listUserLicenses(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.createSubscription",
+  label: i18n.nodes.microsoft365.createSubscription.label,
+  description: i18n.nodes.microsoft365.createSubscription.description,
+  group: GROUP_NAME_ADMIN,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "resource",
+      label: i18n.nodes.microsoft365.createSubscription.pin_resource,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "changeType",
+      label: i18n.nodes.microsoft365.createSubscription.pin_change_type,
+      type: "string",
+      direction: "input",
+      defaultValue: "updated",
+    },
+    {
+      id: "notificationUrl",
+      label: i18n.nodes.microsoft365.createSubscription.pin_notification_url,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    {
+      id: "expirationDateTime",
+      label: i18n.nodes.microsoft365.createSubscription.pin_expiration_date_time,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "id",
+      label: i18n.nodes.microsoft365.__shared.pin_id,
+      type: "string",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, id: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).createSubscription(String(inputs.resource ?? ""), String(inputs.changeType ?? "updated"), String(inputs.notificationUrl ?? ""), String(inputs.expirationDateTime ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.deleteSubscription",
+  label: i18n.nodes.microsoft365.deleteSubscription.label,
+  description: i18n.nodes.microsoft365.deleteSubscription.description,
+  group: GROUP_NAME_ADMIN,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    {
+      id: "subscriptionId",
+      label: i18n.nodes.microsoft365.deleteSubscription.pin_subscription_id,
+      type: "string",
+      direction: "input",
+      defaultValue: "",
+    },
+    execInOutPins().execOut,
+    execInOutPins().success,
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).deleteSubscription(String(inputs.subscriptionId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+});
+
+registerNode({
+  type: "microsoft365.listTrendingDocuments",
+  label: i18n.nodes.microsoft365.listTrendingDocuments.label,
+  description: i18n.nodes.microsoft365.listTrendingDocuments.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    {
+      id: "documents",
+      label: i18n.nodes.microsoft365.listTrendingDocuments.pin_documents,
+      type: "object",
+      container: "array",
+      direction: "output",
+    },
+    execInOutPins().error,
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, documents: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listTrendingDocuments(String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
 });
