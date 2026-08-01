@@ -4,7 +4,7 @@ import { useState } from "react";
 import { i18n } from "@i18n";
 import { Colors } from "../../graph/engine/color";
 import type { Graph } from "../../graph/engine/graph";
-import { addVariable, DEFAULT_VALUE_BY_TYPE, moveVariable, nextId, removeVariable, updateVariable } from "../../graph/engine/graphMutations";
+import { addVariable, defaultValueFor, moveVariable, nextId, removeVariable, updateVariable } from "../../graph/engine/graphMutations";
 import type { PinContainer, Variable } from "../../graph/engine/types";
 import { getLastVariableType } from "../../client/lastVariableType";
 import { VARIABLE_DRAG_MIME } from "../../graph/overlay/dragTypes";
@@ -64,12 +64,13 @@ export function VariablePanel({ id, title, store, getGraph }: { id?: string; tit
       graph.variables.map((v) => v.name),
       "NewVariable",
     );
-    const type = getLastVariableType();
+    const { type, subType } = getLastVariableType();
     const variable: Variable = {
       id: nextId("var"),
       name,
       type,
-      defaultValue: DEFAULT_VALUE_BY_TYPE[type],
+      subType,
+      defaultValue: defaultValueFor(type, undefined, subType),
     };
     addVariable(graph, variable);
     setEditingId(variable.id);

@@ -30,7 +30,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
                     type,
                     subType,
                   });
-                  setLastVariableType(type);
+                  setLastVariableType(type, subType);
                   store.notify();
                 },
                 variable.subType,

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { i18n } from "@i18n";
-import { addScriptInput, addScriptOutput, DEFAULT_VALUE_BY_TYPE, moveScriptInput, moveScriptOutput, nextId, removeScriptInput, removeScriptOutput, updateScriptInput, updateScriptOutput } from "../../graph/engine/graphMutations";
+import { addScriptInput, addScriptOutput, defaultValueFor, moveScriptInput, moveScriptOutput, nextId, removeScriptInput, removeScriptOutput, updateScriptInput, updateScriptOutput } from "../../graph/engine/graphMutations";
 import type { CodeScriptDef, PinSignatureEntry } from "../../graph/engine/types";
 import { getLastVariableType, setLastVariableType } from "../../client/lastVariableType";
 import { SCRIPT_IO_ENTRY_DRAG_MIME } from "../../graph/overlay/dragTypes";
@@ -46,12 +46,13 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
       entries.map((entry) => entry.name),
       kind === "input" ? "NewInput" : "NewOutput",
     );
-    const type = getLastVariableType();
+    const { type, subType } = getLastVariableType();
     const entry: PinSignatureEntry = {
       id: nextId("io"),
       name,
       type,
-      defaultValue: DEFAULT_VALUE_BY_TYPE[type],
+      subType,
+      defaultValue: defaultValueFor(type, undefined, subType),
     };
     if (kind === "input") addScriptInput(script!, entry);
     else addScriptOutput(script!, entry);
@@ -108,7 +109,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
                         type,
                         subType,
                       });
-                      setLastVariableType(type);
+                      setLastVariableType(type, subType);
                       store.notify();
                     },
                     entry.subType,

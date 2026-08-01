@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { i18n } from "@i18n";
-import { addFunctionInput, addFunctionOutput, DEFAULT_VALUE_BY_TYPE, moveFunctionEntry, nextId, removeFunctionInput, removeFunctionOutput, updateFunctionInput, updateFunctionOutput } from "../../graph/engine/graphMutations";
+import { addFunctionInput, addFunctionOutput, defaultValueFor, moveFunctionEntry, nextId, removeFunctionInput, removeFunctionOutput, updateFunctionInput, updateFunctionOutput } from "../../graph/engine/graphMutations";
 import type { FunctionDef, PinSignatureEntry } from "../../graph/engine/types";
 import { getLastVariableType, setLastVariableType } from "../../client/lastVariableType";
 import { FUNCTION_IO_ENTRY_DRAG_MIME } from "../../graph/overlay/dragTypes";
@@ -45,12 +45,13 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
       entries.map((entry) => entry.name),
       kind === "input" ? "NewInput" : "NewOutput",
     );
-    const type = getLastVariableType();
+    const { type, subType } = getLastVariableType();
     const entry: PinSignatureEntry = {
       id: nextId("io"),
       name,
       type,
-      defaultValue: DEFAULT_VALUE_BY_TYPE[type],
+      subType,
+      defaultValue: defaultValueFor(type, undefined, subType),
     };
     if (kind === "input") addFunctionInput(fn!, entry);
     else addFunctionOutput(fn!, entry);
@@ -108,7 +109,7 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
                         type,
                         subType,
                       });
-                      setLastVariableType(type);
+                      setLastVariableType(type, subType);
                       store.notify();
                     },
                     entry.subType,
