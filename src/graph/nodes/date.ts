@@ -1,5 +1,5 @@
-import { NodeColorCategory } from "../../engine/types";
-import { registerNode } from "../../engine/registry";
+import { NodeColorCategory } from "../engine/types";
+import { registerNode } from "../engine/registry";
 import { i18n } from "@i18n";
 
 function toDate(value: unknown): Date {

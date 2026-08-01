@@ -5,7 +5,7 @@
  * not a variable. Uses sessionStorage rather than localStorage since this is meant to reset per
  * browser session, not persist indefinitely. */
 
-import type { PinType } from "../engine/types";
+import type { PinType } from "../graph/engine/types";
 
 const STORAGE_KEY = "hermione:lastVariableType";
 const DEFAULT_TYPE: PinType = "number";

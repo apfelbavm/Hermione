@@ -1,13 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import {
-  createExecutionContext,
-  runExecFrom,
-} from "../../../src/engine/executor";
-import { connectPins } from "../../../src/engine/graphMutations";
-import { getNodeDef } from "../../../src/engine/registry";
-import { Graph } from "../../../src/engine/graph";
-import { NodeInstance } from "../../../src/engine/nodeInstance";
+import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
+import { connectPins } from "../../../src/graph/engine/graphMutations";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -26,12 +23,7 @@ describe("array.make", () => {
   it("exposes a configurable element type and starts with one removable entry", () => {
     const def = getNodeDef("array.make");
     expect(def.configurableElementType).toBeDefined();
-    const node = NodeInstance.createNodeInstance(
-      "array.make",
-      { x: 0, y: 0 },
-      def.pins,
-      "make",
-    );
+    const node = NodeInstance.createNodeInstance("array.make", { x: 0, y: 0 }, def.pins, "make");
     expect(node.elementType).toBe("number");
     const pins = def.deriveInstancePins!(node);
     expect(pins.map((p) => p.id)).toEqual(["entry-0", "result"]);
@@ -40,16 +32,9 @@ describe("array.make", () => {
 
   it("adds a new entry via addInstancePinEntry and assembles the array from all entries", async () => {
     const def = getNodeDef("array.make");
-    const node = NodeInstance.createNodeInstance(
-      "array.make",
-      { x: 0, y: 0 },
-      def.pins,
-      "make",
-    );
+    const node = NodeInstance.createNodeInstance("array.make", { x: 0, y: 0 }, def.pins, "make");
     def.addInstancePinEntry!(node);
-    expect(
-      Object.keys(node.pins).filter((id) => id.startsWith("entry-")),
-    ).toEqual(["entry-0", "entry-1"]);
+    expect(Object.keys(node.pins).filter((id) => id.startsWith("entry-"))).toEqual(["entry-0", "entry-1"]);
     node.pins["entry-0"].value = 1;
     node.pins["entry-1"].value = 2;
 
@@ -72,12 +57,7 @@ describe("array.make", () => {
 describe("array.length", () => {
   it("returns 0 for an unwired (empty array) input and the count otherwise", async () => {
     const def = getNodeDef("array.length");
-    const node = NodeInstance.createNodeInstance(
-      "array.length",
-      { x: 0, y: 0 },
-      def.pins,
-      "len",
-    );
+    const node = NodeInstance.createNodeInstance("array.length", { x: 0, y: 0 }, def.pins, "len");
     const outputs = await def.evaluate!({
       node,
       inputs: { array: [1, 2, 3] },
@@ -95,12 +75,7 @@ describe("array.length", () => {
 
 describe("array.get", () => {
   const def = getNodeDef("array.get");
-  const node = NodeInstance.createNodeInstance(
-    "array.get",
-    { x: 0, y: 0 },
-    def.pins,
-    "get",
-  );
+  const node = NodeInstance.createNodeInstance("array.get", { x: 0, y: 0 }, def.pins, "get");
 
   it("returns the element and found=true for an in-range index", async () => {
     const outputs = await def.evaluate!({
@@ -133,12 +108,7 @@ describe("array.get", () => {
 
 describe("array.set", () => {
   const def = getNodeDef("array.set");
-  const node = NodeInstance.createNodeInstance(
-    "array.set",
-    { x: 0, y: 0 },
-    def.pins,
-    "set",
-  );
+  const node = NodeInstance.createNodeInstance("array.set", { x: 0, y: 0 }, def.pins, "set");
 
   it("replaces the element at an in-range index without mutating the input array", async () => {
     const original = [1, 2, 3];
@@ -164,12 +134,7 @@ describe("array.set", () => {
 describe("array.add", () => {
   it("appends the item and reports its new index", async () => {
     const def = getNodeDef("array.add");
-    const node = NodeInstance.createNodeInstance(
-      "array.add",
-      { x: 0, y: 0 },
-      def.pins,
-      "add",
-    );
+    const node = NodeInstance.createNodeInstance("array.add", { x: 0, y: 0 }, def.pins, "add");
     const outputs = await def.evaluate!({
       node,
       inputs: { array: [1, 2], item: 3 },
@@ -182,12 +147,7 @@ describe("array.add", () => {
 describe("array.append", () => {
   it("concatenates two arrays", async () => {
     const def = getNodeDef("array.append");
-    const node = NodeInstance.createNodeInstance(
-      "array.append",
-      { x: 0, y: 0 },
-      def.pins,
-      "append",
-    );
+    const node = NodeInstance.createNodeInstance("array.append", { x: 0, y: 0 }, def.pins, "append");
     const outputs = await def.evaluate!({
       node,
       inputs: { a: [1, 2], b: [3, 4] },
@@ -200,12 +160,7 @@ describe("array.append", () => {
 describe("array.insert", () => {
   it("inserts at a valid index", async () => {
     const def = getNodeDef("array.insert");
-    const node = NodeInstance.createNodeInstance(
-      "array.insert",
-      { x: 0, y: 0 },
-      def.pins,
-      "insert",
-    );
+    const node = NodeInstance.createNodeInstance("array.insert", { x: 0, y: 0 }, def.pins, "insert");
     const outputs = await def.evaluate!({
       node,
       inputs: { array: [1, 2, 3], index: 1, item: 99 },
@@ -216,12 +171,7 @@ describe("array.insert", () => {
 
   it("clamps an out-of-range index instead of throwing", async () => {
     const def = getNodeDef("array.insert");
-    const node = NodeInstance.createNodeInstance(
-      "array.insert",
-      { x: 0, y: 0 },
-      def.pins,
-      "insert",
-    );
+    const node = NodeInstance.createNodeInstance("array.insert", { x: 0, y: 0 }, def.pins, "insert");
     const outputs = await def.evaluate!({
       node,
       inputs: { array: [1, 2], index: 99, item: 3 },
@@ -233,12 +183,7 @@ describe("array.insert", () => {
 
 describe("array.removeAt", () => {
   const def = getNodeDef("array.removeAt");
-  const node = NodeInstance.createNodeInstance(
-    "array.removeAt",
-    { x: 0, y: 0 },
-    def.pins,
-    "removeAt",
-  );
+  const node = NodeInstance.createNodeInstance("array.removeAt", { x: 0, y: 0 }, def.pins, "removeAt");
 
   it("removes the element at an in-range index", async () => {
     const outputs = await def.evaluate!({
@@ -261,12 +206,7 @@ describe("array.removeAt", () => {
 
 describe("array.removeItem", () => {
   const def = getNodeDef("array.removeItem");
-  const node = NodeInstance.createNodeInstance(
-    "array.removeItem",
-    { x: 0, y: 0 },
-    def.pins,
-    "removeItem",
-  );
+  const node = NodeInstance.createNodeInstance("array.removeItem", { x: 0, y: 0 }, def.pins, "removeItem");
 
   it("removes the first matching item by value", async () => {
     const outputs = await def.evaluate!({
@@ -290,12 +230,7 @@ describe("array.removeItem", () => {
 describe("array.clear / contains / findIndex / isEmpty / reverse", () => {
   it("Clear always returns an empty array", async () => {
     const def = getNodeDef("array.clear");
-    const node = NodeInstance.createNodeInstance(
-      "array.clear",
-      { x: 0, y: 0 },
-      def.pins,
-      "clear",
-    );
+    const node = NodeInstance.createNodeInstance("array.clear", { x: 0, y: 0 }, def.pins, "clear");
     expect(
       (
         await def.evaluate!({
@@ -309,12 +244,7 @@ describe("array.clear / contains / findIndex / isEmpty / reverse", () => {
 
   it("Contains finds a deep-equal item", async () => {
     const def = getNodeDef("array.contains");
-    const node = NodeInstance.createNodeInstance(
-      "array.contains",
-      { x: 0, y: 0 },
-      def.pins,
-      "contains",
-    );
+    const node = NodeInstance.createNodeInstance("array.contains", { x: 0, y: 0 }, def.pins, "contains");
     expect(
       (
         await def.evaluate!({
@@ -337,12 +267,7 @@ describe("array.clear / contains / findIndex / isEmpty / reverse", () => {
 
   it("Find Index returns -1 when absent", async () => {
     const def = getNodeDef("array.findIndex");
-    const node = NodeInstance.createNodeInstance(
-      "array.findIndex",
-      { x: 0, y: 0 },
-      def.pins,
-      "findIndex",
-    );
+    const node = NodeInstance.createNodeInstance("array.findIndex", { x: 0, y: 0 }, def.pins, "findIndex");
     expect(
       (
         await def.evaluate!({
@@ -365,12 +290,7 @@ describe("array.clear / contains / findIndex / isEmpty / reverse", () => {
 
   it("Is Empty reflects the array's length", async () => {
     const def = getNodeDef("array.isEmpty");
-    const node = NodeInstance.createNodeInstance(
-      "array.isEmpty",
-      { x: 0, y: 0 },
-      def.pins,
-      "isEmpty",
-    );
+    const node = NodeInstance.createNodeInstance("array.isEmpty", { x: 0, y: 0 }, def.pins, "isEmpty");
     expect(
       (
         await def.evaluate!({
@@ -393,12 +313,7 @@ describe("array.clear / contains / findIndex / isEmpty / reverse", () => {
 
   it("Reverse returns a reversed copy without mutating the input", async () => {
     const def = getNodeDef("array.reverse");
-    const node = NodeInstance.createNodeInstance(
-      "array.reverse",
-      { x: 0, y: 0 },
-      def.pins,
-      "reverse",
-    );
+    const node = NodeInstance.createNodeInstance("array.reverse", { x: 0, y: 0 }, def.pins, "reverse");
     const original = [1, 2, 3];
     const outputs = await def.evaluate!({
       node,
@@ -414,38 +329,14 @@ describe("array.forEach", () => {
   it("runs the loop-body chain once per element, exposing Element and Index, then fires Completed", async () => {
     const graph = new Graph("g", "test");
     const forEachDef = getNodeDef("array.forEach");
-    const forEach = NodeInstance.createNodeInstance(
-      "array.forEach",
-      { x: 0, y: 0 },
-      forEachDef.pins,
-      "forEach",
-    );
+    const forEach = NodeInstance.createNodeInstance("array.forEach", { x: 0, y: 0 }, forEachDef.pins, "forEach");
     graph.nodes.push(forEach);
 
     const toStrDef = getNodeDef("string.fromNumber");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "string.fromNumber",
-        { x: 0, y: 0 },
-        toStrDef.pins,
-        "toStr",
-      ),
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("string.fromNumber", { x: 0, y: 0 }, toStrDef.pins, "toStr"));
     const printBody = getNodeDef("debug.print");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "debug.print",
-        { x: 0, y: 0 },
-        printBody.pins,
-        "printElement",
-      ),
-    );
-    const printDone = NodeInstance.createNodeInstance(
-      "debug.print",
-      { x: 0, y: 0 },
-      printBody.pins,
-      "printDone",
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("debug.print", { x: 0, y: 0 }, printBody.pins, "printElement"));
+    const printDone = NodeInstance.createNodeInstance("debug.print", { x: 0, y: 0 }, printBody.pins, "printDone");
     printDone.pins.message.value = "Done";
     graph.nodes.push(printDone);
 
@@ -477,11 +368,7 @@ describe("array.forEach", () => {
     forEach.pins.array.value = [10, 20, 30];
 
     const logs: string[] = [];
-    await runExecFrom(
-      "forEach",
-      "exec-in",
-      createExecutionContext(graph, { log: (m) => logs.push(m) }),
-    );
+    await runExecFrom("forEach", "exec-in", createExecutionContext(graph, { log: (m) => logs.push(m) }));
 
     expect(logs).toEqual(["10", "20", "30", "Done"]);
   });
@@ -489,20 +376,10 @@ describe("array.forEach", () => {
   it("fires only Completed for an empty array", async () => {
     const graph = new Graph("g", "test");
     const forEachDef = getNodeDef("array.forEach");
-    const forEach = NodeInstance.createNodeInstance(
-      "array.forEach",
-      { x: 0, y: 0 },
-      forEachDef.pins,
-      "forEach",
-    );
+    const forEach = NodeInstance.createNodeInstance("array.forEach", { x: 0, y: 0 }, forEachDef.pins, "forEach");
     graph.nodes.push(forEach);
     const printDef = getNodeDef("debug.print");
-    const printDone = NodeInstance.createNodeInstance(
-      "debug.print",
-      { x: 0, y: 0 },
-      printDef.pins,
-      "printDone",
-    );
+    const printDone = NodeInstance.createNodeInstance("debug.print", { x: 0, y: 0 }, printDef.pins, "printDone");
     printDone.pins.message.value = "Done";
     graph.nodes.push(printDone);
     connectPins(graph, graph.variables, graph.functions, {
@@ -513,11 +390,7 @@ describe("array.forEach", () => {
     });
 
     const logs: string[] = [];
-    await runExecFrom(
-      "forEach",
-      "exec-in",
-      createExecutionContext(graph, { log: (m) => logs.push(m) }),
-    );
+    await runExecFrom("forEach", "exec-in", createExecutionContext(graph, { log: (m) => logs.push(m) }));
 
     expect(logs).toEqual(["Done"]);
   });
@@ -525,29 +398,12 @@ describe("array.forEach", () => {
   it("when disabled, never runs the loop body (even with a non-empty array) and fires only Completed", async () => {
     const graph = new Graph("g", "test");
     const forEachDef = getNodeDef("array.forEach");
-    const forEach = NodeInstance.createNodeInstance(
-      "array.forEach",
-      { x: 0, y: 0 },
-      forEachDef.pins,
-      "forEach",
-    );
+    const forEach = NodeInstance.createNodeInstance("array.forEach", { x: 0, y: 0 }, forEachDef.pins, "forEach");
     forEach.disabled = true;
     graph.nodes.push(forEach);
     const printDef = getNodeDef("debug.print");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "debug.print",
-        { x: 0, y: 0 },
-        printDef.pins,
-        "printElement",
-      ),
-    );
-    const printDone = NodeInstance.createNodeInstance(
-      "debug.print",
-      { x: 0, y: 0 },
-      printDef.pins,
-      "printDone",
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("debug.print", { x: 0, y: 0 }, printDef.pins, "printElement"));
+    const printDone = NodeInstance.createNodeInstance("debug.print", { x: 0, y: 0 }, printDef.pins, "printDone");
     printDone.pins.message.value = "Done";
     graph.nodes.push(printDone);
     connectPins(graph, graph.variables, graph.functions, {
@@ -565,11 +421,7 @@ describe("array.forEach", () => {
     forEach.pins.array.value = [10, 20, 30];
 
     const logs: string[] = [];
-    await runExecFrom(
-      "forEach",
-      "exec-in",
-      createExecutionContext(graph, { log: (m) => logs.push(m) }),
-    );
+    await runExecFrom("forEach", "exec-in", createExecutionContext(graph, { log: (m) => logs.push(m) }));
 
     expect(logs).toEqual(["Done"]);
   });
@@ -579,20 +431,10 @@ describe("changeNodeElementType", () => {
   it("switches an array node's element type, disconnects wires touching it, and resets its pins to the new type's default", () => {
     const graph = new Graph("g", "root");
     const makeDef = getNodeDef("array.make");
-    const makeNode = NodeInstance.createNodeInstance(
-      "array.make",
-      { x: 0, y: 0 },
-      makeDef.pins,
-      "make",
-    );
+    const makeNode = NodeInstance.createNodeInstance("array.make", { x: 0, y: 0 }, makeDef.pins, "make");
     graph.nodes.push(makeNode);
     const lengthDef = getNodeDef("array.length");
-    const lengthNode = NodeInstance.createNodeInstance(
-      "array.length",
-      { x: 100, y: 0 },
-      lengthDef.pins,
-      "len",
-    );
+    const lengthNode = NodeInstance.createNodeInstance("array.length", { x: 100, y: 0 }, lengthDef.pins, "len");
     graph.nodes.push(lengthNode);
 
     // Both are Array<number> right now, so this wire is valid.
@@ -623,12 +465,7 @@ describe("changeNodeElementType", () => {
   it("preserves a Make Array node's entry count across an element-type change, resetting only their values", () => {
     const graph = new Graph("g", "root");
     const makeDef = getNodeDef("array.make");
-    const makeNode = NodeInstance.createNodeInstance(
-      "array.make",
-      { x: 0, y: 0 },
-      makeDef.pins,
-      "make",
-    );
+    const makeNode = NodeInstance.createNodeInstance("array.make", { x: 0, y: 0 }, makeDef.pins, "make");
     graph.nodes.push(makeNode);
     makeDef.addInstancePinEntry!(makeNode); // now has entry-0 and entry-1
     makeNode.pins["entry-0"].value = 5;
@@ -637,9 +474,7 @@ describe("changeNodeElementType", () => {
     graph.changeNodeElementType([], [], "make", { elementType: "string" });
 
     expect(makeNode.elementType).toBe("string");
-    expect(
-      Object.keys(makeNode.pins).filter((id) => id.startsWith("entry-")),
-    ).toEqual(["entry-0", "entry-1"]);
+    expect(Object.keys(makeNode.pins).filter((id) => id.startsWith("entry-"))).toEqual(["entry-0", "entry-1"]);
     expect(makeNode.pins["entry-0"].value).toBe("");
     expect(makeNode.pins["entry-1"].value).toBe("");
   });

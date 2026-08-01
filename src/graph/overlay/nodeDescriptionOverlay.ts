@@ -1,6 +1,6 @@
 import type { Camera } from "../render/camera";
 import type { NodeScreenGeometry } from "../render/nodeGeometry";
-import { getEditingGraph, type Store } from "../state/store";
+import { getEditingGraph, type Store } from "../../state/store";
 
 /** World-space gap kept between the bubble's bottom tip and the node's own top edge — scaled by
  * zoom below, same as every other screen-space measurement derived from a world constant. */

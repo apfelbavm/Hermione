@@ -1,5 +1,5 @@
-import { deserializeGraph } from "../persistence/load";
-import { serializeGraph } from "../persistence/save";
+import { deserializeGraph } from "../graph/persistence/load";
+import { serializeGraph } from "../graph/persistence/save";
 import type { Store } from "./store";
 
 const UNDO_DEBOUNCE_MS = 500;

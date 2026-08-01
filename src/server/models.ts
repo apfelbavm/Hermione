@@ -1,5 +1,5 @@
-import type { LogFormat } from "../engine/types";
-import type { TriggerDescriptor } from "../compiler/codegen";
+import type { LogFormat } from "../graph/engine/types";
+import type { TriggerDescriptor } from "../graph/compiler/codegen";
 
 /** Plain data shapes returned by DatabaseManager — never anything SQL/row-shaped (see that file's
  * own doc comment). Safe to import (type-only) from anywhere, including client components, since

@@ -1,4 +1,4 @@
-import { registerStructType } from "../../engine/structRegistry";
+import { registerStructType } from "../engine/structRegistry";
 import { i18n } from "@i18n";
 
 export const ISSUE_STRUCT_TYPE = "githubIssue";

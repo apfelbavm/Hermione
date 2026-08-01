@@ -1,6 +1,6 @@
-import { NodeInstance } from "../../engine/nodeInstance";
-import { registerNode } from "../../engine/registry";
-import type { PinDef, PinType } from "../../engine/types";
+import { NodeInstance } from "../engine/nodeInstance";
+import { registerNode } from "../engine/registry";
+import type { PinDef, PinType } from "../engine/types";
 import { i18n } from "@i18n";
 
 function rerouteElementType(node: NodeInstance): PinType {

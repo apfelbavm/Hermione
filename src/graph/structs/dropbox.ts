@@ -1,4 +1,4 @@
-import { registerStructType } from "../../engine/structRegistry";
+import { registerStructType } from "../engine/structRegistry";
 import { i18n } from "@i18n";
 
 export const AUTH_TOKENS_STRUCT_TYPE = "dropboxAuthTokens";

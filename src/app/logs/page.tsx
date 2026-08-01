@@ -20,10 +20,7 @@ export default function GlobalLogsPage() {
     void listProjects().then(setProjects);
   }, []);
 
-  const projectById = useMemo(
-    () => new Map(projects.map((p) => [p.id, p])),
-    [projects],
-  );
+  const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
 
   return (
     <PageShell>

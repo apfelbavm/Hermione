@@ -1,54 +1,23 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/graph/nodes";
-import {
-  createExecutionContext,
-  runExecFrom,
-  runFunctionCall,
-} from "../../src/engine/executor";
-import {
-  addFunctionInput,
-  addFunctionOutput,
-  addVariable,
-  connectPins,
-  createFunctionDef,
-  nextId,
-} from "../../src/engine/graphMutations";
-import { getNodeDef } from "../../src/engine/registry";
-import { type Variable } from "../../src/engine/types";
-import { Graph } from "../../src/engine/graph";
-import { NodeInstance } from "../../src/engine/nodeInstance";
+import { registerBuiltins } from "../../../src/graph/nodes";
+import { createExecutionContext, runExecFrom, runFunctionCall } from "../../../src/graph/engine/executor";
+import { addFunctionInput, addFunctionOutput, addVariable, connectPins, createFunctionDef, nextId } from "../../../src/graph/engine/graphMutations";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { type Variable } from "../../../src/graph/engine/types";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
-function addBuiltinNode(
-  graph: Graph,
-  type: string,
-  position = { x: 0, y: 0 },
-  id?: string,
-) {
+function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);
   const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
   return node;
 }
 
-function addFunctionBoundNode(
-  graph: Graph,
-  type: "function.return" | "function.call",
-  functionId: string,
-  fn: Parameters<
-    NonNullable<ReturnType<typeof getNodeDef>["deriveFunctionPins"]>
-  >[0],
-  id: string,
-) {
+function addFunctionBoundNode(graph: Graph, type: "function.return" | "function.call", functionId: string, fn: Parameters<NonNullable<ReturnType<typeof getNodeDef>["deriveFunctionPins"]>>[0], id: string) {
   const def = getNodeDef(type);
   const pins = def.deriveFunctionPins!(fn);
-  const node = NodeInstance.createNodeInstance(
-    type,
-    { x: 0, y: 0 },
-    pins,
-    id,
-    undefined,
-    functionId,
-  );
+  const node = NodeInstance.createNodeInstance(type, { x: 0, y: 0 }, pins, id, undefined, functionId);
   graph.nodes.push(node);
   return node;
 }
@@ -81,13 +50,7 @@ describe("function calls", () => {
     const entryNode = fn.body.nodes.find((n) => n.type === "function.entry")!;
     const add = addBuiltinNode(fn.body, "math.add", { x: 0, y: 0 }, "add");
     add.pins.b.value = 10;
-    const returnNode = addFunctionBoundNode(
-      fn.body,
-      "function.return",
-      fn.id,
-      fn,
-      "ret",
-    );
+    const returnNode = addFunctionBoundNode(fn.body, "function.return", fn.id, fn, "ret");
 
     connectPins(fn.body, fn.body.variables, rootGraph.functions, {
       fromNode: entryNode.id,
@@ -136,13 +99,7 @@ describe("function calls", () => {
 
     const entryNode = fn.body.nodes.find((n) => n.type === "function.entry")!;
     const add = addBuiltinNode(fn.body, "math.add", { x: 0, y: 0 }, "add");
-    const returnNode = addFunctionBoundNode(
-      fn.body,
-      "function.return",
-      fn.id,
-      fn,
-      "ret",
-    );
+    const returnNode = addFunctionBoundNode(fn.body, "function.return", fn.id, fn, "ret");
     connectPins(fn.body, fn.body.variables, rootGraph.functions, {
       fromNode: entryNode.id,
       fromPin: xInput.id,
@@ -168,19 +125,8 @@ describe("function calls", () => {
       toPin: "exec-in",
     });
 
-    const start = addBuiltinNode(
-      rootGraph,
-      "event.start",
-      { x: 0, y: 0 },
-      "start",
-    );
-    const callNode = addFunctionBoundNode(
-      rootGraph,
-      "function.call",
-      fn.id,
-      fn,
-      "call",
-    );
+    const start = addBuiltinNode(rootGraph, "event.start", { x: 0, y: 0 }, "start");
+    const callNode = addFunctionBoundNode(rootGraph, "function.call", fn.id, fn, "call");
     callNode.pins[xInput.id].value = 21;
 
     connectPins(rootGraph, rootGraph.variables, rootGraph.functions, {
@@ -210,25 +156,9 @@ describe("function calls", () => {
     addFunctionOutput(fn, resultOutput);
     // Entry's exec-out is left unconnected — the body never reaches any Return node.
 
-    const start = addBuiltinNode(
-      rootGraph,
-      "event.start",
-      { x: 0, y: 0 },
-      "start",
-    );
-    const callNode = addFunctionBoundNode(
-      rootGraph,
-      "function.call",
-      fn.id,
-      fn,
-      "call",
-    );
-    const print = addBuiltinNode(
-      rootGraph,
-      "debug.print",
-      { x: 0, y: 0 },
-      "print",
-    );
+    const start = addBuiltinNode(rootGraph, "event.start", { x: 0, y: 0 }, "start");
+    const callNode = addFunctionBoundNode(rootGraph, "function.call", fn.id, fn, "call");
+    const print = addBuiltinNode(rootGraph, "debug.print", { x: 0, y: 0 }, "print");
     print.pins.message.value = "caller kept going";
 
     connectPins(rootGraph, rootGraph.variables, rootGraph.functions, {
@@ -251,9 +181,7 @@ describe("function calls", () => {
     await runExecFrom(start.id, "exec-out", ctx);
 
     expect(logs).toEqual(["caller kept going"]);
-    expect(ctx.execOutputs.get(`${callNode.id}:${resultOutput.id}`)).toBe(
-      "fallback",
-    );
+    expect(ctx.execOutputs.get(`${callNode.id}:${resultOutput.id}`)).toBe("fallback");
   });
 
   it("an unbounded self-recursive call trips the call-depth guard with a clear error", async () => {
@@ -262,13 +190,7 @@ describe("function calls", () => {
     rootGraph.functions.push(fn);
 
     const entryNode = fn.body.nodes.find((n) => n.type === "function.entry")!;
-    const selfCall = addFunctionBoundNode(
-      fn.body,
-      "function.call",
-      fn.id,
-      fn,
-      "selfCall",
-    );
+    const selfCall = addFunctionBoundNode(fn.body, "function.call", fn.id, fn, "selfCall");
     connectPins(fn.body, fn.body.variables, rootGraph.functions, {
       fromNode: entryNode.id,
       fromPin: "exec-out",
@@ -302,13 +224,7 @@ describe("function calls", () => {
 
     const entryNode = fn.body.nodes.find((n) => n.type === "function.entry")!;
     const setDef = getNodeDef("variable.set");
-    const setNode = NodeInstance.createNodeInstance(
-      "variable.set",
-      { x: 0, y: 0 },
-      setDef.derivePins!(localVar),
-      "set",
-      localVar.id,
-    );
+    const setNode = NodeInstance.createNodeInstance("variable.set", { x: 0, y: 0 }, setDef.derivePins!(localVar), "set", localVar.id);
     setNode.pins.value.value = "changed";
     fn.body.nodes.push(setNode);
     connectPins(fn.body, fn.body.variables, rootGraph.functions, {

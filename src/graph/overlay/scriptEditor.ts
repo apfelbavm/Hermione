@@ -1,8 +1,8 @@
 import { transpileScript } from "../engine/transpile";
 import type { CodeScriptDef } from "../engine/types";
 import type { Graph } from "../engine/graph";
-import { closeScriptTab, type Store } from "../state/store";
-import { getCurrentTheme, THEME_CHANGE_EVENT } from "../client/theme";
+import { closeScriptTab, type Store } from "../../state/store";
+import { getCurrentTheme, THEME_CHANGE_EVENT } from "../../client/theme";
 
 function monacoThemeFor(theme: "light" | "dark"): string {
   return theme === "light" ? "vs" : "vs-dark";

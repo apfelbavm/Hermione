@@ -65,14 +65,7 @@ export interface AzureStorageConnectionStringCredentialData {
   connectionString: string;
 }
 
-export type CredentialData =
-  | UsernamePasswordCredentialData
-  | Oauth2SamlBearerCredentialData
-  | DropboxOAuth2CredentialData
-  | GithubTokenCredentialData
-  | GithubAppCredentialData
-  | MicrosoftGraphClientCredentialsData
-  | AzureStorageConnectionStringCredentialData;
+export type CredentialData = UsernamePasswordCredentialData | Oauth2SamlBearerCredentialData | DropboxOAuth2CredentialData | GithubTokenCredentialData | GithubAppCredentialData | MicrosoftGraphClientCredentialsData | AzureStorageConnectionStringCredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */

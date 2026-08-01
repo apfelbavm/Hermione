@@ -1,5 +1,5 @@
-import { NodeColorCategory, type ExecutionContext } from "../../engine/types";
-import { registerNode } from "../../engine/registry";
+import { NodeColorCategory, type ExecutionContext } from "../engine/types";
+import { registerNode } from "../engine/registry";
 import { DropboxManager } from "../../lib/dropboxManager";
 import type { DropboxOAuth2CredentialData } from "../../credentials/types";
 import { AUTH_TOKENS_STRUCT_TYPE, METADATA_STRUCT_TYPE, REVISION_STRUCT_TYPE, ACCOUNT_STRUCT_TYPE, SPACE_USAGE_STRUCT_TYPE } from "../structs/dropbox";

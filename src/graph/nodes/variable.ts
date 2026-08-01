@@ -1,6 +1,6 @@
-import { registerNode } from "../../engine/registry";
-import { NodeColorCategory } from "../../engine/types";
-import type { ExecutionContext } from "../../engine/types";
+import { registerNode } from "../engine/registry";
+import { NodeColorCategory } from "../engine/types";
+import type { ExecutionContext } from "../engine/types";
 import { i18n } from "@i18n";
 
 function variableName(graph: { variables: { id: string; name: string }[] }, variableId?: string): string {

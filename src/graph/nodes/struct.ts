@@ -1,8 +1,8 @@
-import { registerNode } from "../../engine/registry";
-import { NodeColorCategory } from "../../engine/types";
-import type { PinDef } from "../../engine/types";
-import { NodeInstance } from "../../engine/nodeInstance";
-import { allStructTypeDefs, defaultStructValue, tryGetStructTypeDef } from "../../engine/structRegistry";
+import { registerNode } from "../engine/registry";
+import { NodeColorCategory } from "../engine/types";
+import type { PinDef } from "../engine/types";
+import { NodeInstance } from "../engine/nodeInstance";
+import { allStructTypeDefs, defaultStructValue, tryGetStructTypeDef } from "../engine/structRegistry";
 import { i18n } from "@i18n";
 
 const GROUP = i18n.nodes.struct.group;

@@ -1,21 +1,16 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/graph/nodes";
-import { createExecutionContext, runExecFrom } from "../../src/engine/executor";
-import { connectPins } from "../../src/engine/graphMutations";
-import { getNodeDef } from "../../src/engine/registry";
-import { type Variable } from "../../src/engine/types";
-import { deserializeGraph } from "../../src/persistence/load";
-import { serializeGraph } from "../../src/persistence/save";
-import { CURRENT_FORMAT_VERSION } from "../../src/persistence/schema";
-import { Graph } from "../../src/engine/graph";
-import { NodeInstance } from "../../src/engine/nodeInstance";
+import { registerBuiltins } from "../../../src/graph/nodes";
+import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
+import { connectPins } from "../../../src/graph/engine/graphMutations";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { type Variable } from "../../../src/graph/engine/types";
+import { deserializeGraph } from "../../../src/graph/persistence/load";
+import { serializeGraph } from "../../../src/graph/persistence/save";
+import { CURRENT_FORMAT_VERSION } from "../../../src/graph/persistence/schema";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
-function addBuiltinNode(
-  graph: Graph,
-  type: string,
-  position = { x: 0, y: 0 },
-  id?: string,
-) {
+function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);
   const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
@@ -38,18 +33,8 @@ describe("persistence round-trip", () => {
     };
     graph.variables.push(variable);
 
-    const start = addBuiltinNode(
-      graph,
-      "event.start",
-      { x: 12, y: 34 },
-      "start",
-    );
-    const print = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: 50 },
-      "print",
-    );
+    const start = addBuiltinNode(graph, "event.start", { x: 12, y: 34 }, "start");
+    const print = addBuiltinNode(graph, "debug.print", { x: 200, y: 50 }, "print");
     print.pins.message.value = "round-tripped";
     print.description = "Reminder: this logs to the shared log panel";
     connectPins(graph, graph.variables, graph.functions, {
@@ -79,24 +64,9 @@ describe("persistence round-trip", () => {
   it("re-executes identically after a save/load round trip", async () => {
     const graph = new Graph("g2", "test");
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start");
-    const branch = addBuiltinNode(
-      graph,
-      "flow.branch",
-      { x: 100, y: 0 },
-      "branch",
-    );
-    const printTrue = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: -50 },
-      "printTrue",
-    );
-    const printFalse = addBuiltinNode(
-      graph,
-      "debug.print",
-      { x: 200, y: 50 },
-      "printFalse",
-    );
+    const branch = addBuiltinNode(graph, "flow.branch", { x: 100, y: 0 }, "branch");
+    const printTrue = addBuiltinNode(graph, "debug.print", { x: 200, y: -50 }, "printTrue");
+    const printFalse = addBuiltinNode(graph, "debug.print", { x: 200, y: 50 }, "printFalse");
     branch.pins.condition.value = true;
     printTrue.pins.message.value = "took true branch";
     printFalse.pins.message.value = "took false branch";
@@ -122,11 +92,7 @@ describe("persistence round-trip", () => {
 
     const runLogs = async (g: Graph) => {
       const logs: string[] = [];
-      await runExecFrom(
-        start.id,
-        "exec-out",
-        createExecutionContext(g, { log: (m) => logs.push(m) }),
-      );
+      await runExecFrom(start.id, "exec-out", createExecutionContext(g, { log: (m) => logs.push(m) }));
       return logs;
     };
 

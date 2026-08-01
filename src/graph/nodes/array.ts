@@ -1,10 +1,10 @@
-import { DEFAULT_VALUE_BY_TYPE } from "../../engine/graphMutations";
-import { registerNode } from "../../engine/registry";
-import { connectionsFrom } from "../../engine/graphQueries";
-import { runExecFrom } from "../../engine/executor";
-import { NodeColorCategory } from "../../engine/types";
-import type { PinDef, PinType } from "../../engine/types";
-import { NodeInstance } from "../../engine/nodeInstance";
+import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
+import { registerNode } from "../engine/registry";
+import { connectionsFrom } from "../engine/graphQueries";
+import { runExecFrom } from "../engine/executor";
+import { NodeColorCategory } from "../engine/types";
+import type { PinDef, PinType } from "../engine/types";
+import { NodeInstance } from "../engine/nodeInstance";
 import { i18n } from "@i18n";
 
 const GROUP = i18n.nodes.array.group;

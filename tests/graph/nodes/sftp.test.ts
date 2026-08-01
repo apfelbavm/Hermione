@@ -1,12 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import {
-  createExecutionContext,
-  runExecFrom,
-} from "../../../src/engine/executor";
-import { getNodeDef } from "../../../src/engine/registry";
-import { Graph } from "../../../src/engine/graph";
-import { NodeInstance } from "../../../src/engine/nodeInstance";
+import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -15,12 +12,7 @@ beforeAll(() => {
 function buildGraph(pinValues: Record<string, unknown> = {}) {
   const graph: Graph = new Graph("g", "test");
   const def = getNodeDef("sftp.upload");
-  const node = NodeInstance.createNodeInstance(
-    "sftp.upload",
-    { x: 0, y: 0 },
-    def.pins,
-    "req",
-  );
+  const node = NodeInstance.createNodeInstance("sftp.upload", { x: 0, y: 0 }, def.pins, "req");
   for (const [id, value] of Object.entries(pinValues)) {
     node.pins[id].value = value;
   }
@@ -44,12 +36,8 @@ describe("sftp.upload", () => {
 
   it("defaults Prevent Directory Traversal and Create Directory to on", () => {
     const def = getNodeDef("sftp.upload");
-    expect(
-      def.pins.find((p) => p.id === "preventDirectoryTraversal")!.defaultValue,
-    ).toBe(true);
-    expect(def.pins.find((p) => p.id === "createDirectory")!.defaultValue).toBe(
-      true,
-    );
+    expect(def.pins.find((p) => p.id === "preventDirectoryTraversal")!.defaultValue).toBe(true);
+    expect(def.pins.find((p) => p.id === "createDirectory")!.defaultValue).toBe(true);
   });
 
   it("interpreter execute() always reports failure — there is no browser-side way to open a real SFTP connection", async () => {
@@ -64,9 +52,7 @@ describe("sftp.upload", () => {
     expect(ctx.execOutputs.get("req:success")).toBe(false);
     expect(ctx.execOutputs.get("req:skipped")).toBe(false);
     expect(ctx.execOutputs.get("req:attempts")).toBe(0);
-    expect(String(ctx.execOutputs.get("req:error"))).toMatch(
-      /compiled output/i,
-    );
+    expect(String(ctx.execOutputs.get("req:error"))).toMatch(/compiled output/i);
   });
 
   it("compileExecute references the compiled-only helper by name with every pin in order", () => {
@@ -94,17 +80,13 @@ describe("sftp.upload", () => {
       graph: {} as never,
       compileFrom: () => ["/* continuation */"],
     });
-    expect(statements[0]).toBe(
-      "const __result_req = await sftpUploadExecute(h, p, u, pw, pk, pp, fp, c, e, cd, efm, pdt, mra, rdm, t);",
-    );
+    expect(statements[0]).toBe("const __result_req = await sftpUploadExecute(h, p, u, pw, pk, pp, fp, c, e, cd, efm, pdt, mra, rdm, t);");
     expect(statements[1]).toBe("/* continuation */");
   });
 
   it("compileImports declares the ssh2-sftp-client package the compiled output needs", () => {
     const def = getNodeDef("sftp.upload");
-    expect(def.compileImports).toEqual([
-      'import SftpClient from "ssh2-sftp-client";',
-    ]);
+    expect(def.compileImports).toEqual(['import SftpClient from "ssh2-sftp-client";']);
   });
 
   it("the compileHelpers source is syntactically valid and exports a function (never actually invoked here)", () => {

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { getNodeDef } from "../../../src/engine/registry";
-import { NodeInstance } from "../../../src/engine/nodeInstance";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();

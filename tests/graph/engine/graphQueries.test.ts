@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { connectionsFrom, connectionsTouchingPin, connectionTo } from "../../src/engine/graphQueries";
-import {  type Connection } from "../../src/engine/types";
-import { Graph } from "../../src/engine/graph";
+import { connectionsFrom, connectionsTouchingPin, connectionTo } from "../../../src/graph/engine/graphQueries";
+import { type Connection } from "../../../src/graph/engine/types";
+import { Graph } from "../../../src/graph/engine/graph";
 
 function conn(id: string, fromNode: string, fromPin: string, toNode: string, toPin: string): Connection {
   return { id, fromNode, fromPin, toNode, toPin };
@@ -19,24 +19,25 @@ describe("connectionsTouchingPin", () => {
 
   it("returns every incoming branch on an exec input that fans in from several sources — unlike connectionTo, which only ever returns one", () => {
     const graph = new Graph("g", "root");
-    graph.connections.push(
-      conn("c1", "branch1", "exec-out", "target", "exec-in"),
-      conn("c2", "branch2", "exec-out", "target", "exec-in"),
-      conn("c3", "branch3", "exec-out", "target", "exec-in"),
-    );
+    graph.connections.push(conn("c1", "branch1", "exec-out", "target", "exec-in"), conn("c2", "branch2", "exec-out", "target", "exec-in"), conn("c3", "branch3", "exec-out", "target", "exec-in"));
 
-    expect(connectionsTouchingPin(graph, "target", "exec-in").map((c) => c.id).sort()).toEqual(["c1", "c2", "c3"]);
+    expect(
+      connectionsTouchingPin(graph, "target", "exec-in")
+        .map((c) => c.id)
+        .sort(),
+    ).toEqual(["c1", "c2", "c3"]);
     expect(connectionTo(graph, "target", "exec-in")?.id).toBeDefined(); // only finds one of the three
   });
 
   it("returns every fan-out branch on a data output feeding several inputs", () => {
     const graph = new Graph("g", "root");
-    graph.connections.push(
-      conn("c1", "source", "value", "consumer1", "in"),
-      conn("c2", "source", "value", "consumer2", "in"),
-    );
+    graph.connections.push(conn("c1", "source", "value", "consumer1", "in"), conn("c2", "source", "value", "consumer2", "in"));
 
-    expect(connectionsTouchingPin(graph, "source", "value").map((c) => c.id).sort()).toEqual(["c1", "c2"]);
+    expect(
+      connectionsTouchingPin(graph, "source", "value")
+        .map((c) => c.id)
+        .sort(),
+    ).toEqual(["c1", "c2"]);
     expect(connectionsFrom(graph, "source", "value")).toHaveLength(2);
   });
 

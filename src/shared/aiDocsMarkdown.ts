@@ -1,5 +1,5 @@
-import { allNodeDefs, topLevelGroup } from "../engine/registry";
-import type { NodeDef } from "../engine/types";
+import { allNodeDefs, topLevelGroup } from "../graph/engine/registry";
+import type { NodeDef } from "../graph/engine/types";
 import { registerBuiltins } from "../graph/nodes";
 
 /** Nodes whose pin list isn't fixed on the NodeDef (derivePins/deriveFunctionPins/deriveScriptPins/

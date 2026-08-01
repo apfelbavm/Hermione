@@ -1,6 +1,6 @@
 import { registerBuiltins } from "../../../../../../../graph/nodes";
-import { compileGraph } from "../../../../../../../compiler/codegen";
-import { deserializeGraph } from "../../../../../../../persistence/load";
+import { compileGraph } from "../../../../../../../graph/compiler/codegen";
+import { deserializeGraph } from "../../../../../../../graph/persistence/load";
 import { getDatabaseManager } from "../../../../../../../server/DatabaseManager";
 import { writeDeployedScriptFile } from "../../../../../../../server/deployedScriptFile";
 
@@ -13,7 +13,6 @@ type Params = Promise<{ projectId: string; flowId: string }>;
 interface DeployRequestBody {
   graph: string;
 }
-
 
 export async function POST(request: Request, { params }: { params: Params }): Promise<Response> {
   const { projectId, flowId } = await params;
@@ -46,7 +45,6 @@ export async function POST(request: Request, { params }: { params: Params }): Pr
 
   return Response.json({ manifest: deployed.manifest, version: deployed.version, deployedAt: deployed.deployedAt });
 }
-
 
 export async function GET(_request: Request, { params }: { params: Params }): Promise<Response> {
   const { projectId, flowId } = await params;

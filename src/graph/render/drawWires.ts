@@ -3,7 +3,7 @@ import type { CodeScriptDef, FunctionDef, Variable } from "../engine/types";
 import { bezierControlPoints } from "./bezier";
 import type { Camera } from "./camera";
 import type { NodeScreenGeometry } from "./nodeGeometry";
-import type { WireDragState } from "../state/store";
+import type { WireDragState } from "../../state/store";
 import { Graph } from "../engine/graph";
 
 export function drawWires(ctx: CanvasRenderingContext2D, graph: Graph, camera: Camera, geometries: ReadonlyMap<string, NodeScreenGeometry>, firedConnectionIds: ReadonlySet<string>, variables: Variable[], functions: FunctionDef[], scripts: CodeScriptDef[] = []): void {

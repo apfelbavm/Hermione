@@ -802,9 +802,7 @@ export class GraphManager {
   }
 
   async getWorksheetRange(userId: string, path: string, worksheetName: string, address: string): Promise<GraphRangeResult> {
-    const res = await this.call(
-      () => this.client.api(`/users/${encodeURIComponent(userId)}/drive${this.driveItemPath(path)}/workbook/worksheets/${encodeURIComponent(worksheetName)}/range(address='${encodeURIComponent(address)}')`).get() as Promise<WorkbookRange>,
-    );
+    const res = await this.call(() => this.client.api(`/users/${encodeURIComponent(userId)}/drive${this.driveItemPath(path)}/workbook/worksheets/${encodeURIComponent(worksheetName)}/range(address='${encodeURIComponent(address)}')`).get() as Promise<WorkbookRange>);
     if (!res.ok) return { success: false, valuesJson: "", error: res.error };
     return {
       success: true,

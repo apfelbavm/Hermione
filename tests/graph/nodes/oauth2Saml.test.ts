@@ -1,16 +1,10 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import {
-  createExecutionContext,
-  runExecFrom,
-} from "../../../src/engine/executor";
-import { getNodeDef } from "../../../src/engine/registry";
-import { Graph } from "../../../src/engine/graph";
-import { NodeInstance } from "../../../src/engine/nodeInstance";
-import type {
-  CredentialRecord,
-  Oauth2SamlBearerCredentialData,
-} from "../../../src/credentials/types";
+import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import type { CredentialRecord, Oauth2SamlBearerCredentialData } from "../../../src/credentials/types";
 
 beforeAll(() => {
   registerBuiltins();
@@ -23,12 +17,7 @@ afterEach(() => {
 function buildGraph(credentialName: string) {
   const graph: Graph = new Graph("g", "test");
   const def = getNodeDef("auth.oauth2Saml");
-  const node = NodeInstance.createNodeInstance(
-    "auth.oauth2Saml",
-    { x: 0, y: 0 },
-    def.pins,
-    "saml",
-  );
+  const node = NodeInstance.createNodeInstance("auth.oauth2Saml", { x: 0, y: 0 }, def.pins, "saml");
   node.pins.credentialName.value = credentialName;
   graph.nodes.push(node);
   return { graph, node };
@@ -62,13 +51,10 @@ describe("auth.oauth2Saml", () => {
       if (url === CREDENTIAL_DATA.idpUrl) {
         return new Response("signed-assertion-text", { status: 200 });
       }
-      return new Response(
-        JSON.stringify({ access_token: "tok-1", expires_in: 3600 }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ access_token: "tok-1", expires_in: 3600 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -103,16 +89,12 @@ describe("auth.oauth2Saml", () => {
     expect(tokenBody.get("client_id")).toBe("client-1");
     expect(tokenBody.get("user_id")).toBe("user-1");
     expect(tokenBody.get("company_id")).toBe("company-1");
-    expect(tokenBody.get("grant_type")).toBe(
-      "urn:ietf:params:oauth:grant-type:saml2-bearer",
-    );
+    expect(tokenBody.get("grant_type")).toBe("urn:ietf:params:oauth:grant-type:saml2-bearer");
     expect(tokenBody.get("assertion")).toBe("signed-assertion-text");
   });
 
   it("reports a failed assertion request as an error and never calls the token endpoint", async () => {
-    const fetchMock = vi.fn(
-      async () => new Response("invalid private key", { status: 400 }),
-    );
+    const fetchMock = vi.fn(async () => new Response("invalid private key", { status: 400 }));
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph(TEST_CREDENTIAL.name);
@@ -130,8 +112,7 @@ describe("auth.oauth2Saml", () => {
 
   it("reports a failed token exchange as an error, with the real status and response body", async () => {
     const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
-      if (url === CREDENTIAL_DATA.idpUrl)
-        return new Response("signed-assertion-text", { status: 200 });
+      if (url === CREDENTIAL_DATA.idpUrl) return new Response("signed-assertion-text", { status: 200 });
       return new Response('{"error":"invalid_grant"}', { status: 401 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -198,16 +179,13 @@ describe("auth.oauth2Saml", () => {
     const { graph } = buildGraph(wrongType.name);
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: (name) =>
-        name === wrongType.name ? wrongType : undefined,
+      getCredential: (name) => (name === wrongType.name ? wrongType : undefined),
     });
     await runExecFrom("saml", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("saml:success")).toBe(false);
     expect(ctx.execOutputs.get("saml:status")).toBe(0);
-    expect(ctx.execOutputs.get("saml:error")).toContain(
-      "not an OAuth2 SAML Bearer credential",
-    );
+    expect(ctx.execOutputs.get("saml:error")).toContain("not an OAuth2 SAML Bearer credential");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

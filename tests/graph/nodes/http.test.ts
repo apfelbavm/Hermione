@@ -1,12 +1,9 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import {
-  createExecutionContext,
-  runExecFrom,
-} from "../../../src/engine/executor";
-import { getNodeDef } from "../../../src/engine/registry";
-import { Graph } from "../../../src/engine/graph";
-import { NodeInstance } from "../../../src/engine/nodeInstance";
+import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -19,12 +16,7 @@ afterEach(() => {
 function buildGraph(pinValues: Record<string, unknown> = {}) {
   const graph: Graph = new Graph("g", "test");
   const def = getNodeDef("http.request");
-  const node = NodeInstance.createNodeInstance(
-    "http.request",
-    { x: 0, y: 0 },
-    def.pins,
-    "req",
-  );
+  const node = NodeInstance.createNodeInstance("http.request", { x: 0, y: 0 }, def.pins, "req");
   for (const [id, value] of Object.entries(pinValues)) {
     node.pins[id].value = value;
   }
@@ -37,15 +29,7 @@ describe("http.request", () => {
     const def = getNodeDef("http.request");
     const method = def.pins.find((p) => p.id === "method")!;
     expect(method.type).toBe("string");
-    expect(method.options).toEqual([
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "HEAD",
-      "OPTIONS",
-    ]);
+    expect(method.options).toEqual(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
   });
 
   it("performs a GET request and reports status/success/body/headers, without sending a body", async () => {
@@ -54,8 +38,7 @@ describe("http.request", () => {
       ok: true,
       text: async () => "hello",
       headers: {
-        forEach: (cb: (v: string, k: string) => void) =>
-          cb("application/json", "content-type"),
+        forEach: (cb: (v: string, k: string) => void) => cb("application/json", "content-type"),
       },
     }));
     vi.stubGlobal("fetch", fetchMock);
@@ -76,9 +59,7 @@ describe("http.request", () => {
     expect(ctx.execOutputs.get("req:status")).toBe(200);
     expect(ctx.execOutputs.get("req:success")).toBe(true);
     expect(ctx.execOutputs.get("req:responseBody")).toBe("hello");
-    expect(ctx.execOutputs.get("req:responseHeaders")).toBe(
-      JSON.stringify({ "content-type": "application/json" }),
-    );
+    expect(ctx.execOutputs.get("req:responseHeaders")).toBe(JSON.stringify({ "content-type": "application/json" }));
     expect(ctx.execOutputs.get("req:error")).toBe("");
   });
 

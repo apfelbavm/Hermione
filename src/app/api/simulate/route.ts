@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { registerBuiltins } from "../../../graph/nodes";
-import { createExecutionContext, runExecFrom } from "../../../engine/executor";
-import { deserializeGraph } from "../../../persistence/load";
-import { checkpointSimulation, disposeSimulationRun, registerSimulationRun, requestSimulationResume } from "../../../engine/simulationControl";
-import { allGraphs, nextId } from "../../../engine/graphMutations";
-import type { Graph } from "../../../engine/graph";
-import type { LogFormat } from "../../../engine/types";
+import { createExecutionContext, runExecFrom } from "../../../graph/engine/executor";
+import { deserializeGraph } from "../../../graph/persistence/load";
+import { checkpointSimulation, disposeSimulationRun, registerSimulationRun, requestSimulationResume } from "../../../graph/engine/simulationControl";
+import { allGraphs, nextId } from "../../../graph/engine/graphMutations";
+import type { Graph } from "../../../graph/engine/graph";
+import type { LogFormat } from "../../../graph/engine/types";
 import { getDatabaseManager } from "../../../server/DatabaseManager";
 import type { LogEntry, RunLog } from "../../../server/models";
 

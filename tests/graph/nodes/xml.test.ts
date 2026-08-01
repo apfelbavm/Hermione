@@ -2,7 +2,7 @@ import { XMLParser, XMLValidator } from "fast-xml-parser";
 import XMLBuilder from "fast-xml-builder";
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { getNodeDef } from "../../../src/engine/registry";
+import { getNodeDef } from "../../../src/graph/engine/registry";
 
 beforeAll(() => {
   registerBuiltins();
@@ -10,10 +10,7 @@ beforeAll(() => {
 
 function evaluateNode(type: string, inputs: Record<string, unknown>) {
   const def = getNodeDef(type);
-  return def.evaluate!({ node: {} as any, inputs, ctx: {} as any }) as Record<
-    string,
-    unknown
-  >;
+  return def.evaluate!({ node: {} as any, inputs, ctx: {} as any }) as Record<string, unknown>;
 }
 
 async function executeNode(type: string, inputs: Record<string, unknown>) {
@@ -39,12 +36,7 @@ function runCompiled(type: string, inputs: Record<string, string>) {
   const outputEntries = Object.entries(compiled)
     .map(([pin, expr]) => `${JSON.stringify(pin)}: ${expr}`)
     .join(", ");
-  const fn = new Function(
-    "XMLParser",
-    "XMLValidator",
-    "XMLBuilder",
-    `return { ${outputEntries} };`,
-  );
+  const fn = new Function("XMLParser", "XMLValidator", "XMLBuilder", `return { ${outputEntries} };`);
   return fn(XMLParser, XMLValidator, XMLBuilder) as Record<string, unknown>;
 }
 
@@ -154,9 +146,7 @@ describe("xml.fromJson", () => {
       json: { person: { name: "Alice", age: "30" } },
     });
     expect(result.success).toBe(true);
-    expect(
-      evaluateNode("xml.toJson", { xml: result.xml as string }).json,
-    ).toEqual({
+    expect(evaluateNode("xml.toJson", { xml: result.xml as string }).json).toEqual({
       person: { name: "Alice", age: "30" },
     });
   });
@@ -166,9 +156,7 @@ describe("xml.fromJson", () => {
     const toJson = evaluateNode("xml.toJson", { xml: original });
     const fromJson = evaluateNode("xml.fromJson", { json: toJson.json });
     expect(fromJson.success).toBe(true);
-    expect(
-      evaluateNode("xml.toJson", { xml: fromJson.xml as string }).json,
-    ).toEqual(toJson.json);
+    expect(evaluateNode("xml.toJson", { xml: fromJson.xml as string }).json).toEqual(toJson.json);
   });
 
   it("reports success: false for a value the builder can't handle instead of throwing", () => {
@@ -186,8 +174,7 @@ describe("xml.fromJson", () => {
 
 describe("xml.toCsv", () => {
   it("converts repeated flat-record elements into CSV rows", async () => {
-    const xml =
-      "<people><person><name>Alice</name><age>30</age></person><person><name>Bob</name><age>25</age></person></people>";
+    const xml = "<people><person><name>Alice</name><age>30</age></person><person><name>Bob</name><age>25</age></person></people>";
     const result = await executeNode("xml.toCsv", { xml, delimiter: "," });
     expect(result.success).toBe(true);
     expect(result.csv).toBe("name,age\r\nAlice,30\r\nBob,25");
@@ -203,8 +190,7 @@ describe("xml.toCsv", () => {
   });
 
   it("honors a custom delimiter", async () => {
-    const xml =
-      "<people><person><name>Alice</name></person><person><name>Bob</name></person></people>";
+    const xml = "<people><person><name>Alice</name></person><person><name>Bob</name></person></people>";
     const result = await executeNode("xml.toCsv", { xml, delimiter: ";" });
     expect(result.csv).toBe("name\r\nAlice\r\nBob");
   });

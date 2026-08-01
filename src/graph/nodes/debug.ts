@@ -1,9 +1,9 @@
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import XMLBuilder from "fast-xml-builder";
 import * as Papa from "papaparse";
-import { registerNode } from "../../engine/registry";
-import { NodeColorCategory } from "../../engine/types";
-import type { LogFormat } from "../../engine/types";
+import { registerNode } from "../engine/registry";
+import { NodeColorCategory } from "../engine/types";
+import type { LogFormat } from "../engine/types";
 import { XML_BUILDER_IMPORT_LINE, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, XML_PRETTY_BUILD_OPTIONS_LITERAL } from "./dataFormatHelpers";
 import { i18n } from "@i18n";
 

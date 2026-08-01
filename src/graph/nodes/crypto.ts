@@ -1,7 +1,7 @@
 import forge from "node-forge";
 import * as openpgp from "openpgp";
-import { compileResultVar } from "../../engine/compileUtils";
-import { registerNode } from "../../engine/registry";
+import { compileResultVar } from "../engine/compileUtils";
+import { registerNode } from "../engine/registry";
 import { i18n } from "@i18n";
 
 function errorMessage(err: unknown): string {

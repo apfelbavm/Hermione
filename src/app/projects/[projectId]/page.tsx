@@ -217,14 +217,7 @@ export default function ProjectPage() {
 
       <div className="project-description-box">
         {isEditingDescription ? (
-          <textarea
-            className="project-description-input"
-            placeholder={i18n.pages.project.description_placeholder}
-            value={description}
-            autoFocus
-            onChange={(e) => setDescription(e.target.value)}
-            onBlur={(e) => void commitDescription(e.target.value)}
-          />
+          <textarea className="project-description-input" placeholder={i18n.pages.project.description_placeholder} value={description} autoFocus onChange={(e) => setDescription(e.target.value)} onBlur={(e) => void commitDescription(e.target.value)} />
         ) : (
           <p className="project-description-text">{description || i18n.pages.project.description_placeholder}</p>
         )}

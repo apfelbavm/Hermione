@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { i18n } from "@i18n";
-import { createTemplatedCodeScriptDef, moveScript, removeCodeScriptDef } from "../../engine/graphMutations";
-import type { CodeScriptDef } from "../../engine/types";
-import { SCRIPT_DRAG_MIME } from "../../overlay/dragTypes";
-import { openRowContextMenu } from "../../overlay/rowContextMenu";
-import { nextAvailableName } from "../../overlay/uniqueName";
+import { createTemplatedCodeScriptDef, moveScript, removeCodeScriptDef } from "../../graph/engine/graphMutations";
+import type { CodeScriptDef } from "../../graph/engine/types";
+import { SCRIPT_DRAG_MIME } from "../../graph/overlay/dragTypes";
+import { openRowContextMenu } from "../../graph/overlay/rowContextMenu";
+import { nextAvailableName } from "../../graph/overlay/uniqueName";
 import { closeScriptTab, openScriptTab, type Store } from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
 import { CollapsibleSection } from "./CollapsibleSection";

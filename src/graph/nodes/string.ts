@@ -1,7 +1,7 @@
-import { NodeInstance } from "../../engine/nodeInstance";
-import { registerNode } from "../../engine/registry";
-import { NodeColorCategory } from "../../engine/types";
-import type { PinDef } from "../../engine/types";
+import { NodeInstance } from "../engine/nodeInstance";
+import { registerNode } from "../engine/registry";
+import { NodeColorCategory } from "../engine/types";
+import type { PinDef } from "../engine/types";
 import { i18n } from "@i18n";
 
 registerNode({

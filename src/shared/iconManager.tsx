@@ -100,11 +100,7 @@ export class IconManager {
   static ClearIcon() {
     return (
       <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M6 1H10A1 1 0 0 1 11 2V3H14V4.5H13.25L12.6 13.6A1.5 1.5 0 0 1 11.1 15H4.9A1.5 1.5 0 0 1 3.4 13.6L2.75 4.5H2V3H5V2A1 1 0 0 1 6 1ZM6.5 3H9.5V2.5H6.5V3ZM4.26 4.5L4.9 13.5H11.1L11.74 4.5H4.26ZM6 6H7V12H6V6ZM9 6H10V12H9V6Z"
-        />
+        <path fillRule="evenodd" clipRule="evenodd" d="M6 1H10A1 1 0 0 1 11 2V3H14V4.5H13.25L12.6 13.6A1.5 1.5 0 0 1 11.1 15H4.9A1.5 1.5 0 0 1 3.4 13.6L2.75 4.5H2V3H5V2A1 1 0 0 1 6 1ZM6.5 3H9.5V2.5H6.5V3ZM4.26 4.5L4.9 13.5H11.1L11.74 4.5H4.26ZM6 6H7V12H6V6ZM9 6H10V12H9V6Z" />
       </svg>
     );
   }

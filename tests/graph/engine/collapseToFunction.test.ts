@@ -1,48 +1,28 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/graph/nodes";
-import { createExecutionContext, runExecFrom } from "../../src/engine/executor";
-import {
-  canCollapseSelectionToFunction,
-  collapseSelectionToFunction,
-} from "../../src/engine/collapseToFunction";
-import { Graph } from "../../src/engine/graph";
-import { addVariable, connectPins, createFunctionDef, nextId } from "../../src/engine/graphMutations";
-import { NodeInstance } from "../../src/engine/nodeInstance";
-import { getNodeDef } from "../../src/engine/registry";
-import type { Variable } from "../../src/engine/types";
+import { registerBuiltins } from "../../../src/graph/nodes";
+import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
+import { canCollapseSelectionToFunction, collapseSelectionToFunction } from "../../../src/graph/engine/collapseToFunction";
+import { Graph } from "../../../src/graph/engine/graph";
+import { addVariable, connectPins, createFunctionDef, nextId } from "../../../src/graph/engine/graphMutations";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import type { Variable } from "../../../src/graph/engine/types";
 
-function addNode(
-  graph: Graph,
-  type: string,
-  position = { x: 0, y: 0 },
-  id?: string,
-): NodeInstance {
+function addNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string): NodeInstance {
   const def = getNodeDef(type);
   const node = NodeInstance.createNodeInstance(type, position, def.pins, id);
   graph.nodes.push(node);
   return node;
 }
 
-function addVariableNode(
-  graph: Graph,
-  type: "variable.get" | "variable.set",
-  variable: Variable,
-  id: string,
-): NodeInstance {
+function addVariableNode(graph: Graph, type: "variable.get" | "variable.set", variable: Variable, id: string): NodeInstance {
   const def = getNodeDef(type);
   const node = NodeInstance.createNodeInstance(type, { x: 0, y: 0 }, def.derivePins!(variable), id, variable.id);
   graph.nodes.push(node);
   return node;
 }
 
-function connect(
-  graph: Graph,
-  root: Graph,
-  fromNode: string,
-  fromPin: string,
-  toNode: string,
-  toPin: string,
-) {
+function connect(graph: Graph, root: Graph, fromNode: string, fromPin: string, toNode: string, toPin: string) {
   return connectPins(graph, root.getVisibleVariables(graph), root.functions, {
     fromNode,
     fromPin,
@@ -203,15 +183,7 @@ describe("collapseSelectionToFunction", () => {
     });
 
     const selection = new Set([a.id, b.id]);
-    const { fn, callNodeId } = collapseSelectionToFunction(
-      root,
-      root,
-      selection,
-      root.variables,
-      root.functions,
-      root.scripts,
-      "Extracted",
-    );
+    const { fn, callNodeId } = collapseSelectionToFunction(root, root, selection, root.variables, root.functions, root.scripts, "Extracted");
 
     expect(root.functions).toContain(fn);
     expect(root.nodes.some((n) => n.id === a.id || n.id === b.id)).toBe(false);
@@ -222,27 +194,15 @@ describe("collapseSelectionToFunction", () => {
     expect(root.commentBoxes[0].containedNodeIds).toEqual([after.id]);
 
     // Boundary wires now run through the Call node.
-    expect(
-      root.connections.some((c) => c.fromNode === start.id && c.toNode === callNodeId && c.toPin === "exec-in"),
-    ).toBe(true);
-    expect(
-      root.connections.some((c) => c.fromNode === callNodeId && c.fromPin === "exec-out" && c.toNode === after.id),
-    ).toBe(true);
+    expect(root.connections.some((c) => c.fromNode === start.id && c.toNode === callNodeId && c.toPin === "exec-in")).toBe(true);
+    expect(root.connections.some((c) => c.fromNode === callNodeId && c.fromPin === "exec-out" && c.toNode === after.id)).toBe(true);
     expect(root.connections.some((c) => c.fromNode === a.id || c.toNode === a.id)).toBe(false);
 
     // Internally, Entry drives the old entry point and the old exit point drives Return.
     const entryNode = fn.body.nodes.find((n) => n.type === "function.entry")!;
     const returnNode = fn.body.nodes.find((n) => n.type === "function.return")!;
-    expect(
-      fn.body.connections.some(
-        (c) => c.fromNode === entryNode.id && c.fromPin === "exec-out" && c.toNode === a.id && c.toPin === "exec-in",
-      ),
-    ).toBe(true);
-    expect(
-      fn.body.connections.some(
-        (c) => c.fromNode === b.id && c.fromPin === "exec-out" && c.toNode === returnNode.id && c.toPin === "exec-in",
-      ),
-    ).toBe(true);
+    expect(fn.body.connections.some((c) => c.fromNode === entryNode.id && c.fromPin === "exec-out" && c.toNode === a.id && c.toPin === "exec-in")).toBe(true);
+    expect(fn.body.connections.some((c) => c.fromNode === b.id && c.fromPin === "exec-out" && c.toNode === returnNode.id && c.toPin === "exec-in")).toBe(true);
   });
 
   it("names a new input after the pin it was connected to, and preserves runtime behavior end-to-end", async () => {
@@ -267,25 +227,13 @@ describe("collapseSelectionToFunction", () => {
     const selection = new Set([add.id, setResult.id]);
     expect(canCollapseSelectionToFunction(root, root, selection, root.variables, root.functions)).toBe(true);
 
-    const { fn, callNodeId } = collapseSelectionToFunction(
-      root,
-      root,
-      selection,
-      root.variables,
-      root.functions,
-      root.scripts,
-      "Extracted",
-    );
+    const { fn, callNodeId } = collapseSelectionToFunction(root, root, selection, root.variables, root.functions, root.scripts, "Extracted");
 
     expect(fn.inputs).toHaveLength(1);
     expect(fn.inputs[0].name).toBe("A"); // math.add's "a" pin is labeled "A"
     expect(fn.outputs).toHaveLength(0); // add -> setResult is entirely internal, nothing crosses out
 
-    expect(
-      root.connections.some(
-        (c) => c.fromNode === getX.id && c.fromPin === "value" && c.toNode === callNodeId && c.toPin === fn.inputs[0].id,
-      ),
-    ).toBe(true);
+    expect(root.connections.some((c) => c.fromNode === getX.id && c.fromPin === "value" && c.toNode === callNodeId && c.toPin === fn.inputs[0].id)).toBe(true);
 
     const ctx = createExecutionContext(root, { log: () => {} });
     await runExecFrom(start.id, "exec-out", ctx);
@@ -349,8 +297,6 @@ describe("collapseSelectionToFunction", () => {
     expect(fn.outputs).toHaveLength(1);
     expect(fn.outputs[0].name).toBe("Index");
     const outputId = fn.outputs[0].id;
-    expect(
-      root.connections.filter((c) => c.fromNode === callNodeId && c.fromPin === outputId),
-    ).toHaveLength(2);
+    expect(root.connections.filter((c) => c.fromNode === callNodeId && c.fromPin === outputId)).toHaveLength(2);
   });
 });

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { getNodeDef } from "../../../src/engine/registry";
-import type { Variable } from "../../../src/engine/types";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import type { Variable } from "../../../src/graph/engine/types";
 
 beforeAll(() => {
   registerBuiltins();
@@ -35,8 +35,6 @@ describe("variable.get / variable.set pins are unlabeled — the node's title (s
     const valuePin = setDef.derivePins!(variable).find((p) => p.id === "value");
     expect(valuePin?.type).toBe("number");
     expect(valuePin?.defaultValue).toBe(7);
-    expect(
-      getDef.derivePins!(variable).find((p) => p.id === "value")?.type,
-    ).toBe("number");
+    expect(getDef.derivePins!(variable).find((p) => p.id === "value")?.type).toBe("number");
   });
 });

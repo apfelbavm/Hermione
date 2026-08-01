@@ -1,6 +1,6 @@
 import * as oauth from "oauth4webapi";
-import { NodeColorCategory } from "../../engine/types";
-import { registerNode } from "../../engine/registry";
+import { NodeColorCategory } from "../engine/types";
+import { registerNode } from "../engine/registry";
 import { i18n } from "@i18n";
 
 // OAuth2 Client Credentials (RFC 6749 §4.4) — the standard app-only / service-to-service grant:

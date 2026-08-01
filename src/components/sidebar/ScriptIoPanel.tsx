@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { i18n } from "@i18n";
-import { addScriptInput, addScriptOutput, DEFAULT_VALUE_BY_TYPE, moveScriptInput, moveScriptOutput, nextId, removeScriptInput, removeScriptOutput, updateScriptInput, updateScriptOutput } from "../../engine/graphMutations";
-import type { CodeScriptDef, PinSignatureEntry } from "../../engine/types";
+import { addScriptInput, addScriptOutput, DEFAULT_VALUE_BY_TYPE, moveScriptInput, moveScriptOutput, nextId, removeScriptInput, removeScriptOutput, updateScriptInput, updateScriptOutput } from "../../graph/engine/graphMutations";
+import type { CodeScriptDef, PinSignatureEntry } from "../../graph/engine/types";
 import { getLastVariableType, setLastVariableType } from "../../client/lastVariableType";
-import { SCRIPT_IO_ENTRY_DRAG_MIME } from "../../overlay/dragTypes";
-import { openRowContextMenu } from "../../overlay/rowContextMenu";
-import { createContainerSelect, createTypeSelect, createTypedValueInput } from "../../overlay/typedValueInput";
-import { nextAvailableName } from "../../overlay/uniqueName";
+import { SCRIPT_IO_ENTRY_DRAG_MIME } from "../../graph/overlay/dragTypes";
+import { openRowContextMenu } from "../../graph/overlay/rowContextMenu";
+import { createContainerSelect, createTypeSelect, createTypedValueInput } from "../../graph/overlay/typedValueInput";
+import { nextAvailableName } from "../../graph/overlay/uniqueName";
 import type { Store } from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
 import { CollapsibleSection } from "./CollapsibleSection";

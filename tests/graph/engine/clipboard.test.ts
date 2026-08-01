@@ -1,16 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
-  cloneNodesForClipboard,
-  parseClipboardPayload,
-  pasteNodesIntoGraph,
-  pasteVariableIntoGraph,
-  serializeNodesClipboardPayload,
-  serializeVariableClipboardPayload,
-  type NodesClipboardPayload,
-} from "../../src/engine/clipboard";
-import { type Connection, type Variable } from "../../src/engine/types";
-import { Graph } from "../../src/engine/graph";
-import { NodeInstance } from "../../src/engine/nodeInstance";
+import { cloneNodesForClipboard, parseClipboardPayload, pasteNodesIntoGraph, pasteVariableIntoGraph, serializeNodesClipboardPayload, serializeVariableClipboardPayload, type NodesClipboardPayload } from "../../../src/graph/engine/clipboard";
+import { type Connection, type Variable } from "../../../src/graph/engine/types";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
 describe("parseClipboardPayload", () => {
   it("rejects non-JSON text", () => {
@@ -18,11 +10,7 @@ describe("parseClipboardPayload", () => {
   });
 
   it("rejects JSON with no source/version tag (e.g. copied from elsewhere)", () => {
-    expect(
-      parseClipboardPayload(
-        JSON.stringify({ kind: "nodes", nodes: [], connections: [] }),
-      ),
-    ).toBeNull();
+    expect(parseClipboardPayload(JSON.stringify({ kind: "nodes", nodes: [], connections: [] }))).toBeNull();
   });
 
   it("rejects an unknown kind", () => {
@@ -51,9 +39,7 @@ describe("parseClipboardPayload", () => {
   it("accepts a well-formed nodes payload round-tripped through serialize", () => {
     const nodes = [new NodeInstance("n1", "math.add", { x: 0, y: 0 }, {})];
     const connections: Connection[] = [];
-    const parsed = parseClipboardPayload(
-      serializeNodesClipboardPayload(nodes, connections),
-    );
+    const parsed = parseClipboardPayload(serializeNodesClipboardPayload(nodes, connections));
     expect(parsed).toEqual({
       source: "hermione-graph-editor",
       version: 1,
@@ -70,9 +56,7 @@ describe("parseClipboardPayload", () => {
       type: "number",
       defaultValue: 0,
     };
-    const parsed = parseClipboardPayload(
-      serializeVariableClipboardPayload(variable),
-    );
+    const parsed = parseClipboardPayload(serializeVariableClipboardPayload(variable));
     expect(parsed).toEqual({
       source: "hermione-graph-editor",
       version: 1,
@@ -100,9 +84,7 @@ describe("parseClipboardPayload", () => {
       keyType: "string",
       defaultValue: [{ key: "a", value: 1 }],
     };
-    const parsed = parseClipboardPayload(
-      serializeVariableClipboardPayload(variable),
-    );
+    const parsed = parseClipboardPayload(serializeVariableClipboardPayload(variable));
     expect(parsed).toEqual({
       source: "hermione-graph-editor",
       version: 1,
@@ -131,20 +113,13 @@ describe("parseClipboardPayload", () => {
 describe("cloneNodesForClipboard", () => {
   it("copies only selected nodes and connections strictly between them", () => {
     const graph = new Graph("g", "Root");
-    graph.nodes.push(
-      new NodeInstance("a", "math.add", { x: 0, y: 0 }, {}),
-      new NodeInstance("b", "math.add", { x: 100, y: 0 }, {}),
-      new NodeInstance("c", "math.add", { x: 200, y: 0 }, {}),
-    );
+    graph.nodes.push(new NodeInstance("a", "math.add", { x: 0, y: 0 }, {}), new NodeInstance("b", "math.add", { x: 100, y: 0 }, {}), new NodeInstance("c", "math.add", { x: 200, y: 0 }, {}));
     graph.connections.push(
       { id: "c1", fromNode: "a", fromPin: "out", toNode: "b", toPin: "in" },
       { id: "c2", fromNode: "b", fromPin: "out", toNode: "c", toPin: "in" }, // c is NOT selected
     );
 
-    const { nodes, connections } = cloneNodesForClipboard(
-      graph,
-      new Set(["a", "b"]),
-    );
+    const { nodes, connections } = cloneNodesForClipboard(graph, new Set(["a", "b"]));
     expect(nodes.map((n) => n.id).sort()).toEqual(["a", "b"]);
     expect(connections).toHaveLength(1);
     expect(connections[0]).toMatchObject({ fromNode: "a", toNode: "b" });
@@ -152,10 +127,7 @@ describe("cloneNodesForClipboard", () => {
 
   it("excludes structural function.entry/function.return nodes even if selected", () => {
     const graph = new Graph("g", "Root");
-    graph.nodes.push(
-      new NodeInstance("entry", "function.entry", { x: 0, y: 0 }, {}),
-      new NodeInstance("mid", "math.add", { x: 50, y: 0 }, {}),
-    );
+    graph.nodes.push(new NodeInstance("entry", "function.entry", { x: 0, y: 0 }, {}), new NodeInstance("mid", "math.add", { x: 50, y: 0 }, {}));
 
     const { nodes } = cloneNodesForClipboard(graph, new Set(["entry", "mid"]));
     expect(nodes.map((n) => n.id)).toEqual(["mid"]);
@@ -163,9 +135,7 @@ describe("cloneNodesForClipboard", () => {
 
   it("deep-clones so mutating the source graph doesn't affect the copy", () => {
     const graph = new Graph("g", "Root");
-    graph.nodes.push(
-      new NodeInstance("a", "math.add", { x: 0, y: 0 }, { in: { value: 1 } }),
-    );
+    graph.nodes.push(new NodeInstance("a", "math.add", { x: 0, y: 0 }, { in: { value: 1 } }));
     const { nodes } = cloneNodesForClipboard(graph, new Set(["a"]));
     graph.nodes[0].pins.in.value = 999;
     expect(nodes[0].pins.in.value).toBe(1);
@@ -179,18 +149,8 @@ describe("pasteNodesIntoGraph", () => {
       source: "hermione-graph-editor",
       version: 1,
       kind: "nodes",
-      nodes: [
-        new NodeInstance("a", "math.add", { x: 10, y: 10 }, {}),
-        new NodeInstance(
-          "b",
-          "math.add",
-          { x: 60, y: 10 },
-          { in: { connectionId: "c1" } },
-        ),
-      ],
-      connections: [
-        { id: "c1", fromNode: "a", fromPin: "out", toNode: "b", toPin: "in" },
-      ],
+      nodes: [new NodeInstance("a", "math.add", { x: 10, y: 10 }, {}), new NodeInstance("b", "math.add", { x: 60, y: 10 }, { in: { connectionId: "c1" } })],
+      connections: [{ id: "c1", fromNode: "a", fromPin: "out", toNode: "b", toPin: "in" }],
     };
 
     const newIds = pasteNodesIntoGraph(graph, payload, { x: 100, y: 200 });

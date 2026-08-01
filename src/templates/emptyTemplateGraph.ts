@@ -1,6 +1,6 @@
-import { Graph } from "../engine/graph";
-import { nextId } from "../engine/graphMutations";
-import { parseClipboardPayload, pasteNodesIntoGraph } from "../engine/clipboard";
+import { Graph } from "../graph/engine/graph";
+import { nextId } from "../graph/engine/graphMutations";
+import { parseClipboardPayload, pasteNodesIntoGraph } from "../graph/engine/clipboard";
 import emptyTemplateGraph from "./emptyTemplateGraph.json";
 
 export function buildEmptyTemplateIllustrationGraph(): Graph {

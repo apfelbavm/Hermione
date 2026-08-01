@@ -1,5 +1,5 @@
-import { NodeColorCategory, type ExecutionContext } from "../../engine/types";
-import { registerNode } from "../../engine/registry";
+import { NodeColorCategory, type ExecutionContext } from "../engine/types";
+import { registerNode } from "../engine/registry";
 import { GraphManager } from "../../lib/graphManager";
 import type { MicrosoftGraphClientCredentialsData } from "../../credentials/types";
 import {

@@ -1,9 +1,9 @@
-import { registerNode } from "../../engine/registry";
-import { DELAY_HELPER_SOURCE, indent } from "../../engine/compileUtils";
-import { runExecFrom } from "../../engine/executor";
-import { connectionsFrom } from "../../engine/graphQueries";
-import type { PinDef } from "../../engine/types";
-import { NodeInstance } from "../../engine/nodeInstance";
+import { registerNode } from "../engine/registry";
+import { DELAY_HELPER_SOURCE, indent } from "../engine/compileUtils";
+import { runExecFrom } from "../engine/executor";
+import { connectionsFrom } from "../engine/graphQueries";
+import type { PinDef } from "../engine/types";
+import { NodeInstance } from "../engine/nodeInstance";
 import { i18n } from "@i18n";
 
 function wait(ms: number): Promise<void> {

@@ -1,5 +1,5 @@
 import { Colors } from "../engine/color";
-import type { MarqueeSelectionState } from "../state/store";
+import type { MarqueeSelectionState } from "../../state/store";
 import type { Camera } from "./camera";
 
 const MARQUEE_COLOR = "#5ad1ff";

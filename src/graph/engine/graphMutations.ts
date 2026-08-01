@@ -352,10 +352,7 @@ export function updateVariable(rootGraph: Graph, variableId: string, patch: Type
   if (!variable) return;
 
   const signatureChanged =
-    (patch.type !== undefined && patch.type !== variable.type) ||
-    (patch.container !== undefined && patch.container !== variable.container) ||
-    (patch.keyType !== undefined && patch.keyType !== variable.keyType) ||
-    (patch.subType !== undefined && patch.subType !== variable.subType);
+    (patch.type !== undefined && patch.type !== variable.type) || (patch.container !== undefined && patch.container !== variable.container) || (patch.keyType !== undefined && patch.keyType !== variable.keyType) || (patch.subType !== undefined && patch.subType !== variable.subType);
   if (patch.name !== undefined) variable.name = patch.name;
   if (patch.type !== undefined) variable.type = patch.type;
   if (patch.container !== undefined) variable.container = patch.container;
@@ -380,11 +377,7 @@ function updateFunctionEntry(rootGraph: Graph, fn: FunctionDef, entries: PinSign
   const entry = entries.find((e) => e.id === entryId);
   if (!entry) return;
 
-  const signatureChanged =
-    (patch.type !== undefined && patch.type !== entry.type) ||
-    (patch.container !== undefined && patch.container !== entry.container) ||
-    (patch.keyType !== undefined && patch.keyType !== entry.keyType) ||
-    (patch.subType !== undefined && patch.subType !== entry.subType);
+  const signatureChanged = (patch.type !== undefined && patch.type !== entry.type) || (patch.container !== undefined && patch.container !== entry.container) || (patch.keyType !== undefined && patch.keyType !== entry.keyType) || (patch.subType !== undefined && patch.subType !== entry.subType);
   if (patch.name !== undefined) entry.name = patch.name;
   if (patch.type !== undefined) entry.type = patch.type;
   if (patch.container !== undefined) entry.container = patch.container;
@@ -459,16 +452,7 @@ const TEMPLATE_OUTPUT_NAME = "MyOutputPin";
  * way through that same `await`, since awaiting a non-Promise value just resolves to it immediately
  * (see code.ts's own test coverage for that guarantee). */
 function templateScriptSource(): string {
-  return [
-    "async function run(",
-    "  log: (message: string) => void,",
-    `  inputs: { ${TEMPLATE_INPUT_NAME}: string },`,
-    `): Promise<{ ${TEMPLATE_OUTPUT_NAME}: string }> {`,
-    `  log(inputs.${TEMPLATE_INPUT_NAME});`,
-    `  return { ${TEMPLATE_OUTPUT_NAME}: "I am Alive" };`,
-    "}",
-    "",
-  ].join("\n");
+  return ["async function run(", "  log: (message: string) => void,", `  inputs: { ${TEMPLATE_INPUT_NAME}: string },`, `): Promise<{ ${TEMPLATE_OUTPUT_NAME}: string }> {`, `  log(inputs.${TEMPLATE_INPUT_NAME});`, `  return { ${TEMPLATE_OUTPUT_NAME}: "I am Alive" };`, "}", ""].join("\n");
 }
 
 /** The exact plain-JS equivalent of templateScriptSource() above, with every type annotation
@@ -576,11 +560,7 @@ function updateScriptEntry(rootGraph: Graph, script: CodeScriptDef, entries: Pin
   const entry = entries.find((e) => e.id === entryId);
   if (!entry) return;
 
-  const signatureChanged =
-    (patch.type !== undefined && patch.type !== entry.type) ||
-    (patch.container !== undefined && patch.container !== entry.container) ||
-    (patch.keyType !== undefined && patch.keyType !== entry.keyType) ||
-    (patch.subType !== undefined && patch.subType !== entry.subType);
+  const signatureChanged = (patch.type !== undefined && patch.type !== entry.type) || (patch.container !== undefined && patch.container !== entry.container) || (patch.keyType !== undefined && patch.keyType !== entry.keyType) || (patch.subType !== undefined && patch.subType !== entry.subType);
   if (patch.name !== undefined) entry.name = patch.name;
   if (patch.type !== undefined) entry.type = patch.type;
   if (patch.container !== undefined) entry.container = patch.container;

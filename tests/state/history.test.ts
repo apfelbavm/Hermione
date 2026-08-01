@@ -1,8 +1,8 @@
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../src/graph/nodes";
-import { getNodeDef } from "../../src/engine/registry";
-import { Graph } from "../../src/engine/graph";
-import { NodeInstance } from "../../src/engine/nodeInstance";
+import { getNodeDef } from "../../src/graph/engine/registry";
+import { Graph } from "../../src/graph/engine/graph";
+import { NodeInstance } from "../../src/graph/engine/nodeInstance";
 import type { AppState, Store } from "../../src/state/store";
 import { createHistoryManager } from "../../src/state/history";
 

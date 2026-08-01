@@ -1,4 +1,4 @@
-import { registerNode } from "../../engine/registry";
+import { registerNode } from "../engine/registry";
 import { csvToObjects, extractTabularRows, jsonValueToXml, objectsToCsv } from "./dataFormatHelpers";
 import { i18n } from "@i18n";
 

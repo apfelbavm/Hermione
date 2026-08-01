@@ -1,5 +1,5 @@
-import { NodeColorCategory, type ExecutionContext } from "../../engine/types";
-import { registerNode } from "../../engine/registry";
+import { NodeColorCategory, type ExecutionContext } from "../engine/types";
+import { registerNode } from "../engine/registry";
 import { GithubManager, type GithubAuth } from "../../lib/githubManager";
 import type { GithubTokenCredentialData, GithubAppCredentialData } from "../../credentials/types";
 import { ISSUE_STRUCT_TYPE, PULL_REQUEST_STRUCT_TYPE, CREATE_RESULT_STRUCT_TYPE, MERGE_RESULT_STRUCT_TYPE, FILE_CONTENT_STRUCT_TYPE, FILE_WRITE_RESULT_STRUCT_TYPE } from "../structs/github";

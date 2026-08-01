@@ -1,5 +1,5 @@
-import { registerNode } from "../../engine/registry";
-import { compileResultVar } from "../../engine/compileUtils";
+import { registerNode } from "../engine/registry";
+import { compileResultVar } from "../engine/compileUtils";
 import { i18n } from "@i18n";
 
 const EXISTING_FILE_MODES = ["Overwrite", "Append", "Fail", "Ignore"];

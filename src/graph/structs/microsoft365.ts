@@ -1,4 +1,4 @@
-import { registerStructType } from "../../engine/structRegistry";
+import { registerStructType } from "../engine/structRegistry";
 import { i18n } from "@i18n";
 
 // Same struct-array pattern as structs/azureStorage.ts/dropbox.ts/github.ts: every "list X" result

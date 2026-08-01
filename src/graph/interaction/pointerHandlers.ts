@@ -6,7 +6,7 @@ import { COMMENT_HEADER_HEIGHT, COMMENT_MIN_SIZE, rectContains, rectIntersects, 
 import { snapPositionToGrid } from "../render/drawGrid";
 import { computeAllNodeGeometries, computeNodeWorldRect } from "../render/nodeGeometry";
 import { hitTestCommentHeader, hitTestCommentResizeHandle, hitTestNode, hitTestNodeAddButton, hitTestPin, type CommentCorner, type PinHit } from "../render/hitTest";
-import { getEditingGraph, getVisibleVariablesForState, openFunctionTab, openScriptTab, type MarqueeSelectionState, type Store } from "../state/store";
+import { getEditingGraph, getVisibleVariablesForState, openFunctionTab, openScriptTab, type MarqueeSelectionState, type Store } from "../../state/store";
 import { Graph } from "../engine/graph";
 
 type DragMode =

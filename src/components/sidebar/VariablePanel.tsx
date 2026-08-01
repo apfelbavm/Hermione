@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { i18n } from "@i18n";
-import { Colors } from "../../engine/color";
-import type { Graph } from "../../engine/graph";
-import { addVariable, DEFAULT_VALUE_BY_TYPE, moveVariable, nextId, removeVariable, updateVariable } from "../../engine/graphMutations";
-import type { PinContainer, Variable } from "../../engine/types";
+import { Colors } from "../../graph/engine/color";
+import type { Graph } from "../../graph/engine/graph";
+import { addVariable, DEFAULT_VALUE_BY_TYPE, moveVariable, nextId, removeVariable, updateVariable } from "../../graph/engine/graphMutations";
+import type { PinContainer, Variable } from "../../graph/engine/types";
 import { getLastVariableType } from "../../client/lastVariableType";
-import { VARIABLE_DRAG_MIME } from "../../overlay/dragTypes";
-import { openRowContextMenu } from "../../overlay/rowContextMenu";
-import { nextAvailableName } from "../../overlay/uniqueName";
+import { VARIABLE_DRAG_MIME } from "../../graph/overlay/dragTypes";
+import { openRowContextMenu } from "../../graph/overlay/rowContextMenu";
+import { nextAvailableName } from "../../graph/overlay/uniqueName";
 import type { Store } from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
 import { CollapsibleSection } from "./CollapsibleSection";

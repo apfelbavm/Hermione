@@ -6,8 +6,8 @@ import type { CommentBox } from "../engine/types";
 import { COMMENT_HEADER_HEIGHT, DEFAULT_COMMENT_COLOR, DEFAULT_COMMENT_HEIGHT, DEFAULT_COMMENT_WIDTH } from "../render/commentGeometry";
 import { snapPositionToGrid } from "../render/drawGrid";
 import { computeNodeWorldRect } from "../render/nodeGeometry";
-import type { HistoryManager } from "../state/history";
-import { getEditingGraph, getVisibleVariablesForState, type Store } from "../state/store";
+import type { HistoryManager } from "../../state/history";
+import { getEditingGraph, getVisibleVariablesForState, type Store } from "../../state/store";
 
 export function selectAllNodes(graph: Graph): Set<string> {
   return new Set(graph.nodes.map((n) => n.id));

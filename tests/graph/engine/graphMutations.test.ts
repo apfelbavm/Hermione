@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltins } from "../../src/graph/nodes";
+import { registerBuiltins } from "../../../src/graph/nodes";
 import {
   addScriptInput,
   addScriptOutput,
@@ -21,12 +21,12 @@ import {
   updateScriptInput,
   updateScriptOutput,
   updateVariable,
-} from "../../src/engine/graphMutations";
-import { getNodeDef } from "../../src/engine/registry";
-import { transpileScript } from "../../src/engine/transpile";
-import { type CodeScriptDef, type ExecutionContext, type FunctionDef, type Variable } from "../../src/engine/types";
-import { Graph } from "../../src/engine/graph";
-import { NodeInstance } from "../../src/engine/nodeInstance";
+} from "../../../src/graph/engine/graphMutations";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { transpileScript } from "../../../src/graph/engine/transpile";
+import { type CodeScriptDef, type ExecutionContext, type FunctionDef, type Variable } from "../../../src/graph/engine/types";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -54,9 +54,7 @@ describe("canPlaceNodeType", () => {
   it("blocks a second instance of the same event type in the same graph", () => {
     const graph = new Graph("g", "root");
     const def = getNodeDef("event.run");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance("event.run", { x: 0, y: 0 }, def.pins),
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("event.run", { x: 0, y: 0 }, def.pins));
 
     expect(graph.canPlaceNodeType("event.run", false)).toBe(false);
   });
@@ -64,9 +62,7 @@ describe("canPlaceNodeType", () => {
   it("still allows a DIFFERENT event type even if one event type is already present", () => {
     const graph = new Graph("g", "root");
     const runDef = getNodeDef("event.run");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance("event.run", { x: 0, y: 0 }, runDef.pins),
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("event.run", { x: 0, y: 0 }, runDef.pins));
 
     expect(graph.canPlaceNodeType("event.start", false)).toBe(true);
   });
@@ -76,12 +72,7 @@ describe("removeNode", () => {
   it("restores a downstream input pin to its literal default instead of leaving it wired-but-dangling", () => {
     const graph = new Graph("g", "root");
     const addDef = getNodeDef("math.add");
-    const addNode = NodeInstance.createNodeInstance(
-      "math.add",
-      { x: 100, y: 0 },
-      addDef.pins,
-      "add",
-    );
+    const addNode = NodeInstance.createNodeInstance("math.add", { x: 100, y: 0 }, addDef.pins, "add");
     graph.nodes.push(addNode);
 
     const variable: Variable = {
@@ -92,13 +83,7 @@ describe("removeNode", () => {
     };
     addVariable(graph, variable);
     const getDef = getNodeDef("variable.get");
-    const getNode = NodeInstance.createNodeInstance(
-      "variable.get",
-      { x: 0, y: 0 },
-      getDef.derivePins!(variable),
-      "get",
-      variable.id,
-    );
+    const getNode = NodeInstance.createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
     graph.nodes.push(getNode);
 
     connectPins(graph, graph.variables, graph.functions, {
@@ -114,9 +99,7 @@ describe("removeNode", () => {
     expect(graph.nodes.find((n) => n.id === "get")).toBeUndefined();
     expect(graph.connections).toHaveLength(0);
     expect(addNode.pins.a.connectionId).toBeUndefined();
-    expect(addNode.pins.a.value).toBe(
-      addDef.pins.find((p) => p.id === "a")!.defaultValue,
-    ); // 0, not undefined/stuck
+    expect(addNode.pins.a.value).toBe(addDef.pins.find((p) => p.id === "a")!.defaultValue); // 0, not undefined/stuck
   });
 });
 
@@ -124,12 +107,7 @@ describe("removeVariable", () => {
   it("removes the Get node AND restores whatever it fed into, rather than leaving a dangling wired-looking pin", () => {
     const graph = new Graph("g", "root");
     const addDef = getNodeDef("math.add");
-    const addNode = NodeInstance.createNodeInstance(
-      "math.add",
-      { x: 100, y: 0 },
-      addDef.pins,
-      "add",
-    );
+    const addNode = NodeInstance.createNodeInstance("math.add", { x: 100, y: 0 }, addDef.pins, "add");
     graph.nodes.push(addNode);
 
     const variable: Variable = {
@@ -140,13 +118,7 @@ describe("removeVariable", () => {
     };
     addVariable(graph, variable);
     const getDef = getNodeDef("variable.get");
-    const getNode = NodeInstance.createNodeInstance(
-      "variable.get",
-      { x: 0, y: 0 },
-      getDef.derivePins!(variable),
-      "get",
-      variable.id,
-    );
+    const getNode = NodeInstance.createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
     graph.nodes.push(getNode);
 
     connectPins(graph, graph.variables, graph.functions, {
@@ -177,13 +149,7 @@ describe("resolveNodeLabel", () => {
       defaultValue: 0,
     };
     const getDef = getNodeDef("variable.get");
-    const node = NodeInstance.createNodeInstance(
-      "variable.get",
-      { x: 0, y: 0 },
-      getDef.derivePins!(variable),
-      "get",
-      variable.id,
-    );
+    const node = NodeInstance.createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
 
     expect(node.resolveNodeLabel(getDef, [variable], [])).toBe("Get Score");
   });
@@ -196,38 +162,21 @@ describe("resolveNodeLabel", () => {
       defaultValue: 0,
     };
     const setDef = getNodeDef("variable.set");
-    const node = NodeInstance.createNodeInstance(
-      "variable.set",
-      { x: 0, y: 0 },
-      setDef.derivePins!(variable),
-      "set",
-      variable.id,
-    );
+    const node = NodeInstance.createNodeInstance("variable.set", { x: 0, y: 0 }, setDef.derivePins!(variable), "set", variable.id);
 
     expect(node.resolveNodeLabel(setDef, [variable], [])).toBe("Set Score");
   });
 
   it("falls back to the def's generic label when the bound variable can't be found", () => {
     const getDef = getNodeDef("variable.get");
-    const node = NodeInstance.createNodeInstance(
-      "variable.get",
-      { x: 0, y: 0 },
-      [],
-      "get",
-      "missing-variable-id",
-    );
+    const node = NodeInstance.createNodeInstance("variable.get", { x: 0, y: 0 }, [], "get", "missing-variable-id");
 
     expect(node.resolveNodeLabel(getDef, [], [])).toBe("Get Variable");
   });
 
   it("has no effect on ordinary node types", () => {
     const addDef = getNodeDef("math.add");
-    const node = NodeInstance.createNodeInstance(
-      "math.add",
-      { x: 0, y: 0 },
-      addDef.pins,
-      "add",
-    );
+    const node = NodeInstance.createNodeInstance("math.add", { x: 0, y: 0 }, addDef.pins, "add");
 
     expect(node.resolveNodeLabel(addDef, [], [])).toBe(addDef.label);
   });
@@ -236,34 +185,19 @@ describe("resolveNodeLabel", () => {
 describe("canToggleDisabled", () => {
   it("is false for a pure data node with no execution pin at all", () => {
     const def = getNodeDef("math.add");
-    const node = NodeInstance.createNodeInstance(
-      "math.add",
-      { x: 0, y: 0 },
-      def.pins,
-      "add",
-    );
+    const node = NodeInstance.createNodeInstance("math.add", { x: 0, y: 0 }, def.pins, "add");
     expect(node.canToggleDisabled([], [])).toBe(false);
   });
 
   it("is true for an ordinary exec-capable node", () => {
     const def = getNodeDef("debug.print");
-    const node = NodeInstance.createNodeInstance(
-      "debug.print",
-      { x: 0, y: 0 },
-      def.pins,
-      "print",
-    );
+    const node = NodeInstance.createNodeInstance("debug.print", { x: 0, y: 0 }, def.pins, "print");
     expect(node.canToggleDisabled([], [])).toBe(true);
   });
 
   it("is false for an event trigger, even though it has an execution pin", () => {
     const def = getNodeDef("event.run");
-    const node = NodeInstance.createNodeInstance(
-      "event.run",
-      { x: 0, y: 0 },
-      def.pins,
-      "run",
-    );
+    const node = NodeInstance.createNodeInstance("event.run", { x: 0, y: 0 }, def.pins, "run");
     expect(node.canToggleDisabled([], [])).toBe(false);
   });
 });
@@ -272,36 +206,15 @@ describe("hasConnectedDataOutput", () => {
   it("is false when a node's data output has no connection", () => {
     const graph = new Graph("g", "root");
     const def = getNodeDef("math.add");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "math.add",
-        { x: 0, y: 0 },
-        def.pins,
-        "add",
-      ),
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("math.add", { x: 0, y: 0 }, def.pins, "add"));
     expect(graph.hasConnectedDataOutput("add", [], [])).toBe(false);
   });
 
   it("is true once the data output feeds something else", () => {
     const graph = new Graph("g", "root");
     const addDef = getNodeDef("math.add");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "math.add",
-        { x: 0, y: 0 },
-        addDef.pins,
-        "add1",
-      ),
-    );
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "math.add",
-        { x: 0, y: 0 },
-        addDef.pins,
-        "add2",
-      ),
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("math.add", { x: 0, y: 0 }, addDef.pins, "add1"));
+    graph.nodes.push(NodeInstance.createNodeInstance("math.add", { x: 0, y: 0 }, addDef.pins, "add2"));
     connectPins(graph, [], [], {
       fromNode: "add1",
       fromPin: "result",
@@ -315,22 +228,8 @@ describe("hasConnectedDataOutput", () => {
     const graph = new Graph("g", "root");
     const branchDef = getNodeDef("flow.branch");
     const printDef = getNodeDef("debug.print");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "flow.branch",
-        { x: 0, y: 0 },
-        branchDef.pins,
-        "branch",
-      ),
-    );
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "debug.print",
-        { x: 0, y: 0 },
-        printDef.pins,
-        "print",
-      ),
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("flow.branch", { x: 0, y: 0 }, branchDef.pins, "branch"));
+    graph.nodes.push(NodeInstance.createNodeInstance("debug.print", { x: 0, y: 0 }, printDef.pins, "print"));
     connectPins(graph, [], [], {
       fromNode: "branch",
       fromPin: "true",
@@ -344,22 +243,8 @@ describe("hasConnectedDataOutput", () => {
     const graph = new Graph("g", "root");
     const loopDef = getNodeDef("flow.forLoop");
     const toStrDef = getNodeDef("string.fromNumber");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "flow.forLoop",
-        { x: 0, y: 0 },
-        loopDef.pins,
-        "loop",
-      ),
-    );
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "string.fromNumber",
-        { x: 0, y: 0 },
-        toStrDef.pins,
-        "toStr",
-      ),
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("flow.forLoop", { x: 0, y: 0 }, loopDef.pins, "loop"));
+    graph.nodes.push(NodeInstance.createNodeInstance("string.fromNumber", { x: 0, y: 0 }, toStrDef.pins, "toStr"));
     connectPins(graph, [], [], {
       fromNode: "loop",
       fromPin: "index",
@@ -381,23 +266,10 @@ describe("updateVariable — container support", () => {
     };
     addVariable(graph, variable);
     const getDef = getNodeDef("variable.get");
-    const getNode = NodeInstance.createNodeInstance(
-      "variable.get",
-      { x: 0, y: 0 },
-      getDef.derivePins!(variable),
-      "get",
-      variable.id,
-    );
+    const getNode = NodeInstance.createNodeInstance("variable.get", { x: 0, y: 0 }, getDef.derivePins!(variable), "get", variable.id);
     graph.nodes.push(getNode);
     const addDef = getNodeDef("math.add");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "math.add",
-        { x: 100, y: 0 },
-        addDef.pins,
-        "add",
-      ),
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("math.add", { x: 100, y: 0 }, addDef.pins, "add"));
     connectPins(graph, graph.variables, graph.functions, {
       fromNode: "get",
       fromPin: "value",
@@ -469,18 +341,8 @@ describe("insertRerouteOnConnection", () => {
     const graph = new Graph("g", "root");
     const add1Def = getNodeDef("math.add");
     const add2Def = getNodeDef("math.add");
-    const add1 = NodeInstance.createNodeInstance(
-      "math.add",
-      { x: 0, y: 0 },
-      add1Def.pins,
-      "add1",
-    );
-    const add2 = NodeInstance.createNodeInstance(
-      "math.add",
-      { x: 200, y: 0 },
-      add2Def.pins,
-      "add2",
-    );
+    const add1 = NodeInstance.createNodeInstance("math.add", { x: 0, y: 0 }, add1Def.pins, "add1");
+    const add2 = NodeInstance.createNodeInstance("math.add", { x: 200, y: 0 }, add2Def.pins, "add2");
     graph.nodes.push(add1, add2);
     const conn = connectPins(graph, graph.variables, graph.functions, {
       fromNode: "add1",
@@ -489,13 +351,7 @@ describe("insertRerouteOnConnection", () => {
       toPin: "a",
     });
 
-    insertRerouteOnConnection(
-      graph,
-      graph.variables,
-      graph.functions,
-      conn.id,
-      { x: 100, y: 0 },
-    );
+    insertRerouteOnConnection(graph, graph.variables, graph.functions, conn.id, { x: 100, y: 0 });
 
     const reroute = graph.nodes.find((n) => n.type === "core.reroute");
     expect(reroute).toBeDefined();
@@ -523,18 +379,8 @@ describe("insertRerouteOnConnection", () => {
     const graph = new Graph("g", "root");
     const branchDef = getNodeDef("flow.branch");
     const printDef = getNodeDef("debug.print");
-    const branch = NodeInstance.createNodeInstance(
-      "flow.branch",
-      { x: 0, y: 0 },
-      branchDef.pins,
-      "branch",
-    );
-    const print = NodeInstance.createNodeInstance(
-      "debug.print",
-      { x: 200, y: 0 },
-      printDef.pins,
-      "print",
-    );
+    const branch = NodeInstance.createNodeInstance("flow.branch", { x: 0, y: 0 }, branchDef.pins, "branch");
+    const print = NodeInstance.createNodeInstance("debug.print", { x: 200, y: 0 }, printDef.pins, "print");
     graph.nodes.push(branch, print);
     const conn = connectPins(graph, graph.variables, graph.functions, {
       fromNode: "branch",
@@ -543,21 +389,13 @@ describe("insertRerouteOnConnection", () => {
       toPin: "exec-in",
     });
 
-    insertRerouteOnConnection(
-      graph,
-      graph.variables,
-      graph.functions,
-      conn.id,
-      { x: 100, y: 0 },
-    );
+    insertRerouteOnConnection(graph, graph.variables, graph.functions, conn.id, { x: 100, y: 0 });
 
     const reroute = graph.nodes.find((n) => n.type === "core.rerouteExec");
     expect(reroute).toBeDefined();
 
     expect(graph.connections).toHaveLength(2);
-    expect(
-      graph.connections.find((c) => c.fromNode === "branch"),
-    ).toMatchObject({
+    expect(graph.connections.find((c) => c.fromNode === "branch")).toMatchObject({
       fromNode: "branch",
       fromPin: "true",
       toNode: reroute!.id,
@@ -573,13 +411,7 @@ describe("insertRerouteOnConnection", () => {
 
   it("does nothing when the connection id doesn't exist", () => {
     const graph = new Graph("g", "root");
-    insertRerouteOnConnection(
-      graph,
-      graph.variables,
-      graph.functions,
-      "nonexistent",
-      { x: 0, y: 0 },
-    );
+    insertRerouteOnConnection(graph, graph.variables, graph.functions, "nonexistent", { x: 0, y: 0 });
     expect(graph.nodes).toHaveLength(0);
   });
 });
@@ -720,7 +552,7 @@ describe("createCodeScriptDef", () => {
 });
 
 describe("createTemplatedCodeScriptDef", () => {
-  it("seeds one string input (MyInputPin, default \"Hello World!\") and one string output (MyOutputPin)", () => {
+  it('seeds one string input (MyInputPin, default "Hello World!") and one string output (MyOutputPin)', () => {
     const script = createTemplatedCodeScriptDef("MyScript");
 
     expect(script.inputs).toHaveLength(1);
@@ -748,15 +580,7 @@ describe("createTemplatedCodeScriptDef", () => {
   it("the template actually runs end-to-end: logs the input and sets the output, both under their own plain pin names", async () => {
     const script = createTemplatedCodeScriptDef("MyScript");
     const def = getNodeDef("code.run");
-    const node = NodeInstance.createNodeInstance(
-      "code.run",
-      { x: 0, y: 0 },
-      def.deriveScriptPins!(script),
-      "code1",
-      undefined,
-      undefined,
-      script.id,
-    );
+    const node = NodeInstance.createNodeInstance("code.run", { x: 0, y: 0 }, def.deriveScriptPins!(script), "code1", undefined, undefined, script.id);
 
     const logs: string[] = [];
     const ctx = {
@@ -784,36 +608,18 @@ describe("removeCodeScriptDef", () => {
     graph.scripts.push(script);
 
     const addDef = getNodeDef("math.add");
-    const addNode = NodeInstance.createNodeInstance(
-      "math.add",
-      { x: 200, y: 0 },
-      addDef.pins,
-      "add",
-    );
+    const addNode = NodeInstance.createNodeInstance("math.add", { x: 200, y: 0 }, addDef.pins, "add");
     graph.nodes.push(addNode);
 
     const codeDef = getNodeDef("code.run");
-    const codeNode = NodeInstance.createNodeInstance(
-      "code.run",
-      { x: 0, y: 0 },
-      codeDef.deriveScriptPins!(script),
-      "code1",
-      undefined,
-      undefined,
-      script.id,
-    );
+    const codeNode = NodeInstance.createNodeInstance("code.run", { x: 0, y: 0 }, codeDef.deriveScriptPins!(script), "code1", undefined, undefined, script.id);
     graph.nodes.push(codeNode);
 
     // code.run has no output pins (see nodes/code.ts), so wire its exec-out into the Add node's
     // exec pin isn't representative — instead prove the general "removeNode cleans up connections"
     // path via an exec wire from a fresh On Run node into the Code node.
     const startDef = getNodeDef("event.run");
-    const startNode = NodeInstance.createNodeInstance(
-      "event.run",
-      { x: -200, y: 0 },
-      startDef.pins,
-      "start",
-    );
+    const startNode = NodeInstance.createNodeInstance("event.run", { x: -200, y: 0 }, startDef.pins, "start");
     graph.nodes.push(startNode);
     connectPins(
       graph,
@@ -842,26 +648,7 @@ describe("removeCodeScriptDef", () => {
     graph.scripts.push(keep, drop);
 
     const codeDef = getNodeDef("code.run");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "code.run",
-        { x: 0, y: 0 },
-        codeDef.deriveScriptPins!(keep),
-        "keepNode",
-        undefined,
-        undefined,
-        keep.id,
-      ),
-      NodeInstance.createNodeInstance(
-        "code.run",
-        { x: 0, y: 100 },
-        codeDef.deriveScriptPins!(drop),
-        "dropNode",
-        undefined,
-        undefined,
-        drop.id,
-      ),
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("code.run", { x: 0, y: 0 }, codeDef.deriveScriptPins!(keep), "keepNode", undefined, undefined, keep.id), NodeInstance.createNodeInstance("code.run", { x: 0, y: 100 }, codeDef.deriveScriptPins!(drop), "dropNode", undefined, undefined, drop.id));
 
     removeCodeScriptDef(graph, drop.id);
 
@@ -875,15 +662,7 @@ describe("addScriptInput / removeScriptInput", () => {
     const graph = new Graph("g", "root");
     graph.scripts.push(script);
     const codeDef = getNodeDef("code.run");
-    const codeNode = NodeInstance.createNodeInstance(
-      "code.run",
-      { x: 0, y: 0 },
-      codeDef.deriveScriptPins!(script),
-      "code1",
-      undefined,
-      undefined,
-      script.id,
-    );
+    const codeNode = NodeInstance.createNodeInstance("code.run", { x: 0, y: 0 }, codeDef.deriveScriptPins!(script), "code1", undefined, undefined, script.id);
     graph.nodes.push(codeNode);
     return graph;
   }
@@ -899,14 +678,8 @@ describe("addScriptInput / removeScriptInput", () => {
       defaultValue: "",
     });
     const codeNode = graph.nodes.find((n) => n.id === "code1")!;
-    const pins = codeNode.resolvePinDefs(
-      graph.variables,
-      graph.functions,
-      graph.scripts,
-    );
-    expect(pins.some((p) => p.id === "name" && p.direction === "input")).toBe(
-      true,
-    );
+    const pins = codeNode.resolvePinDefs(graph.variables, graph.functions, graph.scripts);
+    expect(pins.some((p) => p.id === "name" && p.direction === "input")).toBe(true);
   });
 
   it("removing an input prunes the now-dangling pin/connection off every bound code.run node", () => {
@@ -927,21 +700,9 @@ describe("addScriptInput / removeScriptInput", () => {
       defaultValue: "Alice",
     };
     addVariable(graph, variable);
-    const getNode = NodeInstance.createNodeInstance(
-      "variable.get",
-      { x: -200, y: 0 },
-      varDef.derivePins!(variable),
-      "get",
-      variable.id,
-    );
+    const getNode = NodeInstance.createNodeInstance("variable.get", { x: -200, y: 0 }, varDef.derivePins!(variable), "get", variable.id);
     graph.nodes.push(getNode);
-    connectPins(
-      graph,
-      graph.variables,
-      graph.functions,
-      { fromNode: "get", fromPin: "value", toNode: "code1", toPin: "name" },
-      graph.scripts,
-    );
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "get", fromPin: "value", toNode: "code1", toPin: "name" }, graph.scripts);
 
     expect(graph.connections).toHaveLength(1);
 
@@ -967,15 +728,7 @@ describe("updateScriptInput", () => {
     graph.scripts.push(script);
 
     const codeDef = getNodeDef("code.run");
-    const codeNode = NodeInstance.createNodeInstance(
-      "code.run",
-      { x: 0, y: 0 },
-      codeDef.deriveScriptPins!(script),
-      "code1",
-      undefined,
-      undefined,
-      script.id,
-    );
+    const codeNode = NodeInstance.createNodeInstance("code.run", { x: 0, y: 0 }, codeDef.deriveScriptPins!(script), "code1", undefined, undefined, script.id);
     graph.nodes.push(codeNode);
     const variable: Variable = {
       id: "v1",
@@ -985,22 +738,8 @@ describe("updateScriptInput", () => {
     };
     addVariable(graph, variable);
     const getDef = getNodeDef("variable.get");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "variable.get",
-        { x: -200, y: 0 },
-        getDef.derivePins!(variable),
-        "get",
-        variable.id,
-      ),
-    );
-    connectPins(
-      graph,
-      graph.variables,
-      graph.functions,
-      { fromNode: "get", fromPin: "value", toNode: "code1", toPin: "name" },
-      graph.scripts,
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("variable.get", { x: -200, y: 0 }, getDef.derivePins!(variable), "get", variable.id));
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "get", fromPin: "value", toNode: "code1", toPin: "name" }, graph.scripts);
 
     updateScriptInput(graph, script, "name", { name: "playerName" });
 
@@ -1020,15 +759,7 @@ describe("updateScriptInput", () => {
     graph.scripts.push(script);
 
     const codeDef = getNodeDef("code.run");
-    const codeNode = NodeInstance.createNodeInstance(
-      "code.run",
-      { x: 0, y: 0 },
-      codeDef.deriveScriptPins!(script),
-      "code1",
-      undefined,
-      undefined,
-      script.id,
-    );
+    const codeNode = NodeInstance.createNodeInstance("code.run", { x: 0, y: 0 }, codeDef.deriveScriptPins!(script), "code1", undefined, undefined, script.id);
     graph.nodes.push(codeNode);
     const variable: Variable = {
       id: "v1",
@@ -1038,22 +769,8 @@ describe("updateScriptInput", () => {
     };
     addVariable(graph, variable);
     const getDef = getNodeDef("variable.get");
-    graph.nodes.push(
-      NodeInstance.createNodeInstance(
-        "variable.get",
-        { x: -200, y: 0 },
-        getDef.derivePins!(variable),
-        "get",
-        variable.id,
-      ),
-    );
-    connectPins(
-      graph,
-      graph.variables,
-      graph.functions,
-      { fromNode: "get", fromPin: "value", toNode: "code1", toPin: "name" },
-      graph.scripts,
-    );
+    graph.nodes.push(NodeInstance.createNodeInstance("variable.get", { x: -200, y: 0 }, getDef.derivePins!(variable), "get", variable.id));
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "get", fromPin: "value", toNode: "code1", toPin: "name" }, graph.scripts);
 
     updateScriptInput(graph, script, "name", { type: "number" });
 
@@ -1065,11 +782,7 @@ describe("updateScriptInput", () => {
 describe("moveScript", () => {
   it("reorders scripts on the graph", () => {
     const graph = new Graph("g", "root");
-    graph.scripts.push(
-      createCodeScriptDef("a"),
-      createCodeScriptDef("b"),
-      createCodeScriptDef("c"),
-    );
+    graph.scripts.push(createCodeScriptDef("a"), createCodeScriptDef("b"), createCodeScriptDef("c"));
     const [a, b, c] = graph.scripts;
     moveScript(graph, c.id, a.id, "before");
     expect(graph.scripts.map((s) => s.id)).toEqual([c.id, a.id, b.id]);
@@ -1079,11 +792,7 @@ describe("moveScript", () => {
 describe("moveScriptInput", () => {
   it("reorders a script's inputs list", () => {
     const script = createCodeScriptDef("Fn");
-    script.inputs.push(
-      { id: "a", name: "a", type: "number", defaultValue: 0 },
-      { id: "b", name: "b", type: "number", defaultValue: 0 },
-      { id: "c", name: "c", type: "number", defaultValue: 0 },
-    );
+    script.inputs.push({ id: "a", name: "a", type: "number", defaultValue: 0 }, { id: "b", name: "b", type: "number", defaultValue: 0 }, { id: "c", name: "c", type: "number", defaultValue: 0 });
     moveScriptInput(script, "c", "a", "before");
     expect(script.inputs.map((e) => e.id)).toEqual(["c", "a", "b"]);
   });
@@ -1094,15 +803,7 @@ describe("addScriptOutput / removeScriptOutput", () => {
     const graph = new Graph("g", "root");
     graph.scripts.push(script);
     const codeDef = getNodeDef("code.run");
-    const codeNode = NodeInstance.createNodeInstance(
-      "code.run",
-      { x: 0, y: 0 },
-      codeDef.deriveScriptPins!(script),
-      "code1",
-      undefined,
-      undefined,
-      script.id,
-    );
+    const codeNode = NodeInstance.createNodeInstance("code.run", { x: 0, y: 0 }, codeDef.deriveScriptPins!(script), "code1", undefined, undefined, script.id);
     graph.nodes.push(codeNode);
     return graph;
   }
@@ -1118,14 +819,8 @@ describe("addScriptOutput / removeScriptOutput", () => {
       defaultValue: "",
     });
     const codeNode = graph.nodes.find((n) => n.id === "code1")!;
-    const pins = codeNode.resolvePinDefs(
-      graph.variables,
-      graph.functions,
-      graph.scripts,
-    );
-    expect(
-      pins.some((p) => p.id === "greeting" && p.direction === "output"),
-    ).toBe(true);
+    const pins = codeNode.resolvePinDefs(graph.variables, graph.functions, graph.scripts);
+    expect(pins.some((p) => p.id === "greeting" && p.direction === "output")).toBe(true);
   });
 
   it("removing an output prunes the now-dangling pin/connection off every bound code.run node", () => {
@@ -1138,20 +833,9 @@ describe("addScriptOutput / removeScriptOutput", () => {
     });
     const graph = buildGraphWithBoundCodeNode(script);
 
-    const printNode = NodeInstance.createNodeInstance(
-      "debug.print",
-      { x: 200, y: 0 },
-      getNodeDef("debug.print").pins,
-      "print",
-    );
+    const printNode = NodeInstance.createNodeInstance("debug.print", { x: 200, y: 0 }, getNodeDef("debug.print").pins, "print");
     graph.nodes.push(printNode);
-    connectPins(
-      graph,
-      graph.variables,
-      graph.functions,
-      { fromNode: "code1", fromPin: "greeting", toNode: "print", toPin: "message" },
-      graph.scripts,
-    );
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "code1", fromPin: "greeting", toNode: "print", toPin: "message" }, graph.scripts);
 
     expect(graph.connections).toHaveLength(1);
 
@@ -1177,30 +861,11 @@ describe("updateScriptOutput", () => {
     graph.scripts.push(script);
 
     const codeDef = getNodeDef("code.run");
-    const codeNode = NodeInstance.createNodeInstance(
-      "code.run",
-      { x: 0, y: 0 },
-      codeDef.deriveScriptPins!(script),
-      "code1",
-      undefined,
-      undefined,
-      script.id,
-    );
+    const codeNode = NodeInstance.createNodeInstance("code.run", { x: 0, y: 0 }, codeDef.deriveScriptPins!(script), "code1", undefined, undefined, script.id);
     graph.nodes.push(codeNode);
-    const printNode = NodeInstance.createNodeInstance(
-      "debug.print",
-      { x: 200, y: 0 },
-      getNodeDef("debug.print").pins,
-      "print",
-    );
+    const printNode = NodeInstance.createNodeInstance("debug.print", { x: 200, y: 0 }, getNodeDef("debug.print").pins, "print");
     graph.nodes.push(printNode);
-    connectPins(
-      graph,
-      graph.variables,
-      graph.functions,
-      { fromNode: "code1", fromPin: "greeting", toNode: "print", toPin: "message" },
-      graph.scripts,
-    );
+    connectPins(graph, graph.variables, graph.functions, { fromNode: "code1", fromPin: "greeting", toNode: "print", toPin: "message" }, graph.scripts);
     return { graph, script };
   }
 
@@ -1226,11 +891,7 @@ describe("updateScriptOutput", () => {
 describe("moveScriptOutput", () => {
   it("reorders a script's outputs list", () => {
     const script = createCodeScriptDef("Fn");
-    script.outputs.push(
-      { id: "a", name: "a", type: "number", defaultValue: 0 },
-      { id: "b", name: "b", type: "number", defaultValue: 0 },
-      { id: "c", name: "c", type: "number", defaultValue: 0 },
-    );
+    script.outputs.push({ id: "a", name: "a", type: "number", defaultValue: 0 }, { id: "b", name: "b", type: "number", defaultValue: 0 }, { id: "c", name: "c", type: "number", defaultValue: 0 });
     moveScriptOutput(script, "c", "a", "before");
     expect(script.outputs.map((e) => e.id)).toEqual(["c", "a", "b"]);
   });

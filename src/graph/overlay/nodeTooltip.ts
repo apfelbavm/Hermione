@@ -2,7 +2,7 @@ import { getNodeDef } from "../engine/registry";
 import type { PinDef, PinType } from "../engine/types";
 import { hitTestNode, hitTestPin } from "../render/hitTest";
 import { computeAllNodeGeometries } from "../render/nodeGeometry";
-import { getEditingGraph, getVisibleVariablesForState, type Store } from "../state/store";
+import { getEditingGraph, getVisibleVariablesForState, type Store } from "../../state/store";
 import { cursorOffset, hideTooltip, moveTooltip, showTooltip } from "./tooltip";
 
 const HOVER_DELAY_MS = 500;

@@ -1,5 +1,5 @@
 import { i18n } from "@i18n";
-import type { FunctionDef } from "../engine/types";
+import type { FunctionDef } from "../graph/engine/types";
 import type { FlowVersionSummary } from "../server/models";
 import type { Store } from "../state/store";
 import { useStoreRevision } from "../state/useStore";

@@ -1,11 +1,11 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { nextId } from "../engine/graphMutations";
+import { nextId } from "../graph/engine/graphMutations";
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
 import { MAX_RUNS_PER_PROJECT } from "../shared/runLogConstants";
 import type { DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, LogEntry, ProjectSummary, RunKind, RunLog } from "./models";
-import type { TriggerDescriptor } from "../compiler/codegen";
+import type { TriggerDescriptor } from "../graph/compiler/codegen";
 
 const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "hermione.db");
 

@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { removeInstancePin } from "../../../src/engine/graphMutations";
-import { getNodeDef } from "../../../src/engine/registry";
-import { Graph } from "../../../src/engine/graph";
-import { NodeInstance } from "../../../src/engine/nodeInstance";
+import { removeInstancePin } from "../../../src/graph/engine/graphMutations";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -11,11 +11,7 @@ beforeAll(() => {
 
 function appendNode(): NodeInstance {
   const def = getNodeDef("string.append");
-  return NodeInstance.createNodeInstance(
-    "string.append",
-    { x: 0, y: 0 },
-    def.pins,
-  );
+  return NodeInstance.createNodeInstance("string.append", { x: 0, y: 0 }, def.pins);
 }
 
 describe("string.fromNumber / fromBoolean / fromJson", () => {
@@ -153,17 +149,13 @@ describe("string.replaceAll", () => {
 
 describe("string.substring", () => {
   it("returns the characters between Start and End", () => {
-    expect(
-      evaluate("string.substring", { value: "hello world", start: 6, end: 11 }),
-    ).toEqual({
+    expect(evaluate("string.substring", { value: "hello world", start: 6, end: 11 })).toEqual({
       result: "world",
     });
   });
 
   it("is order-independent (swaps Start/End if Start > End), matching String.prototype.substring", () => {
-    expect(
-      evaluate("string.substring", { value: "hello world", start: 11, end: 6 }),
-    ).toEqual({
+    expect(evaluate("string.substring", { value: "hello world", start: 11, end: 6 })).toEqual({
       result: "world",
     });
   });
@@ -180,17 +172,13 @@ describe("string.substring", () => {
 
 describe("string.slice", () => {
   it("returns the characters between Start and End", () => {
-    expect(
-      evaluate("string.slice", { value: "hello world", start: 6, end: 11 }),
-    ).toEqual({
+    expect(evaluate("string.slice", { value: "hello world", start: 6, end: 11 })).toEqual({
       result: "world",
     });
   });
 
   it("supports a negative index counting from the end", () => {
-    expect(
-      evaluate("string.slice", { value: "hello world", start: -5, end: 11 }),
-    ).toEqual({
+    expect(evaluate("string.slice", { value: "hello world", start: -5, end: 11 })).toEqual({
       result: "world",
     });
   });
@@ -212,9 +200,7 @@ describe("string.append", () => {
     graph.nodes.push(node);
 
     const pinDefs = node.resolvePinDefs([], []);
-    const entryIds = pinDefs
-      .filter((p) => p.direction === "input")
-      .map((p) => p.id);
+    const entryIds = pinDefs.filter((p) => p.direction === "input").map((p) => p.id);
     expect(entryIds).toEqual(["entry-0", "entry-1"]);
 
     const def = getNodeDef("string.append");
@@ -241,11 +227,7 @@ describe("string.append", () => {
     const pinDefs = node.resolvePinDefs([], []);
     const entries = pinDefs.filter((p) => p.direction === "input");
     expect(entries.map((p) => p.id)).toEqual(["entry-0", "entry-1", "entry-2"]);
-    expect(entries.map((p) => p.label)).toEqual([
-      "String 1",
-      "String 2",
-      "String 3",
-    ]);
+    expect(entries.map((p) => p.label)).toEqual(["String 1", "String 2", "String 3"]);
     expect(node.pins["entry-2"]).toEqual({ value: "" });
   });
 

@@ -1,4 +1,4 @@
-import { registerNode } from "../../engine/registry";
+import { registerNode } from "../engine/registry";
 import { i18n } from "@i18n";
 import { XML_BUILDER_IMPORT_LINE, XML_BUILD_OPTIONS_LITERAL, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, extractTabularRows, jsonValueToXml, objectsToCsv, xmlToJsonValue } from "./dataFormatHelpers";
 

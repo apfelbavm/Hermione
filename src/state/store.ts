@@ -1,6 +1,6 @@
-import { Graph } from "../engine/graph";
-import type { PinDirection, PinType, Variable } from "../engine/types";
-import type { Camera } from "../render/camera";
+import { Graph } from "../graph/engine/graph";
+import type { PinDirection, PinType, Variable } from "../graph/engine/types";
+import type { Camera } from "../graph/render/camera";
 
 export interface WireDragState {
   /** One entry per anchor being dragged — more than one when a Ctrl+drag picked up every

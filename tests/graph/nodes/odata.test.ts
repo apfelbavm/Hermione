@@ -1,12 +1,9 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import {
-  createExecutionContext,
-  runExecFrom,
-} from "../../../src/engine/executor";
-import { getNodeDef } from "../../../src/engine/registry";
-import { Graph } from "../../../src/engine/graph";
-import { NodeInstance } from "../../../src/engine/nodeInstance";
+import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -19,12 +16,7 @@ afterEach(() => {
 function buildGraph(pinValues: Record<string, unknown> = {}) {
   const graph: Graph = new Graph("g", "test");
   const def = getNodeDef("odata.v2Request");
-  const node = NodeInstance.createNodeInstance(
-    "odata.v2Request",
-    { x: 0, y: 0 },
-    def.pins,
-    "req",
-  );
+  const node = NodeInstance.createNodeInstance("odata.v2Request", { x: 0, y: 0 }, def.pins, "req");
   for (const [id, value] of Object.entries(pinValues)) {
     node.pins[id].value = value;
   }
@@ -60,8 +52,7 @@ describe("odata.v2Request", () => {
       const u = new URL(url);
       const skip = Number(u.searchParams.get("$skip"));
       expect(u.searchParams.get("$filter")).toBe("Active eq true"); // preserved from the base URL
-      if (skip === 0)
-        return jsonResponse({ d: { results: [{ id: 1 }, { id: 2 }] } });
+      if (skip === 0) return jsonResponse({ d: { results: [{ id: 1 }, { id: 2 }] } });
       if (skip === 2) return jsonResponse({ d: { results: [{ id: 3 }] } }); // short page — last one
       throw new Error(`unexpected $skip=${skip}`);
     });
@@ -78,11 +69,7 @@ describe("odata.v2Request", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(ctx.execOutputs.get("req:success")).toBe(true);
     expect(ctx.execOutputs.get("req:pageCount")).toBe(2);
-    expect(ctx.execOutputs.get("req:rows")).toEqual([
-      { id: 1 },
-      { id: 2 },
-      { id: 3 },
-    ]);
+    expect(ctx.execOutputs.get("req:rows")).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
     expect(ctx.execOutputs.get("req:error")).toBe("");
   });
 
@@ -117,9 +104,7 @@ describe("odata.v2Request", () => {
   });
 
   it("stops at Max Pages even if the server keeps returning full pages / a next link", async () => {
-    const fetchMock = vi.fn(async () =>
-      jsonResponse({ d: { results: [{ id: 1 }, { id: 2 }] } }),
-    );
+    const fetchMock = vi.fn(async () => jsonResponse({ d: { results: [{ id: 1 }, { id: 2 }] } }));
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph({
@@ -140,8 +125,7 @@ describe("odata.v2Request", () => {
   it("reports a failed page via success/error/status instead of throwing, keeping rows gathered so far", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       const skip = Number(new URL(url).searchParams.get("$skip"));
-      if (skip === 0)
-        return jsonResponse({ d: { results: [{ id: 1 }, { id: 2 }] } });
+      if (skip === 0) return jsonResponse({ d: { results: [{ id: 1 }, { id: 2 }] } });
       return { status: 500, ok: false, text: async () => "" };
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -161,9 +145,7 @@ describe("odata.v2Request", () => {
   });
 
   it("merges a wired Auth object's header into every page request", async () => {
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
-      jsonResponse({ d: { results: [] } }),
-    );
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse({ d: { results: [] } }));
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph({

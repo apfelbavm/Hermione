@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { registerBuiltins } from "../../src/graph/nodes";
-import { createExecutionContext, runExecFrom } from "../../src/engine/executor";
-import { connectPins } from "../../src/engine/graphMutations";
-import { getNodeDef } from "../../src/engine/registry";
-import { compileGraph } from "../../src/compiler/codegen";
-import { Graph } from "../../src/engine/graph";
-import { NodeInstance } from "../../src/engine/nodeInstance";
+import { registerBuiltins } from "../../../src/graph/nodes";
+import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
+import { connectPins } from "../../../src/graph/engine/graphMutations";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { compileGraph } from "../../../src/graph/compiler/codegen";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
 
 function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { attachHoverTooltip } from "../../overlay/tooltip";
+import { attachHoverTooltip } from "../../graph/overlay/tooltip";
 
 export function EditableNameInput({ name, onCommit, onCancel }: { name: string; onCommit: (newName: string) => void; onCancel: () => void }) {
   const settledRef = useRef(false);

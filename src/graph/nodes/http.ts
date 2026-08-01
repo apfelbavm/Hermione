@@ -1,5 +1,5 @@
-import { registerNode } from "../../engine/registry";
-import { compileResultVar } from "../../engine/compileUtils";
+import { registerNode } from "../engine/registry";
+import { compileResultVar } from "../engine/compileUtils";
 import { i18n } from "@i18n";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];

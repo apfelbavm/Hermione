@@ -5,7 +5,7 @@ import { guardAgainstMultilinePaste, openMultilineTextEditor } from "./multiline
 import type { Camera } from "../render/camera";
 import { MULTILINE_EXPAND_BUTTON_WIDTH, pinWidgetWidth } from "../render/layout";
 import type { NodeScreenGeometry } from "../render/nodeGeometry";
-import { getEditingGraph, type Store } from "../state/store";
+import { getEditingGraph, type Store } from "../../state/store";
 
 const WIDGET_TYPES: readonly PinType[] = ["number", "boolean", "string", "date", "enum"];
 

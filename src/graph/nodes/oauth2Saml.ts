@@ -1,6 +1,6 @@
-import { NodeColorCategory } from "../../engine/types";
-import { registerNode } from "../../engine/registry";
-import { compileResultVar } from "../../engine/compileUtils";
+import { NodeColorCategory } from "../engine/types";
+import { registerNode } from "../engine/registry";
+import { compileResultVar } from "../engine/compileUtils";
 import type { Oauth2SamlBearerCredentialData } from "../../credentials/types";
 import { i18n } from "@i18n";
 

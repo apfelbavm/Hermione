@@ -1,6 +1,6 @@
 import { Graph } from "./graph";
 import { NodeInstance } from "./nodeInstance";
-import type { CredentialRecord } from "../credentials/types";
+import type { CredentialRecord } from "../../credentials/types";
 
 /** "enum" is a literal-only config knob (a PinDef with `options` set) — never wireable in either
  * direction, on purpose (see isPinTypeCompatible), and drawn in its own dark-green color (see

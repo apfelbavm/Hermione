@@ -1,16 +1,10 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import {
-  createExecutionContext,
-  runExecFrom,
-} from "../../../src/engine/executor";
-import { getNodeDef } from "../../../src/engine/registry";
-import { Graph } from "../../../src/engine/graph";
-import { NodeInstance } from "../../../src/engine/nodeInstance";
-import type {
-  CredentialRecord,
-  MicrosoftGraphClientCredentialsData,
-} from "../../../src/credentials/types";
+import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import type { CredentialRecord, MicrosoftGraphClientCredentialsData } from "../../../src/credentials/types";
 import { ClientSecretCredential } from "@azure/identity";
 
 /** GraphManager authenticates via @azure/identity's ClientSecretCredential, which acquires tokens
@@ -34,19 +28,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function buildGraph(
-  type: string,
-  id: string,
-  pinValues: Record<string, unknown> = {},
-) {
+function buildGraph(type: string, id: string, pinValues: Record<string, unknown> = {}) {
   const graph: Graph = new Graph("g", "test");
   const def = getNodeDef(type);
-  const node = NodeInstance.createNodeInstance(
-    type,
-    { x: 0, y: 0 },
-    def.pins,
-    id,
-  );
+  const node = NodeInstance.createNodeInstance(type, { x: 0, y: 0 }, def.pins, id);
   for (const [pinId, value] of Object.entries(pinValues)) {
     node.pins[pinId].value = value;
   }
@@ -78,17 +63,14 @@ function freshCredential(): {
   };
   return {
     name: credential.name,
-    getCredential: (name) =>
-      name === credential.name ? credential : undefined,
+    getCredential: (name) => (name === credential.name ? credential : undefined),
   };
 }
 
 /** Graph client SDK calls go through global fetch (see HTTPMessageHandler); token acquisition is
  * mocked separately via the @azure/identity mock above, so this just wraps the Graph API handler
  * as a vi.fn spy. */
-function mockGraphFetch(
-  handleOp: (url: string, init?: RequestInit) => Response | Promise<Response>,
-) {
+function mockGraphFetch(handleOp: (url: string, init?: RequestInit) => Response | Promise<Response>) {
   return vi.fn(handleOp);
 }
 
@@ -175,9 +157,7 @@ describe("microsoft365.listUsers", () => {
     await runExecFrom("lu", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lu:success")).toBe(false);
-    expect(ctx.execOutputs.get("lu:error")).toBe(
-      "Forbidden: Insufficient privileges",
-    );
+    expect(ctx.execOutputs.get("lu:error")).toBe("Forbidden: Insufficient privileges");
   });
 });
 
@@ -228,9 +208,7 @@ describe("microsoft365.sendMail", () => {
       mockGraphFetch(async (url, init) => {
         expect(String(url)).toContain("/users/ada%40contoso.com/sendMail");
         const body = JSON.parse(String(init?.body));
-        expect(body.message.toRecipients).toEqual([
-          { emailAddress: { address: "bob@contoso.com" } },
-        ]);
+        expect(body.message.toRecipients).toEqual([{ emailAddress: { address: "bob@contoso.com" } }]);
         return new Response(null, { status: 202 });
       }),
     );
@@ -256,9 +234,7 @@ describe("microsoft365.uploadFile / downloadFile", () => {
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url) => {
-        expect(String(url)).toContain(
-          "/drive/root:/reports/report.csv:/content",
-        );
+        expect(String(url)).toContain("/drive/root:/reports/report.csv:/content");
         return new Response(JSON.stringify({ id: "item-1" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -391,9 +367,7 @@ describe("microsoft365.listChannels", () => {
     await runExecFrom("lc", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lc:success")).toBe(true);
-    expect(ctx.execOutputs.get("lc:channels")).toEqual([
-      { id: "c1", displayName: "General", description: "" },
-    ]);
+    expect(ctx.execOutputs.get("lc:channels")).toEqual([{ id: "c1", displayName: "General", description: "" }]);
   });
 });
 
@@ -476,9 +450,7 @@ describe("microsoft365.getWorksheetRange / setWorksheetRange", () => {
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url) => {
-        expect(String(url)).toContain(
-          "/workbook/worksheets/Sheet1/range(address='A1%3AB2')",
-        );
+        expect(String(url)).toContain("/workbook/worksheets/Sheet1/range(address='A1%3AB2')");
         return new Response(JSON.stringify({ values: [[1, 2]] }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -505,9 +477,7 @@ describe("microsoft365.getWorksheetRange / setWorksheetRange", () => {
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url, init) => {
-        expect(String(url)).toContain(
-          "/workbook/worksheets/Sheet1/range(address='A1%3AB2')",
-        );
+        expect(String(url)).toContain("/workbook/worksheets/Sheet1/range(address='A1%3AB2')");
         const body = JSON.parse(String(init?.body));
         expect(body.values).toEqual([[1, 2]]);
         return new Response(null, { status: 200 });
@@ -556,9 +526,7 @@ describe("microsoft365.listPlannerTasks", () => {
     await runExecFrom("lp", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lp:success")).toBe(true);
-    expect(ctx.execOutputs.get("lp:tasks")).toEqual([
-      { id: "t1", title: "Write spec", percentComplete: 50 },
-    ]);
+    expect(ctx.execOutputs.get("lp:tasks")).toEqual([{ id: "t1", title: "Write spec", percentComplete: 50 }]);
   });
 });
 
@@ -595,9 +563,7 @@ describe("microsoft365.listContacts", () => {
     await runExecFrom("lct", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lct:success")).toBe(true);
-    expect(ctx.execOutputs.get("lct:contacts")).toEqual([
-      { id: "ct1", displayName: "Bob", email: "bob@contoso.com" },
-    ]);
+    expect(ctx.execOutputs.get("lct:contacts")).toEqual([{ id: "ct1", displayName: "Bob", email: "bob@contoso.com" }]);
   });
 });
 
@@ -627,9 +593,7 @@ describe("microsoft365.listApplications", () => {
     await runExecFrom("la", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("la:success")).toBe(true);
-    expect(ctx.execOutputs.get("la:applications")).toEqual([
-      { id: "a1", displayName: "My App", appId: "app-guid" },
-    ]);
+    expect(ctx.execOutputs.get("la:applications")).toEqual([{ id: "a1", displayName: "My App", appId: "app-guid" }]);
   });
 });
 

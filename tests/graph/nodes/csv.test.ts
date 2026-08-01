@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { getNodeDef } from "../../../src/engine/registry";
+import { getNodeDef } from "../../../src/graph/engine/registry";
 
 beforeAll(() => {
   registerBuiltins();
@@ -182,9 +182,7 @@ describe("csv.toXml", () => {
       rowTag: "",
     });
     expect(result.success).toBe(true);
-    expect(result.xml).toBe(
-      "<rows><row><name>Alice</name><age>30</age></row></rows>",
-    );
+    expect(result.xml).toBe("<rows><row><name>Alice</name><age>30</age></row></rows>");
   });
 
   it("honors custom root/row tags", async () => {
@@ -194,9 +192,7 @@ describe("csv.toXml", () => {
       rootTag: "people",
       rowTag: "person",
     });
-    expect(result.xml).toBe(
-      "<people><person><name>Alice</name></person><person><name>Bob</name></person></people>",
-    );
+    expect(result.xml).toBe("<people><person><name>Alice</name></person><person><name>Bob</name></person></people>");
   });
 
   it("honors a custom delimiter", async () => {

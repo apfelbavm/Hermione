@@ -1,6 +1,6 @@
-import { registerNode } from "../../engine/registry";
-import { compileResultVar } from "../../engine/compileUtils";
-import type { CodeScriptDef } from "../../engine/types";
+import { registerNode } from "../engine/registry";
+import { compileResultVar } from "../engine/compileUtils";
+import type { CodeScriptDef } from "../engine/types";
 import { i18n } from "@i18n";
 // The Code node runs a user-authored script (see CodeScriptDef in types.ts, edited via Monaco in
 // scriptEditor.ts) — the one node type in this engine whose actual logic is data the user writes,

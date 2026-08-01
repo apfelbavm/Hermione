@@ -1,5 +1,5 @@
-import { NodeColorCategory, type ExecutionContext } from "../../engine/types";
-import { registerNode } from "../../engine/registry";
+import { NodeColorCategory, type ExecutionContext } from "../engine/types";
+import { registerNode } from "../engine/registry";
 import { AzureStorageManager } from "../../lib/azureStorageManager";
 import type { AzureStorageBlobUploadOptions } from "../../lib/azureStorageManager";
 import type { AzureStorageConnectionStringCredentialData } from "../../credentials/types";

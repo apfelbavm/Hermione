@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { i18n } from "@i18n";
-import { addFunctionInput, addFunctionOutput, DEFAULT_VALUE_BY_TYPE, moveFunctionEntry, nextId, removeFunctionInput, removeFunctionOutput, updateFunctionInput, updateFunctionOutput } from "../../engine/graphMutations";
-import type { FunctionDef, PinSignatureEntry } from "../../engine/types";
+import { addFunctionInput, addFunctionOutput, DEFAULT_VALUE_BY_TYPE, moveFunctionEntry, nextId, removeFunctionInput, removeFunctionOutput, updateFunctionInput, updateFunctionOutput } from "../../graph/engine/graphMutations";
+import type { FunctionDef, PinSignatureEntry } from "../../graph/engine/types";
 import { getLastVariableType, setLastVariableType } from "../../client/lastVariableType";
-import { FUNCTION_IO_ENTRY_DRAG_MIME } from "../../overlay/dragTypes";
-import { openRowContextMenu } from "../../overlay/rowContextMenu";
-import { createContainerSelect, createTypeSelect, createTypedValueInput } from "../../overlay/typedValueInput";
-import { nextAvailableName } from "../../overlay/uniqueName";
+import { FUNCTION_IO_ENTRY_DRAG_MIME } from "../../graph/overlay/dragTypes";
+import { openRowContextMenu } from "../../graph/overlay/rowContextMenu";
+import { createContainerSelect, createTypeSelect, createTypedValueInput } from "../../graph/overlay/typedValueInput";
+import { nextAvailableName } from "../../graph/overlay/uniqueName";
 import type { Store } from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
 import { CollapsibleSection } from "./CollapsibleSection";

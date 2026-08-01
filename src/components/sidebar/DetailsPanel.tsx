@@ -1,13 +1,13 @@
 "use client";
 
-import { allGraphs, setPinLiteralValue, updateVariable } from "../../engine/graphMutations";
+import { allGraphs, setPinLiteralValue, updateVariable } from "../../graph/engine/graphMutations";
 import { i18n } from "@i18n";
-import type { NodeInstance } from "../../engine/nodeInstance";
-import { getNodeDef } from "../../engine/registry";
-import type { CommentBox, FunctionDef, PinDef, Variable } from "../../engine/types";
+import type { NodeInstance } from "../../graph/engine/nodeInstance";
+import { getNodeDef } from "../../graph/engine/registry";
+import type { CommentBox, FunctionDef, PinDef, Variable } from "../../graph/engine/types";
 import { setLastVariableType } from "../../client/lastVariableType";
-import { createContainerSelect, createStructTypeSelect, createTypeSelect, createTypedValueInput } from "../../overlay/typedValueInput";
-import { DEFAULT_COMMENT_COLOR } from "../../render/commentGeometry";
+import { createContainerSelect, createStructTypeSelect, createTypeSelect, createTypedValueInput } from "../../graph/overlay/typedValueInput";
+import { DEFAULT_COMMENT_COLOR } from "../../graph/render/commentGeometry";
 import { getEditingGraph, getVisibleVariablesForState, type Store } from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
 import { FunctionIoPanel } from "./FunctionIoPanel";

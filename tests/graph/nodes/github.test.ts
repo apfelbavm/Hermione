@@ -1,16 +1,10 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import {
-  createExecutionContext,
-  runExecFrom,
-} from "../../../src/engine/executor";
-import { getNodeDef } from "../../../src/engine/registry";
-import { Graph } from "../../../src/engine/graph";
-import { NodeInstance } from "../../../src/engine/nodeInstance";
-import type {
-  CredentialRecord,
-  GithubTokenCredentialData,
-} from "../../../src/credentials/types";
+import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
+import { getNodeDef } from "../../../src/graph/engine/registry";
+import { Graph } from "../../../src/graph/engine/graph";
+import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import type { CredentialRecord, GithubTokenCredentialData } from "../../../src/credentials/types";
 
 beforeAll(() => {
   registerBuiltins();
@@ -20,19 +14,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function buildGraph(
-  type: string,
-  id: string,
-  pinValues: Record<string, unknown> = {},
-) {
+function buildGraph(type: string, id: string, pinValues: Record<string, unknown> = {}) {
   const graph: Graph = new Graph("g", "test");
   const def = getNodeDef(type);
-  const node = NodeInstance.createNodeInstance(
-    type,
-    { x: 0, y: 0 },
-    def.pins,
-    id,
-  );
+  const node = NodeInstance.createNodeInstance(type, { x: 0, y: 0 }, def.pins, id);
   for (const [pinId, value] of Object.entries(pinValues)) {
     node.pins[pinId].value = value;
   }
@@ -134,12 +119,7 @@ describe("github.createIssue", () => {
   it("creates an issue and returns its number and URL", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        jsonResponse(
-          { number: 42, html_url: "https://github.com/acme/widgets/issues/42" },
-          201,
-        ),
-      ),
+      vi.fn(async () => jsonResponse({ number: 42, html_url: "https://github.com/acme/widgets/issues/42" }, 201)),
     );
 
     const { graph } = buildGraph("github.createIssue", "ci", {
@@ -182,9 +162,7 @@ describe("github.createIssue", () => {
     await runExecFrom("ci", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("ci:success")).toBe(false);
-    expect(ctx.execOutputs.get("ci:error")).toBe(
-      "Validation Failed (status 422)",
-    );
+    expect(ctx.execOutputs.get("ci:error")).toBe("Validation Failed (status 422)");
   });
 });
 

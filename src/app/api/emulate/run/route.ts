@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 import { registerBuiltins } from "../../../../graph/nodes";
-import { nextId } from "../../../../engine/graphMutations";
+import { nextId } from "../../../../graph/engine/graphMutations";
 import { getDatabaseManager } from "../../../../server/DatabaseManager";
 import { applyCredentialEnvVars } from "../../../../server/credentialEnv";
 import { deployedScriptPath } from "../../../../server/deployedScriptFile";

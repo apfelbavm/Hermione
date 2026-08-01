@@ -23,15 +23,7 @@ const SUPPORTED_FORMAT_VERSIONS = [1, 2, CURRENT_FORMAT_VERSION];
  * `NodeInstance` — it has none of NodeInstance.prototype's methods (e.g. resolvePinDefs). Rebuilds
  * a proper instance so the loaded node behaves identically to one built with `new NodeInstance(...)`. */
 function reviveNode(node: NodeInstance): NodeInstance {
-  const revived = new NodeInstance(
-    node.id,
-    node.type,
-    node.position,
-    node.pins,
-    node.variableId,
-    node.functionId,
-    node.scriptId,
-  );
+  const revived = new NodeInstance(node.id, node.type, node.position, node.pins, node.variableId, node.functionId, node.scriptId);
   revived.disabled = node.disabled;
   revived.breakpoint = node.breakpoint;
   revived.elementType = node.elementType;

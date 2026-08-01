@@ -141,7 +141,7 @@ function createContainerListInput(type: PinType, value: unknown, onChange: (valu
 
   function dedupeInPlace(): void {
     const seen = new Set<string>();
-    for (let i = 0; i < entries.length; ) {
+    for (let i = 0; i < entries.length;) {
       const key = JSON.stringify(entries[i]);
       if (seen.has(key)) entries.splice(i, 1);
       else {

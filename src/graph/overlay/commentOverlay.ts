@@ -1,5 +1,5 @@
 import { COMMENT_HEADER_HEIGHT, computeCommentScreenRect } from "../render/commentGeometry";
-import { getEditingGraph, type Store } from "../state/store";
+import { getEditingGraph, type Store } from "../../state/store";
 
 interface CommentEntry {
   titleEl: HTMLDivElement;
