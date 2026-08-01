@@ -3,7 +3,7 @@ import { cloneDefaultValue } from "./graphMutations";
 import { connectionsFrom, connectionTo } from "./graphQueries";
 import { NodeInstance } from "./nodeInstance";
 import { getNodeDef } from "./registry";
-import type { ExecutionContext, FunctionDef } from "./types";
+import type { ExecutionContext, FunctionDef, NodeDef } from "./types";
 
 export function findNode(graph: Graph, nodeId: string): NodeInstance {
   const node = graph.nodes.find((n) => n.id === nodeId);
@@ -72,35 +72,61 @@ export async function resolveDataPin(nodeId: string, pinId: string, ctx: Executi
     throw new Error(`Cyclic data-pin dependency detected at ${outputCacheKey}`);
   }
   resolving.add(outputCacheKey);
+  await evaluateAndCache(upstreamNode, upstreamDef.evaluate, ctx, resolving);
+  resolving.delete(outputCacheKey);
 
+  return ctx.tickCache.get(outputCacheKey);
+}
+
+/** Runs a pure/data node's evaluate() and caches + reports (via onPinValues) every one of its
+ * OUTPUT pins' values, not just whichever one a caller happens to be after — shared by
+ * resolveDataPin (pulled on demand by a downstream consumer) and warmPureNodeTooltips (forced
+ * eagerly below, so an otherwise-unconsumed pure node like Break Struct still gets hover-tooltip
+ * values while simulating, even with none of its outputs wired anywhere). */
+async function evaluateAndCache(node: NodeInstance, evaluate: NonNullable<NodeDef["evaluate"]>, ctx: ExecutionContext, resolving: Set<string>): Promise<void> {
   // Pins actually in effect for this instance — not the static def.pins, which is empty
   // for variable-derived node types (Get/Set Variable) whose pins depend on the bound Variable.
-  const upstreamPinDefs = upstreamNode.resolvePinDefs(visibleVariables(ctx), ctx.rootGraph.functions, ctx.rootGraph.scripts);
+  const pinDefs = node.resolvePinDefs(visibleVariables(ctx), ctx.rootGraph.functions, ctx.rootGraph.scripts);
 
-  const upstreamInputs: Record<string, unknown> = {};
-  for (const pinDef of upstreamPinDefs) {
+  const inputs: Record<string, unknown> = {};
+  for (const pinDef of pinDefs) {
     if (pinDef.direction === "input" && pinDef.type !== "exec") {
-      upstreamInputs[pinDef.id] = await resolveDataPin(upstreamNode.id, pinDef.id, ctx, resolving);
+      inputs[pinDef.id] = await resolveDataPin(node.id, pinDef.id, ctx, resolving);
     }
   }
 
-  const outputs = await upstreamDef.evaluate({
-    node: upstreamNode,
-    inputs: upstreamInputs,
-    ctx,
-  });
-  resolving.delete(outputCacheKey);
+  const outputs = await evaluate({ node, inputs, ctx });
 
   const outputValues: Record<string, unknown> = {};
-  for (const pinDef of upstreamPinDefs) {
+  for (const pinDef of pinDefs) {
     if (pinDef.direction === "output" && pinDef.type !== "exec") {
-      ctx.tickCache.set(`${upstreamNode.id}:${pinDef.id}`, outputs[pinDef.id]);
+      ctx.tickCache.set(`${node.id}:${pinDef.id}`, outputs[pinDef.id]);
       outputValues[pinDef.id] = outputs[pinDef.id];
     }
   }
-  ctx.onPinValues?.(upstreamNode.id, outputValues);
+  ctx.onPinValues?.(node.id, outputValues);
+}
 
-  return ctx.tickCache.get(outputCacheKey);
+/** Forces every pure/data node in ctx.graph to evaluate (and report via onPinValues) this tick,
+ * even ones with no downstream consumer at all — resolveDataPin's own on-demand pull never visits
+ * those, so e.g. a Break Struct node whose fields aren't wired anywhere would otherwise never get
+ * a hover-tooltip value while simulating (see nodeTooltip.ts). Best-effort: a node whose inputs
+ * aren't fully resolvable yet (e.g. wired from a branch not taken this tick) is simply skipped,
+ * same "no value recorded yet" fallback the tooltip already handles. */
+export async function warmPureNodeTooltips(ctx: ExecutionContext): Promise<void> {
+  for (const node of ctx.graph.nodes) {
+    const def = getNodeDef(node.type);
+    if (!def.evaluate) continue;
+    const pinDefs = node.resolvePinDefs(visibleVariables(ctx), ctx.rootGraph.functions, ctx.rootGraph.scripts);
+    const firstOutput = pinDefs.find((p) => p.direction === "output" && p.type !== "exec");
+    if (!firstOutput || ctx.tickCache.has(`${node.id}:${firstOutput.id}`)) continue;
+    try {
+      await evaluateAndCache(node, def.evaluate, ctx, new Set());
+    } catch {
+      // Best-effort tooltip warming only — a node that can't run yet this tick just stays
+      // "hasn't run yet" in the tooltip, same as any other not-yet-reached pure node.
+    }
+  }
 }
 
 const MAX_EXEC_STEPS = 100_000;
@@ -172,6 +198,12 @@ export async function runExecFrom(nodeId: string, execInPin: string, ctx: Execut
         }
         ctx.onPinValues?.(node.id, result.outputs);
       }
+
+      // Best-effort: also surface any otherwise-unconsumed pure/data node's outputs this tick
+      // (e.g. a Break Struct with none of its fields wired anywhere) so the hover tooltip can show
+      // them — see warmPureNodeTooltips' own doc comment. Skipped when nobody's listening (e.g. a
+      // plain executor.ts test with no onPinValues callback) to avoid the extra work for nothing.
+      if (ctx.onPinValues) await warmPureNodeTooltips(ctx);
 
       nextExecPins = result.nextExec ? (Array.isArray(result.nextExec) ? result.nextExec : [result.nextExec]) : [];
     }
