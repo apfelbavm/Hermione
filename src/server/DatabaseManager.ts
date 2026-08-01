@@ -1,9 +1,9 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { nextId } from "../graph/engine/graphMutations";
+import { nextId } from "../graph/engine/graphMutations.ts";
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
-import { MAX_RUNS_PER_PROJECT } from "../shared/runLogConstants";
+import { MAX_RUNS_PER_PROJECT } from "../shared/runLogConstants.ts";
 import type { DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, LogEntry, ProjectSummary, RunKind, RunLog } from "./models";
 import type { TriggerDescriptor } from "../graph/compiler/codegen";
 

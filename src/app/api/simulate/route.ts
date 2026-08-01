@@ -7,6 +7,7 @@ import { allGraphs, nextId } from "../../../graph/engine/graphMutations";
 import type { Graph } from "../../../graph/engine/graph";
 import type { LogFormat } from "../../../graph/engine/types";
 import { getDatabaseManager } from "../../../server/DatabaseManager";
+import { executeDeployedFlow } from "../../../server/executeDeployedFlow";
 import type { LogEntry, RunLog } from "../../../server/models";
 
 // Must run under the Node runtime (not edge) — the interpreter and node implementations
@@ -111,6 +112,11 @@ export async function POST(request: Request): Promise<Response> {
           recordLogEntry(message, format);
         },
         getCredential: (name) => db.getCredentialByName(name),
+        executeFlow: (targetProjectId, targetFlowId) =>
+          executeDeployedFlow(targetProjectId, targetFlowId, (message) => {
+            send("log", { message });
+            recordLogEntry(message);
+          }),
         onNodeStart: async (nodeId) => {
           if (aborted) throw new Error("Simulation aborted by client");
           send("node-start", { nodeId });

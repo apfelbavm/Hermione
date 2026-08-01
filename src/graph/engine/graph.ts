@@ -1,7 +1,7 @@
-import { cloneDefaultValue } from "./graphMutations";
-import { NodeInstance } from "./nodeInstance";
-import { getNodeDef } from "./registry";
-import type { CodeScriptDef, CommentBox, Connection, FunctionDef, Pin, PinType, Variable } from "./types";
+import { cloneDefaultValue } from "./graphMutations.ts";
+import { NodeInstance } from "./nodeInstance.ts";
+import { getNodeDef } from "./registry.ts";
+import type { CodeScriptDef, CommentBox, Connection, FunctionDef, Pin, PinType, Variable } from "./types.ts";
 
 export class Graph {
   id: string;

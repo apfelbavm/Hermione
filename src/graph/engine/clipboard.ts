@@ -51,6 +51,8 @@ function isValidNodeInstance(value: unknown): value is NodeInstance {
   if (!isPlainObject(value.pins) || !Object.values(value.pins).every(isValidPin)) return false;
   if (value.variableId !== undefined && typeof value.variableId !== "string") return false;
   if (value.functionId !== undefined && typeof value.functionId !== "string") return false;
+  if (value.targetProjectId !== undefined && typeof value.targetProjectId !== "string") return false;
+  if (value.targetFlowId !== undefined && typeof value.targetFlowId !== "string") return false;
   return true;
 }
 
@@ -130,6 +132,9 @@ function cloneOptionalFields(target: NodeInstance, source: NodeInstance): void {
   target.container = source.container;
   target.subType = source.subType;
   target.description = source.description;
+  target.targetProjectId = source.targetProjectId;
+  target.targetFlowId = source.targetFlowId;
+  target.outputEntries = source.outputEntries ? structuredClone(source.outputEntries) : source.outputEntries;
 }
 
 /** Deep-clones the given selection for copying: the nodes themselves (minus Entry/Return, which are

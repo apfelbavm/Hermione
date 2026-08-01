@@ -31,6 +31,11 @@ function reviveNode(node: NodeInstance): NodeInstance {
   revived.container = node.container;
   revived.subType = node.subType;
   revived.description = node.description;
+  revived.targetProjectId = node.targetProjectId;
+  revived.targetFlowId = node.targetFlowId;
+  // A save from before this node type could have editable outputs is simply missing the field
+  // (same defaulting-IS-the-migration story as reviveGraph's own doc comment below).
+  revived.outputEntries = node.outputEntries ? [...node.outputEntries] : node.outputEntries;
   return revived;
 }
 

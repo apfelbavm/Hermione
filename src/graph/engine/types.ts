@@ -1,5 +1,5 @@
-import { Graph } from "./graph";
-import { NodeInstance } from "./nodeInstance";
+import type { Graph } from "./graph.ts";
+import type { NodeInstance } from "./nodeInstance.ts";
 import type { CredentialRecord } from "../../credentials/types";
 
 /** "enum" and "struct" both back onto a real registered CLASS looked up by PinDef.subType (see
@@ -147,6 +147,13 @@ export interface NodeDef {
   /** Present only on a deriveInstancePins node: mutates `node.pins` in place to add one more
    * entry. Invoked by the canvas "+" affordance drawn next to the node (see NodeLayout.addButton). */
   addInstancePinEntry?: (node: NodeInstance) => void;
+  /** Marks this node type as having its own editable output SIGNATURE stored directly on the
+   * instance (see NodeInstance.outputEntries) — e.g. Execute Flow's user-added mapped outputs, or
+   * Return Flow Values' declared return values. Shown as a dedicated Inputs/Outputs-style panel in
+   * the Details sidebar (see NodeOutputsPanel) in addition to whatever deriveInstancePins already
+   * derives from that same `outputEntries` array — sibling of configurableElementType/
+   * configurableSubType, just for a whole editable signature instead of one picked type. */
+  editableOutputs?: boolean;
   /** Instance-level configuration edited in the sidebar Details panel when this node is selected
    * on the canvas (see detailsPanel.ts) — e.g. On Interval's interval duration — instead of as a
    * wireable pin. Storage still goes through NodeInstance.pins (same as any other pin's value);
@@ -364,6 +371,14 @@ export interface ExecutionContext {
    * nodes/oauth2Saml.ts) has no equivalent for the COMPILED path, which instead reads the same
    * credential's fields from environment variables at runtime (see that node's compileHelpers). */
   getCredential?: (name: string) => CredentialRecord | undefined;
+  /** Runs another Flow's DEPLOYED compiled output on this same server process and reports back its
+   * declared return values (see nodes/flow.ts's flow.executeFlow and flow.return) \u2014 only meaningful
+   * server-side, where the interpreter can actually reach the deployed-scripts filesystem/DB (see
+   * server/executeDeployedFlow.ts, wired in by /api/simulate/route.ts). The COMPILED path has no
+   * equivalent need for this: a deployed flow's own compiled flow.executeFlow calls
+   * executeDeployedFlow directly (see compileUtils.ts's EXECUTE_FLOW_IMPORT) instead of going
+   * through this context hook. */
+  executeFlow?: (projectId: string, flowId: string) => Promise<{ success: boolean; error: string; outputs: Record<string, unknown> }>;
   /** Fired whenever a node's data OUTPUT pins get a fresh value — both when an exec node's own
    * execute() produces them, and when a pure/data node's evaluate() runs to satisfy some downstream
    * pin read (see executor.ts's runExecFrom/resolveDataPin) — so a client watching a live run can

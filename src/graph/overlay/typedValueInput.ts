@@ -582,6 +582,49 @@ function openStructTypeMenu(screenPos: { x: number; y: number }, onPick: (subTyp
   );
 }
 
+/** A searchable flyout for picking one item by id out of an arbitrary flat list (see
+ * openGroupedPicker) — e.g. flow.executeFlow's Project/Flow dropdowns in the Details panel
+ * (DetailsPanel.tsx), where the underlying storage is an id (NodeInstance.targetProjectId/
+ * targetFlowId) but the user searches/picks by name. Unlike createStructTypeSelect's fixed
+ * struct-type registry, `items` is supplied fresh by the caller every time the button is clicked
+ * (via a getter, not a snapshot) so a Flow dropdown can react to whichever Project was most
+ * recently chosen. `emptyLabel` is shown on the closed button when `currentId` doesn't (yet) match
+ * anything in `items` — e.g. no Project selected yet, or a Flow id whose Project changed. */
+export function createEntityPicker(currentId: string | undefined, currentLabel: string, getItems: () => { id: string; label: string }[], emptyLabel: string, onChange: (id: string, label: string) => void): HTMLElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "typed-value-type-select";
+
+  function renderButton(label: string): void {
+    button.innerHTML = "";
+    const caret = document.createElement("span");
+    caret.className = "typed-value-type-caret";
+    caret.textContent = "▾";
+    button.append(document.createTextNode(label), caret);
+  }
+  renderButton(currentId ? currentLabel : emptyLabel);
+
+  button.addEventListener("mousedown", (e) => e.stopPropagation());
+  button.addEventListener("click", () => {
+    const rect = button.getBoundingClientRect();
+    const items = getItems();
+    openGroupedPicker(
+      { x: rect.left, y: rect.bottom },
+      items,
+      () => "",
+      (item) => item.label,
+      () => null,
+      (item) => {
+        renderButton(item.label);
+        onChange(item.id, item.label);
+        button.blur(); // see createTypeSelect's identical fix for why this is necessary
+      },
+    );
+  });
+
+  return button;
+}
+
 export function createStructTypeSelect(current: string, onChange: (subType: string) => void): HTMLElement {
   const button = document.createElement("button");
   button.type = "button";

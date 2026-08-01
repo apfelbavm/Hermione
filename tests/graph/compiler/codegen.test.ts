@@ -847,4 +847,113 @@ describe("compileGraph", () => {
       expect(instance[outField]).toBe(17);
     });
   });
+
+  describe("flow.return (root graph output bindings)", () => {
+    it("compiles a trigger method that declares a `let` per flow.return output and returns them from the method", async () => {
+      const graph = new Graph("g20", "test");
+      const start = addBuiltinNode(graph, "event.run", { x: 0, y: 0 }, "start");
+      const add = addBuiltinNode(graph, "math.add", { x: 100, y: 0 }, "add");
+      add.pins.a.value = 2;
+      add.pins.b.value = 3;
+
+      const returnDef = getNodeDef("flow.return");
+      const returnNode = NodeInstance.createNodeInstance("flow.return", { x: 200, y: 0 }, returnDef.pins, "ret");
+      graph.nodes.push(returnNode);
+      returnDef.addInstancePinEntry!(returnNode);
+      const [entry] = returnNode.outputEntries!;
+      entry.name = "sum";
+
+      connectPins(graph, graph.variables, graph.functions, { fromNode: start.id, fromPin: "exec-out", toNode: returnNode.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: add.id, fromPin: "result", toNode: returnNode.id, toPin: entry.id });
+
+      const { code, manifest } = compileGraph(graph);
+      expect(code).toContain("let sum");
+      expect(code).toContain("return {");
+
+      const compiled = await loadCompiled(code);
+      const instance = instantiate(compiled, () => {});
+      const fn = (instance[manifest.triggers[0].functionName] as () => Promise<Record<string, unknown>>).bind(instance);
+      const returned = await fn();
+
+      expect(returned).toEqual({ sum: 5 });
+    });
+
+    it("still compiles a trigger with no return statement when the graph has no flow.return node", async () => {
+      const graph = new Graph("g21", "test");
+      addBuiltinNode(graph, "event.run", { x: 0, y: 0 }, "start");
+
+      const { code, manifest } = compileGraph(graph);
+      expect(code).not.toContain("return {");
+
+      const compiled = await loadCompiled(code);
+      const instance = instantiate(compiled, () => {});
+      const fn = (instance[manifest.triggers[0].functionName] as () => Promise<unknown>).bind(instance);
+
+      expect(await fn()).toBeUndefined();
+    });
+  });
+
+  describe("event.request (per-node trigger arguments)", () => {
+    it("compiles a trigger method taking one real parameter per declared field, in declared order, and reports them (by name) in the manifest", async () => {
+      const graph = new Graph("g22", "test");
+      const requestDef = getNodeDef("event.request");
+      const request = NodeInstance.createNodeInstance("event.request", { x: 0, y: 0 }, requestDef.pins, "req");
+      graph.nodes.push(request);
+      requestDef.addInstancePinEntry!(request);
+      requestDef.addInstancePinEntry!(request);
+      const [userId, amount] = request.outputEntries!;
+      userId.name = "userId";
+      amount.name = "amount";
+      amount.type = "number";
+      amount.defaultValue = 0;
+
+      const returnDef = getNodeDef("flow.return");
+      const returnNode = NodeInstance.createNodeInstance("flow.return", { x: 200, y: 0 }, returnDef.pins, "ret");
+      graph.nodes.push(returnNode);
+      returnDef.addInstancePinEntry!(returnNode);
+      const [echoed] = returnNode.outputEntries!;
+      echoed.name = "echoedUserId";
+      echoed.type = "string";
+
+      connectPins(graph, graph.variables, graph.functions, { fromNode: request.id, fromPin: "exec-out", toNode: returnNode.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: request.id, fromPin: userId.id, toNode: returnNode.id, toPin: echoed.id });
+
+      const { code, manifest } = compileGraph(graph);
+      const trigger = manifest.triggers.find((t) => t.kind === "request")!;
+      expect(trigger.details.params).toEqual([
+        { name: "userId", type: "string", defaultValue: "" },
+        { name: "amount", type: "number", defaultValue: 0 },
+      ]);
+
+      const compiled = await loadCompiled(code);
+      const instance = instantiate(compiled, () => {});
+      const fn = (instance[trigger.functionName] as (...args: unknown[]) => Promise<Record<string, unknown>>).bind(instance);
+
+      expect(await fn("alice", 42)).toEqual({ echoedUserId: "alice" });
+    });
+
+    it("refuses to compile a reference to one event node's declared field from a DIFFERENT event's own trigger body", () => {
+      const graph = new Graph("g23", "test");
+      const requestDef = getNodeDef("event.request");
+      const request = NodeInstance.createNodeInstance("event.request", { x: 0, y: 0 }, requestDef.pins, "req");
+      graph.nodes.push(request);
+      requestDef.addInstancePinEntry!(request);
+      const [field] = request.outputEntries!;
+
+      const run = addBuiltinNode(graph, "event.run", { x: 0, y: 100 }, "start");
+      const returnDef = getNodeDef("flow.return");
+      const returnNode = NodeInstance.createNodeInstance("flow.return", { x: 200, y: 100 }, returnDef.pins, "ret");
+      graph.nodes.push(returnNode);
+      returnDef.addInstancePinEntry!(returnNode);
+      const [echoed] = returnNode.outputEntries!;
+      echoed.type = "string";
+
+      // Wires event.run's own exec chain to Return, but the DATA pin feeding Return comes from
+      // event.request's field — only ever valid inside event.request's own trigger method.
+      connectPins(graph, graph.variables, graph.functions, { fromNode: run.id, fromPin: "exec-out", toNode: returnNode.id, toPin: "exec-in" });
+      connectPins(graph, graph.variables, graph.functions, { fromNode: request.id, fromPin: field.id, toNode: returnNode.id, toPin: echoed.id });
+
+      expect(() => compileGraph(graph)).toThrow(/only available within its own trigger method/);
+    });
+  });
 });

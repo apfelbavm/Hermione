@@ -130,13 +130,8 @@ registerNode({
     const script = ctx.rootGraph.scripts.find((s) => s.id === node.scriptId);
     if (!script || !script.compiledJs) return { nextExec: "exec-out" };
 
-    let returned: unknown;
-    try {
-      const run = getRunFunction(script.compiledJs);
-      returned = await run(ctx.log, namedInputsFor(script, inputs));
-    } catch (err) {
-      ctx.log(`Error: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    const run = getRunFunction(script.compiledJs);
+    const returned = await run(ctx.log, namedInputsFor(script, inputs));
     return { nextExec: "exec-out", outputs: pinOutputsFor(script, returned) };
   },
   // compileExecute/compileExecuteOutputs are special-cased directly in compiler/codegen.ts instead

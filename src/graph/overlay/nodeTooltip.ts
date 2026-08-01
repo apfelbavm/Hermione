@@ -1,5 +1,6 @@
 import { getNodeDef } from "../engine/registry";
 import type { PinDef, PinType } from "../engine/types";
+import type { NodeInstance } from "../engine/nodeInstance";
 import { hitTestNode, hitTestPin } from "../render/hitTest";
 import { computeAllNodeGeometries } from "../render/nodeGeometry";
 import { getEditingGraph, getVisibleVariablesForState, type Store } from "../../state/store";
@@ -174,11 +175,21 @@ export function setupNodeHoverTooltip(canvas: HTMLCanvasElement, store: Store): 
       const node = graph.nodes.find((n) => n.id === target.nodeId);
       if (!node) return; // deleted (or the graph switched) since the timer was scheduled
       const text = node.resolveNodeDescription(getNodeDef(node.type), functions);
-      if (text) showTooltip(lastScreenPos, text);
+      const combined = [text, executeFlowEndpointLine(node)].filter(Boolean).join("\n");
+      if (combined) showTooltip(lastScreenPos, combined);
     }, HOVER_DELAY_MS);
   });
 
   canvas.addEventListener("mouseleave", reset);
   canvas.addEventListener("mousedown", reset);
   canvas.addEventListener("wheel", reset, { passive: true });
+}
+
+/** Sibling detail line for an Execute Flow node's tooltip (see nodes/flow.ts): its target flow's
+ * own HTTP endpoint (see api/hooks/[projectId]/[flowId]/route.ts) is genuinely useful to see here
+ * too — an "On HTTP Request" event on that flow is reachable at this exact URL, even though THIS
+ * node itself invokes it directly (see server/executeDeployedFlow.ts) rather than over HTTP. */
+function executeFlowEndpointLine(node: NodeInstance): string {
+  if (node.type !== "flow.executeFlow" || !node.targetFlowId) return "";
+  return `Endpoint: ${window.location.origin}/api/hooks/${node.targetProjectId ?? ""}/${node.targetFlowId}`;
 }

@@ -1,7 +1,7 @@
-import { cloneDefaultValue, nextId } from "./graphMutations";
-import { getNodeDef } from "./registry";
-import { allStructTypeDefs } from "./structRegistry";
-import { CodeScriptDef, FunctionDef, NodeDef, Pin, PinContainer, PinDef, PinType, Variable } from "./types";
+import { cloneDefaultValue, nextId } from "./graphMutations.ts";
+import { getNodeDef } from "./registry.ts";
+import { allStructTypeDefs } from "./structRegistry.ts";
+import type { CodeScriptDef, FunctionDef, NodeDef, Pin, PinContainer, PinDef, PinSignatureEntry, PinType, Variable } from "./types.ts";
 
 export class NodeInstance {
   id: string;
@@ -43,6 +43,16 @@ export class NodeInstance {
    * shared blurb) and from a function.call's own resolveNodeDescription (its bound FunctionDef's
    * description) — this is specific to this one instance, e.g. "remember to reset this before prod". */
   description?: string;
+  /** Binds a "flow.executeFlow" node to the Project/Flow it triggers — only that Flow's own
+   * DEPLOYED script (see server/DatabaseManager.ts's DeployedScript) can actually be invoked, never
+   * whatever the graph currently looks like (see nodes/flow.ts). */
+  targetProjectId?: string;
+  targetFlowId?: string;
+  /** Set only for a node whose NodeDef.editableOutputs is set (flow.executeFlow/flow.return) — this
+   * instance's own editable output signature, edited via the Details panel's NodeOutputsPanel
+   * (sibling of CodeScriptDef.outputs/FunctionDef.outputs, just living directly on the instance
+   * instead of a shared definition, since neither node type binds to one). */
+  outputEntries?: PinSignatureEntry[];
 
   constructor(id: string, type: string, position: { x: number; y: number }, pins: Record<string, Pin>, variableId?: string, functionId?: string, scriptId?: string) {
     this.id = id;
@@ -59,6 +69,9 @@ export class NodeInstance {
     this.container = undefined;
     this.subType = undefined;
     this.description = undefined;
+    this.targetProjectId = undefined;
+    this.targetFlowId = undefined;
+    this.outputEntries = undefined;
   }
 
   /** Seed element/key type for a freshly-created configurableElementType node instance (see
@@ -84,6 +97,7 @@ export class NodeInstance {
       if (def.configurableElementType.includeKeyType) node.mapKeyType = NodeInstance.DEFAULT_KEY_TYPE;
     }
     if (def.configurableSubType?.kind === "struct") node.subType = allStructTypeDefs()[0]?.id;
+    if (def.editableOutputs) node.outputEntries = [];
     return node;
   }
 

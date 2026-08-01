@@ -137,7 +137,12 @@
       "key_type": "Key Type",
       "struct_type": "Struct Type",
       "node_description_placeholder": "Shown as a speech bubble above this node on the canvas",
-      "function_description_placeholder": "Shown as a tooltip when hovering this function"
+      "function_description_placeholder": "Shown as a tooltip when hovering this function",
+      "node_outputs_title": "Outputs",
+      "target_project": "Project",
+      "target_flow": "Deployed Flow",
+      "no_project_selected": "Select a project…",
+      "no_flow_selected": "Select a flow…"
     },
     "graph_tabs": {
       "main_graph": "Main Graph",
@@ -1242,6 +1247,10 @@
       "run": {
         "label": "On Run",
         "description": "Fires when the editor's own Run button is pressed."
+      },
+      "request": {
+        "label": "On HTTP Request",
+        "description": "Fires when the deployed script's HTTP endpoint is called, outputting its user-declared request fields."
       }
     },
     "flow": {
@@ -1281,6 +1290,14 @@
         "pin_branch": "Branch",
         "pin_branch_0": "Branch 0",
         "pin_branch_1": "Branch 1"
+      },
+      "return": {
+        "label": "Return Flow Values",
+        "description": "Ends this Flow's run, declaring the values an Execute Flow node calling it can read back."
+      },
+      "executeFlow": {
+        "label": "Execute Flow",
+        "description": "Runs another Flow's deployed script and waits for it to finish, reading back whatever it declared via Return Flow Values."
       }
     },
     "function": {

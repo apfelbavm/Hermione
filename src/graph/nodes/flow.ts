@@ -1,8 +1,9 @@
 import { registerNode } from "../engine/registry";
-import { DELAY_HELPER_SOURCE, indent } from "../engine/compileUtils";
+import { DELAY_HELPER_SOURCE, EXECUTE_FLOW_IMPORT, compileResultVar, indent } from "../engine/compileUtils";
 import { runExecFrom } from "../engine/executor";
 import { connectionsFrom } from "../engine/graphQueries";
-import type { PinDef } from "../engine/types";
+import { cloneDefaultValue, nextId } from "../engine/graphMutations";
+import type { PinDef, PinSignatureEntry } from "../engine/types";
 import { NodeInstance } from "../engine/nodeInstance";
 import { i18n } from "@i18n";
 
@@ -208,3 +209,119 @@ registerNode({
     return [`await Promise.all([`, ...indent(branchBlocks.flat()), `]);`, ...compileFrom("completed")];
   },
 });
+
+/** A brand-new output entry, seeded the same way ScriptIoPanel/FunctionIoPanel seed a fresh
+ * input/output: an unused "NewOutput_N" name, type "number", its own type's default value —
+ * added via the canvas "+" affordance (NodeDef.addInstancePinEntry); renamed/retyped afterward via
+ * NodeOutputsPanel in the Details sidebar (see NodeDef.editableOutputs). */
+function addOutputEntry(node: NodeInstance): void {
+  const entries = node.outputEntries ?? (node.outputEntries = []);
+  const taken = new Set(entries.map((e) => e.name));
+  let i = entries.length + 1;
+  while (taken.has(`NewOutput_${i}`)) i++;
+  const entry: PinSignatureEntry = { id: nextId("io"), name: `NewOutput_${i}`, type: "number", defaultValue: 0 };
+  entries.push(entry);
+  node.pins[entry.id] = { value: cloneDefaultValue(entry.defaultValue) };
+}
+
+registerNode({
+  type: "flow.return",
+  label: i18n.nodes.flow.return.label,
+  description: i18n.nodes.flow.return.description,
+  group: "Flow Control",
+  pins: [], // real pins are derived per-instance from this node's own outputEntries
+  editableOutputs: true,
+  deriveInstancePins: (node) => [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    ...(node.outputEntries ?? []).map((entry) => ({
+      id: entry.id,
+      label: entry.name,
+      type: entry.type,
+      direction: "input" as const,
+      defaultValue: entry.defaultValue,
+      container: entry.container,
+      keyType: entry.keyType,
+      subType: entry.subType,
+    })),
+  ],
+  addInstancePinEntry: addOutputEntry,
+  // Terminal — no exec-out, same as function.return. Only meaningful to the interpreter as a log
+  // line (there's no caller waiting on a return value while Simulating this flow itself in the
+  // editor — a real caller only ever sees these values via the DEPLOYED path, see flow.executeFlow
+  // /server/executeDeployedFlow.ts). If more than one flow.return instance fires, the last one to
+  // run wins — same "most recent write wins" rule function.return's own doc comment already covers.
+  execute: ({ inputs, ctx }) => {
+    ctx.log(`Flow return: ${JSON.stringify(inputs)}`);
+    return {};
+  },
+  // Assigns straight into the real `let` bindings compiler/codegen.ts's compileGraph declared for
+  // each trigger method (see rootGraphOutputEntries/functionOutputNamesByGraph there) — reuses
+  // function.return's exact resolveFunctionOutputRef mechanism, since the root graph is registered
+  // in that same map the same way a function body is.
+  compileExecute: ({ inputs, resolveFunctionOutputRef }) => {
+    if (!resolveFunctionOutputRef) throw new Error("flow.return's compileExecute requires resolveFunctionOutputRef (only codegen.ts provides this)");
+    return Object.entries(inputs).map(([pinId, expr]) => `${resolveFunctionOutputRef(pinId)} = ${expr};`);
+  },
+});
+
+registerNode({
+  type: "flow.executeFlow",
+  label: i18n.nodes.flow.executeFlow.label,
+  description: i18n.nodes.flow.executeFlow.description,
+  group: "Flow Control",
+  pins: [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
+    { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
+  ], // any further output pins below are derived per-instance from this node's own outputEntries
+  editableOutputs: true,
+  // Latent: dynamic-imports and awaits the target Flow's own DEPLOYED script (see
+  // server/executeDeployedFlow.ts) — genuinely spans real time, same reasoning as Delay/HTTP Request.
+  latent: true,
+  deriveInstancePins: (node) => [
+    { id: "exec-in", label: "", type: "exec", direction: "input" },
+    { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
+    { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
+    ...(node.outputEntries ?? []).map((entry) => ({
+      id: entry.id,
+      label: entry.name,
+      type: entry.type,
+      direction: "output" as const,
+      container: entry.container,
+      keyType: entry.keyType,
+      subType: entry.subType,
+    })),
+  ],
+  addInstancePinEntry: addOutputEntry,
+  execute: async ({ node, ctx }) => {
+    if (!node.targetFlowId || !ctx.executeFlow) {
+      return { nextExec: "exec-out", outputs: mappedOutputs(node, false, "Script not compiled, couldn't execute.", {}) };
+    }
+    const result = await ctx.executeFlow(node.targetProjectId ?? "", node.targetFlowId);
+    return { nextExec: "exec-out", outputs: mappedOutputs(node, result.success, result.error, result.outputs) };
+  },
+  compileExecute: ({ node, compileFrom }) => [`const ${compileResultVar(node.id)} = await executeDeployedFlow(${JSON.stringify(node.targetProjectId ?? "")}, ${JSON.stringify(node.targetFlowId ?? "")}, (m) => this.log(m));`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    const outputs: Record<string, string> = { success: `${v}.success`, error: `${v}.error` };
+    for (const entry of node.outputEntries ?? []) {
+      outputs[entry.id] = `(${JSON.stringify(entry.name)} in ${v}.outputs ? ${v}.outputs[${JSON.stringify(entry.name)}] : ${JSON.stringify(entry.defaultValue ?? null)})`;
+    }
+    return outputs;
+  },
+  compileImports: [EXECUTE_FLOW_IMPORT],
+});
+
+/** Turns a runDeployedFlow-shaped result into this node's own pin-id-keyed outputs — mapped by each
+ * declared output entry's own NAME (exactly like code.ts's pinOutputsFor matches a Code node's
+ * outputs against whatever its script's run() returned), falling back to that entry's own default
+ * when the callee's flow.return never declared/set a same-named value. */
+function mappedOutputs(node: NodeInstance, success: boolean, error: string, named: Record<string, unknown>): Record<string, unknown> {
+  const outputs: Record<string, unknown> = { success, error };
+  for (const entry of node.outputEntries ?? []) {
+    outputs[entry.id] = entry.name in named ? named[entry.name] : entry.defaultValue;
+  }
+  return outputs;
+}

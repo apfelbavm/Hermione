@@ -411,3 +411,79 @@ describe("flow.parallel", () => {
     expect(logs).toEqual(["Done"]);
   });
 });
+
+describe("flow.executeFlow / flow.return", () => {
+  it("adds/removes output entries as both a real pin and a NodeInstance.outputEntries entry", () => {
+    const def = getNodeDef("flow.executeFlow");
+    const node = NodeInstance.createNodeInstance("flow.executeFlow", { x: 0, y: 0 }, def.pins, "exe");
+    expect(node.outputEntries).toEqual([]);
+
+    def.addInstancePinEntry!(node);
+    expect(node.outputEntries).toHaveLength(1);
+    const [entry] = node.outputEntries!;
+    expect(entry.name).toBe("NewOutput_1");
+    expect(node.pins[entry.id]).toBeDefined();
+
+    const pins = def.deriveInstancePins!(node);
+    expect(pins.map((p) => p.id)).toEqual(["exec-in", "exec-out", "success", "error", entry.id]);
+  });
+
+  it('reports "Script not compiled, couldn\'t execute." when no Flow is targeted', async () => {
+    const graph = new Graph("g", "test");
+    addBuiltinNode(graph, "flow.executeFlow", "exe");
+    const ctx = createExecutionContext(graph, { executeFlow: async () => ({ success: true, error: "", outputs: {} }) });
+
+    await runExecFrom("exe", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("exe:success")).toBe(false);
+    expect(ctx.execOutputs.get("exe:error")).toBe("Script not compiled, couldn't execute.");
+  });
+
+  it("calls ctx.executeFlow with the targeted project/flow id and maps returned outputs BY NAME onto its own output entries", async () => {
+    const graph = new Graph("g", "test");
+    const node = addBuiltinNode(graph, "flow.executeFlow", "exe");
+    node.targetProjectId = "proj-1";
+    node.targetFlowId = "flow-1";
+    getNodeDef("flow.executeFlow").addInstancePinEntry!(node);
+    const [entry] = node.outputEntries!;
+    entry.name = "total";
+
+    const calls: Array<[string, string]> = [];
+    const ctx = createExecutionContext(graph, {
+      executeFlow: async (projectId, flowId) => {
+        calls.push([projectId, flowId]);
+        return { success: true, error: "", outputs: { total: 42 } };
+      },
+    });
+
+    await runExecFrom("exe", "exec-in", ctx);
+
+    expect(calls).toEqual([["proj-1", "flow-1"]]);
+    expect(ctx.execOutputs.get("exe:success")).toBe(true);
+    expect(ctx.execOutputs.get(`exe:${entry.id}`)).toBe(42);
+  });
+
+  it("falls back to the output entry's own default value when the callee never returned a same-named value", async () => {
+    const graph = new Graph("g", "test");
+    const node = addBuiltinNode(graph, "flow.executeFlow", "exe");
+    node.targetFlowId = "flow-1";
+    getNodeDef("flow.executeFlow").addInstancePinEntry!(node);
+    const [entry] = node.outputEntries!;
+    entry.defaultValue = -1;
+
+    const ctx = createExecutionContext(graph, { executeFlow: async () => ({ success: false, error: "boom", outputs: {} }) });
+    await runExecFrom("exe", "exec-in", ctx);
+
+    expect(ctx.execOutputs.get("exe:success")).toBe(false);
+    expect(ctx.execOutputs.get("exe:error")).toBe("boom");
+    expect(ctx.execOutputs.get(`exe:${entry.id}`)).toBe(-1);
+  });
+
+  it("flow.return logs its inputs and produces no exec-out", () => {
+    const def = getNodeDef("flow.return");
+    expect(def.pins).toEqual([]);
+    const node = NodeInstance.createNodeInstance("flow.return", { x: 0, y: 0 }, def.pins, "ret");
+    const pins = def.deriveInstancePins!(node);
+    expect(pins.map((p) => p.id)).toEqual(["exec-in"]);
+  });
+});

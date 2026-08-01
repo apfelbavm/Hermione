@@ -30,3 +30,10 @@ export const FUNCTION_LIBRARY_IMPORT = 'import * as functionLibrary from "../../
  * on "ssh2-sftp-client", a package deliberately NOT installed for the interpreter/browser build (see
  * that file's own header comment) — no interpreter-facing code may ever import it directly. */
 export const FUNCTION_LIBRARY_SFTP_IMPORT = 'import * as functionLibrarySftp from "../../src/server/functionLibrarySftp.ts";';
+
+/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/executeDeployedFlow.ts — used by
+ * flow.executeFlow's compileExecute (see nodes/flow.ts) so a deployed flow's own "Execute Flow"
+ * node dynamic-imports the target Flow's DEPLOYED script exactly the same way the interpreter's
+ * ExecutionContext.executeFlow hook does (see api/simulate/route.ts), instead of duplicating that
+ * DB-lookup/dynamic-import logic inline in generated code. */
+export const EXECUTE_FLOW_IMPORT = 'import { executeDeployedFlow } from "../../src/server/executeDeployedFlow.ts";';

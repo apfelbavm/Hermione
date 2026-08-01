@@ -1,18 +1,100 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { allGraphs, setPinLiteralValue, updateVariable } from "../../graph/engine/graphMutations";
 import { i18n } from "@i18n";
 import type { NodeInstance } from "../../graph/engine/nodeInstance";
 import { getNodeDef } from "../../graph/engine/registry";
 import type { CommentBox, FunctionDef, PinDef, Variable } from "../../graph/engine/types";
 import { setLastVariableType } from "../../client/lastVariableType";
-import { createContainerSelect, createStructTypeSelect, createTypeSelect, createTypedValueInput } from "../../graph/overlay/typedValueInput";
+import { listDeployedScripts, listProjects } from "../../client/api";
+import type { ProjectSummary } from "../../server/models";
+import { createContainerSelect, createEntityPicker, createStructTypeSelect, createTypeSelect, createTypedValueInput } from "../../graph/overlay/typedValueInput";
 import { DEFAULT_COMMENT_COLOR } from "../../graph/render/commentGeometry";
 import { getEditingGraph, getVisibleVariablesForState, type Store } from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
 import { FunctionIoPanel } from "./FunctionIoPanel";
 import { ImperativeMount } from "./ImperativeMount";
+import { NodeOutputsPanel } from "./NodeOutputsPanel";
 import { ScriptIoPanel } from "./ScriptIoPanel";
+
+/** Only rendered for a "flow.executeFlow" node (see NodeDef.editableOutputs/nodes/flow.ts) — the
+ * searchable Project/Flow dropdowns requirement #2/#3 asked for. Stores the picked PROJECT/FLOW
+ * ID on the node (NodeInstance.targetProjectId/targetFlowId), the same id-not-name convention every
+ * other cross-entity reference in this codebase already uses (Variable.id, FunctionDef.id, etc.),
+ * while the dropdown itself shows names — fetched fresh from the server each time it's opened (see
+ * createEntityPicker), never cached stale in component state, since a Flow can be renamed elsewhere
+ * at any time. Only "Deployed" scripts are offered for Flow (see requirement #4: only an already-
+ * compiled Flow can actually be triggered), never every Flow in the project. */
+function ExecuteFlowFields({ store, node }: { store: Store; node: NodeInstance }) {
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const disabled = store.state.simulating || store.state.readOnly;
+
+  useEffect(() => {
+    void listProjects().then(setProjects);
+  }, []);
+
+  const projectName = projects.find((p) => p.id === node.targetProjectId)?.name ?? "";
+
+  return (
+    <>
+      <div className="variable-row">
+        <span className="variable-name">{i18n.components.details_panel.target_project}</span>
+        <ImperativeMount
+          build={() =>
+            createEntityPicker(
+              node.targetProjectId,
+              projectName,
+              () => projects.map((p) => ({ id: p.id, label: p.name })),
+              i18n.components.details_panel.no_project_selected,
+              (id) => {
+                node.targetProjectId = id;
+                node.targetFlowId = undefined; // a Flow id only ever means something within its own Project
+                store.notify();
+              },
+            )
+          }
+          deps={[node.id, node.targetProjectId, projects]}
+          disabled={disabled}
+        />
+      </div>
+      {node.targetProjectId && <FlowField store={store} node={node} projectId={node.targetProjectId} />}
+    </>
+  );
+}
+
+function FlowField({ store, node, projectId }: { store: Store; node: NodeInstance; projectId: string }) {
+  const [flows, setFlows] = useState<{ id: string; label: string }[]>([]);
+  const disabled = store.state.simulating || store.state.readOnly;
+
+  useEffect(() => {
+    void listDeployedScripts(projectId).then((scripts) => setFlows(scripts.map((s) => ({ id: s.flowId, label: s.flowName }))));
+  }, [projectId]);
+
+  const flowName = flows.find((f) => f.id === node.targetFlowId)?.label ?? "";
+
+  return (
+    <div className="variable-row">
+      <span className="variable-name">{i18n.components.details_panel.target_flow}</span>
+      <ImperativeMount
+        build={() =>
+          createEntityPicker(
+            node.targetFlowId,
+            flowName,
+            () => flows,
+            i18n.components.details_panel.no_flow_selected,
+            (id) => {
+              node.targetFlowId = id;
+              store.notify();
+            },
+          )
+        }
+        deps={[node.id, node.targetFlowId, flows]}
+        disabled={disabled}
+      />
+    </div>
+  );
+}
 
 function VariableDetails({ store, variable }: { store: Store; variable: Variable }) {
   const disabled = store.state.simulating || store.state.readOnly;
@@ -169,6 +251,8 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
           </div>
         )}
 
+        {node.type === "flow.executeFlow" && <ExecuteFlowFields store={store} node={node} />}
+
         {properties.map((prop) => (
           <div className="variable-row" key={prop.id}>
             <span className="variable-name">{prop.label}</span>
@@ -278,6 +362,7 @@ export function DetailsPanel({ store }: { store: Store }) {
       <div className="details-header">{i18n.components.details_panel.header}</div>
       {variable && <VariableDetails store={store} variable={variable} />}
       {selectedNode && <NodeDetails store={store} node={selectedNode} properties={nodeProperties ?? []} />}
+      {selectedNode && getNodeDef(selectedNode.type).editableOutputs && <NodeOutputsPanel store={store} getSelectedNode={() => selectedNode!} />}
       {selectedComment && <CommentDetails store={store} comment={selectedComment} />}
       {fn && (
         <div className="details-content">

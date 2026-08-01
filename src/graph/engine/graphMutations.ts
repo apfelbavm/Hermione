@@ -1,9 +1,9 @@
-import { Graph } from "./graph";
-import { NodeInstance } from "./nodeInstance";
-import { getNodeDef, isPinTypeCompatible } from "./registry";
-import { defaultStructValue, tryGetStructTypeDef } from "./structRegistry";
-import { tryGetEnumTypeDef } from "./enumRegistry";
-import type { CodeScriptDef, CommentBox, Connection, FunctionDef, PinContainer, PinSignatureEntry, PinType, Variable } from "./types";
+import { Graph } from "./graph.ts";
+import { NodeInstance } from "./nodeInstance.ts";
+import { getNodeDef, isPinTypeCompatible } from "./registry.ts";
+import { defaultStructValue, tryGetStructTypeDef } from "./structRegistry.ts";
+import { tryGetEnumTypeDef } from "./enumRegistry.ts";
+import type { CodeScriptDef, CommentBox, Connection, FunctionDef, PinContainer, PinSignatureEntry, PinType, Variable } from "./types.ts";
 
 /** Defensive shallow clone for a value about to be copied from a PinDef/Variable's `defaultValue`
  * into a live Pin.value slot. A container's default is a plain array (see PinContainer's own doc
@@ -597,4 +597,49 @@ export function updateScriptInput(rootGraph: Graph, script: CodeScriptDef, entry
  * downstream nodes read from. */
 export function updateScriptOutput(rootGraph: Graph, script: CodeScriptDef, entryId: string, patch: TypedEntryPatch): void {
   updateScriptEntry(rootGraph, script, script.outputs, entryId, patch, (g, visibleVariables, node) => disconnectOutput(g, visibleVariables, rootGraph.functions, node.id, entryId, rootGraph.scripts));
+}
+
+// --- Node-instance output entries (NodeDef.editableOutputs) -------------------------------------
+// Sibling of the Scripts/Functions I/O helpers above, but for a node type whose own declared output
+// signature lives directly on ONE NodeInstance (see NodeInstance.outputEntries) instead of a
+// separate FunctionDef/CodeScriptDef shared by every bound node — currently flow.executeFlow's
+// user-mapped outputs and flow.return's declared flow return values (see nodes/flow.ts). Since
+// every entry here belongs to exactly this one instance, removing/retyping one only ever needs to
+// touch THIS node's own pins/outgoing connections — no cross-graph search like
+// pruneDanglingFunctionPinReferences/pruneDanglingScriptPinReferences need.
+
+export function addNodeOutputEntry(node: NodeInstance, entry: PinSignatureEntry): void {
+  (node.outputEntries ??= []).push(entry);
+  node.pins[entry.id] = { value: cloneDefaultValue(entry.defaultValue) };
+}
+
+export function removeNodeOutputEntry(graph: Graph, node: NodeInstance, entryId: string): void {
+  node.outputEntries = (node.outputEntries ?? []).filter((e) => e.id !== entryId);
+  delete node.pins[entryId];
+  graph.connections = graph.connections.filter((c) => !(c.fromNode === node.id && c.fromPin === entryId));
+}
+
+export function moveNodeOutputEntry(node: NodeInstance, entryId: string, targetEntryId: string, position: "before" | "after"): void {
+  moveInArray(node.outputEntries ?? [], entryId, targetEntryId, position);
+}
+
+/** Renames/retypes/revalues one of this node's own output entries, live on its matching pin — a
+ * type/container/keyType/subType change disconnects any wire leaving that pin (same as
+ * updateScriptOutput), since a rewired downstream pin may no longer be compatible. */
+export function updateNodeOutputEntry(graph: Graph, node: NodeInstance, entryId: string, patch: TypedEntryPatch): void {
+  const entry = (node.outputEntries ?? []).find((e) => e.id === entryId);
+  if (!entry) return;
+
+  const signatureChanged = (patch.type !== undefined && patch.type !== entry.type) || (patch.container !== undefined && patch.container !== entry.container) || (patch.keyType !== undefined && patch.keyType !== entry.keyType) || (patch.subType !== undefined && patch.subType !== entry.subType);
+  if (patch.name !== undefined) entry.name = patch.name;
+  if (patch.type !== undefined) entry.type = patch.type;
+  if (patch.container !== undefined) entry.container = patch.container;
+  if (patch.keyType !== undefined) entry.keyType = patch.keyType;
+  if (patch.subType !== undefined) entry.subType = patch.subType;
+  if (patch.defaultValue !== undefined) entry.defaultValue = patch.defaultValue;
+  else if (signatureChanged) entry.defaultValue = defaultValueFor(entry.type, entry.container, entry.subType);
+
+  if (signatureChanged) {
+    graph.connections = graph.connections.filter((c) => !(c.fromNode === node.id && c.fromPin === entryId));
+  }
 }

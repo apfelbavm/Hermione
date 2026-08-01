@@ -169,11 +169,9 @@ describe("code.run", () => {
     expect(result.nextExec).toBe("exec-out");
   });
 
-  it("logs a caught error instead of throwing out of the exec chain", async () => {
+  it("throws instead of swallowing a script error, so a caller (e.g. a deployed HTTP hook) can report it", async () => {
     const script = await makeScript(`function run(log) { throw new Error("boom"); }`);
-    const { result, logs } = await executeNode({ scriptId: script.id }, {}, [script]);
-    expect(logs).toEqual(["Error: boom"]);
-    expect(result.nextExec).toBe("exec-out");
+    await expect(executeNode({ scriptId: script.id }, {}, [script])).rejects.toThrow("boom");
   });
 
   it("no-ops (continues the exec chain) when no script is bound or it's never been saved", async () => {
@@ -211,7 +209,7 @@ describe("code.run", () => {
       expect(result.outputs).toEqual({ "pin-doubled": 10, "pin-label": "ok" });
     });
 
-    it("falls back to each output's own default value when run() omits that key, returns nothing, or throws", async () => {
+    it("falls back to each output's own default value when run() omits that key or returns nothing (but throws out instead when run() itself throws)", async () => {
       const outputsSig: CodeScriptDef["outputs"] = [
         { id: "pin-a", name: "a", type: "number", defaultValue: 42 },
         { id: "pin-b", name: "b", type: "string", defaultValue: "fallback" },
@@ -232,11 +230,7 @@ describe("code.run", () => {
       });
 
       const throws = await makeScript(`function run() { throw new Error("boom"); }`, [], outputsSig);
-      const { result: throwsResult } = await executeNode({ scriptId: throws.id }, {}, [throws]);
-      expect(throwsResult.outputs).toEqual({
-        "pin-a": 42,
-        "pin-b": "fallback",
-      });
+      await expect(executeNode({ scriptId: throws.id }, {}, [throws])).rejects.toThrow("boom");
     });
 
     it("compiled output maps run()'s return value the same way, including the default-value fallback", async () => {
@@ -318,10 +312,9 @@ describe("code.run", () => {
       expect(logs).toEqual(["Hi!"]);
     });
 
-    it("catches a thrown error in compiled output the same way execute() does", async () => {
+    it("throws out of the compiled trigger method the same way execute() does", async () => {
       const script = await makeScript(`function run(log) { throw new Error("compiled boom"); }`);
-      const logs = await runCompiled(script);
-      expect(logs).toEqual(["Error: compiled boom"]);
+      await expect(runCompiled(script)).rejects.toThrow("compiled boom");
     });
 
     it("throws a clear compile error when no script is bound", () => {

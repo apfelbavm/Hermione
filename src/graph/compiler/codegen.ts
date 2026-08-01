@@ -3,7 +3,7 @@ import { getNodeDef } from "../engine/registry";
 import { indent, compileResultVar } from "../engine/compileUtils";
 import { Graph } from "../engine/graph";
 import { NodeInstance } from "../engine/nodeInstance";
-import type { CodeScriptDef, FunctionDef } from "../engine/types";
+import type { CodeScriptDef, FunctionDef, PinSignatureEntry } from "../engine/types";
 
 export interface TriggerDescriptor {
   nodeId: string;
@@ -77,6 +77,17 @@ interface CompileState {
   /** A code.run node's id -> its own compiled destructured binding names, one per output pin — same
    * role as functionCallOutputNamesByNode, but for Code nodes' script outputs. */
   codeCallOutputNamesByNode: Map<string, Map<string, string>>;
+  /** An event-trigger node's own id (e.g. event.request) -> its own declared outputEntries'
+   * compiled real trigger-method parameter names — sibling of functionArgNamesByGraph, but keyed
+   * per NODE instead of per Graph, since (unlike a FunctionDef's own body) every event-trigger node
+   * shares the same single root Graph: only the one trigger method actually compiled FOR that node
+   * (see currentTriggerNodeId below) ever receives these as real parameters. */
+  eventTriggerArgNamesByNode: Map<string, Map<string, string>>;
+  /** The event-trigger node whose own trigger method is being compiled right now (or null between
+   * triggers) — lets compileResolveDataPin reject a reference to one event node's declared outputs
+   * from a DIFFERENT event's compiled body, the same mistake functionArgNamesByGraph's Graph-keying
+   * already prevents for free between function bodies. */
+  currentTriggerNodeId: string | null;
 }
 
 /** Resolves a variable id to the exact JS reference compiled code should use for it — a bare local
@@ -188,6 +199,21 @@ function compileResolveDataPin(rootGraph: Graph, graph: Graph, nodeId: string, p
   }
 
   const upstreamDef = getNodeDef(upstreamNode.type);
+
+  // An event-trigger node's own declared outputEntries (e.g. event.request's user-chosen request
+  // fields) are just its own trigger method's real parameters — same reasoning as function.entry
+  // above, but keyed per NODE (eventTriggerArgNamesByNode) since every event-trigger node shares one
+  // root Graph. Only resolvable while THAT node's own trigger method is the one being compiled
+  // (currentTriggerNodeId) — referencing it from a different event's body would compile to a
+  // parameter that method never declared.
+  if (upstreamDef.eventTrigger && (upstreamNode.outputEntries?.length ?? 0) > 0) {
+    if (state.currentTriggerNodeId !== upstreamNode.id) {
+      throw new Error(`Output "${conn.fromPin}" on event node "${upstreamNode.id}" is only available within its own trigger method — it can't be read from a different event's chain`);
+    }
+    const argName = state.eventTriggerArgNamesByNode.get(upstreamNode.id)?.get(conn.fromPin);
+    if (!argName) throw new Error(`Output "${conn.fromPin}" isn't declared on event node "${upstreamNode.id}" — cannot compile this reference`);
+    return argName;
+  }
 
   // A latent/exec node's data outputs (e.g. an HTTP-calling node's success/error/status) come from
   // compileExecuteOutputs instead of compileEvaluate — see that field's own doc comment for why the
@@ -494,13 +520,8 @@ function compileScriptDef(script: CodeScriptDef, state: CompileState): string {
 
   const source = [
     `async function ${helperName}(log, inputs) {`,
-    "  let __ret;",
-    "  try {",
-    ...script.compiledJs.split("\n").map((line) => `    ${line}`),
-    "    __ret = await run(log, inputs);",
-    "  } catch (__err) {",
-    '    log("Error: " + (__err instanceof Error ? __err.message : String(__err)));',
-    "  }",
+    ...script.compiledJs.split("\n").map((line) => `  ${line}`),
+    "  const __ret = await run(log, inputs);",
     '  const __normalized = (__ret && typeof __ret === "object") ? __ret : {};',
     ...indent(outputDeclarations),
     "  return {",
@@ -516,6 +537,17 @@ function compileScriptDef(script: CodeScriptDef, state: CompileState): string {
 function functionNameFor(node: NodeInstance, usedNames: Set<string>): string {
   const rawName = typeof node.pins.name?.value === "string" ? node.pins.name.value : node.type;
   return uniqueName(slugify(rawName, "trigger"), usedNames);
+}
+
+/** The root graph's own declared return values (see nodes/flow.ts's "flow.return", the root-level
+ * sibling of function.return) — sourced from the first "flow.return" node instance found, since
+ * (unlike a FunctionDef's outputs) there's no separate definition object for the whole flow's own
+ * signature to live on; multiple flow.return instances simply share the same "last one to fire
+ * wins" semantics function.return's own multiple-Return-nodes case already has. Empty (no bindings,
+ * no `return` statement) for a graph with no flow.return node at all — every existing trigger
+ * method keeps compiling exactly as before. */
+function rootGraphOutputEntries(graph: Graph): PinSignatureEntry[] {
+  return graph.nodes.find((n) => n.type === "flow.return")?.outputEntries ?? [];
 }
 
 export function compileGraph(graph: Graph, version = 1, revision = 1): CompileResult {
@@ -534,6 +566,8 @@ export function compileGraph(graph: Graph, version = 1, revision = 1): CompileRe
     usedScriptHelperNames: new Set<string>(),
     scriptOutputNamesById: new Map<string, Map<string, string>>(),
     codeCallOutputNamesByNode: new Map<string, Map<string, string>>(),
+    eventTriggerArgNamesByNode: new Map<string, Map<string, string>>(),
+    currentTriggerNodeId: null,
   };
 
   // Every global variable becomes a real `this.<name>` class field, named up front so any
@@ -544,6 +578,21 @@ export function compileGraph(graph: Graph, version = 1, revision = 1): CompileRe
     state.globalVariableNames.set(variable.id, uniqueName(slugify(variable.name, "variable"), usedGlobalNames));
   }
 
+  // The root graph's own declared return values (flow.return, if any) become real `let` bindings
+  // inside EVERY trigger method, exactly like a FunctionDef's outputs (see compileFunctionDef) —
+  // registered against the root graph itself in the very same map, so flow.return's compileExecute
+  // (see function.return's identical resolveFunctionOutputRef mechanism in nodes/function.ts) can
+  // resolve them with zero special-casing beyond this one lookup.
+  const flowOutputs = rootGraphOutputEntries(graph);
+  if (flowOutputs.length > 0) {
+    const usedFlowOutputNames = new Set<string>();
+    const flowOutputNames = new Map<string, string>();
+    for (const output of flowOutputs) {
+      flowOutputNames.set(output.id, uniqueName(slugify(output.name, "outVar"), usedFlowOutputNames));
+    }
+    state.functionOutputNamesByGraph.set(graph, flowOutputNames);
+  }
+
   const usedNames = new Set<string>();
   const triggers: TriggerDescriptor[] = [];
   const triggerMethods: string[] = [];
@@ -552,9 +601,20 @@ export function compileGraph(graph: Graph, version = 1, revision = 1): CompileRe
     const def = getNodeDef(node.type);
     if (!def.eventTrigger) continue;
 
+    // This event node's own declared outputEntries (e.g. event.request's user-chosen request
+    // fields) become real parameters on ITS trigger method only — see eventTriggerArgNamesByNode's
+    // own doc comment and compileResolveDataPin's matching branch above.
+    const usedArgNames = new Set<string>();
+    const argNames = new Map<string, string>();
+    for (const entry of node.outputEntries ?? []) {
+      argNames.set(entry.id, uniqueName(slugify(entry.name, "arg"), usedArgNames));
+    }
+    if (argNames.size > 0) state.eventTriggerArgNamesByNode.set(node.id, argNames);
+
     const functionName = functionNameFor(node, usedNames);
     // Same defensive-only guard as above: connectPins already enforces this.
     const outgoing = connectionsFrom(graph, node.id, "exec-out");
+    state.currentTriggerNodeId = node.id;
     const body =
       outgoing.length === 0
         ? []
@@ -565,8 +625,16 @@ export function compileGraph(graph: Graph, version = 1, revision = 1): CompileRe
             const [conn] = outgoing;
             return compileFrom(graph, graph, conn.toNode, conn.toPin, new Set(), state);
           })();
+    state.currentTriggerNodeId = null;
 
-    triggerMethods.push([`async ${functionName}() {`, ...indent(body), `}`].join("\n"));
+    // Declared with each output's own default so a run that never reaches a flow.return node still
+    // returns something sensible — same reasoning as compileFunctionDef's own outputDeclarations.
+    const flowOutputNames = state.functionOutputNamesByGraph.get(graph);
+    const outputDeclarations = flowOutputNames ? flowOutputs.map((output) => `let ${flowOutputNames.get(output.id)} = ${JSON.stringify(output.defaultValue ?? null)}; // ${output.name}`) : [];
+    const returnStatement = flowOutputNames ? [`return {`, ...flowOutputs.map((output) => `  ${flowOutputNames.get(output.id)}, // ${output.name}`), `};`] : [];
+
+    const paramList = (node.outputEntries ?? []).map((entry) => argNames.get(entry.id)).join(", ");
+    triggerMethods.push([`async ${functionName}(${paramList}) {`, ...indent([...outputDeclarations, ...body, ...returnStatement]), `}`].join("\n"));
 
     triggers.push({
       nodeId: node.id,
