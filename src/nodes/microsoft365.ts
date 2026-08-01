@@ -13,6 +13,7 @@ import { i18n } from "@i18n";
 // hands it to GraphManager.forCredential, which caches the client and mints/refreshes the app-only
 // access token on demand — see graphManager.ts.
 
+const GROUP_NAME = "Request.Microsoft365";
 const GROUP_NAME_ONEDRIVE = "Request.Microsoft365 OneDrive";
 const GROUP_NAME_TEAMS = "Request.Microsoft365 Teams";
 const GROUP_NAME_MAIL = "Request.Microsoft365 Mail";
@@ -95,7 +96,7 @@ registerNode({
   type: "microsoft365.listUsers",
   label: i18n.nodes.microsoft365.listUsers.label,
   description: i18n.nodes.microsoft365.listUsers.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -143,7 +144,7 @@ registerNode({
   type: "microsoft365.getUser",
   label: i18n.nodes.microsoft365.getUser.label,
   description: i18n.nodes.microsoft365.getUser.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -202,7 +203,7 @@ registerNode({
   type: "microsoft365.createUser",
   label: i18n.nodes.microsoft365.createUser.label,
   description: i18n.nodes.microsoft365.createUser.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -270,7 +271,7 @@ registerNode({
   type: "microsoft365.updateUser",
   label: i18n.nodes.microsoft365.updateUser.label,
   description: i18n.nodes.microsoft365.updateUser.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -305,7 +306,7 @@ registerNode({
   type: "microsoft365.deleteUser",
   label: i18n.nodes.microsoft365.deleteUser.label,
   description: i18n.nodes.microsoft365.deleteUser.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
   latent: true,
@@ -326,7 +327,7 @@ registerNode({
   type: "microsoft365.listGroups",
   label: i18n.nodes.microsoft365.listGroups.label,
   description: i18n.nodes.microsoft365.listGroups.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -374,7 +375,7 @@ registerNode({
   type: "microsoft365.createGroup",
   label: i18n.nodes.microsoft365.createGroup.label,
   description: i18n.nodes.microsoft365.createGroup.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -442,7 +443,7 @@ registerNode({
   type: "microsoft365.deleteGroup",
   label: i18n.nodes.microsoft365.deleteGroup.label,
   description: i18n.nodes.microsoft365.deleteGroup.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -476,7 +477,7 @@ registerNode({
   type: "microsoft365.addGroupMember",
   label: i18n.nodes.microsoft365.addGroupMember.label,
   description: i18n.nodes.microsoft365.addGroupMember.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -511,7 +512,7 @@ registerNode({
   type: "microsoft365.sendMail",
   label: i18n.nodes.microsoft365.sendMail.label,
   description: i18n.nodes.microsoft365.sendMail.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -583,7 +584,7 @@ registerNode({
   type: "microsoft365.listMessages",
   label: i18n.nodes.microsoft365.listMessages.label,
   description: i18n.nodes.microsoft365.listMessages.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -632,7 +633,7 @@ registerNode({
   type: "microsoft365.getMessage",
   label: i18n.nodes.microsoft365.getMessage.label,
   description: i18n.nodes.microsoft365.getMessage.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -698,7 +699,7 @@ registerNode({
   type: "microsoft365.deleteMessage",
   label: i18n.nodes.microsoft365.deleteMessage.label,
   description: i18n.nodes.microsoft365.deleteMessage.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -733,7 +734,7 @@ registerNode({
   type: "microsoft365.listEvents",
   label: i18n.nodes.microsoft365.listEvents.label,
   description: i18n.nodes.microsoft365.listEvents.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -775,7 +776,7 @@ registerNode({
   type: "microsoft365.createEvent",
   label: i18n.nodes.microsoft365.createEvent.label,
   description: i18n.nodes.microsoft365.createEvent.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -860,7 +861,7 @@ registerNode({
   type: "microsoft365.deleteEvent",
   label: i18n.nodes.microsoft365.deleteEvent.label,
   description: i18n.nodes.microsoft365.deleteEvent.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -1071,7 +1072,7 @@ registerNode({
   type: "microsoft365.listJoinedTeams",
   label: i18n.nodes.microsoft365.listJoinedTeams.label,
   description: i18n.nodes.microsoft365.listJoinedTeams.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME_TEAMS,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -1106,7 +1107,7 @@ registerNode({
   type: "microsoft365.sendChannelMessage",
   label: i18n.nodes.microsoft365.sendChannelMessage.label,
   description: i18n.nodes.microsoft365.sendChannelMessage.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME_TEAMS,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
@@ -1154,7 +1155,7 @@ registerNode({
   type: "microsoft365.request",
   label: i18n.nodes.microsoft365.request.label,
   description: i18n.nodes.microsoft365.request.description,
-  group: GROUP_NAME_ONEDRIVE,
+  group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
