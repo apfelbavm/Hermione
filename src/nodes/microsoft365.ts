@@ -13,7 +13,9 @@ import { i18n } from "@i18n";
 // hands it to GraphManager.forCredential, which caches the client and mints/refreshes the app-only
 // access token on demand — see graphManager.ts.
 
-const GROUP_NAME = "Request.Microsoft365";
+const GROUP_NAME_ONEDRIVE = "Request.Microsoft365 OneDrive";
+const GROUP_NAME_TEAMS = "Request.Microsoft365 Teams";
+const GROUP_NAME_MAIL = "Request.Microsoft365 Mail";
 const BODY_TYPE_OPTIONS = ["text", "html"];
 
 function credentialNamePin() {
@@ -89,40 +91,12 @@ function execInOutPins() {
   };
 }
 
-/** Registers a Microsoft 365 node whose `execute` only needs the resolved GraphManager plus raw
- * pin inputs — resolving the credential and shaping the failure-path outputs is identical for
- * every node, so only the pin list and the actual manager call differ per operation. */
-function registerGraphNode(def: { type: string; label: string; description: string; pins: unknown[]; failureOutputs: Record<string, unknown>; call: (manager: GraphManager, inputs: Record<string, unknown>) => Promise<Record<string, unknown>> }) {
-  registerNode({
-    type: def.type,
-    label: def.label,
-    description: def.description,
-    group: GROUP_NAME,
-    colorCategory: NodeColorCategory.Integration,
-    pins: def.pins as never,
-    latent: true,
-    execute: async ({ inputs, ctx }) => {
-      const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-      if (!resolved.ok) {
-        return {
-          nextExec: "exec-out",
-          outputs: {
-            success: false,
-            ...def.failureOutputs,
-            error: resolved.error,
-          },
-        };
-      }
-      const result = await def.call(managerFor(resolved.data), inputs);
-      return { nextExec: "exec-out", outputs: result };
-    },
-  });
-}
-
-registerGraphNode({
+registerNode({
   type: "microsoft365.listUsers",
   label: i18n.nodes.microsoft365.listUsers.label,
   description: i18n.nodes.microsoft365.listUsers.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -150,15 +124,27 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { users: [] },
-  call: (manager, inputs) => manager.listUsers(String(inputs.filter ?? ""), Number(inputs.top ?? 100)),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, users: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listUsers(String(inputs.filter ?? ""), Number(inputs.top ?? 100));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.getUser",
   label: i18n.nodes.microsoft365.getUser.label,
   description: i18n.nodes.microsoft365.getUser.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -190,15 +176,34 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { id: "", displayName: "", userPrincipalName: "", mail: "" },
-  call: (manager, inputs) => manager.getUser(String(inputs.userId ?? "")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: {
+          success: false,
+          id: "",
+          displayName: "",
+          userPrincipalName: "",
+          mail: "",
+          error: resolved.error,
+        },
+      };
+    }
+    const result = await managerFor(resolved.data).getUser(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.createUser",
   label: i18n.nodes.microsoft365.createUser.label,
   description: i18n.nodes.microsoft365.createUser.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -246,15 +251,27 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { id: "" },
-  call: (manager, inputs) => manager.createUser(String(inputs.displayName ?? ""), String(inputs.userPrincipalName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.password ?? ""), Boolean(inputs.forceChangePasswordNextSignIn)),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, id: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).createUser(String(inputs.displayName ?? ""), String(inputs.userPrincipalName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.password ?? ""), Boolean(inputs.forceChangePasswordNextSignIn));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.updateUser",
   label: i18n.nodes.microsoft365.updateUser.label,
   description: i18n.nodes.microsoft365.updateUser.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -269,24 +286,48 @@ registerGraphNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ],
-  failureOutputs: {},
-  call: (manager, inputs) => manager.updateUser(String(inputs.userId ?? ""), String(inputs.propertiesJson ?? "{}")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).updateUser(String(inputs.userId ?? ""), String(inputs.propertiesJson ?? "{}"));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.deleteUser",
   label: i18n.nodes.microsoft365.deleteUser.label,
   description: i18n.nodes.microsoft365.deleteUser.description,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
-  failureOutputs: {},
-  call: (manager, inputs) => manager.deleteUser(String(inputs.userId ?? "")),
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).deleteUser(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.listGroups",
   label: i18n.nodes.microsoft365.listGroups.label,
   description: i18n.nodes.microsoft365.listGroups.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -314,15 +355,27 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { groups: [] },
-  call: (manager, inputs) => manager.listGroups(String(inputs.filter ?? ""), Number(inputs.top ?? 100)),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, groups: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listGroups(String(inputs.filter ?? ""), Number(inputs.top ?? 100));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.createGroup",
   label: i18n.nodes.microsoft365.createGroup.label,
   description: i18n.nodes.microsoft365.createGroup.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -370,15 +423,27 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { id: "" },
-  call: (manager, inputs) => manager.createGroup(String(inputs.displayName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.description ?? ""), Boolean(inputs.securityEnabled), Boolean(inputs.mailEnabled)),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, id: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).createGroup(String(inputs.displayName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.description ?? ""), Boolean(inputs.securityEnabled), Boolean(inputs.mailEnabled));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.deleteGroup",
   label: i18n.nodes.microsoft365.deleteGroup.label,
   description: i18n.nodes.microsoft365.deleteGroup.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -392,15 +457,27 @@ registerGraphNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ],
-  failureOutputs: {},
-  call: (manager, inputs) => manager.deleteGroup(String(inputs.groupId ?? "")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).deleteGroup(String(inputs.groupId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.addGroupMember",
   label: i18n.nodes.microsoft365.addGroupMember.label,
   description: i18n.nodes.microsoft365.addGroupMember.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -415,15 +492,27 @@ registerGraphNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ],
-  failureOutputs: {},
-  call: (manager, inputs) => manager.addGroupMember(String(inputs.groupId ?? ""), String(inputs.userId ?? "")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).addGroupMember(String(inputs.groupId ?? ""), String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.sendMail",
   label: i18n.nodes.microsoft365.sendMail.label,
   description: i18n.nodes.microsoft365.sendMail.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -468,16 +557,34 @@ registerGraphNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ],
-  failureOutputs: {},
-  call: (manager, inputs) =>
-    manager.sendMail(String(inputs.userId ?? ""), (Array.isArray(inputs.to) ? inputs.to : []).map(String), String(inputs.subject ?? ""), String(inputs.body ?? ""), inputs.bodyType === "html" ? "html" : "text", Boolean(inputs.saveToSentItems)),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).sendMail(
+      String(inputs.userId ?? ""),
+      (Array.isArray(inputs.to) ? inputs.to : []).map(String),
+      String(inputs.subject ?? ""),
+      String(inputs.body ?? ""),
+      inputs.bodyType === "html" ? "html" : "text",
+      Boolean(inputs.saveToSentItems),
+    );
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.listMessages",
   label: i18n.nodes.microsoft365.listMessages.label,
   description: i18n.nodes.microsoft365.listMessages.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -506,15 +613,27 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { messages: [] },
-  call: (manager, inputs) => manager.listMessages(String(inputs.userId ?? ""), Number(inputs.top ?? 25), String(inputs.filter ?? "")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, messages: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listMessages(String(inputs.userId ?? ""), Number(inputs.top ?? 25), String(inputs.filter ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.getMessage",
   label: i18n.nodes.microsoft365.getMessage.label,
   description: i18n.nodes.microsoft365.getMessage.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -553,20 +672,34 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: {
-    subject: "",
-    from: "",
-    bodyContent: "",
-    receivedDateTime: "",
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: {
+          success: false,
+          subject: "",
+          from: "",
+          bodyContent: "",
+          receivedDateTime: "",
+          error: resolved.error,
+        },
+      };
+    }
+    const result = await managerFor(resolved.data).getMessage(String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
   },
-  call: (manager, inputs) => manager.getMessage(String(inputs.userId ?? ""), String(inputs.messageId ?? "")),
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.deleteMessage",
   label: i18n.nodes.microsoft365.deleteMessage.label,
   description: i18n.nodes.microsoft365.deleteMessage.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -581,15 +714,27 @@ registerGraphNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ],
-  failureOutputs: {},
-  call: (manager, inputs) => manager.deleteMessage(String(inputs.userId ?? ""), String(inputs.messageId ?? "")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).deleteMessage(String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.listEvents",
   label: i18n.nodes.microsoft365.listEvents.label,
   description: i18n.nodes.microsoft365.listEvents.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -611,15 +756,27 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { events: [] },
-  call: (manager, inputs) => manager.listEvents(String(inputs.userId ?? ""), Number(inputs.top ?? 25)),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, events: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listEvents(String(inputs.userId ?? ""), Number(inputs.top ?? 25));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.createEvent",
   label: i18n.nodes.microsoft365.createEvent.label,
   description: i18n.nodes.microsoft365.createEvent.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -676,10 +833,17 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { id: "" },
-  call: (manager, inputs) =>
-    manager.createEvent(
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, id: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).createEvent(
       String(inputs.userId ?? ""),
       String(inputs.subject ?? ""),
       String(inputs.start ?? ""),
@@ -687,13 +851,17 @@ registerGraphNode({
       String(inputs.timeZone ?? "UTC"),
       String(inputs.body ?? ""),
       (Array.isArray(inputs.attendees) ? inputs.attendees : []).map(String),
-    ),
+    );
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.deleteEvent",
   label: i18n.nodes.microsoft365.deleteEvent.label,
   description: i18n.nodes.microsoft365.deleteEvent.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -708,15 +876,27 @@ registerGraphNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ],
-  failureOutputs: {},
-  call: (manager, inputs) => manager.deleteEvent(String(inputs.userId ?? ""), String(inputs.eventId ?? "")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).deleteEvent(String(inputs.userId ?? ""), String(inputs.eventId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.listDriveItems",
   label: i18n.nodes.microsoft365.listDriveItems.label,
   description: i18n.nodes.microsoft365.listDriveItems.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -738,15 +918,27 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { items: [] },
-  call: (manager, inputs) => manager.listDriveItems(String(inputs.userId ?? ""), String(inputs.folderPath ?? "")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, items: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listDriveItems(String(inputs.userId ?? ""), String(inputs.folderPath ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.downloadFile",
   label: i18n.nodes.microsoft365.downloadFile.label,
   description: i18n.nodes.microsoft365.downloadFile.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -775,15 +967,27 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { content: "" },
-  call: (manager, inputs) => manager.downloadFile(String(inputs.userId ?? ""), String(inputs.filePath ?? ""), inputs.encoding === "base64" ? "base64" : "utf8"),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, content: "", error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).downloadFile(String(inputs.userId ?? ""), String(inputs.filePath ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.uploadFile",
   label: i18n.nodes.microsoft365.uploadFile.label,
   description: i18n.nodes.microsoft365.uploadFile.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -813,15 +1017,27 @@ registerGraphNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ],
-  failureOutputs: {},
-  call: (manager, inputs) => manager.uploadFile(String(inputs.userId ?? ""), String(inputs.filePath ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8"),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).uploadFile(String(inputs.userId ?? ""), String(inputs.filePath ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.deleteDriveItem",
   label: i18n.nodes.microsoft365.deleteDriveItem.label,
   description: i18n.nodes.microsoft365.deleteDriveItem.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -836,15 +1052,27 @@ registerGraphNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ],
-  failureOutputs: {},
-  call: (manager, inputs) => manager.deleteDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? "")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).deleteDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.listJoinedTeams",
   label: i18n.nodes.microsoft365.listJoinedTeams.label,
   description: i18n.nodes.microsoft365.listJoinedTeams.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -859,15 +1087,27 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { teams: [] },
-  call: (manager, inputs) => manager.listJoinedTeams(String(inputs.userId ?? "")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, teams: [], error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).listJoinedTeams(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.sendChannelMessage",
   label: i18n.nodes.microsoft365.sendChannelMessage.label,
   description: i18n.nodes.microsoft365.sendChannelMessage.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -895,15 +1135,27 @@ registerGraphNode({
     execInOutPins().execOut,
     execInOutPins().success,
     execInOutPins().error,
-  ],
-  failureOutputs: {},
-  call: (manager, inputs) => manager.sendChannelMessage(String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), String(inputs.message ?? "")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: { success: false, error: resolved.error },
+      };
+    }
+    const result = await managerFor(resolved.data).sendChannelMessage(String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), String(inputs.message ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
 
-registerGraphNode({
+registerNode({
   type: "microsoft365.request",
   label: i18n.nodes.microsoft365.request.label,
   description: i18n.nodes.microsoft365.request.description,
+  group: GROUP_NAME_ONEDRIVE,
+  colorCategory: NodeColorCategory.Integration,
   pins: [
     execInOutPins().execIn,
     credentialNamePin(),
@@ -944,7 +1196,22 @@ registerGraphNode({
       direction: "output",
     },
     execInOutPins().error,
-  ],
-  failureOutputs: { status: 0, data: undefined },
-  call: (manager, inputs) => manager.rawRequest(String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.bodyJson ?? "")),
+  ] as never,
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) {
+      return {
+        nextExec: "exec-out",
+        outputs: {
+          success: false,
+          status: 0,
+          data: undefined,
+          error: resolved.error,
+        },
+      };
+    }
+    const result = await managerFor(resolved.data).rawRequest(String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.bodyJson ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
 });
