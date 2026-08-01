@@ -2,6 +2,7 @@ import { Graph } from "./graph";
 import { NodeInstance } from "./nodeInstance";
 import { getNodeDef, isPinTypeCompatible } from "./registry";
 import { defaultStructValue, tryGetStructTypeDef } from "./structRegistry";
+import { tryGetEnumTypeDef } from "./enumRegistry";
 import type { CodeScriptDef, CommentBox, Connection, FunctionDef, PinContainer, PinSignatureEntry, PinType, Variable } from "./types";
 
 /** Defensive shallow clone for a value about to be copied from a PinDef/Variable's `defaultValue`
@@ -336,6 +337,10 @@ export function defaultValueFor(type: PinType, container: PinContainer | undefin
   if (type === "struct") {
     const def = subType ? tryGetStructTypeDef(subType) : undefined;
     return def ? defaultStructValue(def) : {};
+  }
+  if (type === "enum") {
+    const def = subType ? tryGetEnumTypeDef(subType) : undefined;
+    return def?.values[0]?.id ?? DEFAULT_VALUE_BY_TYPE[type];
   }
   return DEFAULT_VALUE_BY_TYPE[type];
 }

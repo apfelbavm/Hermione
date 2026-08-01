@@ -27,6 +27,7 @@ import { transpileScript } from "../../../src/graph/engine/transpile";
 import { type CodeScriptDef, type ExecutionContext, type FunctionDef, type Variable } from "../../../src/graph/engine/types";
 import { Graph } from "../../../src/graph/engine/graph";
 import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import { TEXT_ENCODING_ENUM_TYPE } from "../../../src/graph/enum/common";
 
 beforeAll(() => {
   registerBuiltins();
@@ -333,6 +334,21 @@ describe("updateVariable — container support", () => {
     updateVariable(graph, "v1", { container: "array", defaultValue: [1, 2] });
 
     expect(variable.defaultValue).toEqual([1, 2]);
+  });
+
+  it("defaults to the registered enum's first value id when switching type to enum with a subType", () => {
+    const graph = new Graph("g", "root");
+    const variable: Variable = {
+      id: "v1",
+      name: "Encoding",
+      type: "number",
+      defaultValue: 0,
+    };
+    addVariable(graph, variable);
+
+    updateVariable(graph, "v1", { type: "enum", subType: TEXT_ENCODING_ENUM_TYPE });
+
+    expect(variable.defaultValue).toBe("utf8");
   });
 });
 

@@ -179,9 +179,6 @@ function drawTopHighlight(ctx: CanvasRenderingContext2D, screenX: number, screen
   ctx.roundRect(screenX, screenY, width, height, cornerRadius);
   const fadeDistance = 4 * zoom;
   const highlight = ctx.createLinearGradient(0, screenY, 0, screenY + fadeDistance);
-  // Follows the light/dark toggle (see Colors.NODE_TOP_HIGHLIGHT_RGB/_ALPHA's own comment) — a
-  // lightening sheen over a dark node body, a faint darkening instead over a light one (plain white
-  // would be invisible there).
   const highlightRgb = Colors.NODE_TOP_HIGHLIGHT_RGB;
   highlight.addColorStop(0, `rgba(${highlightRgb}, ${Colors.NODE_TOP_HIGHLIGHT_ALPHA})`);
   highlight.addColorStop(1, `rgba(${highlightRgb}, 0)`);
@@ -189,10 +186,6 @@ function drawTopHighlight(ctx: CanvasRenderingContext2D, screenX: number, screen
   ctx.fill();
 }
 
-/** Draws a small clock icon straddling (cx, cy) — used centered on a node's top-right CORNER so
- * it sits half outside the node's own border, matching Unreal's latent-node marker (a node that
- * genuinely spans real time/multiple ticks, e.g. Delay, or a Function/loop that contains one —
- * see NodeDef.latent/latentBodyPin and engine/latency.ts). */
 function drawLatentIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -212,9 +205,6 @@ function drawLatentIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, r
   ctx.stroke();
 }
 
-/** A small solid red dot straddling (cx, cy) — marks a node whose NodeInstance.breakpoint is set
- * (see AppShell.tsx's "Add Breakpoint" context menu item). Deliberately plainer than
- * drawLatentIcon's clock (no internal detail to read at a glance, just "this is a breakpoint"). */
 function drawBreakpointDot(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -226,8 +216,6 @@ function drawBreakpointDot(ctx: CanvasRenderingContext2D, cx: number, cy: number
 }
 
 function drawPinShape(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, pin: PinDef, connected: boolean): void {
-  // Map pins are colored by their VALUE type (pin.type) — the key type isn't drawn on the dot,
-  // only visible via the type-select controls (see typedValueInput.ts).
   const color = Colors.PIN_COLORS[pin.type];
   ctx.fillStyle = color;
   if (pin.type === "exec") {
@@ -236,8 +224,6 @@ function drawPinShape(ctx: CanvasRenderingContext2D, x: number, y: number, r: nu
     ctx.lineTo(x + r * 1.2, y);
     ctx.lineTo(x - r, y + r);
     ctx.closePath();
-    // Same "hollow until wired, filled once connected" convention as a plain data pin below —
-    // an unconnected exec arrow is outline-only so an unwired exec chain reads at a glance.
     if (connected) {
       ctx.fill();
     } else {
@@ -250,23 +236,15 @@ function drawPinShape(ctx: CanvasRenderingContext2D, x: number, y: number, r: nu
 
   switch (pin.container) {
     case "array":
-      // A 3x3 grid of filled quads with gaps — mirrors the container-select dropdown's icon (see
-      // typedValueInput.ts's createContainerIcon).
       drawContainerGrid(ctx, x, y, r, false);
       break;
     case "set":
       drawSetBraces(ctx, x, y, r);
       break;
     case "map":
-      // Same 3x3 grid as array, but the middle row's first two quads merge into one wide quad
-      // spanning columns 1-2 — visually distinct from a plain Array pin.
       drawContainerGrid(ctx, x, y, r, true);
       break;
     default:
-      // A single-container data pin is hollow (border only) until something's actually wired to
-      // it, filled once it is — same "empty vs. filled circle" convention Unreal uses for its own
-      // data pins (and now exec pins too, above). The container shapes (array/set/map) stay solid
-      // regardless of wiring — there's no natural "hollow" rendering for a grid or brace glyph.
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       if (connected) {
@@ -279,9 +257,6 @@ function drawPinShape(ctx: CanvasRenderingContext2D, x: number, y: number, r: nu
   }
 }
 
-/** Draws a 3x3 grid of filled quads centered at (x, y), each `quad` size apart with a gap between
- * them. When `mergeMiddleRowLeft` is set (Map pins), the middle row's first two quads merge into
- * one wide quad spanning columns 1-2 instead of being drawn separately (Array pins never merge). */
 function drawContainerGrid(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, mergeMiddleRowLeft: boolean): void {
   const quad = r * 0.42;
   const gap = r * 0.18;
@@ -303,8 +278,6 @@ function drawContainerGrid(ctx: CanvasRenderingContext2D, x: number, y: number, 
   }
 }
 
-/** Draws a "{ }" curly-brace pair centered at (x, y) — the Set pin icon. Restores whatever font
- * was active beforehand, since drawNodes.ts reuses ctx.font for every subsequent label/pin. */
 function drawSetBraces(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
   const savedFont = ctx.font;
   const savedAlign = ctx.textAlign;
