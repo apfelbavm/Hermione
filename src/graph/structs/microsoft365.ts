@@ -33,30 +33,10 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphUser.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "userPrincipalName",
-      label: i18n.nodes.microsoft365.__shared.pin_user_principal_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "mail",
-      label: i18n.nodes.microsoft365.__shared.pin_mail,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "displayName", label: i18n.nodes.microsoft365.__shared.pin_display_name, type: "string", defaultValue: "" },
+    { id: "userPrincipalName", label: i18n.nodes.microsoft365.__shared.pin_user_principal_name, type: "string", defaultValue: "" },
+    { id: "mail", label: i18n.nodes.microsoft365.__shared.pin_mail, type: "string", defaultValue: "" },
   ],
 });
 
@@ -65,24 +45,9 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphGroup.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "mailNickname",
-      label: i18n.nodes.microsoft365.__shared.pin_mail_nickname,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "displayName", label: i18n.nodes.microsoft365.__shared.pin_display_name, type: "string", defaultValue: "" },
+    { id: "mailNickname", label: i18n.nodes.microsoft365.__shared.pin_mail_nickname, type: "string", defaultValue: "" },
   ],
 });
 
@@ -91,30 +56,10 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphMessage.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "subject",
-      label: i18n.nodes.microsoft365.__shared.pin_subject,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "from",
-      label: i18n.nodes.microsoft365.getMessage.pin_from,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "receivedDateTime",
-      label: i18n.nodes.microsoft365.getMessage.pin_received_date_time,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "subject", label: i18n.nodes.microsoft365.__shared.pin_subject, type: "string", defaultValue: "" },
+    { id: "from", label: i18n.nodes.microsoft365.getMessage.pin_from, type: "string", defaultValue: "" },
+    { id: "receivedDateTime", label: i18n.nodes.microsoft365.getMessage.pin_received_date_time, type: "string", defaultValue: "" },
   ],
 });
 
@@ -123,30 +68,10 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphEvent.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "subject",
-      label: i18n.nodes.microsoft365.__shared.pin_subject,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "start",
-      label: i18n.nodes.microsoft365.createEvent.pin_start,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "end",
-      label: i18n.nodes.microsoft365.createEvent.pin_end,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "subject", label: i18n.nodes.microsoft365.__shared.pin_subject, type: "string", defaultValue: "" },
+    { id: "start", label: i18n.nodes.microsoft365.createEvent.pin_start, type: "string", defaultValue: "" },
+    { id: "end", label: i18n.nodes.microsoft365.createEvent.pin_end, type: "string", defaultValue: "" },
   ],
 });
 
@@ -155,30 +80,10 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphDriveItem.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "isFolder",
-      label: i18n.nodes.microsoft365.__shared.pin_is_folder,
-      type: "boolean",
-      defaultValue: false,
-    },
-    {
-      id: "size",
-      label: i18n.nodes.microsoft365.__shared.pin_size,
-      type: "number",
-      defaultValue: 0,
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "name", label: i18n.nodes.microsoft365.__shared.pin_name, type: "string", defaultValue: "" },
+    { id: "isFolder", label: i18n.nodes.microsoft365.__shared.pin_is_folder, type: "boolean", defaultValue: false },
+    { id: "size", label: i18n.nodes.microsoft365.__shared.pin_size, type: "number", defaultValue: 0 },
   ],
 });
 
@@ -187,18 +92,8 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphTeam.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "displayName", label: i18n.nodes.microsoft365.__shared.pin_display_name, type: "string", defaultValue: "" },
   ],
 });
 
@@ -207,24 +102,9 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphChannel.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "description",
-      label: i18n.nodes.microsoft365.__shared.pin_description,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "displayName", label: i18n.nodes.microsoft365.__shared.pin_display_name, type: "string", defaultValue: "" },
+    { id: "description", label: i18n.nodes.microsoft365.__shared.pin_description, type: "string", defaultValue: "" },
   ],
 });
 
@@ -233,30 +113,10 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphChannelMessage.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "from",
-      label: i18n.nodes.microsoft365.getMessage.pin_from,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "content",
-      label: i18n.nodes.microsoft365.__shared.pin_content,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "createdDateTime",
-      label: i18n.nodes.microsoft365.__shared.pin_created_date_time,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "from", label: i18n.nodes.microsoft365.getMessage.pin_from, type: "string", defaultValue: "" },
+    { id: "content", label: i18n.nodes.microsoft365.__shared.pin_content, type: "string", defaultValue: "" },
+    { id: "createdDateTime", label: i18n.nodes.microsoft365.__shared.pin_created_date_time, type: "string", defaultValue: "" },
   ],
 });
 
@@ -265,24 +125,9 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphChat.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "topic",
-      label: i18n.nodes.microsoft365.__shared.pin_topic,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "chatType",
-      label: i18n.nodes.microsoft365.__shared.pin_chat_type,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "topic", label: i18n.nodes.microsoft365.__shared.pin_topic, type: "string", defaultValue: "" },
+    { id: "chatType", label: i18n.nodes.microsoft365.__shared.pin_chat_type, type: "string", defaultValue: "" },
   ],
 });
 
@@ -291,24 +136,9 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphSite.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "webUrl",
-      label: i18n.nodes.microsoft365.__shared.pin_web_url,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "name", label: i18n.nodes.microsoft365.__shared.pin_name, type: "string", defaultValue: "" },
+    { id: "webUrl", label: i18n.nodes.microsoft365.__shared.pin_web_url, type: "string", defaultValue: "" },
   ],
 });
 
@@ -317,18 +147,8 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphSiteList.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "name", label: i18n.nodes.microsoft365.__shared.pin_name, type: "string", defaultValue: "" },
   ],
 });
 
@@ -337,18 +157,8 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphListItem.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "fieldsJson",
-      label: i18n.nodes.microsoft365.createListItem.pin_fields_json,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "fieldsJson", label: i18n.nodes.microsoft365.createListItem.pin_fields_json, type: "string", defaultValue: "" },
   ],
 });
 
@@ -357,18 +167,8 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphWorksheet.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "name", label: i18n.nodes.microsoft365.__shared.pin_name, type: "string", defaultValue: "" },
   ],
 });
 
@@ -377,18 +177,8 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphTable.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "name", label: i18n.nodes.microsoft365.__shared.pin_name, type: "string", defaultValue: "" },
   ],
 });
 
@@ -397,18 +187,8 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphPlannerPlan.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "title",
-      label: i18n.nodes.microsoft365.__shared.pin_title,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "title", label: i18n.nodes.microsoft365.__shared.pin_title, type: "string", defaultValue: "" },
   ],
 });
 
@@ -417,24 +197,9 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphPlannerTask.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "title",
-      label: i18n.nodes.microsoft365.__shared.pin_title,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "percentComplete",
-      label: i18n.nodes.microsoft365.__shared.pin_percent_complete,
-      type: "number",
-      defaultValue: 0,
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "title", label: i18n.nodes.microsoft365.__shared.pin_title, type: "string", defaultValue: "" },
+    { id: "percentComplete", label: i18n.nodes.microsoft365.__shared.pin_percent_complete, type: "number", defaultValue: 0 },
   ],
 });
 
@@ -443,18 +208,8 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphTodoList.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "displayName", label: i18n.nodes.microsoft365.__shared.pin_display_name, type: "string", defaultValue: "" },
   ],
 });
 
@@ -463,24 +218,9 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphTodoTask.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "title",
-      label: i18n.nodes.microsoft365.__shared.pin_title,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "status",
-      label: i18n.nodes.microsoft365.__shared.pin_status,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "title", label: i18n.nodes.microsoft365.__shared.pin_title, type: "string", defaultValue: "" },
+    { id: "status", label: i18n.nodes.microsoft365.__shared.pin_status, type: "string", defaultValue: "" },
   ],
 });
 
@@ -489,24 +229,9 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphContact.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "email",
-      label: i18n.nodes.microsoft365.__shared.pin_email,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "displayName", label: i18n.nodes.microsoft365.__shared.pin_display_name, type: "string", defaultValue: "" },
+    { id: "email", label: i18n.nodes.microsoft365.__shared.pin_email, type: "string", defaultValue: "" },
   ],
 });
 
@@ -515,24 +240,9 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphApplication.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "appId",
-      label: i18n.nodes.microsoft365.__shared.pin_app_id,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "displayName", label: i18n.nodes.microsoft365.__shared.pin_display_name, type: "string", defaultValue: "" },
+    { id: "appId", label: i18n.nodes.microsoft365.__shared.pin_app_id, type: "string", defaultValue: "" },
   ],
 });
 
@@ -541,18 +251,8 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphDirectoryRole.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "displayName",
-      label: i18n.nodes.microsoft365.__shared.pin_display_name,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "displayName", label: i18n.nodes.microsoft365.__shared.pin_display_name, type: "string", defaultValue: "" },
   ],
 });
 
@@ -561,24 +261,9 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphTrendingDocument.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "id",
-      label: i18n.nodes.microsoft365.__shared.pin_id,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "name",
-      label: i18n.nodes.microsoft365.__shared.pin_name,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "webUrl",
-      label: i18n.nodes.microsoft365.__shared.pin_web_url,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", defaultValue: "" },
+    { id: "name", label: i18n.nodes.microsoft365.__shared.pin_name, type: "string", defaultValue: "" },
+    { id: "webUrl", label: i18n.nodes.microsoft365.__shared.pin_web_url, type: "string", defaultValue: "" },
   ],
 });
 
@@ -587,29 +272,9 @@ registerStructType({
   label: i18n.nodes.microsoft365.graphMessageDetail.label,
   category: "Microsoft 365",
   fields: [
-    {
-      id: "subject",
-      label: i18n.nodes.microsoft365.__shared.pin_subject,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "from",
-      label: i18n.nodes.microsoft365.getMessage.pin_from,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "bodyContent",
-      label: i18n.nodes.microsoft365.getMessage.pin_body_content,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "receivedDateTime",
-      label: i18n.nodes.microsoft365.getMessage.pin_received_date_time,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "subject", label: i18n.nodes.microsoft365.__shared.pin_subject, type: "string", defaultValue: "" },
+    { id: "from", label: i18n.nodes.microsoft365.getMessage.pin_from, type: "string", defaultValue: "" },
+    { id: "bodyContent", label: i18n.nodes.microsoft365.getMessage.pin_body_content, type: "string", defaultValue: "" },
+    { id: "receivedDateTime", label: i18n.nodes.microsoft365.getMessage.pin_received_date_time, type: "string", defaultValue: "" },
   ],
 });

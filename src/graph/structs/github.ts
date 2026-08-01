@@ -38,12 +38,7 @@ registerStructType({
   category: "GitHub",
   fields: [
     { id: "number", label: i18n.nodes.github.__shared.pin_number, type: "number", defaultValue: 0 },
-    {
-      id: "url",
-      label: i18n.nodes.github.__shared.pin_url,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "url", label: i18n.nodes.github.__shared.pin_url, type: "string", defaultValue: "" },
   ],
 });
 
@@ -52,18 +47,8 @@ registerStructType({
   label: i18n.nodes.github.mergeResult.label,
   category: "GitHub",
   fields: [
-    {
-      id: "merged",
-      label: i18n.nodes.github.mergePullRequest.pin_merged,
-      type: "boolean",
-      defaultValue: false,
-    },
-    {
-      id: "sha",
-      label: i18n.nodes.github.__shared.pin_sha,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "merged", label: i18n.nodes.github.mergePullRequest.pin_merged, type: "boolean", defaultValue: false },
+    { id: "sha", label: i18n.nodes.github.__shared.pin_sha, type: "string", defaultValue: "" },
   ],
 });
 
@@ -72,18 +57,8 @@ registerStructType({
   label: i18n.nodes.github.fileContent.label,
   category: "GitHub",
   fields: [
-    {
-      id: "content",
-      label: i18n.nodes.github.__shared.pin_content,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "sha",
-      label: i18n.nodes.github.__shared.pin_sha,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "content", label: i18n.nodes.github.__shared.pin_content, type: "string", defaultValue: "" },
+    { id: "sha", label: i18n.nodes.github.__shared.pin_sha, type: "string", defaultValue: "" },
   ],
 });
 
@@ -92,17 +67,7 @@ registerStructType({
   label: i18n.nodes.github.fileWriteResult.label,
   category: "GitHub",
   fields: [
-    {
-      id: "sha",
-      label: i18n.nodes.github.createOrUpdateFile.pin_result_sha,
-      type: "string",
-      defaultValue: "",
-    },
-    {
-      id: "commitSha",
-      label: i18n.nodes.github.createOrUpdateFile.pin_commit_sha,
-      type: "string",
-      defaultValue: "",
-    },
+    { id: "sha", label: i18n.nodes.github.createOrUpdateFile.pin_result_sha, type: "string", defaultValue: "" },
+    { id: "commitSha", label: i18n.nodes.github.createOrUpdateFile.pin_commit_sha, type: "string", defaultValue: "" },
   ],
 });
