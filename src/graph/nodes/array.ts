@@ -39,10 +39,7 @@ function arrayPin(elementType: PinType, defaultValue: unknown = []): PinDef {
 // A distinct id from arrayPin's "array" — several nodes below have BOTH an array input and an
 // array output, and pin ids must be unique within one node (they key NodeInstance.pins and
 // NodeScreenGeometry.pinScreen, both flat Records regardless of direction).
-function arrayOutPin(
-  elementType: PinType,
-  label = i18n.nodes.array.pin_result,
-): PinDef {
+function arrayOutPin(elementType: PinType, label = i18n.nodes.array.pin_result): PinDef {
   return {
     id: "result",
     label,
@@ -52,30 +49,18 @@ function arrayOutPin(
   };
 }
 
-function itemPin(
-  id: string,
-  label: string,
-  elementType: PinType,
-  direction: "input" | "output" = "input",
-): PinDef {
+function itemPin(id: string, label: string, elementType: PinType, direction: "input" | "output" = "input"): PinDef {
   return {
     id,
     label,
     type: elementType,
     direction,
-    defaultValue:
-      direction === "input" ? DEFAULT_VALUE_BY_TYPE[elementType] : undefined,
+    defaultValue: direction === "input" ? DEFAULT_VALUE_BY_TYPE[elementType] : undefined,
   };
 }
 
-function indexPin(
-  id = "index",
-  label = i18n.nodes.__shared.pin_index,
-  direction: "input" | "output" = "input",
-): PinDef {
-  return direction === "input"
-    ? { id, label, type: "number", direction, defaultValue: 0, integer: true }
-    : { id, label, type: "number", direction };
+function indexPin(id = "index", label = i18n.nodes.__shared.pin_index, direction: "input" | "output" = "input"): PinDef {
+  return direction === "input" ? { id, label, type: "number", direction, defaultValue: 0, integer: true } : { id, label, type: "number", direction };
 }
 
 const ENTRY_PREFIX = "entry-";
@@ -109,21 +94,8 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    {
-      id: `${ENTRY_PREFIX}0`,
-      label: `${i18n.nodes.array.pin_element} 1`,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-      removable: true,
-    },
-    arrayOutPin("number"),
-  ],
-  deriveInstancePins: (node) => [
-    ...makeArrayEntryPins(node),
-    arrayOutPin(elementTypeOf(node)),
-  ],
+  pins: [{ id: `${ENTRY_PREFIX}0`, label: `${i18n.nodes.array.pin_element} 1`, type: "number", direction: "input", defaultValue: 0, removable: true }, arrayOutPin("number")],
+  deriveInstancePins: (node) => [...makeArrayEntryPins(node), arrayOutPin(elementTypeOf(node))],
   addInstancePinEntry: (node) => {
     const suffixes = makeArrayEntryIds(node).map(entrySuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
@@ -148,24 +120,8 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    arrayPin("number"),
-    {
-      id: "length",
-      label: i18n.nodes.__shared.pin_length,
-      type: "number",
-      direction: "output",
-    },
-  ],
-  deriveInstancePins: (node) => [
-    arrayPin(elementTypeOf(node)),
-    {
-      id: "length",
-      label: i18n.nodes.__shared.pin_length,
-      type: "number",
-      direction: "output",
-    },
-  ],
+  pins: [arrayPin("number"), { id: "length", label: i18n.nodes.__shared.pin_length, type: "number", direction: "output" }],
+  deriveInstancePins: (node) => [arrayPin(elementTypeOf(node)), { id: "length", label: i18n.nodes.__shared.pin_length, type: "number", direction: "output" }],
   evaluate: ({ inputs }) => ({ length: asArray(inputs.array).length }),
   compileEvaluate: ({ inputs }) => ({
     length: `(${compileAsArray(inputs.array)}).length`,
@@ -179,30 +135,10 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    arrayPin("number"),
-    indexPin(),
-    itemPin("element", i18n.nodes.array.pin_element, "number", "output"),
-    {
-      id: "found",
-      label: i18n.nodes.array.get.pin_found,
-      type: "boolean",
-      direction: "output",
-    },
-  ],
+  pins: [arrayPin("number"), indexPin(), itemPin("element", i18n.nodes.array.pin_element, "number", "output"), { id: "found", label: i18n.nodes.array.get.pin_found, type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      arrayPin(t),
-      indexPin(),
-      itemPin("element", i18n.nodes.array.pin_element, t, "output"),
-      {
-        id: "found",
-        label: i18n.nodes.array.get.pin_found,
-        type: "boolean",
-        direction: "output",
-      },
-    ];
+    return [arrayPin(t), indexPin(), itemPin("element", i18n.nodes.array.pin_element, t, "output"), { id: "found", label: i18n.nodes.array.get.pin_found, type: "boolean", direction: "output" }];
   },
   evaluate: ({ node, inputs }) => {
     const arr = asArray(inputs.array);
@@ -230,32 +166,10 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    arrayPin("number"),
-    indexPin(),
-    itemPin("value", i18n.nodes.__shared.pin_value, "number"),
-    arrayOutPin("number"),
-    {
-      id: "success",
-      label: i18n.nodes.__shared.pin_success,
-      type: "boolean",
-      direction: "output",
-    },
-  ],
+  pins: [arrayPin("number"), indexPin(), itemPin("value", i18n.nodes.__shared.pin_value, "number"), arrayOutPin("number"), { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      arrayPin(t),
-      indexPin(),
-      itemPin("value", i18n.nodes.__shared.pin_value, t),
-      arrayOutPin(t),
-      {
-        id: "success",
-        label: i18n.nodes.__shared.pin_success,
-        type: "boolean",
-        direction: "output",
-      },
-    ];
+    return [arrayPin(t), indexPin(), itemPin("value", i18n.nodes.__shared.pin_value, t), arrayOutPin(t), { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" }];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
@@ -278,30 +192,10 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    arrayPin("number"),
-    itemPin("item", i18n.nodes.__shared.pin_item, "number"),
-    arrayOutPin("number"),
-    {
-      id: "index",
-      label: i18n.nodes.__shared.pin_index,
-      type: "number",
-      direction: "output",
-    },
-  ],
+  pins: [arrayPin("number"), itemPin("item", i18n.nodes.__shared.pin_item, "number"), arrayOutPin("number"), { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      arrayPin(t),
-      itemPin("item", i18n.nodes.__shared.pin_item, t),
-      arrayOutPin(t),
-      {
-        id: "index",
-        label: i18n.nodes.__shared.pin_index,
-        type: "number",
-        direction: "output",
-      },
-    ];
+    return [arrayPin(t), itemPin("item", i18n.nodes.__shared.pin_item, t), arrayOutPin(t), { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" }];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
@@ -322,26 +216,10 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    {
-      ...arrayPin("number"),
-      id: "a",
-      label: i18n.nodes.array.append.pin_array_a,
-    },
-    {
-      ...arrayPin("number"),
-      id: "b",
-      label: i18n.nodes.array.append.pin_array_b,
-    },
-    arrayOutPin("number"),
-  ],
+  pins: [{ ...arrayPin("number"), id: "a", label: i18n.nodes.array.append.pin_array_a }, { ...arrayPin("number"), id: "b", label: i18n.nodes.array.append.pin_array_b }, arrayOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      { ...arrayPin(t), id: "a", label: i18n.nodes.array.append.pin_array_a },
-      { ...arrayPin(t), id: "b", label: i18n.nodes.array.append.pin_array_b },
-      arrayOutPin(t),
-    ];
+    return [{ ...arrayPin(t), id: "a", label: i18n.nodes.array.append.pin_array_a }, { ...arrayPin(t), id: "b", label: i18n.nodes.array.append.pin_array_b }, arrayOutPin(t)];
   },
   evaluate: ({ inputs }) => ({
     result: [...asArray(inputs.a), ...asArray(inputs.b)],
@@ -358,27 +236,14 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    arrayPin("number"),
-    indexPin(),
-    itemPin("item", i18n.nodes.__shared.pin_item, "number"),
-    arrayOutPin("number"),
-  ],
+  pins: [arrayPin("number"), indexPin(), itemPin("item", i18n.nodes.__shared.pin_item, "number"), arrayOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      arrayPin(t),
-      indexPin(),
-      itemPin("item", i18n.nodes.__shared.pin_item, t),
-      arrayOutPin(t),
-    ];
+    return [arrayPin(t), indexPin(), itemPin("item", i18n.nodes.__shared.pin_item, t), arrayOutPin(t)];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
-    const index = Math.max(
-      0,
-      Math.min(arr.length, Math.trunc(Number(inputs.index ?? 0))),
-    );
+    const index = Math.max(0, Math.min(arr.length, Math.trunc(Number(inputs.index ?? 0))));
     arr.splice(index, 0, inputs.item);
     return { result: arr };
   },
@@ -394,30 +259,10 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    arrayPin("number"),
-    indexPin(),
-    arrayOutPin("number"),
-    {
-      id: "success",
-      label: i18n.nodes.__shared.pin_success,
-      type: "boolean",
-      direction: "output",
-    },
-  ],
+  pins: [arrayPin("number"), indexPin(), arrayOutPin("number"), { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      arrayPin(t),
-      indexPin(),
-      arrayOutPin(t),
-      {
-        id: "success",
-        label: i18n.nodes.__shared.pin_success,
-        type: "boolean",
-        direction: "output",
-      },
-    ];
+    return [arrayPin(t), indexPin(), arrayOutPin(t), { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" }];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
@@ -442,36 +287,14 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    arrayPin("number"),
-    itemPin("item", i18n.nodes.__shared.pin_item, "number"),
-    arrayOutPin("number"),
-    {
-      id: "removed",
-      label: i18n.nodes.__shared.pin_removed,
-      type: "boolean",
-      direction: "output",
-    },
-  ],
+  pins: [arrayPin("number"), itemPin("item", i18n.nodes.__shared.pin_item, "number"), arrayOutPin("number"), { id: "removed", label: i18n.nodes.__shared.pin_removed, type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      arrayPin(t),
-      itemPin("item", i18n.nodes.__shared.pin_item, t),
-      arrayOutPin(t),
-      {
-        id: "removed",
-        label: i18n.nodes.__shared.pin_removed,
-        type: "boolean",
-        direction: "output",
-      },
-    ];
+    return [arrayPin(t), itemPin("item", i18n.nodes.__shared.pin_item, t), arrayOutPin(t), { id: "removed", label: i18n.nodes.__shared.pin_removed, type: "boolean", direction: "output" }];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
-    const index = arr.findIndex(
-      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
-    );
+    const index = arr.findIndex((v) => JSON.stringify(v) === JSON.stringify(inputs.item));
     const removed = index !== -1;
     if (removed) arr.splice(index, 1);
     return { result: arr, removed };
@@ -505,33 +328,13 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    arrayPin("number"),
-    itemPin("item", i18n.nodes.__shared.pin_item, "number"),
-    {
-      id: "contains",
-      label: i18n.nodes.__shared.pin_contains,
-      type: "boolean",
-      direction: "output",
-    },
-  ],
+  pins: [arrayPin("number"), itemPin("item", i18n.nodes.__shared.pin_item, "number"), { id: "contains", label: i18n.nodes.__shared.pin_contains, type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      arrayPin(t),
-      itemPin("item", i18n.nodes.__shared.pin_item, t),
-      {
-        id: "contains",
-        label: i18n.nodes.__shared.pin_contains,
-        type: "boolean",
-        direction: "output",
-      },
-    ];
+    return [arrayPin(t), itemPin("item", i18n.nodes.__shared.pin_item, t), { id: "contains", label: i18n.nodes.__shared.pin_contains, type: "boolean", direction: "output" }];
   },
   evaluate: ({ inputs }) => ({
-    contains: asArray(inputs.array).some(
-      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
-    ),
+    contains: asArray(inputs.array).some((v) => JSON.stringify(v) === JSON.stringify(inputs.item)),
   }),
   compileEvaluate: ({ inputs }) => ({
     contains: `(${compileAsArray(inputs.array)}).some((v) => ${jsonEq("v", inputs.item)})`,
@@ -545,33 +348,13 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    arrayPin("number"),
-    itemPin("item", i18n.nodes.__shared.pin_item, "number"),
-    {
-      id: "index",
-      label: i18n.nodes.__shared.pin_index,
-      type: "number",
-      direction: "output",
-    },
-  ],
+  pins: [arrayPin("number"), itemPin("item", i18n.nodes.__shared.pin_item, "number"), { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [
-      arrayPin(t),
-      itemPin("item", i18n.nodes.__shared.pin_item, t),
-      {
-        id: "index",
-        label: i18n.nodes.__shared.pin_index,
-        type: "number",
-        direction: "output",
-      },
-    ];
+    return [arrayPin(t), itemPin("item", i18n.nodes.__shared.pin_item, t), { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" }];
   },
   evaluate: ({ inputs }) => ({
-    index: asArray(inputs.array).findIndex(
-      (v) => JSON.stringify(v) === JSON.stringify(inputs.item),
-    ),
+    index: asArray(inputs.array).findIndex((v) => JSON.stringify(v) === JSON.stringify(inputs.item)),
   }),
   compileEvaluate: ({ inputs }) => ({
     index: `(${compileAsArray(inputs.array)}).findIndex((v) => ${jsonEq("v", inputs.item)})`,
@@ -585,24 +368,8 @@ registerNode({
   group: GROUP,
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
-  pins: [
-    arrayPin("number"),
-    {
-      id: "isEmpty",
-      label: i18n.nodes.array.isEmpty.pin_is_empty,
-      type: "boolean",
-      direction: "output",
-    },
-  ],
-  deriveInstancePins: (node) => [
-    arrayPin(elementTypeOf(node)),
-    {
-      id: "isEmpty",
-      label: i18n.nodes.array.isEmpty.pin_is_empty,
-      type: "boolean",
-      direction: "output",
-    },
-  ],
+  pins: [arrayPin("number"), { id: "isEmpty", label: i18n.nodes.array.isEmpty.pin_is_empty, type: "boolean", direction: "output" }],
+  deriveInstancePins: (node) => [arrayPin(elementTypeOf(node)), { id: "isEmpty", label: i18n.nodes.array.isEmpty.pin_is_empty, type: "boolean", direction: "output" }],
   evaluate: ({ inputs }) => ({ isEmpty: asArray(inputs.array).length === 0 }),
   compileEvaluate: ({ inputs }) => ({
     isEmpty: `((${compileAsArray(inputs.array)}).length === 0)`,
@@ -644,50 +411,20 @@ registerNode({
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     arrayPin("number"),
-    {
-      id: "loop-body",
-      label: i18n.nodes.__shared.pin_loop_body,
-      type: "exec",
-      direction: "output",
-    },
+    { id: "loop-body", label: i18n.nodes.__shared.pin_loop_body, type: "exec", direction: "output" },
     itemPin("element", i18n.nodes.array.pin_element, "number", "output"),
-    {
-      id: "index",
-      label: i18n.nodes.__shared.pin_index,
-      type: "number",
-      direction: "output",
-    },
-    {
-      id: "completed",
-      label: i18n.nodes.__shared.pin_completed,
-      type: "exec",
-      direction: "output",
-    },
+    { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" },
+    { id: "completed", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
     return [
       { id: "exec-in", label: "", type: "exec", direction: "input" },
       arrayPin(t),
-      {
-        id: "loop-body",
-        label: i18n.nodes.__shared.pin_loop_body,
-        type: "exec",
-        direction: "output",
-      },
+      { id: "loop-body", label: i18n.nodes.__shared.pin_loop_body, type: "exec", direction: "output" },
       itemPin("element", i18n.nodes.array.pin_element, t, "output"),
-      {
-        id: "index",
-        label: i18n.nodes.__shared.pin_index,
-        type: "number",
-        direction: "output",
-      },
-      {
-        id: "completed",
-        label: i18n.nodes.__shared.pin_completed,
-        type: "exec",
-        direction: "output",
-      },
+      { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" },
+      { id: "completed", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     ];
   },
   // Disabled must skip straight to "completed" — never firing "loop-body" — same rationale as
@@ -698,9 +435,7 @@ registerNode({
   execute: async ({ node, inputs, ctx }) => {
     const arr = asArray(inputs.array);
     if (arr.length > MAX_ARRAY_FOR_EACH_ITERATIONS) {
-      throw new Error(
-        `Array For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_ARRAY_FOR_EACH_ITERATIONS} limit.`,
-      );
+      throw new Error(`Array For Each (${node.id}) would run ${arr.length} iterations, over the ${MAX_ARRAY_FOR_EACH_ITERATIONS} limit.`);
     }
     const bodyTargets = connectionsFrom(ctx.graph, node.id, "loop-body");
     for (let i = 0; i < arr.length; i++) {

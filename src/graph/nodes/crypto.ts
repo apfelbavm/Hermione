@@ -4,28 +4,13 @@ import { compileResultVar } from "../../engine/compileUtils";
 import { registerNode } from "../../engine/registry";
 import { i18n } from "@i18n";
 
-// PGP (OpenPGP.js) and PKCS#7/CMS (node-forge) are both pure-JS, work identically in the browser
-// (in-editor Run) and under plain Node (a compiled .mjs) with no native bindings, and are the two
-// most widely-used, actively-maintained libraries for their respective message formats — hence
-// "bulletproof" rather than a hand-rolled/lower-level ASN.1 implementation (see pkijs/asn1js as
-// the harder-to-get-right alternative for PKCS7 this deliberately avoids).
-
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-// Dropdown choices for the encryption-tuning pins below, taken straight from openpgp's own enums
-// so a new algorithm openpgp.js adds later shows up automatically — the numeric enum VALUE is what
-// openpgp.config actually wants, but pins show/store the readable KEY ("aes256", not 9).
-// "experimentalGCM" is deliberately excluded: openpgp.js's own docs mark it non-standard/unstable,
-// not something to offer as a normal choice alongside eax/ocb/gcm.
 const PGP_SYMMETRIC_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.symmetric);
-const PGP_COMPRESSION_ALGORITHM_OPTIONS = Object.keys(
-  openpgp.enums.compression,
-);
-const PGP_AEAD_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.aead).filter(
-  (k) => k !== "experimentalGCM",
-);
+const PGP_COMPRESSION_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.compression);
+const PGP_AEAD_ALGORITHM_OPTIONS = Object.keys(openpgp.enums.aead).filter((k) => k !== "experimentalGCM");
 
 registerNode({
   type: "crypto.pgpEncrypt",
@@ -34,108 +19,21 @@ registerNode({
   group: "Crypto.PGP",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    {
-      id: "plaintext",
-      label: i18n.nodes.__shared.pin_plaintext,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "publicKeyArmored",
-      label: i18n.nodes.crypto.pgpEncrypt.pin_public_key,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    // When true (the default), none of the pins below are applied at all — openpgp.encrypt() picks
-    // every one of them itself (mainly negotiated from the recipient key's own stated preferences),
-    // which is the normal, recommended OpenPGP behavior. Turn it off to override any of them.
-    {
-      id: "autoDetectSettings",
-      label: i18n.nodes.__shared.pin_auto_detect,
-      type: "boolean",
-      direction: "input",
-      defaultValue: true,
-    },
-    {
-      id: "symmetricAlgorithm",
-      label: i18n.nodes.crypto.pgpEncrypt.pin_symmetric_algorithm,
-      type: "enum",
-      direction: "input",
-      defaultValue: "aes256",
-      options: PGP_SYMMETRIC_ALGORITHM_OPTIONS,
-    },
-    {
-      id: "compressionAlgorithm",
-      label: i18n.nodes.crypto.pgpEncrypt.pin_compression,
-      type: "enum",
-      direction: "input",
-      defaultValue: "uncompressed",
-      options: PGP_COMPRESSION_ALGORITHM_OPTIONS,
-    },
-    {
-      id: "aeadProtect",
-      label: i18n.nodes.crypto.pgpEncrypt.pin_use_aead,
-      type: "boolean",
-      direction: "input",
-      defaultValue: openpgp.config.aeadProtect,
-    },
-    {
-      id: "aeadAlgorithm",
-      label: i18n.nodes.crypto.pgpEncrypt.pin_aead_algorithm,
-      type: "enum",
-      direction: "input",
-      defaultValue: "gcm",
-      options: PGP_AEAD_ALGORITHM_OPTIONS,
-    },
-    {
-      id: "showVersion",
-      label: i18n.nodes.crypto.pgpEncrypt.pin_show_version,
-      type: "boolean",
-      direction: "input",
-      defaultValue: openpgp.config.showVersion,
-    },
-    {
-      id: "versionString",
-      label: i18n.nodes.crypto.pgpEncrypt.pin_version_comment,
-      type: "string",
-      direction: "input",
-      defaultValue: openpgp.config.versionString,
-    },
-    {
-      id: "showComment",
-      label: i18n.nodes.crypto.pgpEncrypt.pin_show_comment,
-      type: "boolean",
-      direction: "input",
-      defaultValue: openpgp.config.showComment,
-    },
-    {
-      id: "commentString",
-      label: i18n.nodes.crypto.pgpEncrypt.pin_comment,
-      type: "string",
-      direction: "input",
-      defaultValue: openpgp.config.commentString,
-    },
+    { id: "plaintext", label: i18n.nodes.__shared.pin_plaintext, type: "string", direction: "input", defaultValue: "" },
+    { id: "publicKeyArmored", label: i18n.nodes.crypto.pgpEncrypt.pin_public_key, type: "string", direction: "input", defaultValue: "" },
+    { id: "autoDetectSettings", label: i18n.nodes.__shared.pin_auto_detect, type: "boolean", direction: "input", defaultValue: true },
+    { id: "symmetricAlgorithm", label: i18n.nodes.crypto.pgpEncrypt.pin_symmetric_algorithm, type: "enum", direction: "input", defaultValue: "aes256", options: PGP_SYMMETRIC_ALGORITHM_OPTIONS },
+    { id: "compressionAlgorithm", label: i18n.nodes.crypto.pgpEncrypt.pin_compression, type: "enum", direction: "input", defaultValue: "uncompressed", options: PGP_COMPRESSION_ALGORITHM_OPTIONS },
+    { id: "aeadProtect", label: i18n.nodes.crypto.pgpEncrypt.pin_use_aead, type: "boolean", direction: "input", defaultValue: openpgp.config.aeadProtect },
+    { id: "aeadAlgorithm", label: i18n.nodes.crypto.pgpEncrypt.pin_aead_algorithm, type: "enum", direction: "input", defaultValue: "gcm", options: PGP_AEAD_ALGORITHM_OPTIONS },
+    { id: "showVersion", label: i18n.nodes.crypto.pgpEncrypt.pin_show_version, type: "boolean", direction: "input", defaultValue: openpgp.config.showVersion },
+    { id: "versionString", label: i18n.nodes.crypto.pgpEncrypt.pin_version_comment, type: "string", direction: "input", defaultValue: openpgp.config.versionString },
+    { id: "showComment", label: i18n.nodes.crypto.pgpEncrypt.pin_show_comment, type: "boolean", direction: "input", defaultValue: openpgp.config.showComment },
+    { id: "commentString", label: i18n.nodes.crypto.pgpEncrypt.pin_comment, type: "string", direction: "input", defaultValue: openpgp.config.commentString },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
-    {
-      id: "encryptedArmored",
-      label: i18n.nodes.crypto.pgpEncrypt.pin_encrypted,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "success",
-      label: i18n.nodes.__shared.pin_success,
-      type: "boolean",
-      direction: "output",
-    },
-    {
-      id: "error",
-      label: i18n.nodes.__shared.pin_error,
-      type: "string",
-      direction: "output",
-    },
+    { id: "encryptedArmored", label: i18n.nodes.crypto.pgpEncrypt.pin_encrypted, type: "string", direction: "output" },
+    { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   execute: async ({ inputs }) => {
     try {
@@ -148,23 +46,10 @@ registerNode({
       const config = inputs.autoDetectSettings
         ? undefined
         : {
-            preferredSymmetricAlgorithm:
-              openpgp.enums.symmetric[
-                String(
-                  inputs.symmetricAlgorithm,
-                ) as keyof typeof openpgp.enums.symmetric
-              ],
-            preferredCompressionAlgorithm:
-              openpgp.enums.compression[
-                String(
-                  inputs.compressionAlgorithm,
-                ) as keyof typeof openpgp.enums.compression
-              ],
+            preferredSymmetricAlgorithm: openpgp.enums.symmetric[String(inputs.symmetricAlgorithm) as keyof typeof openpgp.enums.symmetric],
+            preferredCompressionAlgorithm: openpgp.enums.compression[String(inputs.compressionAlgorithm) as keyof typeof openpgp.enums.compression],
             aeadProtect: Boolean(inputs.aeadProtect),
-            preferredAEADAlgorithm:
-              openpgp.enums.aead[
-                String(inputs.aeadAlgorithm) as keyof typeof openpgp.enums.aead
-              ],
+            preferredAEADAlgorithm: openpgp.enums.aead[String(inputs.aeadAlgorithm) as keyof typeof openpgp.enums.aead],
             showVersion: Boolean(inputs.showVersion),
             versionString: String(inputs.versionString ?? ""),
             showComment: Boolean(inputs.showComment),
@@ -231,72 +116,16 @@ registerNode({
   group: "Crypto.PGP",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    {
-      id: "encryptedArmored",
-      label: i18n.nodes.crypto.pgpDecrypt.pin_encrypted,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "privateKeyArmored",
-      label: i18n.nodes.__shared.pin_private_key,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    // Left empty for a private key that isn't itself passphrase-protected.
-    {
-      id: "passphrase",
-      label: i18n.nodes.crypto.pgpDecrypt.pin_passphrase,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    // Same "off by default" gate as crypto.pgpEncrypt's own — decrypt already reads which algorithm
-    // was used straight off the message itself, so these two pins are strictly about how STRICT to
-    // be with a message/key that fails one of openpgp's own safety checks, not "how to decrypt."
-    {
-      id: "autoDetectSettings",
-      label: i18n.nodes.__shared.pin_auto_detect,
-      type: "boolean",
-      direction: "input",
-      defaultValue: true,
-    },
-    {
-      id: "allowUnauthenticatedMessages",
-      label: i18n.nodes.crypto.pgpDecrypt.pin_allow_unauthenticated,
-      type: "boolean",
-      direction: "input",
-      defaultValue: openpgp.config.allowUnauthenticatedMessages,
-    },
-    {
-      id: "minRSABits",
-      label: i18n.nodes.crypto.pgpDecrypt.pin_min_rsa_bits,
-      type: "number",
-      direction: "input",
-      defaultValue: openpgp.config.minRSABits,
-      integer: true,
-    },
+    { id: "encryptedArmored", label: i18n.nodes.crypto.pgpDecrypt.pin_encrypted, type: "string", direction: "input", defaultValue: "" },
+    { id: "privateKeyArmored", label: i18n.nodes.__shared.pin_private_key, type: "string", direction: "input", defaultValue: "" },
+    { id: "passphrase", label: i18n.nodes.crypto.pgpDecrypt.pin_passphrase, type: "string", direction: "input", defaultValue: "" },
+    { id: "autoDetectSettings", label: i18n.nodes.__shared.pin_auto_detect, type: "boolean", direction: "input", defaultValue: true },
+    { id: "allowUnauthenticatedMessages", label: i18n.nodes.crypto.pgpDecrypt.pin_allow_unauthenticated, type: "boolean", direction: "input", defaultValue: openpgp.config.allowUnauthenticatedMessages },
+    { id: "minRSABits", label: i18n.nodes.crypto.pgpDecrypt.pin_min_rsa_bits, type: "number", direction: "input", defaultValue: openpgp.config.minRSABits, integer: true },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
-    {
-      id: "plaintext",
-      label: i18n.nodes.__shared.pin_plaintext,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "success",
-      label: i18n.nodes.__shared.pin_success,
-      type: "boolean",
-      direction: "output",
-    },
-    {
-      id: "error",
-      label: i18n.nodes.__shared.pin_error,
-      type: "string",
-      direction: "output",
-    },
+    { id: "plaintext", label: i18n.nodes.__shared.pin_plaintext, type: "string", direction: "output" },
+    { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   execute: async ({ inputs }) => {
     try {
@@ -304,17 +133,14 @@ registerNode({
         armoredKey: String(inputs.privateKeyArmored ?? ""),
       });
       const passphrase = String(inputs.passphrase ?? "");
-      if (passphrase)
-        privateKey = await openpgp.decryptKey({ privateKey, passphrase });
+      if (passphrase) privateKey = await openpgp.decryptKey({ privateKey, passphrase });
       const message = await openpgp.readMessage({
         armoredMessage: String(inputs.encryptedArmored ?? ""),
       });
       const config = inputs.autoDetectSettings
         ? undefined
         : {
-            allowUnauthenticatedMessages: Boolean(
-              inputs.allowUnauthenticatedMessages,
-            ),
+            allowUnauthenticatedMessages: Boolean(inputs.allowUnauthenticatedMessages),
             minRSABits: Number(inputs.minRSABits),
           };
       const { data: plaintext } = await openpgp.decrypt({
@@ -363,10 +189,6 @@ registerNode({
   compileImports: ['import * as openpgp from "openpgp";'],
 });
 
-// node-forge's own pkcs7.js only implements exactly these four ciphers for EnvelopedData (anything
-// else throws "Unsupported symmetric cipher" at encrypt time) — see PKCS7_CIPHER_OID_NAMES below,
-// which maps each readable option key to the forge.pki.oids name p7.encrypt()'s second argument
-// actually wants. Default matches forge's own built-in default (aes256-CBC).
 const PKCS7_CIPHER_OPTIONS = ["aes128", "aes192", "aes256", "3des"];
 const PKCS7_CIPHER_OID_NAMES: Record<string, string> = {
   aes128: "aes128-CBC",
@@ -382,67 +204,21 @@ registerNode({
   group: "Crypto.PKCS7",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    {
-      id: "plaintext",
-      label: i18n.nodes.__shared.pin_plaintext,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "recipientCertPem",
-      label: i18n.nodes.crypto.pkcs7Encrypt.pin_recipient_cert,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    // Same "off by default" gate as the PGP nodes' own — when true, p7.encrypt() is called with no
-    // arguments at all, so forge picks its own built-in default cipher (aes256-CBC) itself.
-    {
-      id: "autoDetectSettings",
-      label: i18n.nodes.__shared.pin_auto_detect,
-      type: "boolean",
-      direction: "input",
-      defaultValue: true,
-    },
-    {
-      id: "cipherAlgorithm",
-      label: i18n.nodes.crypto.pkcs7Encrypt.pin_cipher_algorithm,
-      type: "enum",
-      direction: "input",
-      defaultValue: "aes256",
-      options: PKCS7_CIPHER_OPTIONS,
-    },
+    { id: "plaintext", label: i18n.nodes.__shared.pin_plaintext, type: "string", direction: "input", defaultValue: "" },
+    { id: "recipientCertPem", label: i18n.nodes.crypto.pkcs7Encrypt.pin_recipient_cert, type: "string", direction: "input", defaultValue: "" },
+    { id: "autoDetectSettings", label: i18n.nodes.__shared.pin_auto_detect, type: "boolean", direction: "input", defaultValue: true },
+    { id: "cipherAlgorithm", label: i18n.nodes.crypto.pkcs7Encrypt.pin_cipher_algorithm, type: "enum", direction: "input", defaultValue: "aes256", options: PKCS7_CIPHER_OPTIONS },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
-    {
-      id: "envelopedDataPem",
-      label: i18n.nodes.crypto.pkcs7Encrypt.pin_enveloped_data,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "success",
-      label: i18n.nodes.__shared.pin_success,
-      type: "boolean",
-      direction: "output",
-    },
-    {
-      id: "error",
-      label: i18n.nodes.__shared.pin_error,
-      type: "string",
-      direction: "output",
-    },
+    { id: "envelopedDataPem", label: i18n.nodes.crypto.pkcs7Encrypt.pin_enveloped_data, type: "string", direction: "output" },
+    { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   execute: async ({ inputs }) => {
     try {
-      const cert = forge.pki.certificateFromPem(
-        String(inputs.recipientCertPem ?? ""),
-      );
+      const cert = forge.pki.certificateFromPem(String(inputs.recipientCertPem ?? ""));
       const p7 = forge.pkcs7.createEnvelopedData();
       p7.addRecipient(cert);
-      p7.content = forge.util.createBuffer(
-        forge.util.encodeUtf8(String(inputs.plaintext ?? "")),
-      );
+      p7.content = forge.util.createBuffer(forge.util.encodeUtf8(String(inputs.plaintext ?? "")));
       if (inputs.autoDetectSettings) {
         p7.encrypt();
       } else {
@@ -451,9 +227,7 @@ registerNode({
       }
       // @types/node-forge types messageToPem as accepting only PkcsSignedData — it works identically
       // for PkcsEnvelopedData at runtime (both just serialize via .toAsn1()); the .d.ts is just narrow.
-      const envelopedDataPem = forge.pkcs7.messageToPem(
-        p7 as unknown as forge.pkcs7.PkcsSignedData,
-      );
+      const envelopedDataPem = forge.pkcs7.messageToPem(p7 as unknown as forge.pkcs7.PkcsSignedData);
       return {
         nextExec: "exec-out",
         outputs: { envelopedDataPem, success: true, error: "" },
@@ -507,57 +281,24 @@ registerNode({
   group: "Crypto.PKCS7",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    {
-      id: "envelopedDataPem",
-      label: i18n.nodes.crypto.pkcs7Decrypt.pin_enveloped_data,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "privateKeyPem",
-      label: i18n.nodes.__shared.pin_private_key,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
+    { id: "envelopedDataPem", label: i18n.nodes.crypto.pkcs7Decrypt.pin_enveloped_data, type: "string", direction: "input", defaultValue: "" },
+    { id: "privateKeyPem", label: i18n.nodes.__shared.pin_private_key, type: "string", direction: "input", defaultValue: "" },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
-    {
-      id: "plaintext",
-      label: i18n.nodes.__shared.pin_plaintext,
-      type: "string",
-      direction: "output",
-    },
-    {
-      id: "success",
-      label: i18n.nodes.__shared.pin_success,
-      type: "boolean",
-      direction: "output",
-    },
-    {
-      id: "error",
-      label: i18n.nodes.__shared.pin_error,
-      type: "string",
-      direction: "output",
-    },
+    { id: "plaintext", label: i18n.nodes.__shared.pin_plaintext, type: "string", direction: "output" },
+    { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   // Decrypts against the envelope's first RecipientInfo — matches what crypto.pkcs7Encrypt itself
   // produces (always exactly one recipient); a multi-recipient envelope from elsewhere would need
   // its own matching-certificate input to pick the right one via forge's own p7.findRecipient(cert).
   execute: async ({ inputs }) => {
     try {
-      const message = forge.pkcs7.messageFromPem(
-        String(inputs.envelopedDataPem ?? ""),
-      ) as forge.pkcs7.PkcsEnvelopedData;
-      const privateKey = forge.pki.privateKeyFromPem(
-        String(inputs.privateKeyPem ?? ""),
-      );
+      const message = forge.pkcs7.messageFromPem(String(inputs.envelopedDataPem ?? "")) as forge.pkcs7.PkcsEnvelopedData;
+      const privateKey = forge.pki.privateKeyFromPem(String(inputs.privateKeyPem ?? ""));
       const recipient = message.recipients[0];
       if (!recipient) throw new Error("Enveloped data has no recipients");
       message.decrypt(recipient, privateKey);
-      const plaintext = forge.util.decodeUtf8(
-        (message.content as forge.util.ByteStringBuffer).getBytes(),
-      );
+      const plaintext = forge.util.decodeUtf8((message.content as forge.util.ByteStringBuffer).getBytes());
       return {
         nextExec: "exec-out",
         outputs: { plaintext, success: true, error: "" },

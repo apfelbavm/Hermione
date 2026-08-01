@@ -12,14 +12,7 @@ registerNode({
   description: i18n.nodes.date.now.description,
   group: "Date",
   colorCategory: NodeColorCategory.Date,
-  pins: [
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "date",
-      direction: "output",
-    },
-  ],
+  pins: [{ id: "result", label: i18n.nodes.__shared.pin_result, type: "date", direction: "output" }],
   evaluate: () => ({ result: new Date() }),
   compileEvaluate: () => ({
     result: `new Date()`,
@@ -33,19 +26,8 @@ registerNode({
   group: "Date",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    {
-      id: "value",
-      label: i18n.nodes.__shared.pin_value,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "date",
-      direction: "output",
-    },
+    { id: "value", label: i18n.nodes.__shared.pin_value, type: "string", direction: "input", defaultValue: "" },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "date", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({ result: new Date(String(inputs.value ?? "")) }),
   compileEvaluate: ({ inputs }) => ({
@@ -60,19 +42,8 @@ registerNode({
   group: "Date",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    {
-      id: "value",
-      label: i18n.nodes.__shared.pin_value,
-      type: "number",
-      direction: "input",
-      defaultValue: 0,
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "date",
-      direction: "output",
-    },
+    { id: "value", label: i18n.nodes.__shared.pin_value, type: "number", direction: "input", defaultValue: 0 },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "date", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({ result: new Date(Number(inputs.value || 0)) }),
   compileEvaluate: ({ inputs }) => ({
@@ -87,26 +58,9 @@ registerNode({
   group: "Date",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "number",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "date", direction: "input", defaultValue: "" },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "date", direction: "input", defaultValue: "" },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "number", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() - toDate(inputs.b).getTime(),
@@ -123,26 +77,9 @@ registerNode({
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "date", direction: "input", defaultValue: "" },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "date", direction: "input", defaultValue: "" },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() === toDate(inputs.b).getTime(),
@@ -159,26 +96,9 @@ registerNode({
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "date", direction: "input", defaultValue: "" },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "date", direction: "input", defaultValue: "" },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() !== toDate(inputs.b).getTime(),
@@ -195,26 +115,9 @@ registerNode({
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "date", direction: "input", defaultValue: "" },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "date", direction: "input", defaultValue: "" },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() > toDate(inputs.b).getTime(),
@@ -231,26 +134,9 @@ registerNode({
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "date", direction: "input", defaultValue: "" },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "date", direction: "input", defaultValue: "" },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() >= toDate(inputs.b).getTime(),
@@ -267,26 +153,9 @@ registerNode({
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "date", direction: "input", defaultValue: "" },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "date", direction: "input", defaultValue: "" },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() < toDate(inputs.b).getTime(),
@@ -303,26 +172,9 @@ registerNode({
   group: "Date.Comparison",
   colorCategory: NodeColorCategory.Date,
   pins: [
-    {
-      id: "a",
-      label: i18n.nodes.__shared.pin_a,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "b",
-      label: i18n.nodes.__shared.pin_b,
-      type: "date",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "result",
-      label: i18n.nodes.__shared.pin_result,
-      type: "boolean",
-      direction: "output",
-    },
+    { id: "a", label: i18n.nodes.__shared.pin_a, type: "date", direction: "input", defaultValue: "" },
+    { id: "b", label: i18n.nodes.__shared.pin_b, type: "date", direction: "input", defaultValue: "" },
+    { id: "result", label: i18n.nodes.__shared.pin_result, type: "boolean", direction: "output" },
   ],
   evaluate: ({ inputs }) => ({
     result: toDate(inputs.a).getTime() <= toDate(inputs.b).getTime(),

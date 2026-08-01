@@ -4,12 +4,7 @@ import * as Papa from "papaparse";
 import { registerNode } from "../../engine/registry";
 import { NodeColorCategory } from "../../engine/types";
 import type { LogFormat } from "../../engine/types";
-import {
-  XML_BUILDER_IMPORT_LINE,
-  XML_IMPORT_LINE,
-  XML_PARSE_OPTIONS_LITERAL,
-  XML_PRETTY_BUILD_OPTIONS_LITERAL,
-} from "./dataFormatHelpers";
+import { XML_BUILDER_IMPORT_LINE, XML_IMPORT_LINE, XML_PARSE_OPTIONS_LITERAL, XML_PRETTY_BUILD_OPTIONS_LITERAL } from "./dataFormatHelpers";
 import { i18n } from "@i18n";
 
 registerNode({
@@ -20,23 +15,14 @@ registerNode({
   colorCategory: NodeColorCategory.Debug,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    {
-      id: "message",
-      label: i18n.nodes.debug.print.pin_message,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
+    { id: "message", label: i18n.nodes.debug.print.pin_message, type: "string", direction: "input", defaultValue: "" },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
   execute: ({ inputs, ctx }) => {
     ctx.log(String(inputs.message ?? ""));
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ inputs, compileFrom }) => [
-    `rt.log(String(${inputs.message}));`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ inputs, compileFrom }) => [`rt.log(String(${inputs.message}));`, ...compileFrom("exec-out")],
 });
 
 const FORMATS = ["json", "xml", "csv"];
@@ -66,13 +52,7 @@ function formatForLog(message, format) {
 }
 `;
 
-const formatForLog: (message: string, format: string) => string = new Function(
-  "XMLParser",
-  "XMLValidator",
-  "XMLBuilder",
-  "Papa",
-  `${FORMAT_FOR_LOG_SOURCE}\nreturn formatForLog;`,
-)(XMLParser, XMLValidator, XMLBuilder, Papa);
+const formatForLog: (message: string, format: string) => string = new Function("XMLParser", "XMLValidator", "XMLBuilder", "Papa", `${FORMAT_FOR_LOG_SOURCE}\nreturn formatForLog;`)(XMLParser, XMLValidator, XMLBuilder, Papa);
 
 registerNode({
   type: "debug.printFormatted",
@@ -82,21 +62,8 @@ registerNode({
   colorCategory: NodeColorCategory.Debug,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    {
-      id: "message",
-      label: i18n.nodes.debug.printFormatted.pin_message,
-      type: "string",
-      direction: "input",
-      defaultValue: "",
-    },
-    {
-      id: "format",
-      label: i18n.nodes.debug.printFormatted.pin_format,
-      type: "string",
-      direction: "input",
-      defaultValue: FORMATS[0],
-      options: FORMATS,
-    },
+    { id: "message", label: i18n.nodes.debug.printFormatted.pin_message, type: "string", direction: "input", defaultValue: "" },
+    { id: "format", label: i18n.nodes.debug.printFormatted.pin_format, type: "string", direction: "input", defaultValue: FORMATS[0], options: FORMATS },
     { id: "exec-out", label: "", type: "exec", direction: "output" },
   ],
   execute: ({ inputs, ctx }) => {
@@ -104,14 +71,7 @@ registerNode({
     ctx.log(formatForLog(String(inputs.message ?? ""), format), format);
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ inputs, compileFrom }) => [
-    `rt.log(formatForLog(String(${inputs.message}), String(${inputs.format})));`,
-    ...compileFrom("exec-out"),
-  ],
-  compileImports: [
-    XML_IMPORT_LINE,
-    XML_BUILDER_IMPORT_LINE,
-    'import * as Papa from "papaparse";',
-  ],
+  compileExecute: ({ inputs, compileFrom }) => [`rt.log(formatForLog(String(${inputs.message}), String(${inputs.format})));`, ...compileFrom("exec-out")],
+  compileImports: [XML_IMPORT_LINE, XML_BUILDER_IMPORT_LINE, 'import * as Papa from "papaparse";'],
   compileHelpers: { formatForLog: FORMAT_FOR_LOG_SOURCE },
 });
