@@ -3,7 +3,9 @@ import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
 import { allEnumTypeDefs, tryGetEnumTypeDef } from "../engine/enumRegistry";
 import { allStructTypeDefs, tryGetStructTypeDef } from "../engine/structRegistry";
 import type { PinContainer, PinType } from "../engine/types";
+import { chevronSvg } from "./chevronIcon";
 import { guardAgainstMultilinePaste, openMultilineTextEditor } from "./multilineTextEditor";
+import { buildMenuTree, flattenVisible, type MenuNode, type VisibleRow } from "./nodeMenuTree";
 
 const PIN_TYPE_OPTIONS: readonly PinType[] = ["number", "boolean", "string", "object", "date"];
 const PIN_CONTAINER_OPTIONS: readonly PinContainer[] = ["single", "array", "set", "map"];
@@ -286,54 +288,55 @@ function openPickList<T>(screenPos: { x: number; y: number }, options: readonly 
 }
 
 /** Everything openTypeMenu needs to render and pick one option — either one of the flat "simple"
- * PIN_TYPE_OPTIONS (no subType) or one registered struct/enum CLASS (type is always "struct"/
- * "enum", subType is that class's id, label is that class's own label instead of the bare type
- * name). */
+ * PIN_TYPE_OPTIONS (no subType, no group) or one registered struct/enum CLASS (type is always
+ * "struct"/"enum", subType is that class's id, label is that class's own label instead of the bare
+ * type name, group nests it under "Struct.<category>"/"Enum.<category>" — see buildMenuTree). */
 interface TypeMenuEntry {
   type: PinType;
   subType?: string;
   label: string;
+  group: string;
 }
 
-/** Builds the flyout's flat list of options: the "simple" types first (ungrouped, unchanged order),
- * then every registered struct type under a "Structs" header, then every registered enum type
- * under an "Enums" header — each group only appears once at least one type of that kind is
- * registered (see structRegistry.ts/enumRegistry.ts). `includeStructsAndEnums` is false for
- * selectors that only ever apply to one non-struct value (e.g. a Map's key type, an Array's
- * element type) — struct/enum classes aren't wireable as those today. */
-function typeMenuGroups(includeStructsAndEnums: boolean): { header?: string; entries: TypeMenuEntry[] }[] {
-  const groups: { header?: string; entries: TypeMenuEntry[] }[] = [{ entries: PIN_TYPE_OPTIONS.map((type) => ({ type, label: type })) }];
-  if (!includeStructsAndEnums) return groups;
+/** Builds the flyout's full entry list: the "simple" types first (ungrouped — an empty `group`
+ * attaches a leaf directly to the tree's root instead of nesting it), then every registered struct
+ * type nested under "Struct.<category>" and every registered enum type under "Enum.<category>"
+ * (falling back to "Other" for a class with no category — see structRegistry.ts/enumRegistry.ts).
+ * `includeStructsAndEnums` is false for selectors that only ever apply to one non-struct value
+ * (e.g. a Map's key type, an Array's element type) — struct/enum classes aren't wireable as those
+ * today. */
+function typeMenuEntries(includeStructsAndEnums: boolean): TypeMenuEntry[] {
+  const entries: TypeMenuEntry[] = PIN_TYPE_OPTIONS.map((type) => ({
+    type,
+    label: type,
+    group: "",
+  }));
+  if (!includeStructsAndEnums) return entries;
 
-  const structs = allStructTypeDefs();
-  if (structs.length > 0) {
-    groups.push({
-      header: "Structs",
-      entries: structs.map((def) => ({
-        type: "struct",
-        subType: def.id,
-        label: def.label,
-      })),
+  for (const def of allStructTypeDefs()) {
+    entries.push({
+      type: "struct",
+      subType: def.id,
+      label: def.label,
+      group: `Struct.${def.category ?? "Other"}`,
     });
   }
-  const enums = allEnumTypeDefs();
-  if (enums.length > 0) {
-    groups.push({
-      header: "Enums",
-      entries: enums.map((def) => ({
-        type: "enum",
-        subType: def.id,
-        label: def.label,
-      })),
+  for (const def of allEnumTypeDefs()) {
+    entries.push({
+      type: "enum",
+      subType: def.id,
+      label: def.label,
+      group: `Enum.${def.category ?? "Other"}`,
     });
   }
-  return groups;
+  return entries;
 }
 
-/** Same filtered/keyboard-navigable shape as the node-creation search menu (nodeSearchMenu.ts), just
- * over typeMenuGroups' flat type/struct/enum entries instead of NodeDefs — group headers are kept
- * next to their still-matching entries and dropped entirely once a query empties out that group. */
-function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinType, subType?: string) => void, includeStructsAndEnums: boolean): void {
+/** Shared flyout body for both openTypeMenu and createStructTypeSelect's picker — a nested,
+ * collapsed-by-default group tree (see nodeMenuTree.ts/nodeSearchMenu.ts, the same pattern used
+ * for the node-creation search menu) with a search box that flattens matching entries into a plain
+ * sorted-by-label list (matched against label or group path) once a query is typed. */
+function openGroupedPicker<T>(screenPos: { x: number; y: number }, entries: T[], getGroup: (item: T) => string, getLabel: (item: T) => string, renderIcon: (item: T) => HTMLElement | null, onPick: (item: T) => void): void {
   const menu = document.createElement("div");
   menu.className = "row-context-menu type-menu";
   menu.style.left = `${screenPos.x}px`;
@@ -341,7 +344,7 @@ function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinTyp
 
   const search = document.createElement("input");
   search.type = "text";
-  search.placeholder = "Search types…";
+  search.placeholder = "Search…";
   search.className = "type-menu-search-input";
   menu.appendChild(search);
 
@@ -349,50 +352,110 @@ function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinTyp
   list.className = "type-menu-list";
   menu.appendChild(list);
 
-  const allGroups = typeMenuGroups(includeStructsAndEnums);
-  let flatEntries: TypeMenuEntry[] = [];
+  const tree = buildMenuTree(entries, getGroup, getLabel);
+  const expanded = new Set<string>();
+  let treeRows: VisibleRow<T>[] = flattenVisible(tree, expanded);
+  let flatEntries: T[] = [];
+  let query = "";
   let highlighted = 0;
+
+  function currentRowCount(): number {
+    return query ? flatEntries.length : treeRows.length;
+  }
+
+  function renderEmpty(): void {
+    const empty = document.createElement("div");
+    empty.className = "row-context-menu-item pick-list-empty";
+    empty.textContent = "No matching types";
+    list.appendChild(empty);
+  }
 
   function render(): void {
     list.innerHTML = "";
-    const query = search.value.trim().toLowerCase();
-    flatEntries = [];
 
-    for (const group of allGroups) {
-      const entries = query ? group.entries.filter((entry) => entry.label.toLowerCase().includes(query)) : group.entries;
-      if (entries.length === 0) continue;
-      if (group.header) {
-        const header = document.createElement("div");
-        header.className = "pick-list-group-header";
-        header.textContent = group.header;
-        list.appendChild(header);
-      }
-      for (const entry of entries) {
-        const index = flatEntries.length;
-        flatEntries.push(entry);
+    if (query) {
+      if (flatEntries.length === 0) return renderEmpty();
+      flatEntries.forEach((item, i) => {
         const el = document.createElement("div");
-        el.className = "row-context-menu-item pick-list-item";
-        if (index === highlighted) el.classList.add("highlighted");
-        el.append(createTypeDot(entry.type), document.createTextNode(entry.label));
+        el.className = "row-context-menu-item pick-list-item node-search-result";
+        if (i === highlighted) el.classList.add("highlighted");
+
+        const icon = renderIcon(item);
+        const labelEl = document.createElement("span");
+        labelEl.className = "node-search-result-label";
+        labelEl.textContent = getLabel(item);
+        const groupEl = document.createElement("span");
+        groupEl.className = "node-search-result-group";
+        groupEl.textContent = getGroup(item);
+
+        el.append(...(icon ? [icon] : []), labelEl, groupEl);
         el.addEventListener("mousedown", (e) => {
           e.preventDefault();
-          pick(entry);
+          pick(item);
         });
         list.appendChild(el);
-      }
+      });
+      return;
     }
 
-    if (flatEntries.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "row-context-menu-item pick-list-empty";
-      empty.textContent = "No matching types";
-      list.appendChild(empty);
-    }
+    if (treeRows.length === 0) return renderEmpty();
+
+    treeRows.forEach((row, i) => {
+      const el = document.createElement("div");
+      el.className = "row-context-menu-item pick-list-item node-search-tree-row";
+      el.style.paddingLeft = `${8 + row.depth * 14}px`;
+      if (i === highlighted) el.classList.add("highlighted");
+
+      const iconSlot = document.createElement("span");
+      iconSlot.className = "node-search-row-icon";
+      const labelEl = document.createElement("span");
+      labelEl.className = "node-search-row-label";
+
+      if (row.node.kind === "group") {
+        el.classList.add("node-search-group");
+        iconSlot.innerHTML = chevronSvg(expanded.has(row.node.path) ? "down" : "right");
+        labelEl.textContent = row.node.name;
+        el.append(iconSlot, labelEl);
+        el.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          toggleGroup(row.node as Extract<MenuNode<T>, { kind: "group" }>);
+        });
+      } else {
+        const item = row.node.item;
+        const icon = renderIcon(item);
+        labelEl.textContent = getLabel(item);
+        el.append(iconSlot, ...(icon ? [icon] : []), labelEl);
+        el.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          pick(item);
+        });
+      }
+
+      list.appendChild(el);
+    });
   }
 
-  function pick(entry: TypeMenuEntry): void {
+  function toggleGroup(group: Extract<MenuNode<T>, { kind: "group" }>): void {
+    if (expanded.has(group.path)) expanded.delete(group.path);
+    else expanded.add(group.path);
+    treeRows = flattenVisible(tree, expanded);
+    highlighted = Math.min(highlighted, Math.max(0, treeRows.length - 1));
+    render();
+  }
+
+  function applyFilter(): void {
+    query = search.value.trim().toLowerCase();
+    if (query) {
+      const matches = (item: T) => getLabel(item).toLowerCase().includes(query) || getGroup(item).toLowerCase().includes(query);
+      flatEntries = entries.filter(matches).sort((a, b) => getLabel(a).localeCompare(getLabel(b)));
+    }
+    highlighted = 0;
+    render();
+  }
+
+  function pick(item: T): void {
     close();
-    onPick(entry.type, entry.subType);
+    onPick(item);
   }
 
   function close(): void {
@@ -403,13 +466,10 @@ function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinTyp
     if (!menu.contains(e.target as Node)) close();
   }
 
-  search.addEventListener("input", () => {
-    highlighted = 0;
-    render();
-  });
+  search.addEventListener("input", applyFilter);
   search.addEventListener("keydown", (e) => {
     if (e.key === "ArrowDown") {
-      highlighted = Math.min(highlighted + 1, flatEntries.length - 1);
+      highlighted = Math.min(highlighted + 1, currentRowCount() - 1);
       render();
       e.preventDefault();
     } else if (e.key === "ArrowUp") {
@@ -417,7 +477,13 @@ function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinTyp
       render();
       e.preventDefault();
     } else if (e.key === "Enter") {
-      if (flatEntries[highlighted]) pick(flatEntries[highlighted]);
+      if (query) {
+        if (flatEntries[highlighted]) pick(flatEntries[highlighted]);
+      } else {
+        const row = treeRows[highlighted];
+        if (row?.node.kind === "leaf") pick(row.node.item);
+        else if (row?.node.kind === "group") toggleGroup(row.node);
+      }
       e.preventDefault();
     } else if (e.key === "Escape") {
       close();
@@ -429,6 +495,19 @@ function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinTyp
   render();
   search.focus();
   setTimeout(() => document.addEventListener("mousedown", onOutside, true), 0);
+}
+
+/** Same collapsed-by-default group tree as the node-creation search menu (nodeSearchMenu.ts), just
+ * over typeMenuEntries' plain/struct/enum entries instead of NodeDefs — see openGroupedPicker. */
+function openTypeMenu(screenPos: { x: number; y: number }, onPick: (type: PinType, subType?: string) => void, includeStructsAndEnums: boolean): void {
+  openGroupedPicker(
+    screenPos,
+    typeMenuEntries(includeStructsAndEnums),
+    (entry) => entry.group,
+    (entry) => entry.label,
+    (entry) => createTypeDot(entry.type),
+    (entry) => onPick(entry.type, entry.subType),
+  );
 }
 
 function openContainerMenu(screenPos: { x: number; y: number }, onPick: (container: PinContainer) => void): void {
@@ -448,22 +527,55 @@ function openContainerMenu(screenPos: { x: number; y: number }, onPick: (contain
  * shows the same colored dot used everywhere else a variable's type is indicated (see the
  * Variables list in variablePanel.ts and canvas node headers in drawNodes.ts). */
 /** Sibling of createTypeSelect for picking a configurableSubType node instance's struct CLASS (see
- * NodeDef.configurableSubType/structRegistry.ts) — a plain labeled list, not a colored-dot menu
- * like createTypeSelect's PinType options, since every entry here is already the same "struct"
- * type; label is the only thing distinguishing them. */
+ * NodeDef.configurableSubType/structRegistry.ts) — same searchable, collapsed-by-default grouping
+ * as createTypeSelect's variable-type flyout (see openGroupedPicker), just grouped directly by
+ * category (e.g. "Azure") instead of nesting everything under an outer "Struct" group, since every
+ * entry here is already known to be a struct. */
+function openStructTypeMenu(screenPos: { x: number; y: number }, onPick: (subType: string) => void): void {
+  const entries = allStructTypeDefs().map((def) => ({
+    id: def.id,
+    label: def.label,
+    category: def.category ?? "Other",
+  }));
+  openGroupedPicker(
+    screenPos,
+    entries,
+    (entry) => entry.category,
+    (entry) => entry.label,
+    () => null,
+    (entry) => onPick(entry.id),
+  );
+}
+
 export function createStructTypeSelect(current: string, onChange: (subType: string) => void): HTMLElement {
-  const select = document.createElement("select");
-  select.className = "typed-value-type-select";
-  for (const def of allStructTypeDefs()) {
-    const option = document.createElement("option");
-    option.value = def.id;
-    option.textContent = def.label;
-    select.appendChild(option);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "typed-value-type-select";
+
+  function labelFor(subType: string): string {
+    return tryGetStructTypeDef(subType)?.label ?? subType;
   }
-  select.value = current;
-  select.addEventListener("mousedown", (e) => e.stopPropagation());
-  select.addEventListener("change", () => onChange(select.value));
-  return select;
+
+  function renderButton(subType: string): void {
+    button.innerHTML = "";
+    const caret = document.createElement("span");
+    caret.className = "typed-value-type-caret";
+    caret.textContent = "▾";
+    button.append(document.createTextNode(labelFor(subType)), caret);
+  }
+  renderButton(current);
+
+  button.addEventListener("mousedown", (e) => e.stopPropagation());
+  button.addEventListener("click", () => {
+    const rect = button.getBoundingClientRect();
+    openStructTypeMenu({ x: rect.left, y: rect.bottom }, (subType) => {
+      renderButton(subType);
+      onChange(subType);
+      button.blur(); // see createTypeSelect's identical fix for why this is necessary
+    });
+  });
+
+  return button;
 }
 
 /** A custom dropdown (not a native <select> — those can't show arbitrary markup per option) for

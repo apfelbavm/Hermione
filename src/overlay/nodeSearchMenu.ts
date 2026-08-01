@@ -1,6 +1,10 @@
 import type { NodeDef } from "../engine/types";
+import { chevronSvg } from "./chevronIcon";
 import { buildMenuTree, flattenVisible, type MenuNode, type VisibleRow } from "./nodeMenuTree";
 import { attachHoverTooltip } from "./tooltip";
+
+type NodeMenuNode = MenuNode<NodeDef>;
+type NodeVisibleRow = VisibleRow<NodeDef>;
 
 export interface NodeSearchMenuOptions {
   screenPos: { x: number; y: number };
@@ -22,13 +26,6 @@ export interface NodeSearchMenuOptions {
 // entirely) unreachable outside the graph area.
 const MENU_EDGE_PADDING = 16;
 
-// Vanilla-DOM equivalent of IconManager.ChevronDownIcon/ChevronRightIcon — this menu is built with
-// raw DOM calls rather than React, so it can't render the shared component directly.
-function chevronSvg(direction: "down" | "right"): string {
-  const d = direction === "down" ? "M3 6 8 11l5-5" : "M6 3 11 8l-5 5";
-  return `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}" /></svg>`;
-}
-
 export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOptions): void {
   const menu = document.createElement("div");
   menu.className = "node-search-menu";
@@ -48,18 +45,22 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
   // Excluded from the grouped tree so a pinned def doesn't also show up nested under its own group.
   const treeCandidates = opts.candidates.filter((d) => !pinnedSet.has(d));
 
-  const tree = buildMenuTree(treeCandidates);
+  const tree = buildMenuTree(
+    treeCandidates,
+    (d) => d.group || "Other",
+    (d) => d.label,
+  );
   const expanded = new Set<string>();
 
-  function computeTreeRows(): VisibleRow[] {
-    const pinnedRows: VisibleRow[] = pinned.map((def) => ({
+  function computeTreeRows(): NodeVisibleRow[] {
+    const pinnedRows: NodeVisibleRow[] = pinned.map((def) => ({
       depth: 0,
-      node: { kind: "leaf", def },
+      node: { kind: "leaf", item: def },
     }));
     return [...pinnedRows, ...flattenVisible(tree, expanded)];
   }
 
-  let treeRows: VisibleRow[] = computeTreeRows();
+  let treeRows: NodeVisibleRow[] = computeTreeRows();
   let flatDefs: NodeDef[] = [];
   let pinnedMatchCount = 0;
   let query = "";
@@ -135,7 +136,7 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
           toggleGroup(row.node as MenuNode & { kind: "group" });
         });
       } else {
-        const def = row.node.def;
+        const def = row.node.item;
         labelEl.textContent = def.label;
         li.title = def.group;
         li.addEventListener("mousedown", (e) => {
@@ -150,7 +151,7 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
     });
   }
 
-  function toggleGroup(group: Extract<MenuNode, { kind: "group" }>): void {
+  function toggleGroup(group: Extract<NodeMenuNode, { kind: "group" }>): void {
     if (expanded.has(group.path)) expanded.delete(group.path);
     else expanded.add(group.path);
     treeRows = computeTreeRows();
@@ -204,7 +205,7 @@ export function openNodeSearchMenu(overlay: HTMLElement, opts: NodeSearchMenuOpt
         if (flatDefs[highlighted]) pick(flatDefs[highlighted]);
       } else {
         const row = treeRows[highlighted];
-        if (row?.node.kind === "leaf") pick(row.node.def);
+        if (row?.node.kind === "leaf") pick(row.node.item);
         else if (row?.node.kind === "group") toggleGroup(row.node);
       }
       e.preventDefault();

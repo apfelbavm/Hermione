@@ -15,9 +15,9 @@ interface SidebarLinkDef {
 
 const SIDEBAR_LINKS: SidebarLinkDef[] = [
   {
-    href: "/projects",
-    label: i18n.components.sidebar.projects,
-    icon: <IconManager.ProjectsIcon />,
+    href: "/emulate",
+    label: i18n.components.sidebar.emulate,
+    icon: <IconManager.DeploymentIcon />,
   },
   {
     href: "/credential-vault",
@@ -25,14 +25,14 @@ const SIDEBAR_LINKS: SidebarLinkDef[] = [
     icon: <IconManager.CredentialVaultIcon />,
   },
   {
+    href: "/projects",
+    label: i18n.components.sidebar.projects,
+    icon: <IconManager.ProjectsIcon />,
+  },
+  {
     href: "/logs",
     label: i18n.components.sidebar.logs,
     icon: <IconManager.LogsIcon />,
-  },
-  {
-    href: "/emulate",
-    label: i18n.components.sidebar.emulate,
-    icon: <IconManager.DeploymentIcon />,
   },
   {
     href: "/ai-docs",

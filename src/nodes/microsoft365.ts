@@ -56,6 +56,7 @@ const MESSAGE_DETAIL_STRUCT_TYPE = "graphMessageDetail";
 registerStructType({
   id: USER_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphUser.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -87,6 +88,7 @@ registerStructType({
 registerStructType({
   id: GROUP_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphGroup.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -112,6 +114,7 @@ registerStructType({
 registerStructType({
   id: MESSAGE_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphMessage.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -143,6 +146,7 @@ registerStructType({
 registerStructType({
   id: EVENT_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphEvent.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -174,6 +178,7 @@ registerStructType({
 registerStructType({
   id: DRIVE_ITEM_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphDriveItem.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -205,6 +210,7 @@ registerStructType({
 registerStructType({
   id: TEAM_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphTeam.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -224,6 +230,7 @@ registerStructType({
 registerStructType({
   id: CHANNEL_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphChannel.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -249,6 +256,7 @@ registerStructType({
 registerStructType({
   id: CHANNEL_MESSAGE_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphChannelMessage.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -280,6 +288,7 @@ registerStructType({
 registerStructType({
   id: CHAT_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphChat.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -305,6 +314,7 @@ registerStructType({
 registerStructType({
   id: SITE_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphSite.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -330,6 +340,7 @@ registerStructType({
 registerStructType({
   id: SITE_LIST_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphSiteList.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -349,6 +360,7 @@ registerStructType({
 registerStructType({
   id: LIST_ITEM_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphListItem.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -368,6 +380,7 @@ registerStructType({
 registerStructType({
   id: WORKSHEET_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphWorksheet.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -387,6 +400,7 @@ registerStructType({
 registerStructType({
   id: TABLE_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphTable.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -406,6 +420,7 @@ registerStructType({
 registerStructType({
   id: PLANNER_PLAN_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphPlannerPlan.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -425,6 +440,7 @@ registerStructType({
 registerStructType({
   id: PLANNER_TASK_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphPlannerTask.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -450,6 +466,7 @@ registerStructType({
 registerStructType({
   id: TODO_LIST_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphTodoList.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -469,6 +486,7 @@ registerStructType({
 registerStructType({
   id: TODO_TASK_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphTodoTask.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -494,6 +512,7 @@ registerStructType({
 registerStructType({
   id: CONTACT_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphContact.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -519,6 +538,7 @@ registerStructType({
 registerStructType({
   id: APPLICATION_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphApplication.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -544,6 +564,7 @@ registerStructType({
 registerStructType({
   id: DIRECTORY_ROLE_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphDirectoryRole.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -563,6 +584,7 @@ registerStructType({
 registerStructType({
   id: TRENDING_DOCUMENT_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphTrendingDocument.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "id",
@@ -588,6 +610,7 @@ registerStructType({
 registerStructType({
   id: MESSAGE_DETAIL_STRUCT_TYPE,
   label: i18n.nodes.microsoft365.graphMessageDetail.label,
+  category: "Microsoft 365",
   fields: [
     {
       id: "subject",

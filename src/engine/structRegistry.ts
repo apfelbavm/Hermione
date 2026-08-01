@@ -8,6 +8,7 @@ export type StructFieldDef = Omit<PinDef, "direction">;
 export interface StructTypeDef {
   id: string;
   label: string;
+  category?: string;
   fields: StructFieldDef[];
 }
 

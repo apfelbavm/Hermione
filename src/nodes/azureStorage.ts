@@ -36,6 +36,7 @@ const ACCOUNT_INFO_STRUCT_TYPE = "azureStorageAccountInfo";
 registerStructType({
   id: UPLOAD_OPTIONS_STRUCT_TYPE,
   label: i18n.nodes.azureStorage.uploadOptions.label,
+  category: "Azure",
   fields: [
     {
       id: "contentType",
@@ -88,6 +89,7 @@ registerStructType({
 registerStructType({
   id: CONTAINER_PROPERTIES_STRUCT_TYPE,
   label: i18n.nodes.azureStorage.containerProperties.label,
+  category: "Azure",
   fields: [
     {
       id: "etag",
@@ -121,6 +123,7 @@ registerStructType({
 registerStructType({
   id: BLOB_PROPERTIES_STRUCT_TYPE,
   label: i18n.nodes.azureStorage.blobProperties.label,
+  category: "Azure",
   fields: [
     {
       id: "size",
@@ -160,6 +163,7 @@ registerStructType({
 registerStructType({
   id: ACCOUNT_INFO_STRUCT_TYPE,
   label: i18n.nodes.azureStorage.accountInfo.label,
+  category: "Azure",
   fields: [
     {
       id: "accountKind",

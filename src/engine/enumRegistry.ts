@@ -6,6 +6,7 @@ export interface EnumValueDef {
 export interface EnumTypeDef {
   id: string;
   label: string;
+  category?: string;
   values: EnumValueDef[];
 }
 

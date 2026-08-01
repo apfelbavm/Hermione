@@ -32,6 +32,7 @@ const SPACE_USAGE_STRUCT_TYPE = "dropboxSpaceUsage";
 registerStructType({
   id: AUTH_TOKENS_STRUCT_TYPE,
   label: i18n.nodes.dropbox.authTokens.label,
+  category: "Dropbox",
   fields: [
     {
       id: "accessToken",
@@ -57,6 +58,7 @@ registerStructType({
 registerStructType({
   id: METADATA_STRUCT_TYPE,
   label: i18n.nodes.dropbox.metadata.label,
+  category: "Dropbox",
   fields: [
     {
       id: "isFolder",
@@ -88,6 +90,7 @@ registerStructType({
 registerStructType({
   id: REVISION_STRUCT_TYPE,
   label: i18n.nodes.dropbox.revision.label,
+  category: "Dropbox",
   fields: [
     {
       id: "rev",
@@ -113,6 +116,7 @@ registerStructType({
 registerStructType({
   id: ACCOUNT_STRUCT_TYPE,
   label: i18n.nodes.dropbox.account.label,
+  category: "Dropbox",
   fields: [
     {
       id: "accountId",
@@ -138,6 +142,7 @@ registerStructType({
 registerStructType({
   id: SPACE_USAGE_STRUCT_TYPE,
   label: i18n.nodes.dropbox.spaceUsage.label,
+  category: "Dropbox",
   fields: [
     {
       id: "used",

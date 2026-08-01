@@ -27,6 +27,7 @@ const FILE_WRITE_RESULT_STRUCT_TYPE = "githubFileWriteResult";
 registerStructType({
   id: ISSUE_STRUCT_TYPE,
   label: i18n.nodes.github.issue.label,
+  category: "GitHub",
   fields: [
     {
       id: "number",
@@ -58,6 +59,7 @@ registerStructType({
 registerStructType({
   id: PULL_REQUEST_STRUCT_TYPE,
   label: i18n.nodes.github.pullRequest.label,
+  category: "GitHub",
   fields: [
     {
       id: "number",
@@ -89,6 +91,7 @@ registerStructType({
 registerStructType({
   id: CREATE_RESULT_STRUCT_TYPE,
   label: i18n.nodes.github.createResult.label,
+  category: "GitHub",
   fields: [
     {
       id: "number",
@@ -108,6 +111,7 @@ registerStructType({
 registerStructType({
   id: MERGE_RESULT_STRUCT_TYPE,
   label: i18n.nodes.github.mergeResult.label,
+  category: "GitHub",
   fields: [
     {
       id: "merged",
@@ -127,6 +131,7 @@ registerStructType({
 registerStructType({
   id: FILE_CONTENT_STRUCT_TYPE,
   label: i18n.nodes.github.fileContent.label,
+  category: "GitHub",
   fields: [
     {
       id: "content",
@@ -146,6 +151,7 @@ registerStructType({
 registerStructType({
   id: FILE_WRITE_RESULT_STRUCT_TYPE,
   label: i18n.nodes.github.fileWriteResult.label,
+  category: "GitHub",
   fields: [
     {
       id: "sha",
