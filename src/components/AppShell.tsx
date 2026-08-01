@@ -242,6 +242,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       autoPanCheckbox.checked = store.state.autoPan;
 
       const { simulating, paused } = store.state;
+      container.classList.toggle("canvas-container-locked", simulating || store.state.readOnly);
       saveButton.disabled = simulating;
       loadButton.disabled = simulating;
       downloadButton.disabled = simulating;

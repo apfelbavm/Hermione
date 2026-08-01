@@ -54,6 +54,14 @@
   overflow: hidden;
 }
 
+.canvas-container-locked::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 3px solid var(--pp-border-accent);
+  pointer-events: none;
+}
+
 #canvas-hud-toolbar {
   position: absolute;
   top: 12px;

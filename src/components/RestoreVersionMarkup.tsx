@@ -75,7 +75,7 @@ export default function RestoreVersionMarkup({
           <div id="graph-tabs">
             <GraphTabs store={store} />
           </div>
-          <div id="canvas-container">
+          <div id="canvas-container" className="canvas-container-locked">
             <canvas id="graph-canvas" />
             <div id="overlay" />
             <div id="canvas-hud-toolbar">
