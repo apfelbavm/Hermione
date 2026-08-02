@@ -146,6 +146,7 @@
   text-decoration: underline;
 }
 
+.credentials-create-row,
 .create-row {
   display: flex;
   gap: 8px;
@@ -169,6 +170,10 @@
   color: var(--pp-text);
   padding: 7px 10px;
   font-size: 13px;
+}
+
+.credentials-create-row {
+  justify-content: end;
 }
 
 .search-create-row {

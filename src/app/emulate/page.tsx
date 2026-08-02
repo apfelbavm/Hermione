@@ -166,7 +166,7 @@ export default function EmulatePage() {
             </label>
           )}
 
-          <button type="button" onClick={() => void handleRun()} disabled={running || !selectedFlowId || loadingDetail}>
+          <button className="btn btn-green" type="button" onClick={() => void handleRun()} disabled={running || !selectedFlowId || loadingDetail}>
             {running ? i18n.pages.emulate.running : i18n.pages.emulate.run}
           </button>
         </div>

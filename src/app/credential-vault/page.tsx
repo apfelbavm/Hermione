@@ -148,7 +148,7 @@ export default function CredentialVaultPage() {
       <Breadcrumbs items={[{ label: i18n.pages.credential_vault.title }]} />
       <h1>{i18n.pages.credential_vault.title}</h1>
 
-      <div className="create-row">
+      <div className="credentials-create-row">
         <button type="button" className="btn btn-green" onClick={() => setDialog(blankDialogState())}>
           {i18n.pages.credential_vault.add}
         </button>
