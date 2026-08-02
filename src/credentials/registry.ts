@@ -142,3 +142,42 @@ registerCredentialType({
     },
   ],
 });
+
+registerCredentialType({
+  id: "jiraCloudApiToken",
+  label: "Jira Cloud (Email + API Token)",
+  fields: [
+    { id: "url", label: "Site URL", help: "Your Jira Cloud site, e.g. https://your-domain.atlassian.net" },
+    { id: "email", label: "Email" },
+    {
+      id: "apiToken",
+      label: "API Token",
+      secret: true,
+      help: "Create one at https://id.atlassian.com/manage-profile/security/api-tokens",
+    },
+  ],
+});
+
+registerCredentialType({
+  id: "jiraServerPersonalAccessToken",
+  label: "Jira Server/Data Center (Personal Access Token)",
+  fields: [
+    { id: "url", label: "Base URL", help: "Your Jira Server/Data Center base URL, e.g. https://jira.your-company.com" },
+    {
+      id: "personalAccessToken",
+      label: "Personal Access Token",
+      secret: true,
+      help: "Create one from your Jira profile > Personal Access Tokens (Jira Server/Data Center 8.14+).",
+    },
+  ],
+});
+
+registerCredentialType({
+  id: "jiraServerBasicAuth",
+  label: "Jira Server/Data Center (Username + Password)",
+  fields: [
+    { id: "url", label: "Base URL", help: "Your Jira Server/Data Center base URL, e.g. https://jira.your-company.com" },
+    { id: "username", label: "Username" },
+    { id: "password", label: "Password", secret: true },
+  ],
+});

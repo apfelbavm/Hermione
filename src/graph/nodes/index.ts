@@ -19,6 +19,7 @@ import "./azureStorage";
 import "./struct";
 import "./github";
 import "./microsoft365";
+import "./jira";
 import "./array";
 import "./set";
 import "./map";

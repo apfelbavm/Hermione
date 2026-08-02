@@ -885,6 +885,144 @@
         "pin_params": "Params (JSON)"
       }
     },
+    "jira": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_issue_key": "Issue Key"
+      },
+      "issue": {
+        "label": "Jira Issue",
+        "pin_id": "ID",
+        "pin_key": "Key",
+        "pin_summary": "Summary",
+        "pin_status": "Status",
+        "pin_issue_type": "Issue Type",
+        "pin_url": "URL"
+      },
+      "comment": {
+        "label": "Jira Comment",
+        "pin_id": "ID",
+        "pin_body": "Body",
+        "pin_author": "Author",
+        "pin_created": "Created"
+      },
+      "transition": {
+        "label": "Jira Transition",
+        "pin_id": "ID",
+        "pin_name": "Name"
+      },
+      "project": {
+        "label": "Jira Project",
+        "pin_id": "ID",
+        "pin_key": "Key",
+        "pin_name": "Name"
+      },
+      "user": {
+        "label": "Jira User",
+        "pin_account_id": "Account ID",
+        "pin_username": "Username",
+        "pin_display_name": "Display Name",
+        "pin_email_address": "Email Address"
+      },
+      "createIssue": {
+        "label": "Jira Create Issue",
+        "description": "Creates a new issue in a Jira project (Cloud or Server/Data Center).",
+        "pin_project_key": "Project Key",
+        "pin_issue_type": "Issue Type",
+        "pin_summary": "Summary",
+        "pin_description": "Description",
+        "pin_id": "ID",
+        "pin_key": "Key",
+        "pin_url": "URL"
+      },
+      "getIssue": {
+        "label": "Jira Get Issue",
+        "description": "Fetches an issue's summary, status and issue type by key.",
+        "pin_issue": "Issue"
+      },
+      "updateIssue": {
+        "label": "Jira Update Issue",
+        "description": "Updates an issue's summary and/or description. Leave a field blank to leave it unchanged.",
+        "pin_summary": "Summary",
+        "pin_description": "Description"
+      },
+      "deleteIssue": {
+        "label": "Jira Delete Issue",
+        "description": "Deletes an issue."
+      },
+      "searchIssues": {
+        "label": "Jira Search Issues",
+        "description": "Searches issues using a JQL query.",
+        "pin_jql": "JQL",
+        "pin_max_results": "Max Results",
+        "pin_validate_query": "Validate Query",
+        "pin_issues": "Issues",
+        "pin_total": "Total"
+      },
+      "addComment": {
+        "label": "Jira Add Comment",
+        "description": "Adds a comment to an issue.",
+        "pin_body": "Body",
+        "pin_id": "Comment ID"
+      },
+      "listComments": {
+        "label": "Jira List Comments",
+        "description": "Lists comments on an issue.",
+        "pin_comments": "Comments"
+      },
+      "listTransitions": {
+        "label": "Jira List Transitions",
+        "description": "Lists the workflow transitions currently available for an issue.",
+        "pin_transitions": "Transitions"
+      },
+      "transitionIssue": {
+        "label": "Jira Transition Issue",
+        "description": "Moves an issue through its workflow using a transition ID from Jira List Transitions.",
+        "pin_transition_id": "Transition ID"
+      },
+      "assignIssue": {
+        "label": "Jira Assign Issue",
+        "description": "Assigns an issue to a user. Use an account ID for Jira Cloud, or a username for Jira Server/Data Center.",
+        "pin_assignee": "Assignee"
+      },
+      "listProjects": {
+        "label": "Jira List Projects",
+        "description": "Lists all projects visible to the credential.",
+        "pin_projects": "Projects"
+      },
+      "getProject": {
+        "label": "Jira Get Project",
+        "description": "Fetches a project's details by key or ID.",
+        "pin_project_key": "Project Key",
+        "pin_project": "Project"
+      },
+      "addWorklog": {
+        "label": "Jira Add Worklog",
+        "description": "Logs work against an issue, e.g. \"1h 30m\".",
+        "pin_time_spent": "Time Spent",
+        "pin_comment": "Comment",
+        "pin_id": "Worklog ID"
+      },
+      "linkIssues": {
+        "label": "Jira Link Issues",
+        "description": "Creates a link between two issues, e.g. \"Relates\", \"Blocks\", \"Duplicate\".",
+        "pin_link_type": "Link Type"
+      },
+      "getUser": {
+        "label": "Jira Get User",
+        "description": "Fetches a user's profile. Use Account ID for Jira Cloud, or Username for Jira Server/Data Center.",
+        "pin_account_id": "Account ID",
+        "pin_username": "Username",
+        "pin_user": "User"
+      },
+      "findUsers": {
+        "label": "Jira Find Users",
+        "description": "Searches for users matching a query (name or email).",
+        "pin_query": "Query",
+        "pin_max_results": "Max Results",
+        "pin_users": "Users"
+      }
+    },
     "microsoft365": {
       "__shared": {
         "pin_credential_name": "Credential Name",

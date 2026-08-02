@@ -2,7 +2,7 @@
  * (src/server/credentials.ts) and browser (the Credential Vault page, the oauth2Saml node's
  * interpreter path) can import this freely, unlike src/server/* itself. */
 
-export type CredentialTypeId = "usernamePassword" | "oauth2SamlBearer" | "dropboxOAuth2" | "githubToken" | "githubApp" | "microsoftGraphClientCredentials" | "azureStorageConnectionString" | "facebookGraphAPI";
+export type CredentialTypeId = "usernamePassword" | "oauth2SamlBearer" | "dropboxOAuth2" | "githubToken" | "githubApp" | "microsoftGraphClientCredentials" | "azureStorageConnectionString" | "facebookGraphAPI" | "jiraCloudApiToken" | "jiraServerPersonalAccessToken" | "jiraServerBasicAuth";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -79,7 +79,44 @@ export interface FacebookCredentialData {
   accessToken: string;
 }
 
-export type CredentialData = UsernamePasswordCredentialData | Oauth2SamlBearerCredentialData | DropboxOAuth2CredentialData | GithubTokenCredentialData | GithubAppCredentialData | MicrosoftGraphClientCredentialsData | AzureStorageConnectionStringCredentialData | FacebookCredentialData;
+/** A Jira Cloud site's base URL plus an Atlassian account email/API token pair (Basic auth) — see
+ * lib/jiraManager.ts, which routes this into a jira.js Version3Client (the Cloud-only REST API v3,
+ * which uses Atlassian Document Format for rich text fields like description/comment body). */
+export interface JiraCloudApiTokenCredentialData {
+  url: string;
+  email: string;
+  apiToken: string;
+}
+
+/** A Jira Server/Data Center base URL plus a Personal Access Token (Bearer auth, added in Jira
+ * 8.14+) — the auth method Atlassian recommends over Basic auth for self-hosted instances. See
+ * lib/jiraManager.ts, which routes this into a jira.js Version2Client (REST API v2, which — unlike
+ * Cloud — still takes plain strings/wiki markup for description/comment body). */
+export interface JiraServerPersonalAccessTokenCredentialData {
+  url: string;
+  personalAccessToken: string;
+}
+
+/** A Jira Server/Data Center base URL plus a username/password — for older self-hosted instances
+ * predating Personal Access Token support (pre-8.14). See lib/jiraManager.ts. */
+export interface JiraServerBasicAuthCredentialData {
+  url: string;
+  username: string;
+  password: string;
+}
+
+export type CredentialData =
+  | UsernamePasswordCredentialData
+  | Oauth2SamlBearerCredentialData
+  | DropboxOAuth2CredentialData
+  | GithubTokenCredentialData
+  | GithubAppCredentialData
+  | MicrosoftGraphClientCredentialsData
+  | AzureStorageConnectionStringCredentialData
+  | FacebookCredentialData
+  | JiraCloudApiTokenCredentialData
+  | JiraServerPersonalAccessTokenCredentialData
+  | JiraServerBasicAuthCredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */
