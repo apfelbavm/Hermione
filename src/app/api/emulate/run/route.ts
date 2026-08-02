@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 
 registerBuiltins();
 
-interface RunProductionRequestBody {
+interface RunManualRequestBody {
   projectId: string;
   flowId: string;
 }
@@ -30,11 +30,11 @@ interface RunProductionRequestBody {
  * credential the graph might need is pulled from the Credential Vault into env vars first (see
  * server/credentialEnv.ts) so a compiled node reading one by name (e.g. oauth2Saml) finds it the same
  * way it would after being deployed standalone. Persists the result as a RunLog the same way Simulate
- * does, tagged kind: "production" so the Logs page can tell the two apart. */
+ * does, tagged kind: "manual" so the Logs page can tell the two apart. */
 export async function POST(request: Request): Promise<Response> {
-  let body: RunProductionRequestBody;
+  let body: RunManualRequestBody;
   try {
-    body = (await request.json()) as RunProductionRequestBody;
+    body = (await request.json()) as RunManualRequestBody;
   } catch {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
@@ -105,7 +105,7 @@ export async function POST(request: Request): Promise<Response> {
     startedAt,
     finishedAt: new Date().toISOString(),
     entries,
-    kind: "production",
+    kind: "manual",
     executionMs,
     revision: deployed.revision,
     version: deployed.version,

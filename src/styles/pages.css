@@ -378,7 +378,7 @@
   color: var(--pp-text-muted-strong);
 }
 
-.run-row-kind-production {
+.run-row-kind-manual {
   background: var(--pp-accent);
   color: #fff;
 }
@@ -408,7 +408,6 @@
 
 .log-entry {
   display: flex;
-  flex-direction: column;
   gap: 4px;
 }
 
@@ -422,6 +421,7 @@
   color: var(--pp-text-dim);
   font-size: 11px;
   font-family: "Consolas", "Courier New", monospace;
+  white-space: nowrap;
 }
 
 .log-entry-text {

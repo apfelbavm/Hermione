@@ -22,10 +22,10 @@ interface DeployRequestBody {
 
 /** Fires the just-deployed script's "On Deploy" event (nodes/event.ts's event.deploy, manifest
  * kind "deploy"), if it declared one — same dynamic-import approach as api/emulate/run/route.ts's
- * production-run path, since the freshly-written file on disk (see writeDeployedScriptFile above)
+ * manual-run path, since the freshly-written file on disk (see writeDeployedScriptFile above)
  * is exactly what a real "On Deploy" firing should run. A no-op (not an error) when the graph has
  * no such node: deploying is still valid, it just has nothing wired to that event. Persists its
- * own RunLog (kind "deploy") the same way a production/chained run does, so this shows up
+ * own RunLog (kind "deploy") the same way a manual/chained run does, so this shows up
  * alongside them on the Logs page. Never throws back to the caller: a failing "On Deploy" event
  * doesn't mean the deploy itself failed — it already succeeded by the time this runs. */
 async function fireOnDeployEvent(db: DatabaseManager, deployed: DeployedScript): Promise<void> {

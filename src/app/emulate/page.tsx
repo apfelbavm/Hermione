@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getDeployedScript, listDeployedScripts, listProjects, runProductionFlow } from "../../client/api";
+import { getDeployedScript, listDeployedScripts, listProjects, runManualFlow as runManualFlow } from "../../client/api";
 import type { DeployedScript, DeployedScriptSummary, ProjectSummary, RunLog } from "../../server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
@@ -117,7 +117,7 @@ export default function EmulatePage() {
     setError(null);
     setResult(null);
     try {
-      const { run } = await runProductionFlow(selectedProjectId, selectedFlowId);
+      const { run } = await runManualFlow(selectedProjectId, selectedFlowId);
       setResult(run);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

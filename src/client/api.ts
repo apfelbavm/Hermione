@@ -159,7 +159,7 @@ export function listAllRuns(): Promise<RunLog[]> {
  * used by the Emulate page, distinct from Simulate (which streams via SSE for the
  * editor's own step-through visualization). This one just awaits the whole run and returns its
  * RunLog. */
-export function runProductionFlow(projectId: string, flowId: string): Promise<{ run: RunLog }> {
+export function runManualFlow(projectId: string, flowId: string): Promise<{ run: RunLog }> {
   return requestJson("/api/emulate/run", {
     method: "POST",
     headers: JSON_HEADERS,

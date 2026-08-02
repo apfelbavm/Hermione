@@ -47,7 +47,7 @@ export interface LogEntry {
   timestamp: string;
 }
 
-export type RunKind = "simulate" | "production" | "chained" | "deploy" | "request";
+export type RunKind = "simulate" | "manual" | "chained" | "deploy" | "request";
 
 export interface RunLog {
   id: string;
@@ -59,9 +59,9 @@ export interface RunLog {
   entries: LogEntry[];
   kind: RunKind;
   executionMs?: number;
-  /** The Flow's `revision` (production) or the deployed script's own `revision` at the time this ran. */
+  /** The Flow's `revision` (manual) or the deployed script's own `revision` at the time this ran. */
   revision?: number;
-  /** The Flow's `version` (production: the deployed script's own `version`) at the time this ran. */
+  /** The Flow's `version` (manual: the deployed script's own `version`) at the time this ran. */
   version?: number;
 }
 

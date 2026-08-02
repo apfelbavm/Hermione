@@ -16,7 +16,7 @@ export interface ExecuteFlowResult {
 /** Runs another Flow's DEPLOYED compiled output (never the currently-edited graph — see
  * server/DatabaseManager.ts's DeployedScript) and reports back whatever it declared via a
  * "flow.return" node (see nodes/flow.ts), the same dynamic-import approach
- * api/emulate/run/route.ts's production-run path already uses. Shared by both runtime paths a
+ * api/emulate/run/route.ts's manual-run path already uses. Shared by both runtime paths a
  * flow.executeFlow node can take: the interpreter's own ExecutionContext.executeFlow hook (wired in
  * by api/simulate/route.ts) and a DEPLOYED flow's own compiled flow.executeFlow, which imports this
  * exact function directly (see compileUtils.ts's EXECUTE_FLOW_IMPORT) instead of re-implementing
