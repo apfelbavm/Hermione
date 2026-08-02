@@ -117,7 +117,7 @@
   "components": {
     "run_row": {
       "simulate": "Simulate",
-      "production": "Production",
+      "manual": "Manual",
       "chained": "Chained",
       "deploy": "Deploy",
       "request": "Request",
