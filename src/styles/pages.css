@@ -194,8 +194,13 @@
   font-size: 13px;
 }
 
+.emulate-picker-buttons {
+  display: flex;
+  gap: 8px;
+}
 .emulate-picker-row {
   align-items: flex-end;
+  justify-content: space-between;
 }
 
 .emulate-picker-field {

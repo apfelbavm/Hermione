@@ -138,33 +138,35 @@ export default function EmulatePage() {
         <p className="page-empty-note">{i18n.pages.emulate.no_projects}</p>
       ) : (
         <div className="create-row emulate-picker-row">
-          <label className="emulate-picker-field">
-            <span className="emulate-picker-label">Project</span>
-            <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} disabled={running}>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {loadingScripts ? (
-            <span className="page-empty-note">{i18n.pages.emulate.loading_deployed_flows}</span>
-          ) : scripts.length === 0 ? (
-            <span className="page-empty-note">{i18n.pages.emulate.loading_deployed_script}</span>
-          ) : (
+          <div className="emulate-picker-buttons">
             <label className="emulate-picker-field">
-              <span className="emulate-picker-label">{i18n.pages.emulate.flow}</span>
-              <select value={selectedFlowId} onChange={(e) => setSelectedFlowId(e.target.value)} disabled={running}>
-                {scripts.map((script) => (
-                  <option key={script.flowId} value={script.flowId}>
-                    {script.flowName}
+              <span className="emulate-picker-label">Project</span>
+              <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} disabled={running}>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
                   </option>
                 ))}
               </select>
             </label>
-          )}
+
+            {loadingScripts ? (
+              <span className="page-empty-note">{i18n.pages.emulate.loading_deployed_flows}</span>
+            ) : scripts.length === 0 ? (
+              <span className="page-empty-note">{i18n.pages.emulate.loading_deployed_script}</span>
+            ) : (
+              <label className="emulate-picker-field">
+                <span className="emulate-picker-label">{i18n.pages.emulate.flow}</span>
+                <select value={selectedFlowId} onChange={(e) => setSelectedFlowId(e.target.value)} disabled={running}>
+                  {scripts.map((script) => (
+                    <option key={script.flowId} value={script.flowId}>
+                      {script.flowName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
 
           <button className="btn btn-green" type="button" onClick={() => void handleRun()} disabled={running || !selectedFlowId || loadingDetail}>
             {running ? i18n.pages.emulate.running : i18n.pages.emulate.run}
