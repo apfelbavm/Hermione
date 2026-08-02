@@ -23,6 +23,12 @@ const nextConfig = {
       "facebook-nodejs-business-sdk": {
         browser: "./src/lib/facebookSdkBrowserStub.ts",
       },
+      // googleapis's entry point unconditionally requires Node built-ins ('fs', 'net', 'tls',
+      // 'http2', 'child_process') across google-auth-library/gaxios/node-fetch — same problem as
+      // facebook-nodejs-business-sdk above, same fix.
+      googleapis: {
+        browser: "./src/lib/googleapisBrowserStub.ts",
+      },
     },
   },
 };

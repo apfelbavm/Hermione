@@ -181,3 +181,37 @@ registerCredentialType({
     { id: "password", label: "Password", secret: true },
   ],
 });
+
+registerCredentialType({
+  id: "googleServiceAccount",
+  label: "Google Service Account",
+  fields: [
+    {
+      id: "serviceAccountKeyJson",
+      label: "Service Account Key (JSON)",
+      secret: true,
+      help: "Paste the full contents of the service account's JSON key file (Google Cloud Console > IAM & Admin > Service Accounts > Keys).",
+    },
+    {
+      id: "impersonateUser",
+      label: "Impersonate User (optional)",
+      help: "A Workspace user's email to impersonate via domain-wide delegation, needed for Gmail/Calendar/Drive/Admin SDK acting on behalf of that user. Leave blank for APIs that don't need it.",
+    },
+  ],
+});
+
+registerCredentialType({
+  id: "googleOAuth2",
+  label: "Google OAuth2",
+  fields: [
+    { id: "clientId", label: "Client ID" },
+    { id: "clientSecret", label: "Client Secret", secret: true },
+    { id: "redirectUri", label: "Redirect URI", help: "Must exactly match an Authorized redirect URI configured on the OAuth client (Google Cloud Console > APIs & Services > Credentials)." },
+    {
+      id: "authCode",
+      label: "Authorization Code",
+      help: "Single-use code from Google's OAuth2 consent screen (access_type=offline&prompt=consent). Only needed once, to run the Google Authorize node and obtain a Refresh Token below — it stops working after that first use, so it's safe to leave here or clear it afterward.",
+    },
+    { id: "refreshToken", label: "Refresh Token", secret: true },
+  ],
+});

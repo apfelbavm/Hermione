@@ -20,6 +20,7 @@ import "./struct";
 import "./github";
 import "./microsoft365";
 import "./jira";
+import "./google";
 import "./array";
 import "./set";
 import "./map";

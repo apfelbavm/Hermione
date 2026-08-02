@@ -2,7 +2,20 @@
  * (src/server/credentials.ts) and browser (the Credential Vault page, the oauth2Saml node's
  * interpreter path) can import this freely, unlike src/server/* itself. */
 
-export type CredentialTypeId = "usernamePassword" | "oauth2SamlBearer" | "dropboxOAuth2" | "githubToken" | "githubApp" | "microsoftGraphClientCredentials" | "azureStorageConnectionString" | "facebookGraphAPI" | "jiraCloudApiToken" | "jiraServerPersonalAccessToken" | "jiraServerBasicAuth";
+export type CredentialTypeId =
+  | "usernamePassword"
+  | "oauth2SamlBearer"
+  | "dropboxOAuth2"
+  | "githubToken"
+  | "githubApp"
+  | "microsoftGraphClientCredentials"
+  | "azureStorageConnectionString"
+  | "facebookGraphAPI"
+  | "jiraCloudApiToken"
+  | "jiraServerPersonalAccessToken"
+  | "jiraServerBasicAuth"
+  | "googleServiceAccount"
+  | "googleOAuth2";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -105,6 +118,28 @@ export interface JiraServerBasicAuthCredentialData {
   password: string;
 }
 
+/** A Google Cloud service account's JSON key, used for server-to-server access with no signed-in
+ * user — the flow Google recommends for Admin SDK and for Workspace APIs (Gmail/Calendar/Drive)
+ * acting on behalf of a user via domain-wide delegation. See lib/googleAuthManager.ts, which
+ * derives a scoped google-auth-library JWT client from this (subject = impersonateUser). */
+export interface GoogleServiceAccountCredentialData {
+  serviceAccountKeyJson: string;
+  impersonateUser: string;
+}
+
+/** An OAuth2 client id/secret plus a long-lived refresh token — the flow Google recommends for
+ * anything acting on behalf of a user who consented interactively, mirroring
+ * DropboxOAuth2CredentialData. `redirectUri`/`authCode` are only a staging area for the one-time
+ * exchange (see nodes/google.ts's google.authorize, which reads them to mint refreshToken),
+ * irrelevant to every other Google node's normal per-run flow. */
+export interface GoogleOAuth2CredentialData {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  authCode: string;
+  refreshToken: string;
+}
+
 export type CredentialData =
   | UsernamePasswordCredentialData
   | Oauth2SamlBearerCredentialData
@@ -116,7 +151,9 @@ export type CredentialData =
   | FacebookCredentialData
   | JiraCloudApiTokenCredentialData
   | JiraServerPersonalAccessTokenCredentialData
-  | JiraServerBasicAuthCredentialData;
+  | JiraServerBasicAuthCredentialData
+  | GoogleServiceAccountCredentialData
+  | GoogleOAuth2CredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */

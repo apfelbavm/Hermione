@@ -1423,6 +1423,318 @@
         "pin_data": "Data"
       }
     },
+    "google": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_id": "ID",
+        "pin_name": "Name",
+        "pin_mime_type": "MIME Type",
+        "pin_is_folder": "Is Folder",
+        "pin_size": "Size (bytes)",
+        "pin_web_view_link": "Web View Link",
+        "pin_type": "Type",
+        "pin_role": "Role",
+        "pin_email": "Email",
+        "pin_thread_id": "Thread ID",
+        "pin_subject": "Subject",
+        "pin_from": "From",
+        "pin_snippet": "Snippet",
+        "pin_summary": "Summary",
+        "pin_start": "Start",
+        "pin_end": "End",
+        "pin_suspended": "Suspended",
+        "pin_content": "Content",
+        "pin_encoding": "Encoding",
+        "pin_page_size": "Page Size",
+        "pin_max_results": "Max Results",
+        "pin_file_id": "File ID",
+        "pin_parent_folder_id": "Parent Folder ID",
+        "pin_destination_folder_id": "Destination Folder ID",
+        "pin_spreadsheet_id": "Spreadsheet ID",
+        "pin_range": "Range (A1 Notation)",
+        "pin_values_json": "Values (JSON, 2D array)",
+        "pin_updated_cells": "Updated Cells",
+        "pin_title": "Title",
+        "pin_sheet_id": "Sheet ID",
+        "pin_document_id": "Document ID",
+        "pin_text": "Text",
+        "pin_message_id": "Message ID",
+        "pin_body": "Body",
+        "pin_calendar_id": "Calendar ID",
+        "pin_event_id": "Event ID",
+        "pin_description": "Description",
+        "pin_domain": "Domain",
+        "pin_user_key": "User Key (email or ID)",
+        "pin_group_key": "Group Key (email or ID)",
+        "pin_access_token": "Access Token",
+        "pin_refresh_token": "Refresh Token",
+        "pin_expires_in": "Expires In (seconds)"
+      },
+      "authTokens": {
+        "label": "Google Auth Tokens"
+      },
+      "authorize": {
+        "label": "Google Authorize",
+        "description": "One-time setup step: exchanges the credential's staging Authorization Code for a long-lived Refresh Token to paste back into the Google OAuth2 credential.",
+        "pin_credential_name": "Credential Name"
+      },
+      "googleDriveFile": {
+        "label": "Google Drive File"
+      },
+      "googleDrivePermission": {
+        "label": "Google Drive Permission"
+      },
+      "googleGmailMessage": {
+        "label": "Gmail Message"
+      },
+      "googleGmailLabel": {
+        "label": "Gmail Label"
+      },
+      "googleCalendarEvent": {
+        "label": "Google Calendar Event"
+      },
+      "googleCalendarEntry": {
+        "label": "Google Calendar"
+      },
+      "googleAdminUser": {
+        "label": "Google Workspace Admin User"
+      },
+      "googleAdminGroup": {
+        "label": "Google Workspace Admin Group"
+      },
+      "driveListFiles": {
+        "label": "Google Drive List Files",
+        "description": "Lists files and folders, optionally filtered with a Drive query string (e.g. \"'FOLDER_ID' in parents\").",
+        "pin_query": "Query",
+        "pin_files": "Files"
+      },
+      "driveGetFile": {
+        "label": "Google Drive Get File",
+        "description": "Fetches a single file or folder's metadata by ID."
+      },
+      "driveUploadFile": {
+        "label": "Google Drive Upload File",
+        "description": "Creates a new file with the given content in the specified parent folder (or My Drive root if blank)."
+      },
+      "driveUpdateFileContent": {
+        "label": "Google Drive Update File Content",
+        "description": "Replaces an existing file's content by ID."
+      },
+      "driveDownloadFile": {
+        "label": "Google Drive Download File",
+        "description": "Downloads a file's raw content by ID."
+      },
+      "driveCreateFolder": {
+        "label": "Google Drive Create Folder",
+        "description": "Creates a new folder in the specified parent folder (or My Drive root if blank)."
+      },
+      "driveCopyFile": {
+        "label": "Google Drive Copy File",
+        "description": "Copies a file to a new name and/or destination folder.",
+        "pin_new_name": "New Name"
+      },
+      "driveMoveFile": {
+        "label": "Google Drive Move File",
+        "description": "Moves a file to a different folder by replacing all of its current parents with the destination folder."
+      },
+      "driveRenameFile": {
+        "label": "Google Drive Rename File",
+        "description": "Renames a file or folder in place."
+      },
+      "driveDeleteFile": {
+        "label": "Google Drive Delete File",
+        "description": "Permanently deletes a file or folder by ID (bypasses Trash)."
+      },
+      "driveShareFile": {
+        "label": "Google Drive Share File",
+        "description": "Grants a role (Reader/Commenter/Writer/Owner) on a file to a user, group, domain, or anyone."
+      },
+      "driveListPermissions": {
+        "label": "Google Drive List Permissions",
+        "description": "Lists everyone a file is currently shared with.",
+        "pin_permissions": "Permissions"
+      },
+      "driveDeletePermission": {
+        "label": "Google Drive Delete Permission",
+        "description": "Revokes a single sharing permission from a file by its permission ID."
+      },
+      "sheetsGetValues": {
+        "label": "Google Sheets Get Values",
+        "description": "Reads a range of cell values (e.g. \"Sheet1!A1:C10\") as a 2D JSON array."
+      },
+      "sheetsUpdateValues": {
+        "label": "Google Sheets Update Values",
+        "description": "Overwrites a range of cells with a 2D JSON array of values."
+      },
+      "sheetsAppendValues": {
+        "label": "Google Sheets Append Values",
+        "description": "Appends a 2D JSON array of values as new rows after the last row with data in the given range."
+      },
+      "sheetsClearValues": {
+        "label": "Google Sheets Clear Values",
+        "description": "Clears the values (not formatting) of a range of cells."
+      },
+      "sheetsCreateSpreadsheet": {
+        "label": "Google Sheets Create Spreadsheet",
+        "description": "Creates a new blank spreadsheet with the given title."
+      },
+      "sheetsAddSheet": {
+        "label": "Google Sheets Add Sheet",
+        "description": "Adds a new sheet (tab) to an existing spreadsheet."
+      },
+      "sheetsDeleteSheet": {
+        "label": "Google Sheets Delete Sheet",
+        "description": "Deletes a sheet (tab) from a spreadsheet by its numeric sheet ID."
+      },
+      "sheetsGetMetadata": {
+        "label": "Google Sheets Get Metadata",
+        "description": "Fetches a spreadsheet's title and the list of its sheet (tab) titles.",
+        "pin_sheet_titles_json": "Sheet Titles (JSON array)"
+      },
+      "docsCreateDocument": {
+        "label": "Google Docs Create Document",
+        "description": "Creates a new blank document with the given title."
+      },
+      "docsGetText": {
+        "label": "Google Docs Get Text",
+        "description": "Fetches a document's body as plain text."
+      },
+      "docsAppendText": {
+        "label": "Google Docs Append Text",
+        "description": "Appends text to the end of a document's body."
+      },
+      "docsInsertText": {
+        "label": "Google Docs Insert Text",
+        "description": "Inserts text at a specific character index in a document's body.",
+        "pin_index": "Index"
+      },
+      "docsReplaceAllText": {
+        "label": "Google Docs Replace All Text",
+        "description": "Replaces every occurrence of a substring throughout a document's body.",
+        "pin_find": "Find",
+        "pin_replacement": "Replacement",
+        "pin_match_case": "Match Case"
+      },
+      "gmailListMessages": {
+        "label": "Gmail List Messages",
+        "description": "Lists messages in the mailbox, optionally filtered with a Gmail search query (e.g. \"is:unread from:someone@example.com\").",
+        "pin_query": "Query",
+        "pin_messages": "Messages"
+      },
+      "gmailGetMessage": {
+        "label": "Gmail Get Message",
+        "description": "Fetches a single message's headers and plain-text body by ID."
+      },
+      "gmailSendMessage": {
+        "label": "Gmail Send Message",
+        "description": "Sends a plain-text email from the mailbox.",
+        "pin_to": "To"
+      },
+      "gmailTrashMessage": {
+        "label": "Gmail Trash Message",
+        "description": "Moves a message to Trash by ID."
+      },
+      "gmailListLabels": {
+        "label": "Gmail List Labels",
+        "description": "Lists every label (system and user-created) in the mailbox.",
+        "pin_labels": "Labels"
+      },
+      "gmailCreateLabel": {
+        "label": "Gmail Create Label",
+        "description": "Creates a new user label."
+      },
+      "gmailModifyMessageLabels": {
+        "label": "Gmail Modify Message Labels",
+        "description": "Adds and/or removes labels on a message by ID.",
+        "pin_add_label_ids": "Add Label IDs (comma-separated)",
+        "pin_remove_label_ids": "Remove Label IDs (comma-separated)"
+      },
+      "calendarListEvents": {
+        "label": "Google Calendar List Events",
+        "description": "Lists events on a calendar within an optional time range, ordered by start time.",
+        "pin_time_min": "Time Min (RFC3339)",
+        "pin_time_max": "Time Max (RFC3339)",
+        "pin_events": "Events"
+      },
+      "calendarGetEvent": {
+        "label": "Google Calendar Get Event",
+        "description": "Fetches a single event by ID."
+      },
+      "calendarCreateEvent": {
+        "label": "Google Calendar Create Event",
+        "description": "Creates a new event with a start/end date-time (RFC3339)."
+      },
+      "calendarUpdateEvent": {
+        "label": "Google Calendar Update Event",
+        "description": "Updates an existing event's summary, start/end, and/or description by ID."
+      },
+      "calendarDeleteEvent": {
+        "label": "Google Calendar Delete Event",
+        "description": "Deletes an event by ID."
+      },
+      "calendarQuickAddEvent": {
+        "label": "Google Calendar Quick Add Event",
+        "description": "Creates an event by parsing a single free-text string server-side (e.g. \"Dinner with Sam Fri 8pm\")."
+      },
+      "calendarListCalendars": {
+        "label": "Google Calendar List Calendars",
+        "description": "Lists every calendar on the account's calendar list.",
+        "pin_calendars": "Calendars"
+      },
+      "adminListUsers": {
+        "label": "Google Admin List Users",
+        "description": "Lists Workspace users in the domain, optionally filtered with a query.",
+        "pin_query": "Query",
+        "pin_users": "Users"
+      },
+      "adminGetUser": {
+        "label": "Google Admin Get User",
+        "description": "Fetches a single Workspace user's profile by email or ID."
+      },
+      "adminCreateUser": {
+        "label": "Google Admin Create User",
+        "description": "Creates a new Workspace user.",
+        "pin_given_name": "Given Name",
+        "pin_family_name": "Family Name",
+        "pin_password": "Password"
+      },
+      "adminUpdateUser": {
+        "label": "Google Admin Update User",
+        "description": "Updates a Workspace user's properties by email or ID using a raw JSON object of the fields to change.",
+        "pin_properties_json": "Properties (JSON)"
+      },
+      "adminDeleteUser": {
+        "label": "Google Admin Delete User",
+        "description": "Deletes a Workspace user by email or ID."
+      },
+      "adminListGroups": {
+        "label": "Google Admin List Groups",
+        "description": "Lists Workspace groups in the domain.",
+        "pin_groups": "Groups"
+      },
+      "adminGetGroup": {
+        "label": "Google Admin Get Group",
+        "description": "Fetches a single Workspace group by email or ID."
+      },
+      "adminCreateGroup": {
+        "label": "Google Admin Create Group",
+        "description": "Creates a new Workspace group."
+      },
+      "adminDeleteGroup": {
+        "label": "Google Admin Delete Group",
+        "description": "Deletes a Workspace group by email or ID."
+      },
+      "adminAddGroupMember": {
+        "label": "Google Admin Add Group Member",
+        "description": "Adds a user to a group by email, with an optional role (MEMBER/MANAGER/OWNER).",
+        "pin_role": "Role"
+      },
+      "adminRemoveGroupMember": {
+        "label": "Google Admin Remove Group Member",
+        "description": "Removes a member from a group.",
+        "pin_member_key": "Member Key (email or ID)"
+      }
+    },
     "boolean": {
       "not": {
         "label": "Not",
