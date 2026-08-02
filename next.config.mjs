@@ -12,6 +12,19 @@ const nextConfig = {
   async redirects() {
     return [{ source: "/", destination: "/projects", permanent: false }];
   },
+  turbopack: {
+    resolveAlias: {
+      // src/graph/nodes/index.ts (which registers every node type, including facebook.ts) is
+      // reachable from client components for the node menu/labels, even though the actual API
+      // calls only ever run server-side. Unlike this project's other integration SDKs (all
+      // fetch-based), facebook-nodejs-business-sdk's crash reporter unconditionally requires
+      // Node's 'fs'/'path' for on-disk crash logs, which don't exist in the browser — swap it for
+      // a stub in browser bundles instead of failing to resolve them.
+      "facebook-nodejs-business-sdk": {
+        browser: "./src/lib/facebookSdkBrowserStub.ts",
+      },
+    },
+  },
 };
 
 export default nextConfig;

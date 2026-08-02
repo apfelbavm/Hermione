@@ -104,6 +104,31 @@ registerCredentialType({
 });
 
 registerCredentialType({
+  id: "facebookGraphAPI",
+  label: "Facebook Graph API",
+  fields: [
+    { id: "appId", label: "App ID" },
+    { id: "appSecret", label: "App Secret", secret: true },
+    {
+      id: "redirectUri",
+      label: "Redirect URI",
+      help: "Must exactly match a Valid OAuth Redirect URI configured on the Facebook App (Settings > Basic, or the Facebook Login product).",
+    },
+    {
+      id: "authCode",
+      label: "Authorization Code",
+      help: "Single-use code from Facebook's OAuth dialog (https://www.facebook.com/v24.0/dialog/oauth?client_id=YOUR_APP_ID&redirect_uri=YOUR_REDIRECT_URI&scope=...). Only needed once, to run the Facebook Authorize node and obtain a long-lived Access Token below — it stops working after that first use, so it's safe to leave here or clear it afterward.",
+    },
+    {
+      id: "accessToken",
+      label: "Access Token",
+      secret: true,
+      help: "A long-lived User, Page, or System User access token. Filled in automatically by the Facebook Authorize node, or paste one directly (e.g. a never-expiring System User token from Business Settings).",
+    },
+  ],
+});
+
+registerCredentialType({
   id: "microsoftGraphClientCredentials",
   label: "Microsoft Graph (App-only)",
   fields: [

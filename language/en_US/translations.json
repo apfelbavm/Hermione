@@ -519,6 +519,170 @@
         "label": "Dropbox Space Usage"
       }
     },
+    "facebook": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_access_token": "Access Token",
+        "pin_id": "ID",
+        "pin_name": "Name",
+        "pin_message": "Message",
+        "pin_link": "Link",
+        "pin_json": "JSON",
+        "pin_limit": "Limit",
+        "pin_page_id": "Page ID",
+        "pin_post_id": "Post ID",
+        "pin_comment_id": "Comment ID",
+        "pin_object_id": "Object ID",
+        "pin_ad_account_id": "Ad Account ID",
+        "pin_status": "Status",
+        "pin_period": "Period",
+        "pin_created_time": "Created Time"
+      },
+      "authorize": {
+        "label": "Facebook Authorize",
+        "description": "One-time setup step: reads a named Credential Vault entry's App ID/App Secret/Redirect URI/Authorization Code and exchanges the code for a long-lived (~60 day) access token to save back into the vault. Every other Facebook node uses that access token (via its own Credential Name pin) automatically.",
+        "pin_credential_name": "Credential Name",
+        "pin_expires_in": "Expires In (s)"
+      },
+      "authTokens": {
+        "label": "Facebook Auth Tokens"
+      },
+      "debugToken": {
+        "label": "Facebook Debug Token",
+        "description": "Inspects an access token — which app it belongs to, whether it's still valid, when it expires, and which permissions were granted.",
+        "pin_input_token": "Token To Inspect",
+        "pin_app_id": "App ID",
+        "pin_is_valid": "Is Valid",
+        "pin_expires_at": "Expires At (unix time)",
+        "pin_scopes": "Scopes"
+      },
+      "debugTokenResult": {
+        "label": "Facebook Token Info"
+      },
+      "getPageInfo": {
+        "label": "Facebook Get Page Info",
+        "description": "Fetches a Facebook Page's id, name, category, fan count and link.",
+        "pin_category": "Category",
+        "pin_fan_count": "Fan Count"
+      },
+      "page": {
+        "label": "Facebook Page"
+      },
+      "createPost": {
+        "label": "Facebook Create Post",
+        "description": "Publishes a text (and optional link) post to a Facebook Page's feed.",
+        "pin_link": "Link"
+      },
+      "createPhotoPost": {
+        "label": "Facebook Create Photo Post",
+        "description": "Publishes a photo (by URL) to a Facebook Page, with an optional caption.",
+        "pin_url": "Photo URL",
+        "pin_caption": "Caption"
+      },
+      "createVideoPost": {
+        "label": "Facebook Create Video Post",
+        "description": "Publishes a video (by URL) to a Facebook Page, with an optional description.",
+        "pin_video_url": "Video URL",
+        "pin_description": "Description"
+      },
+      "deletePost": {
+        "label": "Facebook Delete Post",
+        "description": "Deletes a post by id."
+      },
+      "getPosts": {
+        "label": "Facebook Get Posts",
+        "description": "Lists the most recent posts on a Facebook Page's feed.",
+        "pin_posts": "Posts"
+      },
+      "post": {
+        "label": "Facebook Post"
+      },
+      "getPageInsights": {
+        "label": "Facebook Get Page Insights",
+        "description": "Fetches Page-level insight metrics (e.g. page_impressions, page_fans) for a given period, as raw JSON.",
+        "pin_metrics": "Metrics"
+      },
+      "createComment": {
+        "label": "Facebook Create Comment",
+        "description": "Posts a comment on a post or another comment."
+      },
+      "getComments": {
+        "label": "Facebook Get Comments",
+        "description": "Lists the comments on a post or other object.",
+        "pin_comments": "Comments",
+        "pin_from_name": "From Name"
+      },
+      "comment": {
+        "label": "Facebook Comment"
+      },
+      "deleteComment": {
+        "label": "Facebook Delete Comment",
+        "description": "Deletes a comment by id."
+      },
+      "likeObject": {
+        "label": "Facebook Like",
+        "description": "Likes a post, comment, or other likeable object, on behalf of the access token's identity."
+      },
+      "unlikeObject": {
+        "label": "Facebook Unlike",
+        "description": "Removes a like from a post, comment, or other likeable object."
+      },
+      "getLikesCount": {
+        "label": "Facebook Get Likes Count",
+        "description": "Fetches the total like count for a post, comment, or other object.",
+        "pin_count": "Count"
+      },
+      "getUserProfile": {
+        "label": "Facebook Get User Profile",
+        "description": "Fetches a user's id, name and email — leave User ID empty to use \"me\" (the access token's own identity).",
+        "pin_user_id": "User ID",
+        "pin_email": "Email"
+      },
+      "user": {
+        "label": "Facebook User"
+      },
+      "getAdAccounts": {
+        "label": "Facebook Get Ad Accounts",
+        "description": "Lists the ad accounts a user (or \"me\") has access to.",
+        "pin_accounts": "Accounts",
+        "pin_account_status": "Account Status"
+      },
+      "adAccount": {
+        "label": "Facebook Ad Account"
+      },
+      "createCampaign": {
+        "label": "Facebook Create Campaign",
+        "description": "Creates a new ad campaign under an ad account.",
+        "pin_objective": "Objective"
+      },
+      "getCampaigns": {
+        "label": "Facebook Get Campaigns",
+        "description": "Lists the ad campaigns under an ad account.",
+        "pin_campaigns": "Campaigns",
+        "pin_status": "Status",
+        "pin_objective": "Objective"
+      },
+      "campaign": {
+        "label": "Facebook Campaign"
+      },
+      "deleteCampaign": {
+        "label": "Facebook Delete Campaign",
+        "description": "Deletes an ad campaign by id.",
+        "pin_campaign_id": "Campaign ID"
+      },
+      "getInsights": {
+        "label": "Facebook Get Insights",
+        "description": "Fetches ad-level insight metrics (impressions, spend, clicks, ...) for a campaign, ad set, or ad, as raw JSON.",
+        "pin_fields": "Fields"
+      },
+      "apiCall": {
+        "label": "Facebook API Call",
+        "description": "Generic escape hatch: calls any Graph API path/edge this manager doesn't have a dedicated node for, authenticated with the vault credential's access token. Params is a JSON object string.",
+        "pin_method": "Method",
+        "pin_path": "Path",
+        "pin_params_json": "Params (JSON)"
+      }
+    },
     "azureStorage": {
       "__shared": {
         "pin_credential_name": "Credential Name",

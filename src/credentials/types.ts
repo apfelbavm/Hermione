@@ -2,7 +2,7 @@
  * (src/server/credentials.ts) and browser (the Credential Vault page, the oauth2Saml node's
  * interpreter path) can import this freely, unlike src/server/* itself. */
 
-export type CredentialTypeId = "usernamePassword" | "oauth2SamlBearer" | "dropboxOAuth2" | "githubToken" | "githubApp" | "microsoftGraphClientCredentials" | "azureStorageConnectionString";
+export type CredentialTypeId = "usernamePassword" | "oauth2SamlBearer" | "dropboxOAuth2" | "githubToken" | "githubApp" | "microsoftGraphClientCredentials" | "azureStorageConnectionString" | "facebookGraphAPI";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -65,7 +65,21 @@ export interface AzureStorageConnectionStringCredentialData {
   connectionString: string;
 }
 
-export type CredentialData = UsernamePasswordCredentialData | Oauth2SamlBearerCredentialData | DropboxOAuth2CredentialData | GithubTokenCredentialData | GithubAppCredentialData | MicrosoftGraphClientCredentialsData | AzureStorageConnectionStringCredentialData;
+/** A Facebook App's id/secret plus a long-lived (User, Page, or System User) access token — the
+ * flow the Graph API centers on, since (unlike Dropbox) there's no refresh token: a long-lived
+ * token just has to be re-obtained via facebook.authorize (or replaced with a never-expiring System
+ * User token) once it nears its ~60 day expiry. `redirectUri`/`authCode` are only a staging area
+ * for that one-time exchange (see nodes/facebook.ts's facebook.authorize), irrelevant to every other
+ * Facebook node's normal per-run flow. */
+export interface FacebookCredentialData {
+  appId: string;
+  appSecret: string;
+  redirectUri: string;
+  authCode: string;
+  accessToken: string;
+}
+
+export type CredentialData = UsernamePasswordCredentialData | Oauth2SamlBearerCredentialData | DropboxOAuth2CredentialData | GithubTokenCredentialData | GithubAppCredentialData | MicrosoftGraphClientCredentialsData | AzureStorageConnectionStringCredentialData | FacebookCredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */
