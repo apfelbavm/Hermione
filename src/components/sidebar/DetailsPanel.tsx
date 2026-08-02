@@ -205,14 +205,20 @@ function NodeDetails({ store, node, properties }: { store: Store; node: NodeInst
             <span className="variable-name">{i18n.components.details_panel.element_type}</span>
             <ImperativeMount
               build={() =>
-                createTypeSelect(node.elementType ?? "number", (elementType) => {
-                  getEditingGraph(store.state).changeNodeElementType(getVisibleVariablesForState(store.state), store.state.rootGraph.functions, node.id, {
-                    elementType,
-                  });
-                  store.notify();
-                })
+                createTypeSelect(
+                  node.elementType ?? "number",
+                  (elementType, elementSubType) => {
+                    getEditingGraph(store.state).changeNodeElementType(getVisibleVariablesForState(store.state), store.state.rootGraph.functions, node.id, {
+                      elementType,
+                      elementSubType,
+                    });
+                    store.notify();
+                  },
+                  node.elementSubType,
+                  true,
+                )
               }
-              deps={[node.id, node.elementType]}
+              deps={[node.id, node.elementType, node.elementSubType]}
               disabled={disabled}
             />
           </div>

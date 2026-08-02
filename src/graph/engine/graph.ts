@@ -76,7 +76,7 @@ export class Graph {
    * from the now-current (post-patch) pin defs — deriveInstancePins reads the still-intact `node.pins`
    * keys for arity (e.g. how many Make Array entries existed) before they're replaced, so entry COUNT
    * survives a type change even though each entry's stored value resets to the new type's default. */
-  changeNodeElementType(variables: Variable[], functions: FunctionDef[], nodeId: string, patch: { elementType?: PinType; mapKeyType?: PinType }): void {
+  changeNodeElementType(variables: Variable[], functions: FunctionDef[], nodeId: string, patch: { elementType?: PinType; elementSubType?: string; mapKeyType?: PinType }): void {
     const node = this.nodes.find((n) => n.id === nodeId);
     if (!node) return;
 
@@ -85,6 +85,7 @@ export class Graph {
     }
 
     if (patch.elementType !== undefined) node.elementType = patch.elementType;
+    if (patch.elementSubType !== undefined) node.elementSubType = patch.elementSubType;
     if (patch.mapKeyType !== undefined) node.mapKeyType = patch.mapKeyType;
 
     const pins: Record<string, Pin> = {};

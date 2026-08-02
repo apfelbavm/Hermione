@@ -25,6 +25,9 @@ export class NodeInstance {
   /** Set only for a node whose NodeDef.configurableElementType is set — see that field's doc
    * comment. Seeded by createNodeInstance, changed via changeNodeElementType. */
   elementType?: PinType;
+  /** Only meaningful when elementType is "struct" or "enum" — which registered class this node's
+   * element type is (sibling of PinDef.subType/PinDef.container's own doc comment). */
+  elementSubType?: string;
   /** Set only for a node whose NodeDef.configurableElementType?.includeKeyType is set. */
   mapKeyType?: PinType;
   /** Set only for a "core.reroute" data-reroute node (see reroute.ts) — every other
@@ -69,6 +72,7 @@ export class NodeInstance {
     this.disabled = false;
     this.breakpoint = false;
     this.elementType = undefined;
+    this.elementSubType = undefined;
     this.mapKeyType = undefined;
     this.container = undefined;
     this.subType = undefined;

@@ -155,7 +155,7 @@ function createContainerListInput(type: PinType, value: unknown, onChange: (valu
 
   function dedupeInPlace(): void {
     const seen = new Set<string>();
-    for (let i = 0; i < entries.length;) {
+    for (let i = 0; i < entries.length; ) {
       const key = JSON.stringify(entries[i]);
       if (seen.has(key)) entries.splice(i, 1);
       else {
@@ -326,9 +326,10 @@ interface TypeMenuEntry {
  * attaches a leaf directly to the tree's root instead of nesting it), then every registered struct
  * type nested under "Struct.<category>" and every registered enum type under "Enum.<category>"
  * (falling back to "Other" for a class with no category — see structRegistry.ts/enumRegistry.ts).
- * `includeStructsAndEnums` is false for selectors that only ever apply to one non-struct value
- * (e.g. a Map's key type, an Array's element type) — struct/enum classes aren't wireable as those
- * today. */
+ * `includeStructsAndEnums` is false for selectors that only ever apply to one non-struct value —
+ * currently just a Map's key type, since a key needs a stable JSON.stringify identity that struct/
+ * enum values provide just as well as any scalar, but there's no established UX yet for choosing
+ * one struct/enum class as "the" key type across every entry. */
 function typeMenuEntries(includeStructsAndEnums: boolean): TypeMenuEntry[] {
   const entries: TypeMenuEntry[] = PIN_TYPE_OPTIONS.map((type) => ({
     type,
@@ -662,7 +663,7 @@ export function createStructTypeSelect(current: string, onChange: (subType: stri
  * Variables list in variablePanel.ts and canvas node headers in drawNodes.ts). `currentSubType`/
  * `includeStructsAndEnums` opt this selector into also offering registered struct/enum classes,
  * grouped after the plain types (see typeMenuGroups) — omit both for a selector that should only
- * ever show the plain types (e.g. a Map's key type, an Array's element type). */
+ * ever show the plain types (e.g. a Map's key type). */
 export function createTypeSelect(current: PinType, onChange: (type: PinType, subType?: string) => void, currentSubType?: string, includeStructsAndEnums = false): HTMLElement {
   const button = document.createElement("button");
   button.type = "button";

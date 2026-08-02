@@ -1,4 +1,4 @@
-import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
+import { defaultValueFor } from "../engine/graphMutations";
 import { registerNode } from "../engine/registry";
 import { connectionsFrom } from "../engine/graphQueries";
 import { runExecFrom } from "../engine/executor";
@@ -13,6 +13,10 @@ function elementTypeOf(node: NodeInstance): PinType {
   return node.elementType ?? "number";
 }
 
+function elementSubTypeOf(node: NodeInstance): string | undefined {
+  return node.elementSubType;
+}
+
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
@@ -25,7 +29,7 @@ function jsonEq(aExpr: string, bExpr: string): string {
   return `(JSON.stringify(${aExpr}) === JSON.stringify(${bExpr}))`;
 }
 
-function arrayPin(elementType: PinType, defaultValue: unknown = []): PinDef {
+function arrayPin(elementType: PinType, defaultValue: unknown = [], subType?: string): PinDef {
   return {
     id: "array",
     label: i18n.nodes.array.pin_array_in,
@@ -33,29 +37,32 @@ function arrayPin(elementType: PinType, defaultValue: unknown = []): PinDef {
     direction: "input",
     container: "array",
     defaultValue,
+    subType,
   };
 }
 
 // A distinct id from arrayPin's "array" — several nodes below have BOTH an array input and an
 // array output, and pin ids must be unique within one node (they key NodeInstance.pins and
 // NodeScreenGeometry.pinScreen, both flat Records regardless of direction).
-function arrayOutPin(elementType: PinType, label = i18n.nodes.array.pin_result): PinDef {
+function arrayOutPin(elementType: PinType, label = i18n.nodes.array.pin_result, subType?: string): PinDef {
   return {
     id: "result",
     label,
     type: elementType,
     direction: "output",
     container: "array",
+    subType,
   };
 }
 
-function itemPin(id: string, label: string, elementType: PinType, direction: "input" | "output" = "input"): PinDef {
+function itemPin(id: string, label: string, elementType: PinType, direction: "input" | "output" = "input", subType?: string): PinDef {
   return {
     id,
     label,
     type: elementType,
     direction,
-    defaultValue: direction === "input" ? DEFAULT_VALUE_BY_TYPE[elementType] : undefined,
+    defaultValue: direction === "input" ? defaultValueFor(elementType, undefined, subType) : undefined,
+    subType,
   };
 }
 
@@ -77,12 +84,14 @@ function makeArrayEntryIds(node: NodeInstance): string[] {
 
 function makeArrayEntryPins(node: NodeInstance): PinDef[] {
   const elementType = elementTypeOf(node);
+  const subType = elementSubTypeOf(node);
   return makeArrayEntryIds(node).map((id, i) => ({
     id,
     label: `${i18n.nodes.array.pin_element} ${i + 1}`,
     type: elementType,
     direction: "input" as const,
-    defaultValue: DEFAULT_VALUE_BY_TYPE[elementType],
+    defaultValue: defaultValueFor(elementType, undefined, subType),
+    subType,
     removable: true,
   }));
 }
@@ -95,12 +104,12 @@ registerNode({
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [{ id: `${ENTRY_PREFIX}0`, label: `${i18n.nodes.array.pin_element} 1`, type: "number", direction: "input", defaultValue: 0, removable: true }, arrayOutPin("number")],
-  deriveInstancePins: (node) => [...makeArrayEntryPins(node), arrayOutPin(elementTypeOf(node))],
+  deriveInstancePins: (node) => [...makeArrayEntryPins(node), arrayOutPin(elementTypeOf(node), undefined, elementSubTypeOf(node))],
   addInstancePinEntry: (node) => {
     const suffixes = makeArrayEntryIds(node).map(entrySuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
     node.pins[`${ENTRY_PREFIX}${nextSuffix}`] = {
-      value: DEFAULT_VALUE_BY_TYPE[elementTypeOf(node)],
+      value: defaultValueFor(elementTypeOf(node), undefined, elementSubTypeOf(node)),
     };
   },
   evaluate: ({ node, inputs }) => ({
@@ -121,7 +130,7 @@ registerNode({
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [arrayPin("number"), { id: "length", label: i18n.nodes.__shared.pin_length, type: "number", direction: "output" }],
-  deriveInstancePins: (node) => [arrayPin(elementTypeOf(node)), { id: "length", label: i18n.nodes.__shared.pin_length, type: "number", direction: "output" }],
+  deriveInstancePins: (node) => [arrayPin(elementTypeOf(node), undefined, elementSubTypeOf(node)), { id: "length", label: i18n.nodes.__shared.pin_length, type: "number", direction: "output" }],
   evaluate: ({ inputs }) => ({ length: asArray(inputs.array).length }),
   compileEvaluate: ({ inputs }) => ({
     length: `(${compileAsArray(inputs.array)}).length`,
@@ -138,19 +147,20 @@ registerNode({
   pins: [arrayPin("number"), indexPin(), itemPin("element", i18n.nodes.array.pin_element, "number", "output"), { id: "found", label: i18n.nodes.array.get.pin_found, type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), indexPin(), itemPin("element", i18n.nodes.array.pin_element, t, "output"), { id: "found", label: i18n.nodes.array.get.pin_found, type: "boolean", direction: "output" }];
+    const s = elementSubTypeOf(node);
+    return [arrayPin(t, undefined, s), indexPin(), itemPin("element", i18n.nodes.array.pin_element, t, "output", s), { id: "found", label: i18n.nodes.array.get.pin_found, type: "boolean", direction: "output" }];
   },
   evaluate: ({ node, inputs }) => {
     const arr = asArray(inputs.array);
     const index = Math.trunc(Number(inputs.index ?? 0));
     const found = index >= 0 && index < arr.length;
     return {
-      element: found ? arr[index] : DEFAULT_VALUE_BY_TYPE[elementTypeOf(node)],
+      element: found ? arr[index] : defaultValueFor(elementTypeOf(node), undefined, elementSubTypeOf(node)),
       found,
     };
   },
   compileEvaluate: ({ node, inputs }) => {
-    const fallback = JSON.stringify(DEFAULT_VALUE_BY_TYPE[elementTypeOf(node)]);
+    const fallback = JSON.stringify(defaultValueFor(elementTypeOf(node), undefined, elementSubTypeOf(node)));
     const bounds = `(Number(${inputs.index}) >= 0 && Number(${inputs.index}) < (${compileAsArray(inputs.array)}).length)`;
     return {
       element: `(${bounds} ? (${compileAsArray(inputs.array)})[Math.trunc(Number(${inputs.index}))] : ${fallback})`,
@@ -169,7 +179,8 @@ registerNode({
   pins: [arrayPin("number"), indexPin(), itemPin("value", i18n.nodes.__shared.pin_value, "number"), arrayOutPin("number"), { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), indexPin(), itemPin("value", i18n.nodes.__shared.pin_value, t), arrayOutPin(t), { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" }];
+    const s = elementSubTypeOf(node);
+    return [arrayPin(t, undefined, s), indexPin(), itemPin("value", i18n.nodes.__shared.pin_value, t, "input", s), arrayOutPin(t, undefined, s), { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" }];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
@@ -195,7 +206,8 @@ registerNode({
   pins: [arrayPin("number"), itemPin("item", i18n.nodes.__shared.pin_item, "number"), arrayOutPin("number"), { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), itemPin("item", i18n.nodes.__shared.pin_item, t), arrayOutPin(t), { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" }];
+    const s = elementSubTypeOf(node);
+    return [arrayPin(t, undefined, s), itemPin("item", i18n.nodes.__shared.pin_item, t, "input", s), arrayOutPin(t, undefined, s), { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" }];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
@@ -219,7 +231,8 @@ registerNode({
   pins: [{ ...arrayPin("number"), id: "a", label: i18n.nodes.array.append.pin_array_a }, { ...arrayPin("number"), id: "b", label: i18n.nodes.array.append.pin_array_b }, arrayOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...arrayPin(t), id: "a", label: i18n.nodes.array.append.pin_array_a }, { ...arrayPin(t), id: "b", label: i18n.nodes.array.append.pin_array_b }, arrayOutPin(t)];
+    const s = elementSubTypeOf(node);
+    return [{ ...arrayPin(t, undefined, s), id: "a", label: i18n.nodes.array.append.pin_array_a }, { ...arrayPin(t, undefined, s), id: "b", label: i18n.nodes.array.append.pin_array_b }, arrayOutPin(t, undefined, s)];
   },
   evaluate: ({ inputs }) => ({
     result: [...asArray(inputs.a), ...asArray(inputs.b)],
@@ -239,7 +252,8 @@ registerNode({
   pins: [arrayPin("number"), indexPin(), itemPin("item", i18n.nodes.__shared.pin_item, "number"), arrayOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), indexPin(), itemPin("item", i18n.nodes.__shared.pin_item, t), arrayOutPin(t)];
+    const s = elementSubTypeOf(node);
+    return [arrayPin(t, undefined, s), indexPin(), itemPin("item", i18n.nodes.__shared.pin_item, t, "input", s), arrayOutPin(t, undefined, s)];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
@@ -262,7 +276,8 @@ registerNode({
   pins: [arrayPin("number"), indexPin(), arrayOutPin("number"), { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), indexPin(), arrayOutPin(t), { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" }];
+    const s = elementSubTypeOf(node);
+    return [arrayPin(t, undefined, s), indexPin(), arrayOutPin(t, undefined, s), { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" }];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
@@ -290,7 +305,8 @@ registerNode({
   pins: [arrayPin("number"), itemPin("item", i18n.nodes.__shared.pin_item, "number"), arrayOutPin("number"), { id: "removed", label: i18n.nodes.__shared.pin_removed, type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), itemPin("item", i18n.nodes.__shared.pin_item, t), arrayOutPin(t), { id: "removed", label: i18n.nodes.__shared.pin_removed, type: "boolean", direction: "output" }];
+    const s = elementSubTypeOf(node);
+    return [arrayPin(t, undefined, s), itemPin("item", i18n.nodes.__shared.pin_item, t, "input", s), arrayOutPin(t, undefined, s), { id: "removed", label: i18n.nodes.__shared.pin_removed, type: "boolean", direction: "output" }];
   },
   evaluate: ({ inputs }) => {
     const arr = asArray(inputs.array).slice();
@@ -315,7 +331,8 @@ registerNode({
   pins: [arrayPin("number"), arrayOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), arrayOutPin(t)];
+    const s = elementSubTypeOf(node);
+    return [arrayPin(t, undefined, s), arrayOutPin(t, undefined, s)];
   },
   evaluate: () => ({ result: [] }),
   compileEvaluate: () => ({ result: "[]" }),
@@ -331,7 +348,8 @@ registerNode({
   pins: [arrayPin("number"), itemPin("item", i18n.nodes.__shared.pin_item, "number"), { id: "contains", label: i18n.nodes.__shared.pin_contains, type: "boolean", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), itemPin("item", i18n.nodes.__shared.pin_item, t), { id: "contains", label: i18n.nodes.__shared.pin_contains, type: "boolean", direction: "output" }];
+    const s = elementSubTypeOf(node);
+    return [arrayPin(t, undefined, s), itemPin("item", i18n.nodes.__shared.pin_item, t, "input", s), { id: "contains", label: i18n.nodes.__shared.pin_contains, type: "boolean", direction: "output" }];
   },
   evaluate: ({ inputs }) => ({
     contains: asArray(inputs.array).some((v) => JSON.stringify(v) === JSON.stringify(inputs.item)),
@@ -351,7 +369,8 @@ registerNode({
   pins: [arrayPin("number"), itemPin("item", i18n.nodes.__shared.pin_item, "number"), { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" }],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), itemPin("item", i18n.nodes.__shared.pin_item, t), { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" }];
+    const s = elementSubTypeOf(node);
+    return [arrayPin(t, undefined, s), itemPin("item", i18n.nodes.__shared.pin_item, t, "input", s), { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" }];
   },
   evaluate: ({ inputs }) => ({
     index: asArray(inputs.array).findIndex((v) => JSON.stringify(v) === JSON.stringify(inputs.item)),
@@ -369,7 +388,7 @@ registerNode({
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: {},
   pins: [arrayPin("number"), { id: "isEmpty", label: i18n.nodes.array.isEmpty.pin_is_empty, type: "boolean", direction: "output" }],
-  deriveInstancePins: (node) => [arrayPin(elementTypeOf(node)), { id: "isEmpty", label: i18n.nodes.array.isEmpty.pin_is_empty, type: "boolean", direction: "output" }],
+  deriveInstancePins: (node) => [arrayPin(elementTypeOf(node), undefined, elementSubTypeOf(node)), { id: "isEmpty", label: i18n.nodes.array.isEmpty.pin_is_empty, type: "boolean", direction: "output" }],
   evaluate: ({ inputs }) => ({ isEmpty: asArray(inputs.array).length === 0 }),
   compileEvaluate: ({ inputs }) => ({
     isEmpty: `((${compileAsArray(inputs.array)}).length === 0)`,
@@ -386,7 +405,8 @@ registerNode({
   pins: [arrayPin("number"), arrayOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [arrayPin(t), arrayOutPin(t)];
+    const s = elementSubTypeOf(node);
+    return [arrayPin(t, undefined, s), arrayOutPin(t, undefined, s)];
   },
   evaluate: ({ inputs }) => ({
     result: asArray(inputs.array).slice().reverse(),
@@ -418,11 +438,12 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
+    const s = elementSubTypeOf(node);
     return [
       { id: "exec-in", label: "", type: "exec", direction: "input" },
-      arrayPin(t),
+      arrayPin(t, undefined, s),
       { id: "loop-body", label: i18n.nodes.__shared.pin_loop_body, type: "exec", direction: "output" },
-      itemPin("element", i18n.nodes.array.pin_element, t, "output"),
+      itemPin("element", i18n.nodes.array.pin_element, t, "output", s),
       { id: "index", label: i18n.nodes.__shared.pin_index, type: "number", direction: "output" },
       { id: "completed", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     ];

@@ -1,4 +1,4 @@
-import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
+import { defaultValueFor } from "../engine/graphMutations";
 import { registerNode } from "../engine/registry";
 import { connectionsFrom } from "../engine/graphQueries";
 import { runExecFrom } from "../engine/executor";
@@ -18,6 +18,10 @@ function valueTypeOf(node: NodeInstance): PinType {
   return node.elementType ?? "number";
 }
 
+function valueSubTypeOf(node: NodeInstance): string | undefined {
+  return node.elementSubType;
+}
+
 function keyTypeOf(node: NodeInstance): PinType {
   return node.mapKeyType ?? "string";
 }
@@ -34,7 +38,7 @@ function jsonEq(aExpr: string, bExpr: string): string {
   return `(JSON.stringify(${aExpr}) === JSON.stringify(${bExpr}))`;
 }
 
-function mapPin(valueType: PinType, keyType: PinType, id = "map", label = i18n.nodes.map.pin_map): PinDef {
+function mapPin(valueType: PinType, keyType: PinType, id = "map", label = i18n.nodes.map.pin_map, subType?: string): PinDef {
   return {
     id,
     label,
@@ -43,10 +47,11 @@ function mapPin(valueType: PinType, keyType: PinType, id = "map", label = i18n.n
     container: "map",
     keyType,
     defaultValue: [],
+    subType,
   };
 }
 
-function mapOutPin(valueType: PinType, keyType: PinType, label = i18n.nodes.map.pin_result): PinDef {
+function mapOutPin(valueType: PinType, keyType: PinType, label = i18n.nodes.map.pin_result, subType?: string): PinDef {
   return {
     id: "result",
     label,
@@ -54,6 +59,7 @@ function mapOutPin(valueType: PinType, keyType: PinType, label = i18n.nodes.map.
     direction: "output",
     container: "map",
     keyType,
+    subType,
   };
 }
 
@@ -63,17 +69,18 @@ function keyPin(keyType: PinType, id = "key", label = i18n.nodes.map.pin_key): P
     label,
     type: keyType,
     direction: "input",
-    defaultValue: DEFAULT_VALUE_BY_TYPE[keyType],
+    defaultValue: defaultValueFor(keyType, undefined),
   };
 }
 
-function valuePin(valueType: PinType, id: string, label: string, direction: "input" | "output" = "input"): PinDef {
+function valuePin(valueType: PinType, id: string, label: string, direction: "input" | "output" = "input", subType?: string): PinDef {
   return {
     id,
     label,
     type: valueType,
     direction,
-    defaultValue: direction === "input" ? DEFAULT_VALUE_BY_TYPE[valueType] : undefined,
+    defaultValue: direction === "input" ? defaultValueFor(valueType, undefined, subType) : undefined,
+    subType,
   };
 }
 
@@ -94,6 +101,7 @@ function makeMapEntrySuffixes(node: NodeInstance): number[] {
 function makeMapEntryPins(node: NodeInstance): PinDef[] {
   const keyType = keyTypeOf(node);
   const valueType = valueTypeOf(node);
+  const valueSubType = valueSubTypeOf(node);
   const pins: PinDef[] = [];
   makeMapEntrySuffixes(node).forEach((i, position) => {
     pins.push({
@@ -101,14 +109,15 @@ function makeMapEntryPins(node: NodeInstance): PinDef[] {
       label: `${i18n.nodes.map.make.pin_key_n} ${position + 1}`,
       type: keyType,
       direction: "input",
-      defaultValue: DEFAULT_VALUE_BY_TYPE[keyType],
+      defaultValue: defaultValueFor(keyType, undefined),
     });
     pins.push({
       id: `${VALUE_PREFIX}${i}`,
       label: `${i18n.nodes.map.make.pin_value_n} ${position + 1}`,
       type: valueType,
       direction: "input",
-      defaultValue: DEFAULT_VALUE_BY_TYPE[valueType],
+      defaultValue: defaultValueFor(valueType, undefined, valueSubType),
+      subType: valueSubType,
       removable: true,
     });
   });
@@ -140,15 +149,15 @@ registerNode({
     },
     mapOutPin("number", "string"),
   ],
-  deriveInstancePins: (node) => [...makeMapEntryPins(node), mapOutPin(valueTypeOf(node), keyTypeOf(node))],
+  deriveInstancePins: (node) => [...makeMapEntryPins(node), mapOutPin(valueTypeOf(node), keyTypeOf(node), undefined, valueSubTypeOf(node))],
   addInstancePinEntry: (node) => {
     const suffixes = makeMapEntrySuffixes(node);
     const next = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
     node.pins[`${KEY_PREFIX}${next}`] = {
-      value: DEFAULT_VALUE_BY_TYPE[keyTypeOf(node)],
+      value: defaultValueFor(keyTypeOf(node), undefined),
     };
     node.pins[`${VALUE_PREFIX}${next}`] = {
-      value: DEFAULT_VALUE_BY_TYPE[valueTypeOf(node)],
+      value: defaultValueFor(valueTypeOf(node), undefined, valueSubTypeOf(node)),
     };
   },
   onInstancePinRemoved: (_node, removedPinId) => {
@@ -185,7 +194,7 @@ registerNode({
     },
   ],
   deriveInstancePins: (node) => [
-    mapPin(valueTypeOf(node), keyTypeOf(node)),
+    mapPin(valueTypeOf(node), keyTypeOf(node), undefined, undefined, valueSubTypeOf(node)),
     {
       id: "length",
       label: i18n.nodes.__shared.pin_length,
@@ -209,8 +218,9 @@ registerNode({
   pins: [mapPin("number", "string"), keyPin("string"), valuePin("number", "value", "Value"), mapOutPin("number", "string")],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
+    const vs = valueSubTypeOf(node);
     const k = keyTypeOf(node);
-    return [mapPin(v, k), keyPin(k), valuePin(v, "value", "Value"), mapOutPin(v, k)];
+    return [mapPin(v, k, undefined, undefined, vs), keyPin(k), valuePin(v, "value", "Value", "input", vs), mapOutPin(v, k, undefined, vs)];
   },
   evaluate: ({ inputs }) => {
     const entries = asEntries(inputs.map).slice();
@@ -244,11 +254,12 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
+    const vs = valueSubTypeOf(node);
     const k = keyTypeOf(node);
     return [
-      mapPin(v, k),
+      mapPin(v, k, undefined, undefined, vs),
       keyPin(k),
-      mapOutPin(v, k),
+      mapOutPin(v, k, undefined, vs),
       {
         id: "removed",
         label: i18n.nodes.__shared.pin_removed,
@@ -278,7 +289,7 @@ registerNode({
   colorCategory: NodeColorCategory.Collections,
   configurableElementType: { includeKeyType: true },
   pins: [mapPin("number", "string"), mapOutPin("number", "string")],
-  deriveInstancePins: (node) => [mapPin(valueTypeOf(node), keyTypeOf(node)), mapOutPin(valueTypeOf(node), keyTypeOf(node))],
+  deriveInstancePins: (node) => [mapPin(valueTypeOf(node), keyTypeOf(node), undefined, undefined, valueSubTypeOf(node)), mapOutPin(valueTypeOf(node), keyTypeOf(node), undefined, valueSubTypeOf(node))],
   evaluate: () => ({ result: [] }),
   compileEvaluate: () => ({ result: "[]" }),
 });
@@ -302,9 +313,10 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
+    const vs = valueSubTypeOf(node);
     const k = keyTypeOf(node);
     return [
-      mapPin(v, k),
+      mapPin(v, k, undefined, undefined, vs),
       keyPin(k),
       {
         id: "contains",
@@ -342,11 +354,12 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
+    const vs = valueSubTypeOf(node);
     const k = keyTypeOf(node);
     return [
-      mapPin(v, k),
+      mapPin(v, k, undefined, undefined, vs),
       keyPin(k),
-      valuePin(v, "value", "Value", "output"),
+      valuePin(v, "value", "Value", "output", vs),
       {
         id: "found",
         label: i18n.nodes.map.find.pin_found,
@@ -358,12 +371,12 @@ registerNode({
   evaluate: ({ node, inputs }) => {
     const entry = asEntries(inputs.map).find((e) => JSON.stringify(e.key) === JSON.stringify(inputs.key));
     return {
-      value: entry ? entry.value : DEFAULT_VALUE_BY_TYPE[valueTypeOf(node)],
+      value: entry ? entry.value : defaultValueFor(valueTypeOf(node), undefined, valueSubTypeOf(node)),
       found: !!entry,
     };
   },
   compileEvaluate: ({ node, inputs }) => {
-    const fallback = JSON.stringify(DEFAULT_VALUE_BY_TYPE[valueTypeOf(node)]);
+    const fallback = JSON.stringify(defaultValueFor(valueTypeOf(node), undefined, valueSubTypeOf(node)));
     return {
       value: `(() => { const entry = (${compileAsEntries(inputs.map)}).find((e) => ${jsonEq("e.key", inputs.key)}); return entry ? entry.value : ${fallback}; })()`,
       found: `(${compileAsEntries(inputs.map)}).some((e) => ${jsonEq("e.key", inputs.key)})`,
@@ -390,9 +403,10 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
+    const vs = valueSubTypeOf(node);
     const k = keyTypeOf(node);
     return [
-      mapPin(v, k),
+      mapPin(v, k, undefined, undefined, vs),
       {
         id: "result",
         label: i18n.nodes.map.keys.pin_keys,
@@ -429,15 +443,17 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
+    const vs = valueSubTypeOf(node);
     const k = keyTypeOf(node);
     return [
-      mapPin(v, k),
+      mapPin(v, k, undefined, undefined, vs),
       {
         id: "result",
         label: i18n.nodes.map.values.pin_values,
         type: v,
         direction: "output",
         container: "array" as const,
+        subType: vs,
       },
     ];
   },
@@ -466,7 +482,7 @@ registerNode({
     },
   ],
   deriveInstancePins: (node) => [
-    mapPin(valueTypeOf(node), keyTypeOf(node)),
+    mapPin(valueTypeOf(node), keyTypeOf(node), undefined, undefined, valueSubTypeOf(node)),
     {
       id: "isEmpty",
       label: i18n.nodes.map.isEmpty.pin_is_empty,
@@ -514,10 +530,11 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const v = valueTypeOf(node);
+    const vs = valueSubTypeOf(node);
     const k = keyTypeOf(node);
     return [
       { id: "exec-in", label: "", type: "exec", direction: "input" },
-      mapPin(v, k),
+      mapPin(v, k, undefined, undefined, vs),
       {
         id: "loop-body",
         label: i18n.nodes.__shared.pin_loop_body,
@@ -530,7 +547,7 @@ registerNode({
         type: k,
         direction: "output",
       },
-      valuePin(v, "value", "Value", "output"),
+      valuePin(v, "value", "Value", "output", vs),
       {
         id: "completed",
         label: i18n.nodes.__shared.pin_completed,

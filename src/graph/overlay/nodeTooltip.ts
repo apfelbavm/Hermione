@@ -1,4 +1,6 @@
 import { getNodeDef } from "../engine/registry";
+import { tryGetEnumTypeDef } from "../engine/enumRegistry";
+import { tryGetStructTypeDef } from "../engine/structRegistry";
 import type { PinDef, PinType } from "../engine/types";
 import type { NodeInstance } from "../engine/nodeInstance";
 import { hitTestNode, hitTestPin } from "../render/hitTest";
@@ -12,10 +14,18 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/** For struct/enum pins, shows the registered class's own label (e.g. "Player") instead of the
+ * generic "Struct"/"Enum" type name — same lookup typedValueInput.ts's labelFor uses. */
+function describeScalarType(type: PinType, subType?: string): string {
+  if (type === "struct") return (subType && tryGetStructTypeDef(subType)?.label) ?? capitalize(type);
+  if (type === "enum") return (subType && tryGetEnumTypeDef(subType)?.label) ?? capitalize(type);
+  return capitalize(type);
+}
+
 /** "String", "Array<Number>", "Map<String, Boolean>" — the same Array<Type>/Map<Key, Value>
  * bracket notation used throughout the engine's own doc comments (see PinContainer/PinDef). */
 function describePinType(pin: PinDef): string {
-  const type = capitalize(pin.type);
+  const type = describeScalarType(pin.type, pin.subType);
   const container = pin.container ?? "single";
   if (container === "single") return type;
   if (container === "map") return `Map<${capitalize(pin.keyType ?? "string")}, ${type}>`;

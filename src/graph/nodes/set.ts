@@ -1,4 +1,4 @@
-import { DEFAULT_VALUE_BY_TYPE } from "../engine/graphMutations";
+import { defaultValueFor } from "../engine/graphMutations";
 import { registerNode } from "../engine/registry";
 import { connectionsFrom } from "../engine/graphQueries";
 import { runExecFrom } from "../engine/executor";
@@ -11,6 +11,10 @@ const GROUP = i18n.nodes.set.group;
 
 function elementTypeOf(node: NodeInstance): PinType {
   return node.elementType ?? "number";
+}
+
+function elementSubTypeOf(node: NodeInstance): string | undefined {
+  return node.elementSubType;
 }
 
 function asArray(value: unknown): unknown[] {
@@ -42,7 +46,7 @@ function compileDedupe(expr: string): string {
   return `(() => { const seen = new Set(); const out = []; for (const v of (${expr})) { const k = JSON.stringify(v); if (!seen.has(k)) { seen.add(k); out.push(v); } } return out; })()`;
 }
 
-function setPin(elementType: PinType, id = "set", label = i18n.nodes.set.pin_set_in): PinDef {
+function setPin(elementType: PinType, id = "set", label = i18n.nodes.set.pin_set_in, subType?: string): PinDef {
   return {
     id,
     label,
@@ -50,26 +54,29 @@ function setPin(elementType: PinType, id = "set", label = i18n.nodes.set.pin_set
     direction: "input",
     container: "set",
     defaultValue: [],
+    subType,
   };
 }
 
-function setOutPin(elementType: PinType, label = i18n.nodes.set.pin_result): PinDef {
+function setOutPin(elementType: PinType, label = i18n.nodes.set.pin_result, subType?: string): PinDef {
   return {
     id: "result",
     label,
     type: elementType,
     direction: "output",
     container: "set",
+    subType,
   };
 }
 
-function itemPin(id: string, label: string, elementType: PinType): PinDef {
+function itemPin(id: string, label: string, elementType: PinType, subType?: string): PinDef {
   return {
     id,
     label,
     type: elementType,
     direction: "input",
-    defaultValue: DEFAULT_VALUE_BY_TYPE[elementType],
+    defaultValue: defaultValueFor(elementType, undefined, subType),
+    subType,
   };
 }
 
@@ -87,12 +94,14 @@ function makeSetEntryIds(node: NodeInstance): string[] {
 
 function makeSetEntryPins(node: NodeInstance): PinDef[] {
   const elementType = elementTypeOf(node);
+  const subType = elementSubTypeOf(node);
   return makeSetEntryIds(node).map((id, i) => ({
     id,
     label: `${i18n.nodes.set.pin_element} ${i + 1}`,
     type: elementType,
     direction: "input" as const,
-    defaultValue: DEFAULT_VALUE_BY_TYPE[elementType],
+    defaultValue: defaultValueFor(elementType, undefined, subType),
+    subType,
     removable: true,
   }));
 }
@@ -115,12 +124,12 @@ registerNode({
     },
     setOutPin("number"),
   ],
-  deriveInstancePins: (node) => [...makeSetEntryPins(node), setOutPin(elementTypeOf(node))],
+  deriveInstancePins: (node) => [...makeSetEntryPins(node), setOutPin(elementTypeOf(node), undefined, elementSubTypeOf(node))],
   addInstancePinEntry: (node) => {
     const suffixes = makeSetEntryIds(node).map(entrySuffix);
     const nextSuffix = suffixes.length === 0 ? 0 : Math.max(...suffixes) + 1;
     node.pins[`${ENTRY_PREFIX}${nextSuffix}`] = {
-      value: DEFAULT_VALUE_BY_TYPE[elementTypeOf(node)],
+      value: defaultValueFor(elementTypeOf(node), undefined, elementSubTypeOf(node)),
     };
   },
   evaluate: ({ node, inputs }) => ({
@@ -152,7 +161,7 @@ registerNode({
     },
   ],
   deriveInstancePins: (node) => [
-    setPin(elementTypeOf(node)),
+    setPin(elementTypeOf(node), undefined, undefined, elementSubTypeOf(node)),
     {
       id: "length",
       label: i18n.nodes.__shared.pin_length,
@@ -186,10 +195,11 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
+    const s = elementSubTypeOf(node);
     return [
-      setPin(t),
-      itemPin("item", i18n.nodes.__shared.pin_item, t),
-      setOutPin(t),
+      setPin(t, undefined, undefined, s),
+      itemPin("item", i18n.nodes.__shared.pin_item, t, s),
+      setOutPin(t, undefined, s),
       {
         id: "added",
         label: i18n.nodes.set.add.pin_added,
@@ -235,10 +245,11 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
+    const s = elementSubTypeOf(node);
     return [
-      setPin(t),
-      itemPin("item", i18n.nodes.__shared.pin_item, t),
-      setOutPin(t),
+      setPin(t, undefined, undefined, s),
+      itemPin("item", i18n.nodes.__shared.pin_item, t, s),
+      setOutPin(t, undefined, s),
       {
         id: "removed",
         label: i18n.nodes.__shared.pin_removed,
@@ -270,7 +281,8 @@ registerNode({
   pins: [setPin("number"), setOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [setPin(t), setOutPin(t)];
+    const s = elementSubTypeOf(node);
+    return [setPin(t, undefined, undefined, s), setOutPin(t, undefined, s)];
   },
   evaluate: () => ({ result: [] }),
   compileEvaluate: () => ({ result: "[]" }),
@@ -295,9 +307,10 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
+    const s = elementSubTypeOf(node);
     return [
-      setPin(t),
-      itemPin("item", i18n.nodes.__shared.pin_item, t),
+      setPin(t, undefined, undefined, s),
+      itemPin("item", i18n.nodes.__shared.pin_item, t, s),
       {
         id: "contains",
         label: i18n.nodes.__shared.pin_contains,
@@ -331,7 +344,7 @@ registerNode({
     },
   ],
   deriveInstancePins: (node) => [
-    setPin(elementTypeOf(node)),
+    setPin(elementTypeOf(node), undefined, undefined, elementSubTypeOf(node)),
     {
       id: "isEmpty",
       label: i18n.nodes.set.isEmpty.pin_is_empty,
@@ -364,14 +377,16 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
+    const s = elementSubTypeOf(node);
     return [
-      setPin(t),
+      setPin(t, undefined, undefined, s),
       {
         id: "result",
         label: i18n.nodes.set.toArray.pin_array,
         type: t,
         direction: "output",
         container: "array" as const,
+        subType: s,
       },
     ];
   },
@@ -391,7 +406,8 @@ registerNode({
   pins: [{ ...setPin("number"), id: "a", label: i18n.nodes.set.union.pin_set_a }, { ...setPin("number"), id: "b", label: i18n.nodes.set.union.pin_set_b }, setOutPin("number")],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: i18n.nodes.set.union.pin_set_a }, { ...setPin(t), id: "b", label: i18n.nodes.set.union.pin_set_b }, setOutPin(t)];
+    const s = elementSubTypeOf(node);
+    return [{ ...setPin(t, undefined, undefined, s), id: "a", label: i18n.nodes.set.union.pin_set_a }, { ...setPin(t, undefined, undefined, s), id: "b", label: i18n.nodes.set.union.pin_set_b }, setOutPin(t, undefined, s)];
   },
   evaluate: ({ inputs }) => ({
     result: dedupe([...asArray(inputs.a), ...asArray(inputs.b)]),
@@ -423,7 +439,8 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: i18n.nodes.set.intersection.pin_set_a }, { ...setPin(t), id: "b", label: i18n.nodes.set.intersection.pin_set_b }, setOutPin(t)];
+    const s = elementSubTypeOf(node);
+    return [{ ...setPin(t, undefined, undefined, s), id: "a", label: i18n.nodes.set.intersection.pin_set_a }, { ...setPin(t, undefined, undefined, s), id: "b", label: i18n.nodes.set.intersection.pin_set_b }, setOutPin(t, undefined, s)];
   },
   evaluate: ({ inputs }) => {
     const a = asArray(inputs.a);
@@ -459,7 +476,8 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
-    return [{ ...setPin(t), id: "a", label: i18n.nodes.set.difference.pin_set_a }, { ...setPin(t), id: "b", label: i18n.nodes.set.difference.pin_set_b }, setOutPin(t)];
+    const s = elementSubTypeOf(node);
+    return [{ ...setPin(t, undefined, undefined, s), id: "a", label: i18n.nodes.set.difference.pin_set_a }, { ...setPin(t, undefined, undefined, s), id: "b", label: i18n.nodes.set.difference.pin_set_b }, setOutPin(t, undefined, s)];
   },
   evaluate: ({ inputs }) => {
     const a = asArray(inputs.a);
@@ -512,9 +530,10 @@ registerNode({
   ],
   deriveInstancePins: (node) => {
     const t = elementTypeOf(node);
+    const s = elementSubTypeOf(node);
     return [
       { id: "exec-in", label: "", type: "exec", direction: "input" },
-      setPin(t),
+      setPin(t, undefined, undefined, s),
       {
         id: "loop-body",
         label: i18n.nodes.__shared.pin_loop_body,
@@ -526,6 +545,7 @@ registerNode({
         label: i18n.nodes.set.pin_element,
         type: t,
         direction: "output",
+        subType: s,
       },
       {
         id: "index",
