@@ -47,13 +47,15 @@ export function NodeOutputsPanel({ store, getSelectedNode }: { store: Store; get
       entries.map((entry) => entry.name),
       "NewOutput",
     );
-    const { type, subType } = getLastVariableType();
+    const { type, subType, container, keyType } = getLastVariableType();
     const entry: PinSignatureEntry = {
       id: nextId("io"),
       name,
       type,
       subType,
-      defaultValue: defaultValueFor(type, undefined, subType),
+      container,
+      keyType,
+      defaultValue: defaultValueFor(type, container, subType),
     };
     addNodeOutputEntry(node!, entry);
     setEditingId(entry.id);
@@ -109,7 +111,7 @@ export function NodeOutputsPanel({ store, getSelectedNode }: { store: Store; get
                         type,
                         subType,
                       });
-                      setLastVariableType(type, subType);
+                      setLastVariableType(entry);
                       store.notify();
                     },
                     entry.subType,
@@ -126,6 +128,7 @@ export function NodeOutputsPanel({ store, getSelectedNode }: { store: Store; get
                     updateNodeOutputEntry(store.state.rootGraph, node!, entry.id, {
                       container,
                     });
+                    setLastVariableType(entry);
                     store.notify();
                   })
                 }
@@ -140,6 +143,7 @@ export function NodeOutputsPanel({ store, getSelectedNode }: { store: Store; get
                       updateNodeOutputEntry(store.state.rootGraph, node!, entry.id, {
                         keyType,
                       });
+                      setLastVariableType(entry);
                       store.notify();
                     })
                   }

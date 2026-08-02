@@ -46,13 +46,15 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
       entries.map((entry) => entry.name),
       kind === "input" ? "NewInput" : "NewOutput",
     );
-    const { type, subType } = getLastVariableType();
+    const { type, subType, container, keyType } = getLastVariableType();
     const entry: PinSignatureEntry = {
       id: nextId("io"),
       name,
       type,
       subType,
-      defaultValue: defaultValueFor(type, undefined, subType),
+      container,
+      keyType,
+      defaultValue: defaultValueFor(type, container, subType),
     };
     if (kind === "input") addScriptInput(script!, entry);
     else addScriptOutput(script!, entry);
@@ -109,7 +111,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
                         type,
                         subType,
                       });
-                      setLastVariableType(type, subType);
+                      setLastVariableType(entry);
                       store.notify();
                     },
                     entry.subType,
@@ -126,6 +128,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
                     update(store.state.rootGraph, script!, entry.id, {
                       container,
                     });
+                    setLastVariableType(entry);
                     store.notify();
                   })
                 }
@@ -140,6 +143,7 @@ export function ScriptIoPanel({ store, kind, getSelectedScript }: { store: Store
                       update(store.state.rootGraph, script!, entry.id, {
                         keyType,
                       });
+                      setLastVariableType(entry);
                       store.notify();
                     })
                   }

@@ -113,7 +113,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
                     type,
                     subType,
                   });
-                  setLastVariableType(type, subType);
+                  setLastVariableType(variable);
                   store.notify();
                 },
                 variable.subType,
@@ -129,6 +129,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
                 updateVariable(store.state.rootGraph, variable.id, {
                   container,
                 });
+                setLastVariableType(variable);
                 store.notify();
               })
             }
@@ -142,6 +143,7 @@ function VariableDetails({ store, variable }: { store: Store; variable: Variable
                   updateVariable(store.state.rootGraph, variable.id, {
                     keyType,
                   });
+                  setLastVariableType(variable);
                   store.notify();
                 })
               }

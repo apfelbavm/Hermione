@@ -64,13 +64,15 @@ export function VariablePanel({ id, title, store, getGraph }: { id?: string; tit
       graph.variables.map((v) => v.name),
       "NewVariable",
     );
-    const { type, subType } = getLastVariableType();
+    const { type, subType, container, keyType } = getLastVariableType();
     const variable: Variable = {
       id: nextId("var"),
       name,
       type,
       subType,
-      defaultValue: defaultValueFor(type, undefined, subType),
+      container,
+      keyType,
+      defaultValue: defaultValueFor(type, container, subType),
     };
     addVariable(graph, variable);
     setEditingId(variable.id);

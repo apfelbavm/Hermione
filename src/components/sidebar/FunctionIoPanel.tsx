@@ -45,13 +45,15 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
       entries.map((entry) => entry.name),
       kind === "input" ? "NewInput" : "NewOutput",
     );
-    const { type, subType } = getLastVariableType();
+    const { type, subType, container, keyType } = getLastVariableType();
     const entry: PinSignatureEntry = {
       id: nextId("io"),
       name,
       type,
       subType,
-      defaultValue: defaultValueFor(type, undefined, subType),
+      container,
+      keyType,
+      defaultValue: defaultValueFor(type, container, subType),
     };
     if (kind === "input") addFunctionInput(fn!, entry);
     else addFunctionOutput(fn!, entry);
@@ -109,7 +111,7 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
                         type,
                         subType,
                       });
-                      setLastVariableType(type, subType);
+                      setLastVariableType(entry);
                       store.notify();
                     },
                     entry.subType,
@@ -126,6 +128,7 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
                     update(store.state.rootGraph, fn!, entry.id, {
                       container,
                     });
+                    setLastVariableType(entry);
                     store.notify();
                   })
                 }
@@ -138,6 +141,7 @@ export function FunctionIoPanel({ store, kind, getActiveFunction }: { store: Sto
                   build={() =>
                     createTypeSelect(entry.keyType ?? "string", (keyType) => {
                       update(store.state.rootGraph, fn!, entry.id, { keyType });
+                      setLastVariableType(entry);
                       store.notify();
                     })
                   }
