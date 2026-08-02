@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { registerBuiltins } from "../graph/nodes";
-import { connectPins, insertRerouteOnConnection, nextId, removeInstancePin } from "../graph/engine/graphMutations";
+import { cloneDefaultValue, connectPins, insertRerouteOnConnection, nextId, removeInstancePin } from "../graph/engine/graphMutations";
 import { canCollapseSelectionToFunction, collapseSelectionToFunction } from "../graph/engine/collapseToFunction";
 import { connectionsTouchingPin } from "../graph/engine/graphQueries";
-import { allNodeDefs, findCompatibleNodeDefs, getNodeDef, isPinTypeCompatible, topLevelGroup } from "../graph/engine/registry";
-import type { CodeScriptDef, FunctionDef, NodeDef, Variable } from "../graph/engine/types";
+import { allNodeDefs, getNodeDef, topLevelGroup } from "../graph/engine/registry";
+import { findDragCompatibleNodeDefs, resolveDragMatch } from "../graph/engine/dragNodeCreation";
+import type { CodeScriptDef, FunctionDef, NodeDef, Pin, Variable } from "../graph/engine/types";
 import { buildDemoGraph } from "../templates/demoGraph";
 import { Graph } from "../graph/engine/graph";
 import { Camera } from "../graph/render/camera";
@@ -290,29 +291,50 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     function createNodeAndMaybeConnect(def: NodeDef, worldPos: { x: number; y: number }, anchors: WireAnchor[] = []): void {
       const graph = getEditingGraph(store.state);
       const node = NodeInstance.createNodeInstance(def.type, applySnapIfEnabled(worldPos), def.pins);
-      graph.addNode(node);
 
+      let matchPinId: string | undefined;
       if (anchors.length > 0) {
         const wantDirection = anchors[0].pin.direction === "output" ? "input" : "output";
-        const matchPin = def.pins.find((p) => p.direction === wantDirection && isPinTypeCompatible(anchors[0].pin, p));
-        if (matchPin) {
-          for (const anchor of anchors) {
-            const anchorIsOutput = anchor.pin.direction === "output";
-            const outputEnd = anchorIsOutput ? anchor : { nodeId: node.id, pinId: matchPin.id };
-            const inputEnd = anchorIsOutput ? { nodeId: node.id, pinId: matchPin.id } : anchor;
-            connectPins(
-              graph,
-              getVisibleVariablesForState(store.state),
-              store.state.rootGraph.functions,
-              {
-                fromNode: outputEnd.nodeId,
-                fromPin: outputEnd.pinId,
-                toNode: inputEnd.nodeId,
-                toPin: inputEnd.pinId,
-              },
-              store.state.rootGraph.scripts,
-            );
+        const match = resolveDragMatch(def, anchors[0].pin, wantDirection);
+        if (match) {
+          matchPinId = match.matchPin.id;
+          // Seeds the "wildcard" node's element/key/struct type to match the dragged pin (see
+          // dragNodeCreation.ts) — e.g. dragging a Struct<Player> pin onto empty space and picking
+          // "Break Struct" creates one already configured for Player, not some arbitrary fallback
+          // struct type. A no-op object for every ordinary (non-configurable) node type.
+          if (match.config.elementType !== undefined) node.elementType = match.config.elementType;
+          if (match.config.elementSubType !== undefined) node.elementSubType = match.config.elementSubType;
+          if (match.config.mapKeyType !== undefined) node.mapKeyType = match.config.mapKeyType;
+          if (match.config.subType !== undefined) node.subType = match.config.subType;
+          if (Object.keys(match.config).length > 0) {
+            const pins: Record<string, Pin> = {};
+            for (const pinDef of node.resolvePinDefs(getVisibleVariablesForState(store.state), store.state.rootGraph.functions, store.state.rootGraph.scripts)) {
+              pins[pinDef.id] = pinDef.direction === "input" ? { value: cloneDefaultValue(pinDef.defaultValue) } : {};
+            }
+            node.pins = pins;
           }
+        }
+      }
+
+      graph.addNode(node);
+
+      if (matchPinId) {
+        for (const anchor of anchors) {
+          const anchorIsOutput = anchor.pin.direction === "output";
+          const outputEnd = anchorIsOutput ? anchor : { nodeId: node.id, pinId: matchPinId };
+          const inputEnd = anchorIsOutput ? { nodeId: node.id, pinId: matchPinId } : anchor;
+          connectPins(
+            graph,
+            getVisibleVariablesForState(store.state),
+            store.state.rootGraph.functions,
+            {
+              fromNode: outputEnd.nodeId,
+              fromPin: outputEnd.pinId,
+              toNode: inputEnd.nodeId,
+              toPin: inputEnd.pinId,
+            },
+            store.state.rootGraph.scripts,
+          );
         }
       }
 
@@ -322,7 +344,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     const pointerInteraction = setupPointerInteraction(canvas, store, {
       onWireDroppedInEmptySpace: (anchors, screenPos) => {
         const shared = anchors[0].pin;
-        const candidates = filterCreatableHere(findCompatibleNodeDefs(shared, shared.direction));
+        const candidates = filterCreatableHere(findDragCompatibleNodeDefs(shared, shared.direction));
         const worldPos = store.state.camera.screenToWorld(screenPos.x, screenPos.y);
         openNodeSearchMenu(overlay, {
           screenPos,
