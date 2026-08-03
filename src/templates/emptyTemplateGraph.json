@@ -3,8 +3,8 @@
   "kind": "nodes",
   "version": 1,
   "nodes": [
-    { "id": "node-3-007mv6", "type": "event.run", "position": { "x": 0, "y": 0 }, "pins": { "exec-out": {} }, "disabled": false, "breakpoint": false },
-    { "id": "node-4-bzaa8z", "type": "debug.print", "position": { "x": 320, "y": 0 }, "pins": { "exec-in": { "connectionId": "conn-5-jt08ek" }, "message": { "value": "Hello World!" }, "exec-out": {} }, "disabled": false, "breakpoint": false }
+    { "id": "node-7-cvvtsv", "type": "debug.print", "position": { "x": 320, "y": 0 }, "pins": { "exec-in": { "connectionId": "conn-11-c53zfi" }, "message": { "value": "Hello World!" }, "exec-out": {} }, "disabled": false, "breakpoint": false },
+    { "id": "node-10-qb9nxr", "type": "event.deploy", "position": { "x": 0, "y": 0 }, "pins": { "exec-out": {} }, "disabled": false, "breakpoint": false }
   ],
-  "connections": [{ "id": "conn-5-jt08ek", "fromNode": "node-3-007mv6", "fromPin": "exec-out", "toNode": "node-4-bzaa8z", "toPin": "exec-in" }]
+  "connections": [{ "id": "conn-11-c53zfi", "fromNode": "node-10-qb9nxr", "fromPin": "exec-out", "toNode": "node-7-cvvtsv", "toPin": "exec-in" }]
 }

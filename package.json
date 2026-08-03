@@ -4,15 +4,22 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "preinstall": "node scripts/checkNodeVersion.mjs",
+    "predev": "node scripts/checkNodeVersion.mjs",
     "dev": "cross-env NODE_OPTIONS=--experimental-strip-types next dev",
+    "prebuild": "node scripts/checkNodeVersion.mjs",
     "build": "next build",
+    "prestart": "node scripts/checkNodeVersion.mjs",
     "start": "cross-env NODE_OPTIONS=--experimental-strip-types next start",
+    "pretest": "node scripts/checkNodeVersion.mjs",
     "test": "vitest run",
-    "compile": "tsx scripts/compileGraph.ts"
+    "precompile": "node scripts/checkNodeVersion.mjs",
+    "compile": "tsx scripts/compileGraph.ts",
+    "check:node": "node scripts/checkNodeVersion.mjs"
   },
   "devDependencies": {
     "@microsoft/microsoft-graph-types": "^2.43.1",
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.1.1",
     "@types/node-forge": "^1.3.14",
     "@types/papaparse": "^5.5.2",
@@ -31,8 +38,8 @@
     "@monaco-editor/react": "^4.7.0",
     "@octokit/auth-app": "^8.2.0",
     "@octokit/core": "^7.0.6",
-    "@octokit/plugin-rest-endpoint-methods": "^17.0.0",
-    "better-sqlite3": "^11.10.0",
+    "@octokit/plugin-rest-endpoint-methods": "^18.0.0",
+    "better-sqlite3": "^13.0.2",
     "dropbox": "^10.39.0",
     "facebook-nodejs-business-sdk": "^24.0.1",
     "fast-xml-builder": "^1.3.0",
@@ -51,5 +58,8 @@
   },
   "overrides": {
     "google-auth-library": "^10.9.1"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
