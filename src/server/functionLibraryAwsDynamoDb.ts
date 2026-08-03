@@ -1,7 +1,7 @@
 import { DynamoDbManager, type DynamoDbWriteTransactItem } from "../lib/dynamoDbManager.ts";
 import type { ScalarAttributeType, BillingMode } from "@aws-sdk/client-dynamodb";
 
-/** Mirrors nodes/dynamoDb.ts's own JSON parse/stringify helpers — duplicated rather than shared
+/** Mirrors nodes/AwsdynamoDb.ts's own JSON parse/stringify helpers — duplicated rather than shared
  * since this module and the node file are never imported by the same runtime (see
  * dynamoDbManagerFromEnv below, same reasoning as functionLibraryAzureStorage.ts's header comment). */
 function parseJsonObject(json: string): Record<string, unknown> {
@@ -16,7 +16,7 @@ function parseJsonArray(json: string): unknown[] {
   return Array.isArray(parsed) ? parsed : [];
 }
 
-/** Compile-time-only counterpart of nodes/dynamoDb.ts's execute() vault lookup
+/** Compile-time-only counterpart of nodes/AwsdynamoDb.ts's execute() vault lookup
  * (resolveDynamoDbCredential) — the compiled/deployed script has no access to the Credential Vault
  * database, only the interpreter does, so it reads the same credential's access key back from
  * environment variables instead, the same "HERMIONE_CRED_<NAME>_<FIELD>" naming

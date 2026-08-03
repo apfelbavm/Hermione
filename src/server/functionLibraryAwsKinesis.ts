@@ -7,7 +7,7 @@ import type { StreamMode, ShardIteratorType, EncryptionType, ScalingType } from 
  * environment variables instead, the same "HERMIONE_CRED_<NAME>_<FIELD>" naming
  * credentialEnv.ts's applyCredentialEnvVars writes. Never called by the interpreter — genuinely
  * different credential-sourcing behavior, not duplicated logic (same split as
- * functionLibraryDynamoDb.ts's dynamoDbManagerFromEnv). */
+ * functionLibraryAwsDynamoDb.ts's dynamoDbManagerFromEnv). */
 function kinesisManagerFromEnv(credentialName: string): { ok: true; manager: KinesisManager } | { ok: false; error: string } {
   const prefix = `HERMIONE_CRED_${String(credentialName)
     .toUpperCase()

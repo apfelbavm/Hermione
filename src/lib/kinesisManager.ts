@@ -29,7 +29,7 @@ import {
 /** Every Kinesis node (stream management, shards, records, tags) needs the same boilerplate: build
  * a client from an access key pair, call one SDK method, and turn either a result or a thrown error
  * into a plain {success, error} shape. Centralized here once instead of repeated per node (see
- * nodes/kinesis.ts, which only wires pins to these methods) — same structure as DynamoDbManager. */
+ * nodes/Awskinesis.ts, which only wires pins to these methods) — same structure as DynamoDbManager. */
 
 function kinesisErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);

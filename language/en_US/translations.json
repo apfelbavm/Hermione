@@ -829,82 +829,82 @@
         "pin_scanned_count": "Scanned Count"
       },
       "listTables": {
-        "label": "DynamoDB List Tables",
+        "label": "Aws DynamoDB List Tables",
         "description": "Lists the table names in the account/region, optionally paginated.",
         "pin_exclusive_start_table_name": "Exclusive Start Table Name",
         "pin_table_names": "Table Names",
         "pin_last_evaluated_table_name": "Last Evaluated Table Name"
       },
       "createTable": {
-        "label": "DynamoDB Create Table",
+        "label": "Aws DynamoDB Create Table",
         "description": "Creates a new table with the given partition key and optional sort key."
       },
       "deleteTable": {
-        "label": "DynamoDB Delete Table",
+        "label": "Aws DynamoDB Delete Table",
         "description": "Deletes a table."
       },
       "describeTable": {
-        "label": "DynamoDB Describe Table",
+        "label": "Aws DynamoDB Describe Table",
         "description": "Fetches status, key schema, item count/size, and throughput settings for a table."
       },
       "tableDescription": {
-        "label": "DynamoDB Table Description",
+        "label": "Aws DynamoDB Table Description",
         "pin_status": "Status",
         "pin_item_count": "Item Count",
         "pin_size_bytes": "Size (bytes)"
       },
       "updateTableCapacity": {
-        "label": "DynamoDB Update Table Capacity",
+        "label": "Aws DynamoDB Update Table Capacity",
         "description": "Changes a table's billing mode and/or provisioned read/write capacity units."
       },
       "putItem": {
-        "label": "DynamoDB Put Item",
+        "label": "Aws DynamoDB Put Item",
         "description": "Creates or replaces an item in a table, optionally only if a condition expression holds."
       },
       "getItem": {
-        "label": "DynamoDB Get Item",
+        "label": "Aws DynamoDB Get Item",
         "description": "Fetches a single item by its primary key.",
         "pin_projection_expression": "Projection Expression"
       },
       "updateItem": {
-        "label": "DynamoDB Update Item",
+        "label": "Aws DynamoDB Update Item",
         "description": "Updates one or more attributes of an existing item (or creates it), using an update expression.",
         "pin_update_expression": "Update Expression"
       },
       "deleteItem": {
-        "label": "DynamoDB Delete Item",
+        "label": "Aws DynamoDB Delete Item",
         "description": "Deletes a single item by its primary key, optionally only if a condition expression holds."
       },
       "query": {
-        "label": "DynamoDB Query",
+        "label": "Aws DynamoDB Query",
         "description": "Queries items sharing a partition key (and optional sort key condition), optionally against a secondary index.",
         "pin_key_condition_expression": "Key Condition Expression",
         "pin_scan_index_forward": "Scan Index Forward"
       },
       "scan": {
-        "label": "DynamoDB Scan",
+        "label": "Aws DynamoDB Scan",
         "description": "Scans every item in a table or index, optionally filtered by a filter expression."
       },
       "batchGetItem": {
-        "label": "DynamoDB Batch Get Item",
+        "label": "Aws DynamoDB Batch Get Item",
         "description": "Fetches up to 100 items from one table by their primary keys in a single request.",
         "pin_keys": "Keys (JSON array)",
         "pin_unprocessed_keys": "Unprocessed Keys (JSON)"
       },
       "batchWriteItem": {
-        "label": "DynamoDB Batch Write Item",
+        "label": "Aws DynamoDB Batch Write Item",
         "description": "Puts and/or deletes up to 25 items in one table in a single request.",
         "pin_put_items": "Put Items (JSON array)",
         "pin_delete_keys": "Delete Keys (JSON array)",
         "pin_unprocessed_count": "Unprocessed Count"
       },
       "transactGetItems": {
-        "label": "DynamoDB Transact Get Items",
+        "label": "Aws DynamoDB Transact Get Items",
         "description": "Atomically fetches up to 100 items across one or more tables, e.g. [{\"tableName\":\"T\",\"key\":{\"id\":\"1\"}}].",
         "pin_items_spec": "Items ([{tableName,key}] JSON)"
       },
       "transactWriteItems": {
-        "label": "DynamoDB Transact Write Items",
+        "label": "Aws DynamoDB Transact Write Items",
         "description": "Atomically applies up to 100 put/update/delete/conditionCheck operations across one or more tables, e.g. [{\"operation\":\"put\",\"tableName\":\"T\",\"item\":{...}}].",
         "pin_operations": "Operations (JSON)"
       }
@@ -921,25 +921,25 @@
         "pin_limit": "Limit"
       },
       "createStream": {
-        "label": "Kinesis Create Stream",
+        "label": "AWS Kinesis Create Stream",
         "description": "Creates a new data stream in the given capacity mode.",
         "pin_shard_count": "Shard Count",
         "pin_stream_mode": "Stream Mode"
       },
       "deleteStream": {
-        "label": "Kinesis Delete Stream",
+        "label": "AWS Kinesis Delete Stream",
         "description": "Deletes a data stream.",
         "pin_enforce_consumer_deletion": "Enforce Consumer Deletion"
       },
       "listStreams": {
-        "label": "Kinesis List Streams",
+        "label": "AWS Kinesis List Streams",
         "description": "Lists the stream names in the account/region, optionally paginated.",
         "pin_exclusive_start_stream_name": "Exclusive Start Stream Name",
         "pin_stream_names": "Stream Names",
         "pin_has_more_streams": "Has More Streams"
       },
       "describeStreamSummary": {
-        "label": "Kinesis Describe Stream Summary",
+        "label": "AWS Kinesis Describe Stream Summary",
         "description": "Fetches status, capacity mode, retention, shard count and encryption settings for a stream.",
         "pin_stream_arn": "Stream ARN",
         "pin_status": "Status",
@@ -949,28 +949,28 @@
         "pin_key_id": "KMS Key ID"
       },
       "describeLimits": {
-        "label": "Kinesis Describe Limits",
+        "label": "AWS Kinesis Describe Limits",
         "description": "Fetches the account/region's shard limit and current open shard count.",
         "pin_shard_limit": "Shard Limit",
         "pin_open_shard_count": "Open Shard Count"
       },
       "increaseStreamRetentionPeriod": {
-        "label": "Kinesis Increase Stream Retention Period",
+        "label": "AWS Kinesis Increase Stream Retention Period",
         "description": "Increases a stream's retention period, in hours."
       },
       "decreaseStreamRetentionPeriod": {
-        "label": "Kinesis Decrease Stream Retention Period",
+        "label": "AWS Kinesis Decrease Stream Retention Period",
         "description": "Decreases a stream's retention period, in hours."
       },
       "updateShardCount": {
-        "label": "Kinesis Update Shard Count",
+        "label": "AWS Kinesis Update Shard Count",
         "description": "Scales a provisioned stream up or down to a target shard count.",
         "pin_target_shard_count": "Target Shard Count",
         "pin_scaling_type": "Scaling Type",
         "pin_current_shard_count": "Current Shard Count"
       },
       "listShards": {
-        "label": "Kinesis List Shards",
+        "label": "AWS Kinesis List Shards",
         "description": "Lists the shards of a stream, optionally paginated.",
         "pin_exclusive_start_shard_id": "Exclusive Start Shard ID",
         "pin_max_results": "Max Results",
@@ -978,32 +978,32 @@
         "pin_shards": "Shards (JSON)"
       },
       "mergeShards": {
-        "label": "Kinesis Merge Shards",
+        "label": "AWS Kinesis Merge Shards",
         "description": "Merges two adjacent shards into a single shard.",
         "pin_shard_to_merge": "Shard To Merge",
         "pin_adjacent_shard_to_merge": "Adjacent Shard To Merge"
       },
       "splitShard": {
-        "label": "Kinesis Split Shard",
+        "label": "AWS Kinesis Split Shard",
         "description": "Splits a shard into two new shards using a new starting hash key.",
         "pin_shard_to_split": "Shard To Split",
         "pin_new_starting_hash_key": "New Starting Hash Key"
       },
       "putRecord": {
-        "label": "Kinesis Put Record",
+        "label": "AWS Kinesis Put Record",
         "description": "Writes a single data record into a stream.",
         "pin_shard_id": "Shard ID",
         "pin_sequence_number": "Sequence Number"
       },
       "putRecords": {
-        "label": "Kinesis Put Records",
+        "label": "AWS Kinesis Put Records",
         "description": "Writes up to 500 data records into a stream in a single request, e.g. [{\"data\":\"...\",\"partitionKey\":\"...\"}].",
         "pin_records": "Records ([{data,partitionKey,explicitHashKey}] JSON)",
         "pin_failed_record_count": "Failed Record Count",
         "pin_result_records": "Result Records (JSON)"
       },
       "getShardIterator": {
-        "label": "Kinesis Get Shard Iterator",
+        "label": "AWS Kinesis Get Shard Iterator",
         "description": "Gets a shard iterator, used to read records sequentially from a shard.",
         "pin_shard_iterator_type": "Shard Iterator Type",
         "pin_starting_sequence_number": "Starting Sequence Number",
@@ -1011,7 +1011,7 @@
         "pin_shard_iterator": "Shard Iterator"
       },
       "getRecords": {
-        "label": "Kinesis Get Records",
+        "label": "AWS Kinesis Get Records",
         "description": "Fetches data records from a shard using a shard iterator.",
         "pin_shard_iterator": "Shard Iterator",
         "pin_records": "Records (JSON)",
@@ -1019,30 +1019,30 @@
         "pin_millis_behind_latest": "Millis Behind Latest"
       },
       "addTagsToStream": {
-        "label": "Kinesis Add Tags To Stream",
+        "label": "AWS Kinesis Add Tags To Stream",
         "description": "Adds or updates up to 50 tags on a stream.",
         "pin_tags": "Tags (JSON object)"
       },
       "removeTagsFromStream": {
-        "label": "Kinesis Remove Tags From Stream",
+        "label": "AWS Kinesis Remove Tags From Stream",
         "description": "Removes tags with the given keys from a stream.",
         "pin_tag_keys": "Tag Keys (JSON array)"
       },
       "listTagsForStream": {
-        "label": "Kinesis List Tags For Stream",
+        "label": "AWS Kinesis List Tags For Stream",
         "description": "Lists the tags attached to a stream, optionally paginated.",
         "pin_exclusive_start_tag_key": "Exclusive Start Tag Key",
         "pin_tags": "Tags (JSON)",
         "pin_has_more_tags": "Has More Tags"
       },
       "startStreamEncryption": {
-        "label": "Kinesis Start Stream Encryption",
+        "label": "AWS Kinesis Start Stream Encryption",
         "description": "Enables server-side encryption on a stream using a customer-managed KMS key.",
         "pin_encryption_type": "Encryption Type",
         "pin_key_id": "KMS Key ID"
       },
       "stopStreamEncryption": {
-        "label": "Kinesis Stop Stream Encryption",
+        "label": "AWS Kinesis Stop Stream Encryption",
         "description": "Disables server-side encryption on a stream.",
         "pin_encryption_type": "Encryption Type",
         "pin_key_id": "KMS Key ID"

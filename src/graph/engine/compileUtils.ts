@@ -64,15 +64,15 @@ export const FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT = 'import * as functionLibrar
  * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/soap.ts). */
 export const FUNCTION_LIBRARY_SOAP_IMPORT = 'import * as functionLibrarySoap from "../../src/server/functionLibrarySoap.ts";';
 
-/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryDynamoDb.ts — kept in its own
+/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryAwsDynamoDb.ts — kept in its own
  * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see
- * nodes/dynamoDb.ts). */
-export const FUNCTION_LIBRARY_DYNAMODB_IMPORT = 'import * as functionLibraryDynamoDb from "../../src/server/functionLibraryDynamoDb.ts";';
+ * nodes/AwsdynamoDb.ts). */
+export const FUNCTION_LIBRARY_DYNAMODB_IMPORT = 'import * as functionLibraryDynamoDb from "../../src/server/functionLibraryAwsDynamoDb.ts";';
 
-/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryKinesis.ts — kept in its own
+/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryAwsKinesis.ts — kept in its own
  * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see
- * nodes/kinesis.ts). */
-export const FUNCTION_LIBRARY_KINESIS_IMPORT = 'import * as functionLibraryKinesis from "../../src/server/functionLibraryKinesis.ts";';
+ * nodes/Awskinesis.ts). */
+export const FUNCTION_LIBRARY_KINESIS_IMPORT = 'import * as functionLibraryKinesis from "../../src/server/functionLibraryAwsKinesis.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/executeDeployedFlow.ts — used by
  * flow.executeFlow's compileExecute (see nodes/flow.ts) so a deployed flow's own "Execute Flow"

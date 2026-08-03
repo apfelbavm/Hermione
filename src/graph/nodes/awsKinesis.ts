@@ -9,7 +9,7 @@ import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over KinesisManager (src/lib/kinesisManager.ts),
 // which owns the actual SDK calls and error normalization — this file only ever translates pins to
-// method arguments and method results back to pins. Same structure/conventions as nodes/dynamoDb.ts.
+// method arguments and method results back to pins. Same structure/conventions as nodes/AwsdynamoDb.ts.
 //
 // Every operation node takes a Credential Name directly (no separate auth/refresh node): each
 // resolves the named vault entry and hands its access key pair to KinesisManager.forCredential,
@@ -17,12 +17,12 @@ import { i18n } from "@i18n";
 //
 // Shard lists, record batches, and tag maps are carried as JSON string pins rather than
 // "map"/"struct" pins, since their shapes are arrays/nested objects of varying size — same
-// convention as dynamoDb.ts's items/keys/expression pins.
+// convention as AwsdynamoDb.ts's items/keys/expression pins.
 //
 // Every node here also has a compileExecute: the compiled path calls a same-named
-// `functionLibraryKinesis.kinesis*` wrapper (see server/functionLibraryKinesis.ts), which reads the
+// `functionLibraryKinesis.kinesis*` wrapper (see server/functionLibraryAwsKinesis.ts), which reads the
 // credential's access key back from environment variables instead of the vault — same split as
-// dynamoDb.ts's execute()/compileExecute().
+// AwsdynamoDb.ts's execute()/compileExecute().
 
 const GROUP_NAME = "Request.AWS Kinesis";
 

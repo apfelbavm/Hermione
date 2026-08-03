@@ -4,7 +4,7 @@ import { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, DeleteCo
 /** Every DynamoDB node (table management, items, queries, batches, transactions) needs the same
  * boilerplate: build a client from an access key pair, call one SDK method, and turn either a
  * result or a thrown error into a plain {success, error} shape. Centralized here once instead of
- * repeated per node (see nodes/dynamoDb.ts, which only wires pins to these methods). Uses
+ * repeated per node (see nodes/AwsdynamoDb.ts, which only wires pins to these methods). Uses
  * DynamoDBDocumentClient (from @aws-sdk/lib-dynamodb) rather than the low-level DynamoDBClient
  * directly, so callers deal in plain JS objects instead of DynamoDB's own {S, N, M, L, ...}
  * AttributeValue wire format. */

@@ -22,7 +22,7 @@ import { i18n } from "@i18n";
 // Storage's flat string/string metadata maps — same convention as soap.ts's Args/Headers pins.
 //
 // Every node here also has a compileExecute: the compiled path calls a same-named
-// `functionLibraryDynamoDb.dynamoDb*` wrapper (see server/functionLibraryDynamoDb.ts), which reads
+// `functionLibraryDynamoDb.dynamoDb*` wrapper (see server/functionLibraryAwsDynamoDb.ts), which reads
 // the credential's access key back from environment variables instead of the vault — same split as
 // azureStorage.ts's execute()/compileExecute().
 
