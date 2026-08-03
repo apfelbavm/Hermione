@@ -18,6 +18,7 @@ import "./dropbox";
 import "./facebook";
 import "./azureStorage";
 import "./dynamoDb";
+import "./kinesis";
 import "./struct";
 import "./github";
 import "./microsoft365";

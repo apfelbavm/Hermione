@@ -69,6 +69,11 @@ export const FUNCTION_LIBRARY_SOAP_IMPORT = 'import * as functionLibrarySoap fro
  * nodes/dynamoDb.ts). */
 export const FUNCTION_LIBRARY_DYNAMODB_IMPORT = 'import * as functionLibraryDynamoDb from "../../src/server/functionLibraryDynamoDb.ts";';
 
+/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryKinesis.ts — kept in its own
+ * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see
+ * nodes/kinesis.ts). */
+export const FUNCTION_LIBRARY_KINESIS_IMPORT = 'import * as functionLibraryKinesis from "../../src/server/functionLibraryKinesis.ts";';
+
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/executeDeployedFlow.ts — used by
  * flow.executeFlow's compileExecute (see nodes/flow.ts) so a deployed flow's own "Execute Flow"
  * node dynamic-imports the target Flow's DEPLOYED script exactly the same way the interpreter's

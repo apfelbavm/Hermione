@@ -141,10 +141,10 @@ export interface GoogleOAuth2CredentialData {
   refreshToken: string;
 }
 
-/** An IAM user/role's long-term access key pair plus the region to talk to — used as-is with
- * DynamoDBClient's `credentials`/`region` config (see lib/dynamoDbManager.ts). `sessionToken` is
- * only needed for temporary (STS-issued) credentials; `endpoint` only for pointing at DynamoDB
- * Local or another compatible endpoint instead of AWS itself. */
+/** An IAM user/role's long-term access key pair plus the region to talk to — used as-is with any
+ * AWS SDK client's `credentials`/`region` config (see lib/dynamoDbManager.ts, lib/kinesisManager.ts).
+ * `sessionToken` is only needed for temporary (STS-issued) credentials; `endpoint` only for
+ * pointing at a local/compatible endpoint (e.g. DynamoDB Local) instead of AWS itself. */
 export interface AwsAccessKeyCredentialData {
   accessKeyId: string;
   secretAccessKey: string;

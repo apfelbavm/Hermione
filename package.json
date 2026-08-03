@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1101.0",
+    "@aws-sdk/client-kinesis": "^3.1101.0",
     "@aws-sdk/lib-dynamodb": "^3.1101.0",
     "@azure/identity": "^4.13.1",
     "@azure/storage-blob": "^12.33.0",

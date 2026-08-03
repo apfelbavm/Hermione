@@ -18,6 +18,16 @@
 - Ad-hoc task scripts go in `scripts/`, not the repo root.
 - Format changed files with Prettier before finishing.
 
+## Testing
+
+Do not run the full test suite unless:
+- explicitly requested, or
+- the change affects shared/core infrastructure.
+
+Prefer targeted tests for the files being modified.
+
+Run typecheck when appropriate.
+
 ## Where to look
 - Architecture details: [docs/architecture.md](../docs/architecture.md)
 - Integrations / connectors: [docs/integrations.md](../docs/integrations.md)

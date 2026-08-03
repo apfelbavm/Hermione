@@ -909,6 +909,145 @@
         "pin_operations": "Operations (JSON)"
       }
     },
+    "kinesis": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_stream_name": "Stream Name",
+        "pin_shard_id": "Shard ID",
+        "pin_partition_key": "Partition Key",
+        "pin_explicit_hash_key": "Explicit Hash Key",
+        "pin_data": "Data",
+        "pin_retention_period_hours": "Retention Period (Hours)",
+        "pin_limit": "Limit"
+      },
+      "createStream": {
+        "label": "Kinesis Create Stream",
+        "description": "Creates a new data stream in the given capacity mode.",
+        "pin_shard_count": "Shard Count",
+        "pin_stream_mode": "Stream Mode"
+      },
+      "deleteStream": {
+        "label": "Kinesis Delete Stream",
+        "description": "Deletes a data stream.",
+        "pin_enforce_consumer_deletion": "Enforce Consumer Deletion"
+      },
+      "listStreams": {
+        "label": "Kinesis List Streams",
+        "description": "Lists the stream names in the account/region, optionally paginated.",
+        "pin_exclusive_start_stream_name": "Exclusive Start Stream Name",
+        "pin_stream_names": "Stream Names",
+        "pin_has_more_streams": "Has More Streams"
+      },
+      "describeStreamSummary": {
+        "label": "Kinesis Describe Stream Summary",
+        "description": "Fetches status, capacity mode, retention, shard count and encryption settings for a stream.",
+        "pin_stream_arn": "Stream ARN",
+        "pin_status": "Status",
+        "pin_stream_mode": "Stream Mode",
+        "pin_open_shard_count": "Open Shard Count",
+        "pin_encryption_type": "Encryption Type",
+        "pin_key_id": "KMS Key ID"
+      },
+      "describeLimits": {
+        "label": "Kinesis Describe Limits",
+        "description": "Fetches the account/region's shard limit and current open shard count.",
+        "pin_shard_limit": "Shard Limit",
+        "pin_open_shard_count": "Open Shard Count"
+      },
+      "increaseStreamRetentionPeriod": {
+        "label": "Kinesis Increase Stream Retention Period",
+        "description": "Increases a stream's retention period, in hours."
+      },
+      "decreaseStreamRetentionPeriod": {
+        "label": "Kinesis Decrease Stream Retention Period",
+        "description": "Decreases a stream's retention period, in hours."
+      },
+      "updateShardCount": {
+        "label": "Kinesis Update Shard Count",
+        "description": "Scales a provisioned stream up or down to a target shard count.",
+        "pin_target_shard_count": "Target Shard Count",
+        "pin_scaling_type": "Scaling Type",
+        "pin_current_shard_count": "Current Shard Count"
+      },
+      "listShards": {
+        "label": "Kinesis List Shards",
+        "description": "Lists the shards of a stream, optionally paginated.",
+        "pin_exclusive_start_shard_id": "Exclusive Start Shard ID",
+        "pin_max_results": "Max Results",
+        "pin_next_token": "Next Token",
+        "pin_shards": "Shards (JSON)"
+      },
+      "mergeShards": {
+        "label": "Kinesis Merge Shards",
+        "description": "Merges two adjacent shards into a single shard.",
+        "pin_shard_to_merge": "Shard To Merge",
+        "pin_adjacent_shard_to_merge": "Adjacent Shard To Merge"
+      },
+      "splitShard": {
+        "label": "Kinesis Split Shard",
+        "description": "Splits a shard into two new shards using a new starting hash key.",
+        "pin_shard_to_split": "Shard To Split",
+        "pin_new_starting_hash_key": "New Starting Hash Key"
+      },
+      "putRecord": {
+        "label": "Kinesis Put Record",
+        "description": "Writes a single data record into a stream.",
+        "pin_shard_id": "Shard ID",
+        "pin_sequence_number": "Sequence Number"
+      },
+      "putRecords": {
+        "label": "Kinesis Put Records",
+        "description": "Writes up to 500 data records into a stream in a single request, e.g. [{\"data\":\"...\",\"partitionKey\":\"...\"}].",
+        "pin_records": "Records ([{data,partitionKey,explicitHashKey}] JSON)",
+        "pin_failed_record_count": "Failed Record Count",
+        "pin_result_records": "Result Records (JSON)"
+      },
+      "getShardIterator": {
+        "label": "Kinesis Get Shard Iterator",
+        "description": "Gets a shard iterator, used to read records sequentially from a shard.",
+        "pin_shard_iterator_type": "Shard Iterator Type",
+        "pin_starting_sequence_number": "Starting Sequence Number",
+        "pin_timestamp": "Timestamp (Unix ms)",
+        "pin_shard_iterator": "Shard Iterator"
+      },
+      "getRecords": {
+        "label": "Kinesis Get Records",
+        "description": "Fetches data records from a shard using a shard iterator.",
+        "pin_shard_iterator": "Shard Iterator",
+        "pin_records": "Records (JSON)",
+        "pin_next_shard_iterator": "Next Shard Iterator",
+        "pin_millis_behind_latest": "Millis Behind Latest"
+      },
+      "addTagsToStream": {
+        "label": "Kinesis Add Tags To Stream",
+        "description": "Adds or updates up to 50 tags on a stream.",
+        "pin_tags": "Tags (JSON object)"
+      },
+      "removeTagsFromStream": {
+        "label": "Kinesis Remove Tags From Stream",
+        "description": "Removes tags with the given keys from a stream.",
+        "pin_tag_keys": "Tag Keys (JSON array)"
+      },
+      "listTagsForStream": {
+        "label": "Kinesis List Tags For Stream",
+        "description": "Lists the tags attached to a stream, optionally paginated.",
+        "pin_exclusive_start_tag_key": "Exclusive Start Tag Key",
+        "pin_tags": "Tags (JSON)",
+        "pin_has_more_tags": "Has More Tags"
+      },
+      "startStreamEncryption": {
+        "label": "Kinesis Start Stream Encryption",
+        "description": "Enables server-side encryption on a stream using a customer-managed KMS key.",
+        "pin_encryption_type": "Encryption Type",
+        "pin_key_id": "KMS Key ID"
+      },
+      "stopStreamEncryption": {
+        "label": "Kinesis Stop Stream Encryption",
+        "description": "Disables server-side encryption on a stream.",
+        "pin_encryption_type": "Encryption Type",
+        "pin_key_id": "KMS Key ID"
+      }
+    },
     "github": {
       "__shared": {
         "pin_credential_name": "Credential Name",
