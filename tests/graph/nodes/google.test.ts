@@ -23,15 +23,19 @@ const { driveFilesList, driveFilesGet, sheetsValuesGet, gmailMessagesSend, calen
 vi.mock("googleapis", () => ({
   google: {
     auth: {
-      JWT: vi.fn().mockImplementation((opts: unknown) => ({ __kind: "jwt", opts })),
-      OAuth2: vi.fn().mockImplementation((clientId: string, clientSecret: string, redirectUri?: string) => ({
-        __kind: "oauth2",
-        clientId,
-        clientSecret,
-        redirectUri,
-        setCredentials: vi.fn(),
-        getToken: oauth2GetToken,
-      })),
+      JWT: vi.fn().mockImplementation(function (opts: unknown) {
+        return { __kind: "jwt", opts };
+      }),
+      OAuth2: vi.fn().mockImplementation(function (clientId: string, clientSecret: string, redirectUri?: string) {
+        return {
+          __kind: "oauth2",
+          clientId,
+          clientSecret,
+          redirectUri,
+          setCredentials: vi.fn(),
+          getToken: oauth2GetToken,
+        };
+      }),
     },
     drive: vi.fn().mockReturnValue({
       files: { list: driveFilesList, get: driveFilesGet },

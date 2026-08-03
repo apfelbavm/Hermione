@@ -12,12 +12,14 @@ import { ClientSecretCredential } from "@azure/identity";
  * real token endpoint and only need to stub the actual Graph API calls made through the SDK client
  * (which does use global fetch, see HTTPMessageHandler). */
 vi.mock("@azure/identity", () => ({
-  ClientSecretCredential: vi.fn().mockImplementation(() => ({
-    getToken: vi.fn().mockResolvedValue({
-      token: "tok-live",
-      expiresOnTimestamp: Date.now() + 3600_000,
-    }),
-  })),
+  ClientSecretCredential: vi.fn().mockImplementation(function () {
+    return {
+      getToken: vi.fn().mockResolvedValue({
+        token: "tok-live",
+        expiresOnTimestamp: Date.now() + 3600_000,
+      }),
+    };
+  }),
 }));
 
 beforeAll(() => {
