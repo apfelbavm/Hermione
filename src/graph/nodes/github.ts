@@ -1,5 +1,6 @@
 import { NodeColorCategory, type ExecutionContext } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { compileResultVar, FUNCTION_LIBRARY_GITHUB_IMPORT } from "../engine/compileUtils";
 import { GithubManager, type GithubAuth } from "../../lib/githubManager";
 import type { GithubTokenCredentialData, GithubAppCredentialData } from "../../credentials/types";
 import { ISSUE_STRUCT_TYPE, PULL_REQUEST_STRUCT_TYPE, CREATE_RESULT_STRUCT_TYPE, MERGE_RESULT_STRUCT_TYPE, FILE_CONTENT_STRUCT_TYPE, FILE_WRITE_RESULT_STRUCT_TYPE } from "../structs/github";
@@ -9,8 +10,12 @@ import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over GithubManager (src/lib/githubManager.ts),
 // which owns the actual SDK calls and error normalization — this file only ever translates pins to
-// method arguments and method results back to pins. Interpreter-only for now (no compileExecute/
-// compileImports).
+// method arguments and method results back to pins.
+//
+// Every node here also has a compileExecute: the compiled path calls a same-named
+// `functionLibraryGithub.github*` wrapper (see server/functionLibraryGithub.ts), which reads the
+// credential back from environment variables via `githubCredentialFromEnv` instead of the vault —
+// same split as jira.ts's execute()/compileExecute().
 
 const GROUP_NAME = "Request.GitHub";
 
@@ -130,6 +135,12 @@ registerNode({
     const result = await manager.listIssues(String(inputs.owner ?? ""), String(inputs.repo ?? ""), (inputs.state as "open" | "closed" | "all") ?? "open");
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubListIssues(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.state});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, issues: `${v}.issues`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
 });
 
 registerNode({
@@ -172,6 +183,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubCreateIssue(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.title}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, result: `{ number: ${v}.number, url: ${v}.url }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
 });
 
 registerNode({
@@ -202,6 +219,12 @@ registerNode({
     const result = await manager.commentOnIssue(String(inputs.owner ?? ""), String(inputs.repo ?? ""), Number(inputs.issueNumber ?? 0), String(inputs.body ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubCommentOnIssue(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.issueNumber}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
 });
 
 registerNode({
@@ -232,6 +255,12 @@ registerNode({
     const result = await manager.listPullRequests(String(inputs.owner ?? ""), String(inputs.repo ?? ""), (inputs.state as "open" | "closed" | "all") ?? "open");
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubListPullRequests(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.state});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, pullRequests: `${v}.pullRequests`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
 });
 
 registerNode({
@@ -276,6 +305,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubCreatePullRequest(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.title}, ${inputs.head}, ${inputs.base}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, result: `{ number: ${v}.number, url: ${v}.url }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
 });
 
 registerNode({
@@ -318,6 +353,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubMergePullRequest(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.pullNumber}, ${inputs.mergeMethod});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, result: `{ merged: ${v}.merged, sha: ${v}.sha }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
 });
 
 registerNode({
@@ -361,6 +402,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubGetFileContent(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.path}, ${inputs.ref});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, result: `{ content: ${v}.content, sha: ${v}.sha }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
 });
 
 registerNode({
@@ -408,6 +455,15 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibraryGithub.githubCreateOrUpdateFile(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.path}, ${inputs.content}, ${inputs.message}, ${inputs.branch}, ${inputs.sha});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, result: `{ sha: ${v}.sha, commitSha: ${v}.commitSha }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
 });
 
 registerNode({
@@ -452,4 +508,10 @@ registerNode({
     const result = await manager.request(String(inputs.route ?? ""), params);
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubRequest(${inputs.credentialName}, ${inputs.route}, ${inputs.paramsJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, data: `${v}.data`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
 });
