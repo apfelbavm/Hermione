@@ -19,7 +19,7 @@
 - Format changed files with Prettier before finishing.
 
 ## Where to look
-- Architecture details: [docs/architecture.md](docs/architecture.md)
-- Integrations / connectors: [docs/integrations.md](docs/integrations.md)
-- Auth & credentials: [docs/auth.md](docs/auth.md)
-- Coding conventions: [docs/conventions.md](docs/conventions.md)
+- Architecture details: [docs/architecture.md](../docs/architecture.md)
+- Integrations / connectors: [docs/integrations.md](../docs/integrations.md)
+- Auth & credentials: [docs/auth.md](../docs/auth.md)
+- Coding conventions: [docs/conventions.md](../docs/conventions.md)
