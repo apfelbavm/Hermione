@@ -75,11 +75,16 @@ export async function POST(request: Request): Promise<Response> {
       model,
       messages,
       tools: AI_TOOL_DEFINITIONS.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })),
+      parallel_tool_calls: false, // reduces how often Groq's Llama models emit the malformed inline calls below
     }),
   });
 
   if (!upstream.ok) {
     const text = await upstream.text();
+    const recovered = recoverToolCallFromFailedGeneration(text);
+    if (recovered) {
+      return Response.json({ message: recovered });
+    }
     return Response.json({ error: `AI provider request failed (${upstream.status}): ${text}` }, { status: 502 });
   }
 
