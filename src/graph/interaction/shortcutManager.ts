@@ -87,6 +87,39 @@ export class ShortcutManager {
       this.handleWrapInComment();
       return;
     }
+    if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      this.handleArrowMove(e);
+      return;
+    }
+  }
+
+  private handleArrowMove(e: KeyboardEvent): void {
+    const store = this.store;
+    if (store.state.readOnly) return;
+    const { selectedNodeIds, selectedCommentIds } = store.state;
+    if (selectedNodeIds.size === 0 && selectedCommentIds.size === 0) return;
+
+    e.preventDefault();
+    const STEP = 10;
+    const dx = e.key === "ArrowLeft" ? -STEP : e.key === "ArrowRight" ? STEP : 0;
+    const dy = e.key === "ArrowUp" ? -STEP : e.key === "ArrowDown" ? STEP : 0;
+
+    const graph = getEditingGraph(store.state);
+    for (const nodeId of selectedNodeIds) {
+      const node = graph.nodes.find((n) => n.id === nodeId);
+      if (node) {
+        node.position.x += dx;
+        node.position.y += dy;
+      }
+    }
+    for (const commentId of selectedCommentIds) {
+      const box = graph.commentBoxes.find((b) => b.id === commentId);
+      if (box) {
+        box.position.x += dx;
+        box.position.y += dy;
+      }
+    }
+    store.notify();
   }
 
   private handleDelete(): void {
