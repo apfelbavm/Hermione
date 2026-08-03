@@ -800,6 +800,115 @@
         "label": "Azure Storage Account Info"
       }
     },
+    "dynamoDb": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_table_name": "Table Name",
+        "pin_partition_key_name": "Partition Key Name",
+        "pin_partition_key_type": "Partition Key Type",
+        "pin_sort_key_name": "Sort Key Name",
+        "pin_sort_key_type": "Sort Key Type",
+        "pin_billing_mode": "Billing Mode",
+        "pin_read_capacity_units": "Read Capacity Units",
+        "pin_write_capacity_units": "Write Capacity Units",
+        "pin_key": "Key (JSON)",
+        "pin_item": "Item (JSON)",
+        "pin_condition_expression": "Condition Expression",
+        "pin_expression_attribute_names": "Expression Attribute Names (JSON)",
+        "pin_expression_attribute_values": "Expression Attribute Values (JSON)",
+        "pin_return_values": "Return Values",
+        "pin_attributes": "Attributes (JSON)",
+        "pin_filter_expression": "Filter Expression",
+        "pin_index_name": "Index Name",
+        "pin_limit": "Limit",
+        "pin_exclusive_start_key": "Exclusive Start Key (JSON)",
+        "pin_last_evaluated_key": "Last Evaluated Key (JSON)",
+        "pin_consistent_read": "Consistent Read",
+        "pin_items": "Items (JSON)",
+        "pin_count": "Count",
+        "pin_scanned_count": "Scanned Count"
+      },
+      "listTables": {
+        "label": "DynamoDB List Tables",
+        "description": "Lists the table names in the account/region, optionally paginated.",
+        "pin_exclusive_start_table_name": "Exclusive Start Table Name",
+        "pin_table_names": "Table Names",
+        "pin_last_evaluated_table_name": "Last Evaluated Table Name"
+      },
+      "createTable": {
+        "label": "DynamoDB Create Table",
+        "description": "Creates a new table with the given partition key and optional sort key."
+      },
+      "deleteTable": {
+        "label": "DynamoDB Delete Table",
+        "description": "Deletes a table."
+      },
+      "describeTable": {
+        "label": "DynamoDB Describe Table",
+        "description": "Fetches status, key schema, item count/size, and throughput settings for a table."
+      },
+      "tableDescription": {
+        "label": "DynamoDB Table Description",
+        "pin_status": "Status",
+        "pin_item_count": "Item Count",
+        "pin_size_bytes": "Size (bytes)"
+      },
+      "updateTableCapacity": {
+        "label": "DynamoDB Update Table Capacity",
+        "description": "Changes a table's billing mode and/or provisioned read/write capacity units."
+      },
+      "putItem": {
+        "label": "DynamoDB Put Item",
+        "description": "Creates or replaces an item in a table, optionally only if a condition expression holds."
+      },
+      "getItem": {
+        "label": "DynamoDB Get Item",
+        "description": "Fetches a single item by its primary key.",
+        "pin_projection_expression": "Projection Expression"
+      },
+      "updateItem": {
+        "label": "DynamoDB Update Item",
+        "description": "Updates one or more attributes of an existing item (or creates it), using an update expression.",
+        "pin_update_expression": "Update Expression"
+      },
+      "deleteItem": {
+        "label": "DynamoDB Delete Item",
+        "description": "Deletes a single item by its primary key, optionally only if a condition expression holds."
+      },
+      "query": {
+        "label": "DynamoDB Query",
+        "description": "Queries items sharing a partition key (and optional sort key condition), optionally against a secondary index.",
+        "pin_key_condition_expression": "Key Condition Expression",
+        "pin_scan_index_forward": "Scan Index Forward"
+      },
+      "scan": {
+        "label": "DynamoDB Scan",
+        "description": "Scans every item in a table or index, optionally filtered by a filter expression."
+      },
+      "batchGetItem": {
+        "label": "DynamoDB Batch Get Item",
+        "description": "Fetches up to 100 items from one table by their primary keys in a single request.",
+        "pin_keys": "Keys (JSON array)",
+        "pin_unprocessed_keys": "Unprocessed Keys (JSON)"
+      },
+      "batchWriteItem": {
+        "label": "DynamoDB Batch Write Item",
+        "description": "Puts and/or deletes up to 25 items in one table in a single request.",
+        "pin_put_items": "Put Items (JSON array)",
+        "pin_delete_keys": "Delete Keys (JSON array)",
+        "pin_unprocessed_count": "Unprocessed Count"
+      },
+      "transactGetItems": {
+        "label": "DynamoDB Transact Get Items",
+        "description": "Atomically fetches up to 100 items across one or more tables, e.g. [{\"tableName\":\"T\",\"key\":{\"id\":\"1\"}}].",
+        "pin_items_spec": "Items ([{tableName,key}] JSON)"
+      },
+      "transactWriteItems": {
+        "label": "DynamoDB Transact Write Items",
+        "description": "Atomically applies up to 100 put/update/delete/conditionCheck operations across one or more tables, e.g. [{\"operation\":\"put\",\"tableName\":\"T\",\"item\":{...}}].",
+        "pin_operations": "Operations (JSON)"
+      }
+    },
     "github": {
       "__shared": {
         "pin_credential_name": "Credential Name",

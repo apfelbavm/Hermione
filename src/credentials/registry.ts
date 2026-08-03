@@ -215,3 +215,15 @@ registerCredentialType({
     { id: "refreshToken", label: "Refresh Token", secret: true },
   ],
 });
+
+registerCredentialType({
+  id: "awsAccessKey",
+  label: "AWS Access Key",
+  fields: [
+    { id: "accessKeyId", label: "Access Key ID" },
+    { id: "secretAccessKey", label: "Secret Access Key", secret: true },
+    { id: "region", label: "Region", help: "AWS region to send DynamoDB requests to, e.g. us-east-1." },
+    { id: "sessionToken", label: "Session Token (optional)", secret: true, help: "Only needed for temporary credentials issued via AWS STS." },
+    { id: "endpoint", label: "Endpoint Override (optional)", help: "Custom DynamoDB endpoint, e.g. http://localhost:8000 for DynamoDB Local. Leave blank to use AWS's regional endpoint." },
+  ],
+});

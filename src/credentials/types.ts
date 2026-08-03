@@ -15,7 +15,8 @@ export type CredentialTypeId =
   | "jiraServerPersonalAccessToken"
   | "jiraServerBasicAuth"
   | "googleServiceAccount"
-  | "googleOAuth2";
+  | "googleOAuth2"
+  | "awsAccessKey";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -140,6 +141,18 @@ export interface GoogleOAuth2CredentialData {
   refreshToken: string;
 }
 
+/** An IAM user/role's long-term access key pair plus the region to talk to — used as-is with
+ * DynamoDBClient's `credentials`/`region` config (see lib/dynamoDbManager.ts). `sessionToken` is
+ * only needed for temporary (STS-issued) credentials; `endpoint` only for pointing at DynamoDB
+ * Local or another compatible endpoint instead of AWS itself. */
+export interface AwsAccessKeyCredentialData {
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+  sessionToken: string;
+  endpoint: string;
+}
+
 export type CredentialData =
   | UsernamePasswordCredentialData
   | Oauth2SamlBearerCredentialData
@@ -153,7 +166,8 @@ export type CredentialData =
   | JiraServerPersonalAccessTokenCredentialData
   | JiraServerBasicAuthCredentialData
   | GoogleServiceAccountCredentialData
-  | GoogleOAuth2CredentialData;
+  | GoogleOAuth2CredentialData
+  | AwsAccessKeyCredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */

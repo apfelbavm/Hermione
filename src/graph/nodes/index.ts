@@ -17,6 +17,7 @@ import "./oauth2ClientCredentials";
 import "./dropbox";
 import "./facebook";
 import "./azureStorage";
+import "./dynamoDb";
 import "./struct";
 import "./github";
 import "./microsoft365";
