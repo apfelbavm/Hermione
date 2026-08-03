@@ -17,7 +17,7 @@ import { i18n } from "@i18n";
 // Every operation below is a thin pin-wiring shim over the lib/google*Manager.ts classes, which
 // own the actual googleapis SDK calls, auth client construction, and error normalization — this
 // file only ever translates pins to method arguments and method results back to pins.
-// Interpreter-only for now (no compileExecute/compileImports), same deferral as dropbox.ts/github.ts.
+// Interpreter-only for now (no compileExecute/compileImports), same deferral as github.ts.
 //
 // Every operation node (other than google.authorize) takes a Credential Name directly: each
 // resolves the named vault entry, accepting either a Google Service Account or Google OAuth2

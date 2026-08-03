@@ -10,7 +10,7 @@ import { i18n } from "@i18n";
 // Every operation below is a thin pin-wiring shim over GithubManager (src/lib/githubManager.ts),
 // which owns the actual SDK calls and error normalization — this file only ever translates pins to
 // method arguments and method results back to pins. Interpreter-only for now (no compileExecute/
-// compileImports), same deferral as dropbox.ts.
+// compileImports).
 
 const GROUP_NAME = "Request.GitHub";
 

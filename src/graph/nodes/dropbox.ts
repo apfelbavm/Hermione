@@ -1,5 +1,6 @@
 import { NodeColorCategory, type ExecutionContext } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { compileResultVar, FUNCTION_LIBRARY_IMPORT } from "../engine/compileUtils";
 import { DropboxManager } from "../../lib/dropboxManager";
 import type { DropboxOAuth2CredentialData } from "../../credentials/types";
 import { AUTH_TOKENS_STRUCT_TYPE, METADATA_STRUCT_TYPE, REVISION_STRUCT_TYPE, ACCOUNT_STRUCT_TYPE, SPACE_USAGE_STRUCT_TYPE } from "../structs/dropbox";
@@ -76,6 +77,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxAuthorize(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, tokens: `{ accessToken: ${v}.accessToken, refreshToken: ${v}.refreshToken, expiresIn: ${v}.expiresIn }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -108,6 +115,12 @@ registerNode({
     const result = await manager.upload(String(inputs.path ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", inputs.mode === "overwrite" ? "overwrite" : "add", Boolean(inputs.autorename));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxUpload(${inputs.credentialName}, ${inputs.path}, ${inputs.content}, ${inputs.encoding}, ${inputs.mode}, ${inputs.autorename});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -138,6 +151,12 @@ registerNode({
     const result = await manager.download(String(inputs.path ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxDownload(${inputs.credentialName}, ${inputs.path}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, content: `${v}.content`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -168,6 +187,12 @@ registerNode({
     const result = await manager.listFolders(String(inputs.path ?? ""), Boolean(inputs.recursive));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxListFolders(${inputs.credentialName}, ${inputs.path}, ${inputs.recursive});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, folders: `${v}.folders`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 function registerRelocationNode(type: "move" | "copy" | "rename") {
@@ -199,6 +224,15 @@ function registerRelocationNode(type: "move" | "copy" | "rename") {
       const result = await manager[type](String(inputs.fromPath ?? ""), String(inputs.toPath ?? ""), Boolean(inputs.autorename));
       return { nextExec: "exec-out", outputs: result };
     },
+    compileExecute: ({ node, inputs, compileFrom }) => {
+      const fn = type === "move" ? "dropboxMove" : type === "copy" ? "dropboxCopy" : "dropboxRename";
+      return [`const ${compileResultVar(node.id)} = await functionLibrary.${fn}(${inputs.credentialName}, ${inputs.fromPath}, ${inputs.toPath}, ${inputs.autorename});`, ...compileFrom("exec-out")];
+    },
+    compileExecuteOutputs: ({ node }) => {
+      const v = compileResultVar(node.id);
+      return { success: `${v}.success`, error: `${v}.error` };
+    },
+    compileImports: [FUNCTION_LIBRARY_IMPORT],
   });
 }
 
@@ -232,6 +266,12 @@ registerNode({
     const result = await manager.delete(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxDelete(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -261,6 +301,12 @@ registerNode({
     const result = await manager.createFolder(String(inputs.path ?? ""), Boolean(inputs.autorename));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxCreateFolder(${inputs.credentialName}, ${inputs.path}, ${inputs.autorename});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -311,6 +357,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxGetMetadata(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, metadata: `{ isFolder: ${v}.isFolder, size: ${v}.size, contentHash: ${v}.contentHash, serverModified: ${v}.serverModified }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -342,6 +394,12 @@ registerNode({
     const result = await manager.search(String(inputs.query ?? ""), String(inputs.path ?? ""), Number(inputs.maxResults ?? 100));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxSearch(${inputs.credentialName}, ${inputs.query}, ${inputs.path}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, paths: `${v}.paths`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -372,6 +430,12 @@ registerNode({
     const result = await manager.listRevisions(String(inputs.path ?? ""), Number(inputs.limit ?? 10));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxListRevisions(${inputs.credentialName}, ${inputs.path}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, revisions: `${v}.revisions`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -401,6 +465,12 @@ registerNode({
     const result = await manager.restore(String(inputs.path ?? ""), String(inputs.rev ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxRestore(${inputs.credentialName}, ${inputs.path}, ${inputs.rev});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -429,6 +499,12 @@ registerNode({
     const result = await manager.permanentlyDelete(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxPermanentlyDelete(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -458,6 +534,12 @@ registerNode({
     const result = await manager.getTemporaryLink(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxGetTemporaryLink(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, link: `${v}.link`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -488,6 +570,12 @@ registerNode({
     const result = await manager.getTemporaryUploadLink(String(inputs.path ?? ""), Number(inputs.durationSeconds ?? 14400));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxGetTemporaryUploadLink(${inputs.credentialName}, ${inputs.path}, ${inputs.durationSeconds});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, link: `${v}.link`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 function registerRelocationBatchNode(type: "moveBatch" | "copyBatch") {
@@ -519,6 +607,15 @@ function registerRelocationBatchNode(type: "moveBatch" | "copyBatch") {
       const result = await manager[type]((inputs.fromPaths as string[]) ?? [], (inputs.toPaths as string[]) ?? [], Boolean(inputs.autorename));
       return { nextExec: "exec-out", outputs: result };
     },
+    compileExecute: ({ node, inputs, compileFrom }) => {
+      const fn = type === "moveBatch" ? "dropboxMoveBatch" : "dropboxCopyBatch";
+      return [`const ${compileResultVar(node.id)} = await functionLibrary.${fn}(${inputs.credentialName}, ${inputs.fromPaths}, ${inputs.toPaths}, ${inputs.autorename});`, ...compileFrom("exec-out")];
+    },
+    compileExecuteOutputs: ({ node }) => {
+      const v = compileResultVar(node.id);
+      return { success: `${v}.success`, error: `${v}.error` };
+    },
+    compileImports: [FUNCTION_LIBRARY_IMPORT],
   });
 }
 
@@ -551,6 +648,12 @@ registerNode({
     const result = await manager.deleteBatch((inputs.paths as string[]) ?? []);
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxDeleteBatch(${inputs.credentialName}, ${inputs.paths});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -580,6 +683,12 @@ registerNode({
     const result = await manager.createSharedLink(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxCreateSharedLink(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, link: `${v}.link`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -609,6 +718,12 @@ registerNode({
     const result = await manager.listSharedLinks(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxListSharedLinks(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, urls: `${v}.urls`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -638,6 +753,12 @@ registerNode({
     const result = await manager.shareFolder(String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxShareFolder(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, sharedFolderId: `${v}.sharedFolderId`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -668,6 +789,12 @@ registerNode({
     const result = await manager.addFolderMember(String(inputs.sharedFolderId ?? ""), String(inputs.email ?? ""), String(inputs.accessLevel ?? "editor"));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxAddFolderMember(${inputs.credentialName}, ${inputs.sharedFolderId}, ${inputs.email}, ${inputs.accessLevel});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -711,6 +838,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxGetCurrentAccount(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, account: `{ accountId: ${v}.accountId, name: ${v}.name, email: ${v}.email }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
 
 registerNode({
@@ -750,4 +883,10 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.dropboxGetSpaceUsage(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, spaceUsage: `{ used: ${v}.used, allocated: ${v}.allocated }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_IMPORT],
 });
