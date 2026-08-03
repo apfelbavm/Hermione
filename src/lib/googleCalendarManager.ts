@@ -1,5 +1,5 @@
 import { google, type calendar_v3 } from "googleapis";
-import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager";
+import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager.ts";
 import type { GoogleServiceAccountCredentialData, GoogleOAuth2CredentialData } from "../credentials/types";
 
 /** Every Google Calendar node (list/get/create/update/delete events, list calendars, quick-add)

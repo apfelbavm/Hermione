@@ -1,5 +1,5 @@
 import { google, type sheets_v4 } from "googleapis";
-import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager";
+import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager.ts";
 import type { GoogleServiceAccountCredentialData, GoogleOAuth2CredentialData } from "../credentials/types";
 
 /** Every Google Sheets node (get/update/append/clear values, create spreadsheet, add/delete sheet)

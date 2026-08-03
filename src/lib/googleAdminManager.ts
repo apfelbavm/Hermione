@@ -1,5 +1,5 @@
 import { google, type admin_directory_v1 } from "googleapis";
-import { googleErrorMessage, serviceAccountClient } from "./googleAuthManager";
+import { googleErrorMessage, serviceAccountClient } from "./googleAuthManager.ts";
 import type { GoogleServiceAccountCredentialData } from "../credentials/types";
 
 /** Every Google Workspace Admin node (list/get/create/update/delete users and groups, group

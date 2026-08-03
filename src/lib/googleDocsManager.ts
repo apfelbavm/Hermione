@@ -1,5 +1,5 @@
 import { google, type docs_v1 } from "googleapis";
-import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager";
+import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager.ts";
 import type { GoogleServiceAccountCredentialData, GoogleOAuth2CredentialData } from "../credentials/types";
 
 /** Every Google Docs node (create, get text, insert/append/replace text) needs the same

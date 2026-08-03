@@ -1,6 +1,6 @@
 import { google, type drive_v3 } from "googleapis";
 import { Readable } from "node:stream";
-import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager";
+import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager.ts";
 import type { GoogleServiceAccountCredentialData, GoogleOAuth2CredentialData } from "../credentials/types";
 
 /** Every Google Drive node (list, get, upload, download, copy, move, delete, share, create folder)
