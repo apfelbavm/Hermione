@@ -133,7 +133,16 @@ export interface NodeDef {
    * colors by the variable's own TYPE instead (see drawNodes.ts's resolveNodeHeaderColor). */
   colorCategory?: NodeColorCategory;
   pins: PinDef[];
-  execute?: (args: ExecuteArgs) => Promise<ExecuteResult> | ExecuteResult;
+  /** For an EXEC node only (one with "exec" pins) — runs this node's side effect exactly once when
+   * its exec-in pin fires, in the sequence dictated by exec wiring (see runExecFrom), and returns
+   * which exec-out pin to continue from next. A pure/data node (evaluate below) has no exec pins
+   * and never has this — the two are mutually exclusive per node type. */
+  execute: (args: ExecuteArgs) => Promise<ExecuteResult> | ExecuteResult;
+  /** For a PURE/DATA node only (no exec pins) — computes this node's output pin values on demand,
+   * whenever some downstream input pulls them (see resolveDataPin), not on any exec schedule. Must
+   * be side-effect-free: it may be called any number of times per tick, though results are cached
+   * per tick key so a value with multiple consumers is still only computed once. Mutually exclusive
+   * with execute above — a node either sits in the exec chain or is resolved lazily by wiring, never both. */
   evaluate?: (args: EvaluateArgs) => Record<string, unknown> | Promise<Record<string, unknown>>;
   derivePins?: (variable: Variable) => PinDef[];
   /** Sibling of derivePins for the Entry/Return/Call function nodes, dispatched off NodeInstance.functionId. */
@@ -166,9 +175,14 @@ export interface NodeDef {
   detailProperties?: PinDef[];
   /** Marks this node type as a graph entry point (Unreal's BeginPlay/EventTick equivalent). */
   eventTrigger?: EventTrigger;
-  /** Compile-time counterpart of `evaluate`: returns a JS expression string per output pin. */
+  /** Compile-time counterpart of `evaluate`: returns a JS expression string per output pin, safe to
+   * inline/duplicate anywhere a consumer needs it since evaluate itself must be side-effect-free.
+   * Present only alongside evaluate, never alongside execute. */
   compileEvaluate?: (args: CompileEvalArgs) => Record<string, string>;
-  /** Compile-time counterpart of `execute`: returns JS statement strings. */
+  /** Compile-time counterpart of `execute`: returns JS statement strings to splice into the
+   * compiled function body at this exec node's position, then continues the chain via
+   * args.compileFrom — unlike compileEvaluate's expression, these statements run exactly once,
+   * in-place, in exec order. Present only alongside execute, never alongside evaluate. */
   compileExecute?: (args: CompileExecArgs) => string[];
   /** For a latent/exec node whose `execute()` returns MORE than one data output (e.g. an HTTP-calling
    * node's success/error/status/etc): maps each data output pin id to a JS expression a downstream
