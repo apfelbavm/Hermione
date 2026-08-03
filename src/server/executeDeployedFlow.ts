@@ -21,7 +21,7 @@ export interface ExecuteFlowResult {
  * by api/simulate/route.ts) and a DEPLOYED flow's own compiled flow.executeFlow, which imports this
  * exact function directly (see compileUtils.ts's EXECUTE_FLOW_IMPORT) instead of re-implementing
  * this lookup inline in generated code. Fires the target's "On Execute" event (nodes/event.ts's
- * event.execute, manifest kind "execute") — NOT "On Run" (kind "run"), which only ever fires from
+ * event.execute, manifest kind "execute") — NOT "On Simulate" (kind "simulate"), which only ever fires from
  * the Emulate page's own Run button (see api/emulate/run/route.ts). `params` are flow.executeFlow's
  * own user-mapped inputs (by name) — matched against the target's declared fields the exact same
  * way api/hooks/[projectId]/[flowId]/route.ts matches an HTTP request's merged query/body params,

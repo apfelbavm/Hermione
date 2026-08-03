@@ -22,7 +22,7 @@ interface RequestFieldDescriptor {
 }
 
 /** Public HTTP entry point for a deployed Flow's "On HTTP Request" event (nodes/event.ts's
- * event.request, manifest kind "request"). Unlike api/emulate/run/route.ts (kind "run", invoked
+ * event.request, manifest kind "request"). Unlike api/emulate/run/route.ts (kind "simulate", invoked
  * only from inside another flow via flow.executeFlow), a caller here is an arbitrary outside HTTP
  * client, so failures are reported as real HTTP status codes instead of a `{success, error}` body:
  * 200 with whatever the flow's own Return Flow Values node declared on success, 404 if this Flow

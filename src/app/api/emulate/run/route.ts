@@ -22,10 +22,10 @@ interface RunManualRequestBody {
 /** Runs a Flow's DEPLOYED compiled output (see api/projects/[projectId]/flows/[flowId]/deploy/route.ts
  * and DatabaseManager.getDeployedScript) — a snapshot taken the last time "Deploy" was clicked in the
  * editor, not whatever the graph currently looks like — rather than the INTERPRETED graph
- * api/simulate's route runs. Only the "On Run" trigger (manifest kind "run" — nodes/event.ts's
- * event.run, which compiles to a function named "eventRun" by default) fires here: this is the
+ * api/simulate's route runs. Only the "On Simulate" trigger (manifest kind "simulate" — nodes/event.ts's
+ * event.simulate, which compiles to a function named "eventSimulate" by default) fires here: this is the
  * graph's one designated entry point for a deployed run, same node the editor's own Simulate button
- * fires. If the graph has no such node, that's reported as a log line (see EVENT_RUN_MISSING_MESSAGE
+ * fires. If the graph has no such node, that's reported as a log line (see the "EventSimulate" message
  * below), not an error — the deployment itself is still valid, it just has nothing to do. Every
  * credential the graph might need is pulled from the Credential Vault into env vars first (see
  * server/credentialEnv.ts) so a compiled node reading one by name (e.g. oauth2Saml) finds it the same
@@ -55,10 +55,10 @@ export async function POST(request: Request): Promise<Response> {
   const startedAt = new Date().toISOString();
   let executionMs: number | undefined;
   try {
-    const runTrigger = deployed.manifest.triggers.find((t) => t.kind === "run");
+    const runTrigger = deployed.manifest.triggers.find((t) => t.kind === "simulate");
 
     if (!runTrigger) {
-      recordLogEntry('The "EventRun" function does not exist in this graph.');
+      recordLogEntry('The "EventSimulate" function does not exist in this graph.');
     } else {
       applyCredentialEnvVars(db);
 

@@ -33,7 +33,7 @@ interface SimulateRequestBody {
   flowName: string;
 }
 
-/** Executes a saved graph's "On Run" entry points server-side, streaming node-start/log/exec-fire/
+/** Executes a saved graph's "On Simulate" entry points server-side, streaming node-start/log/exec-fire/
  * done events back as Server-Sent Events so the browser can drive the same visual highlighting the
  * old client-side interpreter did — with zero execution logic left in the browser. See the
  * "Simulate" button handler in AppShell.tsx for the client side of this. Also persists the run's own
@@ -93,9 +93,9 @@ export async function POST(request: Request): Promise<Response> {
 
       send("run-start", { runId });
 
-      const eventRoots = graph.nodes.filter((n) => n.type === "event.run");
+      const eventRoots = graph.nodes.filter((n) => n.type === "event.simulate");
       if (eventRoots.length === 0) {
-        const message = 'No "On Run" node in graph — nothing to run.';
+        const message = 'No "On Simulate" node in graph — nothing to run.';
         send("log", { message });
         recordLogEntry(message);
         send("done", {});

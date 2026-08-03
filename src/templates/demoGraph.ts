@@ -14,7 +14,7 @@ function addNode(graph: Graph, type: string, position: { x: number; y: number },
 export function buildDemoGraph(): Graph {
   const graph = new Graph("demo", "Graph");
 
-  const start = addNode(graph, "event.run", { x: 100, y: 220 }, "start");
+  const start = addNode(graph, "event.simulate", { x: 100, y: 220 }, "start");
   const add = addNode(graph, "math.add", { x: 940, y: 360 }, "add");
   const branch = addNode(graph, "flow.branch", { x: 580, y: 220 }, "branch");
   const delay = addNode(graph, "flow.delay", { x: 1160, y: 220 }, "delay");

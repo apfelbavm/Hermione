@@ -3,7 +3,7 @@
   "kind": "nodes",
   "version": 1,
   "nodes": [
-    { "id": "start", "type": "event.run", "position": { "x": 100, "y": -40 }, "pins": { "exec-out": {} }, "disabled": false, "breakpoint": false },
+    { "id": "start", "type": "event.simulate", "position": { "x": 100, "y": -40 }, "pins": { "exec-out": {} }, "disabled": false, "breakpoint": false },
     {
       "id": "node-11-41lkxx",
       "type": "dropbox.auth",

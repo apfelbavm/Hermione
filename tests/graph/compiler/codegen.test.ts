@@ -851,7 +851,7 @@ describe("compileGraph", () => {
   describe("flow.return (root graph output bindings)", () => {
     it("compiles a trigger method that declares a `let` per flow.return output and returns them from the method", async () => {
       const graph = new Graph("g20", "test");
-      const start = addBuiltinNode(graph, "event.run", { x: 0, y: 0 }, "start");
+      const start = addBuiltinNode(graph, "event.simulate", { x: 0, y: 0 }, "start");
       const add = addBuiltinNode(graph, "math.add", { x: 100, y: 0 }, "add");
       add.pins.a.value = 2;
       add.pins.b.value = 3;
@@ -879,7 +879,7 @@ describe("compileGraph", () => {
 
     it("returns an object keyed by the output's own declared name, even when it differs from the compiled internal variable name", async () => {
       const graph = new Graph("g20b", "test");
-      const start = addBuiltinNode(graph, "event.run", { x: 0, y: 0 }, "start");
+      const start = addBuiltinNode(graph, "event.simulate", { x: 0, y: 0 }, "start");
       const add = addBuiltinNode(graph, "math.add", { x: 100, y: 0 }, "add");
       add.pins.a.value = 2;
       add.pins.b.value = 3;
@@ -907,7 +907,7 @@ describe("compileGraph", () => {
 
     it("still compiles a trigger with no return statement when the graph has no flow.return node", async () => {
       const graph = new Graph("g21", "test");
-      addBuiltinNode(graph, "event.run", { x: 0, y: 0 }, "start");
+      addBuiltinNode(graph, "event.simulate", { x: 0, y: 0 }, "start");
 
       const { code, manifest } = compileGraph(graph);
       expect(code).not.toContain("return {");
@@ -961,14 +961,14 @@ describe("compileGraph", () => {
       addNodeOutputEntry(request, { id: nextId("io"), name: "field", type: "string", defaultValue: "" });
       const [field] = request.outputEntries!;
 
-      const run = addBuiltinNode(graph, "event.run", { x: 0, y: 100 }, "start");
+      const run = addBuiltinNode(graph, "event.simulate", { x: 0, y: 100 }, "start");
       const returnDef = getNodeDef("flow.return");
       const returnNode = NodeInstance.createNodeInstance("flow.return", { x: 200, y: 100 }, returnDef.pins, "ret");
       graph.nodes.push(returnNode);
       addNodeOutputEntry(returnNode, { id: nextId("io"), name: "echoed", type: "string", defaultValue: null });
       const [echoed] = returnNode.outputEntries!;
 
-      // Wires event.run's own exec chain to Return, but the DATA pin feeding Return comes from
+      // Wires event.simulate's own exec chain to Return, but the DATA pin feeding Return comes from
       // event.request's field — only ever valid inside event.request's own trigger method.
       connectPins(graph, graph.variables, graph.functions, { fromNode: run.id, fromPin: "exec-out", toNode: returnNode.id, toPin: "exec-in" });
       connectPins(graph, graph.variables, graph.functions, { fromNode: request.id, fromPin: field.id, toNode: returnNode.id, toPin: echoed.id });

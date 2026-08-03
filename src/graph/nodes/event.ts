@@ -40,14 +40,14 @@ registerNode({
 });
 
 registerNode({
-  type: "event.run",
-  label: i18n.nodes.event.run.label,
-  description: i18n.nodes.event.run.description,
+  type: "event.simulate",
+  label: i18n.nodes.event.simulate.label,
+  description: i18n.nodes.event.simulate.description,
   group: "Events",
   colorCategory: NodeColorCategory.Events,
   pins: [{ id: "exec-out", label: "", type: "exec", direction: "output" }],
   execute: () => ({ nextExec: "exec-out" }),
-  eventTrigger: { kind: "run" },
+  eventTrigger: { kind: "simulate" },
 });
 
 registerNode({

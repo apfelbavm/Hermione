@@ -14,8 +14,8 @@ describe("event nodes have no user-settable name — the node type/label says ho
     expect(def.pins.some((p) => p.id === "name")).toBe(false);
   });
 
-  it("On Run has no 'name' pin", () => {
-    const def = getNodeDef("event.run");
+  it("On Simulate has no 'name' pin", () => {
+    const def = getNodeDef("event.simulate");
     expect(def.pins.some((p) => p.id === "name")).toBe(false);
   });
 });
@@ -111,14 +111,14 @@ describe("event.request", () => {
   });
 });
 
-describe("event.run", () => {
+describe("event.simulate", () => {
   it("is a distinct manual-run trigger kind", () => {
-    const def = getNodeDef("event.run");
-    expect(def.eventTrigger?.kind).toBe("run");
+    const def = getNodeDef("event.simulate");
+    expect(def.eventTrigger?.kind).toBe("simulate");
   });
 
   it("executes straight through to exec-out", async () => {
-    const def = getNodeDef("event.run");
+    const def = getNodeDef("event.simulate");
     const result = await def.execute!({
       node: {} as never,
       inputs: {},

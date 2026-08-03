@@ -155,7 +155,7 @@ actually calls for (each is called out on the node's own entry in the reference 
 3. **\`enum\` pins are never wireable**, in either direction — they're config-only (rendered as a
    dropdown), never plug into anything, including another enum pin.
 4. Every graph needs at least one **event/entry node** (an node with an \`eventTrigger\`, e.g.
-   \`event.run\`, \`event.start\`, \`event.interval\`, \`event.deploy\`, \`event.execute\`) so there's an
+   \`event.simulate\`, \`event.start\`, \`event.interval\`, \`event.deploy\`, \`event.execute\`) so there's an
    exec chain to start from, unless the user explicitly only wants a disconnected fragment.
 5. Give every **input** data pin either a literal \`value\` or a \`connectionId\` from a compatible
    output — never leave a required input pin with neither, unless its default value (shown in the
@@ -171,7 +171,7 @@ A tiny "Run → print 2+3" graph:
   "kind": "nodes",
   "version": 1,
   "nodes": [
-    { "id": "start", "type": "event.run", "position": { "x": 80, "y": 80 }, "pins": { "exec-out": {} } },
+    { "id": "start", "type": "event.simulate", "position": { "x": 80, "y": 80 }, "pins": { "exec-out": {} } },
     { "id": "add", "type": "math.add", "position": { "x": 380, "y": 80 }, "pins": { "a": { "value": 2 }, "b": { "value": 3 }, "result": { "connectionId": "conn-2" } } },
     { "id": "print", "type": "debug.print", "position": { "x": 680, "y": 80 }, "pins": { "exec-in": { "connectionId": "conn-1" }, "message": { "connectionId": "conn-2" }, "exec-out": {} } }
   ],

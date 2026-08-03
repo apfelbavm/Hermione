@@ -44,26 +44,26 @@ describe("canPlaceNodeType", () => {
     const graph = new Graph("g", "body");
     expect(graph.canPlaceNodeType("event.start", true)).toBe(false);
     expect(graph.canPlaceNodeType("event.interval", true)).toBe(false);
-    expect(graph.canPlaceNodeType("event.run", true)).toBe(false);
+    expect(graph.canPlaceNodeType("event.simulate", true)).toBe(false);
   });
 
   it("allows an event node type in the root graph if no instance of it exists yet", () => {
     const graph = new Graph("g", "root");
-    expect(graph.canPlaceNodeType("event.run", false)).toBe(true);
+    expect(graph.canPlaceNodeType("event.simulate", false)).toBe(true);
   });
 
   it("blocks a second instance of the same event type in the same graph", () => {
     const graph = new Graph("g", "root");
-    const def = getNodeDef("event.run");
-    graph.nodes.push(NodeInstance.createNodeInstance("event.run", { x: 0, y: 0 }, def.pins));
+    const def = getNodeDef("event.simulate");
+    graph.nodes.push(NodeInstance.createNodeInstance("event.simulate", { x: 0, y: 0 }, def.pins));
 
-    expect(graph.canPlaceNodeType("event.run", false)).toBe(false);
+    expect(graph.canPlaceNodeType("event.simulate", false)).toBe(false);
   });
 
   it("still allows a DIFFERENT event type even if one event type is already present", () => {
     const graph = new Graph("g", "root");
-    const runDef = getNodeDef("event.run");
-    graph.nodes.push(NodeInstance.createNodeInstance("event.run", { x: 0, y: 0 }, runDef.pins));
+    const runDef = getNodeDef("event.simulate");
+    graph.nodes.push(NodeInstance.createNodeInstance("event.simulate", { x: 0, y: 0 }, runDef.pins));
 
     expect(graph.canPlaceNodeType("event.start", false)).toBe(true);
   });
@@ -197,8 +197,8 @@ describe("canToggleDisabled", () => {
   });
 
   it("is false for an event trigger, even though it has an execution pin", () => {
-    const def = getNodeDef("event.run");
-    const node = NodeInstance.createNodeInstance("event.run", { x: 0, y: 0 }, def.pins, "run");
+    const def = getNodeDef("event.simulate");
+    const node = NodeInstance.createNodeInstance("event.simulate", { x: 0, y: 0 }, def.pins, "run");
     expect(node.canToggleDisabled([], [])).toBe(false);
   });
 });
@@ -633,9 +633,9 @@ describe("removeCodeScriptDef", () => {
 
     // code.run has no output pins (see nodes/code.ts), so wire its exec-out into the Add node's
     // exec pin isn't representative — instead prove the general "removeNode cleans up connections"
-    // path via an exec wire from a fresh On Run node into the Code node.
-    const startDef = getNodeDef("event.run");
-    const startNode = NodeInstance.createNodeInstance("event.run", { x: -200, y: 0 }, startDef.pins, "start");
+    // path via an exec wire from a fresh On Simulate node into the Code node.
+    const startDef = getNodeDef("event.simulate");
+    const startNode = NodeInstance.createNodeInstance("event.simulate", { x: -200, y: 0 }, startDef.pins, "start");
     graph.nodes.push(startNode);
     connectPins(
       graph,

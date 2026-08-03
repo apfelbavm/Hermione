@@ -38,7 +38,7 @@ export class Graph {
   }
 
   /** True if a node of this type is allowed to be placed into `graph` right now — trivially true for
-   * any non-event node type. An event node (see NodeDef.eventTrigger — On Start/On Interval/On Run)
+   * any non-event node type. An event node (see NodeDef.eventTrigger — On Start/On Interval/On Simulate)
    * may only live in the root graph, never inside a function body, and at most one instance of each
    * event TYPE may exist per graph, mirroring how Unreal only allows one BeginPlay/EventTick per
    * Blueprint. Used to filter both the node-creation menu and paste. */
