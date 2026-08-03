@@ -10,6 +10,7 @@ import "./string";
 import "./http";
 import "./odata";
 import "./sftp";
+import "./soap";
 import "./auth";
 import "./oauth2Saml";
 import "./oauth2ClientCredentials";
