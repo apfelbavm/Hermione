@@ -55,6 +55,11 @@ export const FUNCTION_LIBRARY_GOOGLE_IMPORT = 'import * as functionLibraryGoogle
  * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/facebook.ts). */
 export const FUNCTION_LIBRARY_FACEBOOK_IMPORT = 'import * as functionLibraryFacebook from "../../src/server/functionLibraryFacebook.ts";';
 
+/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryAzureStorage.ts — kept in its
+ * own file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see
+ * nodes/azureStorage.ts). */
+export const FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT = 'import * as functionLibraryAzureStorage from "../../src/server/functionLibraryAzureStorage.ts";';
+
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/executeDeployedFlow.ts — used by
  * flow.executeFlow's compileExecute (see nodes/flow.ts) so a deployed flow's own "Execute Flow"
  * node dynamic-imports the target Flow's DEPLOYED script exactly the same way the interpreter's

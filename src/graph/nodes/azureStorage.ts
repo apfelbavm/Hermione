@@ -1,5 +1,6 @@
 import { NodeColorCategory, type ExecutionContext } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { compileResultVar, FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT } from "../engine/compileUtils";
 import { AzureStorageManager } from "../../lib/azureStorageManager";
 import type { AzureStorageBlobUploadOptions } from "../../lib/azureStorageManager";
 import type { AzureStorageConnectionStringCredentialData } from "../../credentials/types";
@@ -11,12 +12,16 @@ import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over AzureStorageManager (src/lib/azureStorageManager.ts),
 // which owns the actual SDK calls and error normalization — this file only ever translates pins to
-// method arguments and method results back to pins. Interpreter-only for now (no compileExecute/
-// compileImports), same "out of scope for now" deferral as nodes/dropbox.ts.
+// method arguments and method results back to pins.
 //
 // Every operation node takes a Credential Name directly (no separate auth/refresh node): each
 // resolves the named vault entry and hands its connection string to AzureStorageManager.forCredential,
 // which caches the underlying BlobServiceClient — see azureStorageManager.ts.
+//
+// Every node here also has a compileExecute: the compiled path calls a same-named
+// `functionLibraryAzureStorage.azureStorage*` wrapper (see server/functionLibraryAzureStorage.ts),
+// which reads the credential's connection string back from environment variables instead of the
+// vault — same split as jira.ts's execute()/compileExecute().
 
 const GROUP_NAME = "Request.AzureStorage";
 
@@ -172,6 +177,12 @@ registerNode({
     const result = await resolved.manager.listContainers(String(inputs.prefix ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageListContainers(${inputs.credentialName}, ${inputs.prefix});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, containers: `${v}.containers`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -201,6 +212,12 @@ registerNode({
     const result = await resolved.manager.createContainer(String(inputs.containerName ?? ""), access);
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageCreateContainer(${inputs.credentialName}, ${inputs.containerName}, ${inputs.access});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -221,6 +238,12 @@ registerNode({
     const result = await resolved.manager.deleteContainer(String(inputs.containerName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageDeleteContainer(${inputs.credentialName}, ${inputs.containerName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -262,6 +285,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageGetContainerProperties(${inputs.credentialName}, ${inputs.containerName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, properties: `${v}.properties`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -282,6 +311,12 @@ registerNode({
     const result = await resolved.manager.setContainerMetadata(String(inputs.containerName ?? ""), mapEntriesToRecord(inputs.metadata));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageSetContainerMetadata(${inputs.credentialName}, ${inputs.containerName}, ${inputs.metadata});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -312,6 +347,12 @@ registerNode({
     const result = await resolved.manager.listBlobs(String(inputs.containerName ?? ""), String(inputs.prefix ?? ""), Boolean(inputs.recursive));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageListBlobs(${inputs.credentialName}, ${inputs.containerName}, ${inputs.prefix}, ${inputs.recursive});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, blobs: `${v}.blobs`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -369,6 +410,15 @@ registerNode({
     const result = await resolved.manager.uploadBlob(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", uploadOptions, Boolean(inputs.overwrite));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageUploadBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.content}, ${inputs.encoding}, ${inputs.options}, ${inputs.overwrite});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -399,6 +449,12 @@ registerNode({
     const result = await resolved.manager.downloadBlob(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageDownloadBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, content: `${v}.content`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -419,6 +475,12 @@ registerNode({
     const result = await resolved.manager.deleteBlob(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageDeleteBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 function registerRelocationNode(type: "copyBlob" | "moveBlob") {
@@ -450,6 +512,15 @@ function registerRelocationNode(type: "copyBlob" | "moveBlob") {
       const result = await resolved.manager[type](String(inputs.sourceContainer ?? ""), String(inputs.sourceBlob ?? ""), String(inputs.destContainer ?? ""), String(inputs.destBlob ?? ""));
       return { nextExec: "exec-out", outputs: result };
     },
+    compileExecute: ({ node, inputs, compileFrom }) => {
+      const fn = type === "copyBlob" ? "azureStorageCopyBlob" : "azureStorageMoveBlob";
+      return [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.${fn}(${inputs.credentialName}, ${inputs.sourceContainer}, ${inputs.sourceBlob}, ${inputs.destContainer}, ${inputs.destBlob});`, ...compileFrom("exec-out")];
+    },
+    compileExecuteOutputs: ({ node }) => {
+      const v = compileResultVar(node.id);
+      return { success: `${v}.success`, error: `${v}.error` };
+    },
+    compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
   });
 }
 
@@ -497,6 +568,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageGetBlobProperties(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, properties: `${v}.properties`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -517,6 +594,12 @@ registerNode({
     const result = await resolved.manager.setBlobMetadata(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), mapEntriesToRecord(inputs.metadata));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageSetBlobMetadata(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.metadata});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -537,6 +620,12 @@ registerNode({
     const result = await resolved.manager.blobExists(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageBlobExists(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, exists: `${v}.exists`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -568,6 +657,15 @@ registerNode({
     const result = await resolved.manager.generateBlobSasUrl(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageGenerateBlobSasUrl(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.permissions}, ${inputs.expiresInMinutes});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, url: `${v}.url`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -598,6 +696,12 @@ registerNode({
     const result = await resolved.manager.generateContainerSasUrl(String(inputs.containerName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageGenerateContainerSasUrl(${inputs.credentialName}, ${inputs.containerName}, ${inputs.permissions}, ${inputs.expiresInMinutes});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, url: `${v}.url`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
 
 registerNode({
@@ -632,4 +736,10 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageGetAccountInfo(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, accountInfo: `${v}.accountInfo`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
 });
