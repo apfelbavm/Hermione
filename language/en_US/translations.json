@@ -909,6 +909,147 @@
         "pin_operations": "Operations (JSON)"
       }
     },
+    "mongo": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_database": "Database",
+        "pin_collection": "Collection",
+        "pin_filter": "Filter (JSON)",
+        "pin_document": "Document (JSON)",
+        "pin_documents": "Documents (JSON array)",
+        "pin_update": "Update (JSON)",
+        "pin_replacement": "Replacement (JSON)",
+        "pin_projection": "Projection (JSON)",
+        "pin_sort": "Sort (JSON)",
+        "pin_limit": "Limit",
+        "pin_skip": "Skip",
+        "pin_upsert": "Upsert",
+        "pin_return_document": "Return Document",
+        "pin_count": "Count",
+        "pin_inserted_id": "Inserted ID",
+        "pin_matched_count": "Matched Count",
+        "pin_modified_count": "Modified Count",
+        "pin_upserted_id": "Upserted ID",
+        "pin_deleted_count": "Deleted Count"
+      },
+      "listDatabases": {
+        "label": "MongoDB List Databases",
+        "description": "Lists the database names visible to this connection.",
+        "pin_database_names": "Database Names"
+      },
+      "listCollections": {
+        "label": "MongoDB List Collections",
+        "description": "Lists the collection names in a database.",
+        "pin_collection_names": "Collection Names"
+      },
+      "createCollection": {
+        "label": "MongoDB Create Collection",
+        "description": "Creates a new (empty) collection in a database."
+      },
+      "dropCollection": {
+        "label": "MongoDB Drop Collection",
+        "description": "Drops a collection and all its documents/indexes."
+      },
+      "dropDatabase": {
+        "label": "MongoDB Drop Database",
+        "description": "Drops an entire database and all its collections."
+      },
+      "renameCollection": {
+        "label": "MongoDB Rename Collection",
+        "description": "Renames a collection within the same database.",
+        "pin_new_name": "New Name",
+        "pin_drop_target": "Drop Target If Exists"
+      },
+      "insertOne": {
+        "label": "MongoDB Insert One",
+        "description": "Inserts a single document into a collection."
+      },
+      "insertMany": {
+        "label": "MongoDB Insert Many",
+        "description": "Inserts multiple documents into a collection in one request.",
+        "pin_documents": "Documents (JSON array)",
+        "pin_inserted_ids": "Inserted IDs"
+      },
+      "findOne": {
+        "label": "MongoDB Find One",
+        "description": "Fetches the first document matching a filter."
+      },
+      "find": {
+        "label": "MongoDB Find",
+        "description": "Fetches documents matching a filter, optionally sorted/paginated."
+      },
+      "countDocuments": {
+        "label": "MongoDB Count Documents",
+        "description": "Counts documents matching a filter."
+      },
+      "updateOne": {
+        "label": "MongoDB Update One",
+        "description": "Applies an update operator document to the first document matching a filter, optionally upserting."
+      },
+      "updateMany": {
+        "label": "MongoDB Update Many",
+        "description": "Applies an update operator document to every document matching a filter, optionally upserting."
+      },
+      "replaceOne": {
+        "label": "MongoDB Replace One",
+        "description": "Replaces the first document matching a filter with a new document, optionally upserting."
+      },
+      "deleteOne": {
+        "label": "MongoDB Delete One",
+        "description": "Deletes the first document matching a filter."
+      },
+      "deleteMany": {
+        "label": "MongoDB Delete Many",
+        "description": "Deletes every document matching a filter."
+      },
+      "findOneAndUpdate": {
+        "label": "MongoDB Find One And Update",
+        "description": "Atomically updates the first document matching a filter and returns its before/after state."
+      },
+      "findOneAndReplace": {
+        "label": "MongoDB Find One And Replace",
+        "description": "Atomically replaces the first document matching a filter and returns its before/after state."
+      },
+      "findOneAndDelete": {
+        "label": "MongoDB Find One And Delete",
+        "description": "Atomically deletes the first document matching a filter and returns the deleted document."
+      },
+      "aggregate": {
+        "label": "MongoDB Aggregate",
+        "description": "Runs an aggregation pipeline against a collection, e.g. [{\"$match\":{...}},{\"$group\":{...}}].",
+        "pin_pipeline": "Pipeline ([{...}] JSON array)",
+        "pin_results": "Results (JSON array)"
+      },
+      "distinct": {
+        "label": "MongoDB Distinct",
+        "description": "Fetches the distinct values of a field across documents matching a filter.",
+        "pin_field": "Field",
+        "pin_values": "Values (JSON array)"
+      },
+      "createIndex": {
+        "label": "MongoDB Create Index",
+        "description": "Creates an index on one or more fields, e.g. {\"email\":1}.",
+        "pin_keys": "Keys ({field: 1|-1, ...} JSON)",
+        "pin_unique": "Unique",
+        "pin_name": "Name (optional)",
+        "pin_index_name": "Index Name"
+      },
+      "dropIndex": {
+        "label": "MongoDB Drop Index",
+        "description": "Drops an index by name."
+      },
+      "listIndexes": {
+        "label": "MongoDB List Indexes",
+        "description": "Lists the indexes defined on a collection.",
+        "pin_indexes": "Indexes (JSON array)"
+      },
+      "bulkWrite": {
+        "label": "MongoDB Bulk Write",
+        "description": "Applies a mix of insertOne/updateOne/updateMany/replaceOne/deleteOne/deleteMany operations in a single request, e.g. [{\"insertOne\":{\"document\":{...}}}].",
+        "pin_operations": "Operations ([{insertOne|updateOne|updateMany|replaceOne|deleteOne|deleteMany}] JSON array)",
+        "pin_upserted_count": "Upserted Count"
+      }
+    },
     "kinesis": {
       "__shared": {
         "pin_credential_name": "Credential Name",

@@ -16,7 +16,8 @@ export type CredentialTypeId =
   | "jiraServerBasicAuth"
   | "googleServiceAccount"
   | "googleOAuth2"
-  | "awsAccessKey";
+  | "awsAccessKey"
+  | "mongoConnectionString";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -153,6 +154,14 @@ export interface AwsAccessKeyCredentialData {
   endpoint: string;
 }
 
+/** A MongoDB connection URI (e.g. `mongodb://user:pass@host:27017` or a `mongodb+srv://...` Atlas
+ * SRV string), used as-is with the official driver's `MongoClient` — see lib/mongoManager.ts.
+ * The default database to operate on when a node's own `database` pin is left blank. */
+export interface MongoConnectionStringCredentialData {
+  connectionString: string;
+  defaultDatabase: string;
+}
+
 export type CredentialData =
   | UsernamePasswordCredentialData
   | Oauth2SamlBearerCredentialData
@@ -167,7 +176,8 @@ export type CredentialData =
   | JiraServerBasicAuthCredentialData
   | GoogleServiceAccountCredentialData
   | GoogleOAuth2CredentialData
-  | AwsAccessKeyCredentialData;
+  | AwsAccessKeyCredentialData
+  | MongoConnectionStringCredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */

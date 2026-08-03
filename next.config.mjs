@@ -29,6 +29,12 @@ const nextConfig = {
       googleapis: {
         browser: "./src/lib/googleapisBrowserStub.ts",
       },
+      // The official mongodb driver's entry point unconditionally requires Node built-ins ('net',
+      // 'tls', 'timers/promises', 'fs/promises') for its TCP wire protocol — same problem as
+      // facebook-nodejs-business-sdk/googleapis above, same fix.
+      mongodb: {
+        browser: "./src/lib/mongoBrowserStub.ts",
+      },
     },
   },
 };

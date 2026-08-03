@@ -9,7 +9,7 @@ Every 3rd-party provider follows the same 4-layer pattern. Take Jira as the exam
 | Node definitions      | `src/graph/nodes/jira.ts`                             | Editor-only: pins, labels, tooltips. No real API/HTTP calls here.                                                                                                                                                      |
 | Struct/enum pin types | `src/graph/structs/jira.ts`, `src/graph/enum/jira.ts` | Typed pin shapes surfaced in the editor for this provider's data.                                                                                                                                                      |
 
-Current providers: Dropbox, GitHub, Google (Admin/Calendar/Docs/Drive/Gmail/Sheets/Auth), Jira, Facebook, Azure Storage, Microsoft 365, AWS DynamoDB. Plus generic protocol nodes not tied to one vendor: `http.ts`, `soap.ts`, `sftp.ts`, `odata.ts`, `xml.ts`, `csv.ts`.
+Current providers: Dropbox, GitHub, Google (Admin/Calendar/Docs/Drive/Gmail/Sheets/Auth), Jira, Facebook, Azure Storage, Microsoft 365, AWS DynamoDB, MongoDB. Plus generic protocol nodes not tied to one vendor: `http.ts`, `soap.ts`, `sftp.ts`, `odata.ts`, `xml.ts`, `csv.ts`.
 
 ## Adding a new integration
 
@@ -21,4 +21,4 @@ Current providers: Dropbox, GitHub, Google (Admin/Calendar/Docs/Drive/Gmail/Shee
 
 ## Browser-side SDK stubs
 
-Some provider SDKs (`googleapis`, `facebook-nodejs-business-sdk`) are Node-only and would break the browser bundle if imported by editor code. `src/lib/googleapisBrowserStub.ts` and `src/lib/facebookSdkBrowserStub.ts` exist to satisfy imports client-side — never import the real SDK from anything that also runs in the browser (editor nodes, components).
+Some provider SDKs (`googleapis`, `facebook-nodejs-business-sdk`, `mongodb`) are Node-only and would break the browser bundle if imported by editor code. `src/lib/googleapisBrowserStub.ts`, `src/lib/facebookSdkBrowserStub.ts`, and `src/lib/mongoBrowserStub.ts` exist to satisfy imports client-side (aliased in `next.config.mjs`'s `turbopack.resolveAlias`) — never import the real SDK from anything that also runs in the browser (editor nodes, components).

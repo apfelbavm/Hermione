@@ -19,6 +19,7 @@ import "./facebook";
 import "./azureStorage";
 import "./awsDynamoDb";
 import "./awsKinesis";
+import "./mongo";
 import "./struct";
 import "./github";
 import "./microsoft365";

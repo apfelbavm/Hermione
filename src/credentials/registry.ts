@@ -227,3 +227,12 @@ registerCredentialType({
     { id: "endpoint", label: "Endpoint Override (optional)", help: "Custom service endpoint, e.g. http://localhost:8000 for DynamoDB Local. Leave blank to use AWS's regional endpoint." },
   ],
 });
+
+registerCredentialType({
+  id: "mongoConnectionString",
+  label: "MongoDB Connection String",
+  fields: [
+    { id: "connectionString", label: "Connection String", secret: true, help: "e.g. mongodb://user:pass@host:27017 or a mongodb+srv://... Atlas URI." },
+    { id: "defaultDatabase", label: "Default Database (optional)", help: "Used when a node's own Database pin is left blank." },
+  ],
+});
