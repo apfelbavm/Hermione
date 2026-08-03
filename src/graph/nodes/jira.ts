@@ -1,6 +1,6 @@
 import { NodeColorCategory, type ExecutionContext } from "../engine/types";
 import { registerNode } from "../engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_IMPORT } from "../engine/compileUtils";
+import { compileResultVar, FUNCTION_LIBRARY_JIRA_IMPORT } from "../engine/compileUtils";
 import { JiraManager, type JiraAuth } from "../../lib/jiraManager";
 import type { JiraCloudApiTokenCredentialData, JiraServerPersonalAccessTokenCredentialData, JiraServerBasicAuthCredentialData } from "../../credentials/types";
 import { JIRA_ISSUE_STRUCT_TYPE, JIRA_COMMENT_STRUCT_TYPE, JIRA_TRANSITION_STRUCT_TYPE, JIRA_PROJECT_STRUCT_TYPE, JIRA_USER_STRUCT_TYPE } from "../structs/jira";
@@ -17,9 +17,9 @@ import { i18n } from "@i18n";
 // identically on both REST APIs once JiraManager has picked the right client/auth for the
 // credential — see the comment atop jiraManager.ts for the full reasoning.
 //
-// Unlike github.ts/dropbox.ts/google.ts/microsoft365.ts (interpreter-only, credential vault lookup
-// has no compiled-script counterpart yet), every node here also has a compileExecute: the compiled
-// path calls a same-named `functionLibrary.jira*` wrapper (see server/functionLibrary.ts), which
+// Unlike github.ts/google.ts/microsoft365.ts (interpreter-only, credential vault lookup has no
+// compiled-script counterpart yet), every node here also has a compileExecute: the compiled path
+// calls a same-named `functionLibraryJira.jira*` wrapper (see server/functionLibraryJira.ts), which
 // reads the credential back from environment variables via `jiraCredentialFromEnv` instead of the
 // vault — same split as oauth2Saml.ts's execute()/compileExecute().
 const GROUP_NAME = "Request.Jira";
@@ -113,12 +113,12 @@ registerNode({
     const result = await manager.createIssue(String(inputs.projectKey ?? ""), String(inputs.issueType ?? ""), String(inputs.summary ?? ""), String(inputs.description ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraCreateIssue(${inputs.credentialName}, ${inputs.projectKey}, ${inputs.issueType}, ${inputs.summary}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraCreateIssue(${inputs.credentialName}, ${inputs.projectKey}, ${inputs.issueType}, ${inputs.summary}, ${inputs.description});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, key: `${v}.key`, url: `${v}.url`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -136,12 +136,12 @@ registerNode({
     const result = await manager.getIssue(String(inputs.issueKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraGetIssue(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraGetIssue(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, issue: `${v}.issue`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -168,12 +168,12 @@ registerNode({
     const result = await manager.updateIssue(String(inputs.issueKey ?? ""), String(inputs.summary ?? ""), String(inputs.description ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraUpdateIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.summary}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraUpdateIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.summary}, ${inputs.description});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -191,12 +191,12 @@ registerNode({
     const result = await manager.deleteIssue(String(inputs.issueKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraDeleteIssue(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraDeleteIssue(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -225,12 +225,12 @@ registerNode({
     const result = await manager.searchIssues(String(inputs.jql ?? ""), Number(inputs.maxResults ?? 50), (inputs.validateQuery as "strict" | "warn" | "none") ?? "warn");
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraSearchIssues(${inputs.credentialName}, ${inputs.jql}, ${inputs.maxResults}, ${inputs.validateQuery});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraSearchIssues(${inputs.credentialName}, ${inputs.jql}, ${inputs.maxResults}, ${inputs.validateQuery});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, issues: `${v}.issues`, total: `${v}.total`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -257,12 +257,12 @@ registerNode({
     const result = await manager.addComment(String(inputs.issueKey ?? ""), String(inputs.body ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraAddComment(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraAddComment(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.body});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -288,12 +288,12 @@ registerNode({
     const result = await manager.listComments(String(inputs.issueKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraListComments(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraListComments(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, comments: `${v}.comments`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -319,12 +319,12 @@ registerNode({
     const result = await manager.listTransitions(String(inputs.issueKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraListTransitions(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraListTransitions(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, transitions: `${v}.transitions`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -342,12 +342,12 @@ registerNode({
     const result = await manager.transitionIssue(String(inputs.issueKey ?? ""), String(inputs.transitionId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraTransitionIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.transitionId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraTransitionIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.transitionId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -365,12 +365,12 @@ registerNode({
     const result = await manager.assignIssue(String(inputs.issueKey ?? ""), String(inputs.assignee ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraAssignIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.assignee});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraAssignIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.assignee});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -388,12 +388,12 @@ registerNode({
     const result = await manager.listProjects();
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraListProjects(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraListProjects(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, projects: `${v}.projects`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -419,12 +419,12 @@ registerNode({
     const result = await manager.getProject(String(inputs.projectKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraGetProject(${inputs.credentialName}, ${inputs.projectKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraGetProject(${inputs.credentialName}, ${inputs.projectKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, project: `${v}.project`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -452,12 +452,12 @@ registerNode({
     const result = await manager.addWorklog(String(inputs.issueKey ?? ""), String(inputs.timeSpent ?? ""), String(inputs.comment ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraAddWorklog(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.timeSpent}, ${inputs.comment});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraAddWorklog(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.timeSpent}, ${inputs.comment});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -484,12 +484,12 @@ registerNode({
     const result = await manager.linkIssues(String(inputs.inwardIssueKey ?? ""), String(inputs.outwardIssueKey ?? ""), String(inputs.linkType ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraLinkIssues(${inputs.credentialName}, ${inputs.inwardIssueKey}, ${inputs.outwardIssueKey}, ${inputs.linkType});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraLinkIssues(${inputs.credentialName}, ${inputs.inwardIssueKey}, ${inputs.outwardIssueKey}, ${inputs.linkType});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -516,12 +516,12 @@ registerNode({
     const result = await manager.getUser(String(inputs.accountId ?? ""), String(inputs.username ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraGetUser(${inputs.credentialName}, ${inputs.accountId}, ${inputs.username});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraGetUser(${inputs.credentialName}, ${inputs.accountId}, ${inputs.username});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, user: `${v}.user`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });
 
 registerNode({
@@ -548,10 +548,10 @@ registerNode({
     const result = await manager.findUsers(String(inputs.query ?? ""), Number(inputs.maxResults ?? 50));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrary.jiraFindUsers(${inputs.credentialName}, ${inputs.query}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraFindUsers(${inputs.credentialName}, ${inputs.query}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, users: `${v}.users`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
 });

@@ -31,6 +31,14 @@ export const FUNCTION_LIBRARY_IMPORT = 'import * as functionLibrary from "../../
  * that file's own header comment) — no interpreter-facing code may ever import it directly. */
 export const FUNCTION_LIBRARY_SFTP_IMPORT = 'import * as functionLibrarySftp from "../../src/server/functionLibrarySftp.ts";';
 
+/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryJira.ts — kept in its own file
+ * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/jira.ts). */
+export const FUNCTION_LIBRARY_JIRA_IMPORT = 'import * as functionLibraryJira from "../../src/server/functionLibraryJira.ts";';
+
+/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryDropbox.ts — kept in its own file
+ * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/dropbox.ts). */
+export const FUNCTION_LIBRARY_DROPBOX_IMPORT = 'import * as functionLibraryDropbox from "../../src/server/functionLibraryDropbox.ts";';
+
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/executeDeployedFlow.ts — used by
  * flow.executeFlow's compileExecute (see nodes/flow.ts) so a deployed flow's own "Execute Flow"
  * node dynamic-imports the target Flow's DEPLOYED script exactly the same way the interpreter's
