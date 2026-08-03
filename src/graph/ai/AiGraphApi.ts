@@ -8,6 +8,24 @@ import { getRuntimeErrors, getRuntimeState, runGraph, traceExecution, type RunOp
 import { applyChanges, findGraphById } from "./transactions";
 import { validateGraph } from "./validation";
 import type { ApplyChangesRequest, ApplyChangesResult, ChangeOp, GraphSummary, RunResult, ValidationResult } from "./types";
+import {
+  align,
+  type AlignEdge,
+  distribute,
+  fitLayout,
+  getLayoutSnapshot,
+  getNodeLayout,
+  getSpatialRelationships,
+  insertBetween,
+  type InsertBetweenRequest,
+  type InsertBetweenResult,
+  layoutAround,
+  type LayoutAroundRequest,
+  layoutGraph,
+  type LayoutGraphRequest,
+  updateNodePosition,
+} from "./layoutOperations";
+import type { GraphLayoutSnapshot, LayoutDirection, LayoutResult, NodeLayoutInfo, SpatialRelationship } from "./layoutTypes";
 
 export interface AiGraphApiOptions {
   /** True when this API instance is scoped to editing a function's body rather than the root
@@ -142,6 +160,64 @@ export class AiGraphApi {
       this.currentVersion = result.version;
     }
     return result;
+  }
+
+  // --- Layout ----------------------------------------------------------------------------------
+  // Every mutating layout op below follows the same commit shape as applyChanges: snapshot the
+  // whole document first, run the (already in-place, atomic) layout mutation, and only push it
+  // onto the undo stack if it actually succeeded — so e.g. "Tidy workflow layout" undoes as ONE
+  // action (section 24), never as N individual position changes.
+
+  private commitLayout<T extends { success: boolean }>(mutate: () => T): T {
+    const before = serializeGraph(this.ctx.rootGraph);
+    const result = mutate();
+    if (result.success) {
+      this.undoStack.push(before);
+      if (this.undoStack.length > 200) this.undoStack.shift();
+      this.redoStack = [];
+      this.currentVersion++;
+    }
+    return result;
+  }
+
+  getLayout(): GraphLayoutSnapshot {
+    return getLayoutSnapshot(this.ctx);
+  }
+
+  getNodeLayout(nodeId: string): NodeLayoutInfo {
+    return getNodeLayout(this.ctx, nodeId);
+  }
+
+  updateNodePosition(nodeId: string, x: number, y: number): LayoutResult {
+    return this.commitLayout(() => updateNodePosition(this.ctx, nodeId, x, y));
+  }
+
+  layout(request: LayoutGraphRequest): LayoutResult {
+    return this.commitLayout(() => layoutGraph(this.ctx, request));
+  }
+
+  layoutAround(request: LayoutAroundRequest): LayoutResult {
+    return this.commitLayout(() => layoutAround(this.ctx, request));
+  }
+
+  insertBetween(request: InsertBetweenRequest): InsertBetweenResult {
+    return this.commitLayout(() => insertBetween(this.ctx, request));
+  }
+
+  align(nodeIds: string[], edge: AlignEdge): LayoutResult {
+    return this.commitLayout(() => align(this.ctx, nodeIds, edge));
+  }
+
+  distribute(nodeIds: string[], axis: "horizontal" | "vertical"): LayoutResult {
+    return this.commitLayout(() => distribute(this.ctx, nodeIds, axis));
+  }
+
+  fitLayout(direction?: LayoutDirection): LayoutResult {
+    return this.commitLayout(() => fitLayout(this.ctx, direction));
+  }
+
+  getSpatialRelationships(nodeIds?: string[]): SpatialRelationship[] {
+    return getSpatialRelationships(this.ctx, nodeIds);
   }
 
   // --- History -------------------------------------------------------------------------------

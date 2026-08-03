@@ -26,6 +26,16 @@ export const TOOL_OPERATION_CATEGORY: Record<string, OperationCategory> = {
   "graph.restore_snapshot": "destructive_mutation",
   "graph.create_snapshot": "safe_mutation",
   "graph.run": "execution",
+  "graph.get_layout": "read",
+  "graph.get_node_layout": "read",
+  "graph.get_spatial_relationships": "read",
+  "graph.layout": "safe_mutation",
+  "graph.layout_around": "safe_mutation",
+  "graph.insert_between": "safe_mutation",
+  "graph.align": "safe_mutation",
+  "graph.distribute": "safe_mutation",
+  "graph.fit_layout": "safe_mutation",
+  "graph.update_node_position": "safe_mutation",
 };
 
 export interface ApprovalPolicy {

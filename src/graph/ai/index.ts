@@ -1,5 +1,7 @@
 export { AiGraphApi, type AiGraphApiOptions } from "./AiGraphApi";
 export * from "./types";
+export * from "./layoutTypes";
+export { GraphLayoutEngine, type EngineLayoutRequest, type EngineLayoutResult, type LayoutNodeInput, type LayoutEdgeInput } from "./layoutEngine";
 export { describeNodeType, allNodeTypeMetadata, getNodeTypeMetadata, findNodeTypes, searchNodeTypes, type NodeTypeFilter } from "./metadataAdapter";
 export { AI_TOOL_DEFINITIONS, dispatchTool, type AiToolDefinition } from "./tools";
 export { AI_GRAPH_SYSTEM_PROMPT } from "./systemPrompt";

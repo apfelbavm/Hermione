@@ -111,6 +111,66 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
   { name: "graph.get_runtime_errors", description: "Structured runtime errors from a past graph.run, or every run if executionId is omitted.", parameters: { type: "object", properties: { executionId: { type: "string" } } } },
   { name: "graph.get_runtime_state", description: "A node's runtime status/inputs/outputs/error from a past run.", parameters: { type: "object", properties: { nodeId: { type: "string" }, executionId: { type: "string" } }, required: ["nodeId"] } },
   { name: "graph.trace_execution", description: "Ordered node-visit trace for a past run, e.g. ['A','B','C','ERROR'].", parameters: { type: "object", properties: { executionId: { type: "string" } }, required: ["executionId"] } },
+
+  // --- Layout: the AI decides WHAT the graph should look like logically; these tools decide WHERE
+  // nodes physically go. Prefer the semantic ones (layout/layout_around/insert_between/align/
+  // distribute) — update_node_position is a last resort for when an exact position is genuinely
+  // required, never the default way to place a node.
+  { name: "graph.get_layout", description: "Full physical layout snapshot: every node's position/size/port geometry, groups, and graph bounds.", parameters: { type: "object", properties: {} } },
+  { name: "graph.get_node_layout", description: "One node's position, size, and port geometry.", parameters: { type: "object", properties: { nodeId: nodeIdSchema }, required: ["nodeId"] } },
+  {
+    name: "graph.get_spatial_relationships",
+    description: "Answers spatial questions (which nodes overlap / are left-right-above-below one another / are in the same group) without you having to do geometry yourself.",
+    parameters: { type: "object", properties: { nodeIds: { type: "array", items: { type: "string" }, description: "Omit to check every node in the graph." } } },
+  },
+  {
+    name: "graph.layout",
+    description: "Run the deterministic layered layout engine over the whole graph or a subgraph/selection. Prefer this over manually positioning nodes.",
+    parameters: {
+      type: "object",
+      properties: {
+        scope: { type: "string", enum: ["graph", "subgraph", "selection"], description: "'graph' lays out everything; 'subgraph'/'selection' require nodeIds and never move anything outside that set." },
+        nodeIds: { type: "array", items: { type: "string" } },
+        direction: { type: "string", enum: ["LR", "RL", "TB", "BT"], description: "Defaults to LR (left-to-right)." },
+        mode: { type: "string", enum: ["tidy", "auto", "incremental", "local"], description: "'tidy'/'auto' recompute a clean layout; 'incremental'/'local' try to preserve the existing arrangement as much as possible." },
+      },
+    },
+  },
+  {
+    name: "graph.layout_around",
+    description: "Place newly-created nodes relative to an existing anchor node without moving the anchor or anything else — use right after creating nodes you want to attach near an existing part of the graph.",
+    parameters: {
+      type: "object",
+      properties: { anchorNodeId: nodeIdSchema, nodeIds: { type: "array", items: { type: "string" } }, direction: { type: "string", enum: ["LR", "RL", "TB", "BT"] } },
+      required: ["anchorNodeId", "nodeIds"],
+    },
+  },
+  {
+    name: "graph.insert_between",
+    description:
+      "Splice an already-created node into an existing connection between two nodes (finds the connection, rewires it through the new node by matching compatible ports, and places the new node between them, shifting only what's downstream as needed). Prefer this over manually deleting/recreating connections plus a manual position.",
+    parameters: {
+      type: "object",
+      properties: { newNodeId: nodeIdSchema, beforeNodeId: nodeIdSchema, afterNodeId: nodeIdSchema, beforePort: { type: "string" }, afterPort: { type: "string" } },
+      required: ["newNodeId", "beforeNodeId", "afterNodeId"],
+    },
+  },
+  {
+    name: "graph.align",
+    description: "Align selected nodes' left/right/top/bottom edges or horizontal/vertical centers.",
+    parameters: { type: "object", properties: { nodeIds: { type: "array", items: { type: "string" } }, edge: { type: "string", enum: ["left", "right", "top", "bottom", "center-horizontal", "center-vertical"] } }, required: ["nodeIds", "edge"] },
+  },
+  {
+    name: "graph.distribute",
+    description: "Evenly space selected nodes horizontally or vertically between the first and last node in the set.",
+    parameters: { type: "object", properties: { nodeIds: { type: "array", items: { type: "string" } }, axis: { type: "string", enum: ["horizontal", "vertical"] } }, required: ["nodeIds", "axis"] },
+  },
+  { name: "graph.fit_layout", description: "Recompute a clean layered layout for the ENTIRE graph — use for an explicit 'tidy/rearrange everything' request, not for small local changes.", parameters: { type: "object", properties: { direction: { type: "string", enum: ["LR", "RL", "TB", "BT"] } } } },
+  {
+    name: "graph.update_node_position",
+    description: "Explicitly move one node to an exact position. Last resort — prefer graph.layout/graph.layout_around/graph.insert_between so the layout engine computes coordinates for you.",
+    parameters: { type: "object", properties: { nodeId: nodeIdSchema, x: { type: "number" }, y: { type: "number" } }, required: ["nodeId", "x", "y"] },
+  },
 ];
 
 /** Executes one tool call by name against `api` — the only place a tool name string is mapped to
@@ -151,6 +211,26 @@ export async function dispatchTool(api: AiGraphApi, name: string, args: Record<s
       return api.getRuntimeState(args.nodeId as string, args.executionId as string | undefined);
     case "graph.trace_execution":
       return api.traceExecution(args.executionId as string);
+    case "graph.get_layout":
+      return api.getLayout();
+    case "graph.get_node_layout":
+      return api.getNodeLayout(args.nodeId as string);
+    case "graph.get_spatial_relationships":
+      return api.getSpatialRelationships(args.nodeIds as string[] | undefined);
+    case "graph.layout":
+      return api.layout(args as never);
+    case "graph.layout_around":
+      return api.layoutAround(args as never);
+    case "graph.insert_between":
+      return api.insertBetween(args as never);
+    case "graph.align":
+      return api.align(args.nodeIds as string[], args.edge as never);
+    case "graph.distribute":
+      return api.distribute(args.nodeIds as string[], args.axis as never);
+    case "graph.fit_layout":
+      return api.fitLayout(args.direction as never);
+    case "graph.update_node_position":
+      return api.updateNodePosition(args.nodeId as string, args.x as number, args.y as number);
     default:
       throw new Error(`Unknown AI graph tool "${name}"`);
   }
