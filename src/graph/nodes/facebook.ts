@@ -1,5 +1,6 @@
 import { NodeColorCategory, type ExecutionContext } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { compileResultVar, FUNCTION_LIBRARY_FACEBOOK_IMPORT } from "../engine/compileUtils";
 import { FacebookManager } from "../../lib/facebookManager";
 import type { FacebookCredentialData } from "../../credentials/types";
 import { AUTH_TOKENS_STRUCT_TYPE, DEBUG_TOKEN_STRUCT_TYPE, PAGE_STRUCT_TYPE, POST_STRUCT_TYPE, COMMENT_STRUCT_TYPE, USER_STRUCT_TYPE, AD_ACCOUNT_STRUCT_TYPE, CAMPAIGN_STRUCT_TYPE } from "../structs/facebook";
@@ -7,6 +8,11 @@ import { FACEBOOK_CAMPAIGN_OBJECTIVE_ENUM_TYPE, FACEBOOK_CAMPAIGN_STATUS_ENUM_TY
 import { HTTP_METHOD_ENUM_TYPE } from "../enum/common";
 import { enumOptionIds } from "../engine/enumRegistry";
 import { i18n } from "@i18n";
+
+// Every node here also has a compileExecute: the compiled path calls a same-named
+// `functionLibraryFacebook.facebook*` wrapper (see server/functionLibraryFacebook.ts), which reads
+// the credential back from environment variables instead of the vault — same split as
+// github.ts's execute()/compileExecute().
 
 const GROUP_NAME = "Request.Facebook";
 
@@ -72,6 +78,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookAuthorize(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, tokens: `{ accessToken: ${v}.accessToken, expiresIn: ${v}.expiresIn }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -116,6 +128,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookDebugToken(${inputs.credentialName}, ${inputs.inputToken});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, result: `{ appId: ${v}.appId, isValid: ${v}.isValid, expiresAt: ${v}.expiresAt, scopes: ${v}.scopes }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -156,6 +174,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetPageInfo(${inputs.credentialName}, ${inputs.pageId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, page: `{ id: ${v}.id, name: ${v}.name, category: ${v}.category, fanCount: ${v}.fanCount, link: ${v}.link }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -187,6 +211,12 @@ registerNode({
     const result = await manager.createPost(String(inputs.pageId ?? ""), String(inputs.message ?? ""), String(inputs.link ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, error: result.error } };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookCreatePost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.message}, ${inputs.link});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, postId: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -218,6 +248,12 @@ registerNode({
     const result = await manager.createPhotoPost(String(inputs.pageId ?? ""), String(inputs.url ?? ""), String(inputs.caption ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, error: result.error } };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookCreatePhotoPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.url}, ${inputs.caption});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, postId: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -249,6 +285,12 @@ registerNode({
     const result = await manager.createVideoPost(String(inputs.pageId ?? ""), String(inputs.videoUrl ?? ""), String(inputs.description ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, error: result.error } };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookCreateVideoPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.videoUrl}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, postId: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -277,6 +319,12 @@ registerNode({
     const result = await manager.deletePost(String(inputs.postId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookDeletePost(${inputs.credentialName}, ${inputs.postId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -307,6 +355,12 @@ registerNode({
     const result = await manager.getPosts(String(inputs.pageId ?? ""), Number(inputs.limit ?? 25));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetPosts(${inputs.credentialName}, ${inputs.pageId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, posts: `${v}.posts`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -338,6 +392,12 @@ registerNode({
     const result = await manager.getPageInsights(String(inputs.pageId ?? ""), (inputs.metrics as string[]) ?? [], String(inputs.period ?? "day"));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetPageInsights(${inputs.credentialName}, ${inputs.pageId}, ${inputs.metrics}, ${inputs.period});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, json: `${v}.json`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -368,6 +428,12 @@ registerNode({
     const result = await manager.createComment(String(inputs.objectId ?? ""), String(inputs.message ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookCreateComment(${inputs.credentialName}, ${inputs.objectId}, ${inputs.message});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -398,6 +464,12 @@ registerNode({
     const result = await manager.getComments(String(inputs.objectId ?? ""), Number(inputs.limit ?? 25));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetComments(${inputs.credentialName}, ${inputs.objectId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, comments: `${v}.comments`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -426,6 +498,12 @@ registerNode({
     const result = await manager.deleteComment(String(inputs.commentId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookDeleteComment(${inputs.credentialName}, ${inputs.commentId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 function registerLikeNode(type: "likeObject" | "unlikeObject") {
@@ -455,6 +533,12 @@ function registerLikeNode(type: "likeObject" | "unlikeObject") {
       const result = await manager[type](String(inputs.objectId ?? ""));
       return { nextExec: "exec-out", outputs: result };
     },
+    compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebook${type[0].toUpperCase()}${type.slice(1)}(${inputs.credentialName}, ${inputs.objectId});`, ...compileFrom("exec-out")],
+    compileExecuteOutputs: ({ node }) => {
+      const v = compileResultVar(node.id);
+      return { success: `${v}.success`, error: `${v}.error` };
+    },
+    compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
   });
 }
 
@@ -488,6 +572,12 @@ registerNode({
     const result = await manager.getLikesCount(String(inputs.objectId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetLikesCount(${inputs.credentialName}, ${inputs.objectId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, count: `${v}.count`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -528,6 +618,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetUserProfile(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, user: `{ id: ${v}.id, name: ${v}.name, email: ${v}.email }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -557,6 +653,12 @@ registerNode({
     const result = await manager.getAdAccounts(String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetAdAccounts(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, accounts: `${v}.accounts`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -589,6 +691,12 @@ registerNode({
     const result = await manager.createCampaign(String(inputs.adAccountId ?? ""), String(inputs.name ?? ""), String(inputs.objective ?? "OUTCOME_TRAFFIC"), String(inputs.status ?? "PAUSED"));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookCreateCampaign(${inputs.credentialName}, ${inputs.adAccountId}, ${inputs.name}, ${inputs.objective}, ${inputs.status});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -619,6 +727,12 @@ registerNode({
     const result = await manager.getCampaigns(String(inputs.adAccountId ?? ""), Number(inputs.limit ?? 25));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetCampaigns(${inputs.credentialName}, ${inputs.adAccountId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, campaigns: `${v}.campaigns`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -647,6 +761,12 @@ registerNode({
     const result = await manager.deleteCampaign(String(inputs.campaignId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookDeleteCampaign(${inputs.credentialName}, ${inputs.campaignId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -677,6 +797,12 @@ registerNode({
     const result = await manager.getInsights(String(inputs.objectId ?? ""), (inputs.fields as string[]) ?? []);
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetInsights(${inputs.credentialName}, ${inputs.objectId}, ${inputs.fields});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, json: `${v}.json`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
 
 registerNode({
@@ -708,4 +834,10 @@ registerNode({
     const result = await manager.apiCall(String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.paramsJson ?? "{}"));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookApiCall(${inputs.credentialName}, ${inputs.method}, ${inputs.path}, ${inputs.paramsJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, json: `${v}.json`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
 });
