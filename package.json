@@ -4,18 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "preinstall": "node scripts/checkNodeVersion.mjs",
-    "predev": "node scripts/checkNodeVersion.mjs",
-    "dev": "cross-env NODE_OPTIONS=--experimental-strip-types next dev",
-    "prebuild": "node scripts/checkNodeVersion.mjs",
+    "run": "node scripts/checkNodeVersion.mjs && npm run run-dev",
+    "--------------------------": "",
     "build": "next build",
-    "prestart": "node scripts/checkNodeVersion.mjs",
-    "start": "cross-env NODE_OPTIONS=--experimental-strip-types next start",
-    "pretest": "node scripts/checkNodeVersion.mjs",
+    "run-dev": "cross-env NODE_OPTIONS=--experimental-strip-types next dev",
+    "run-prod": "cross-env NODE_OPTIONS=--experimental-strip-types next start",
     "test": "vitest run",
-    "precompile": "node scripts/checkNodeVersion.mjs",
-    "compile": "tsx scripts/compileGraph.ts",
-    "check:node": "node scripts/checkNodeVersion.mjs"
+    "compile": "tsx scripts/compileGraph.ts"
   },
   "devDependencies": {
     "@microsoft/microsoft-graph-types": "^2.43.1",
