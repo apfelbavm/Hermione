@@ -1,5 +1,6 @@
 import { NodeColorCategory, type ExecutionContext } from "../engine/types";
 import { registerNode } from "../engine/registry";
+import { compileResultVar, FUNCTION_LIBRARY_MICROSOFT365_IMPORT } from "../engine/compileUtils";
 import { GraphManager } from "../../lib/graphManager";
 import type { MicrosoftGraphClientCredentialsData } from "../../credentials/types";
 import {
@@ -35,7 +36,11 @@ import { i18n } from "@i18n";
 // Every operation below is a thin pin-wiring shim over GraphManager (src/lib/graphManager.ts),
 // which owns the actual Graph REST calls, token acquisition/refresh, and error normalization —
 // this file only ever translates pins to method arguments and method results back to pins.
-// Interpreter-only for now (no compileExecute/compileImports), same deferral as github.ts.
+//
+// Every node here also has a compileExecute: the compiled path calls a same-named
+// `functionLibraryMicrosoft365.microsoft365*` wrapper (see server/functionLibraryMicrosoft365.ts),
+// which reads the credential back from environment variables via `microsoft365ManagerFromEnv`
+// instead of the vault — same split as jira.ts's execute()/compileExecute().
 //
 // Every operation node takes a Credential Name directly: each resolves the named vault entry and
 // hands it to GraphManager.forCredential, which caches the client and mints/refreshes the app-only
@@ -151,6 +156,12 @@ registerNode({
     const result = await managerFor(resolved.data).listUsers(String(inputs.filter ?? ""), Number(inputs.top ?? 100));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListUsers(${inputs.credentialName}, ${inputs.filter}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, users: `${v}.users`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -188,6 +199,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365GetUser(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, user: `{ id: ${v}.id, displayName: ${v}.displayName, userPrincipalName: ${v}.userPrincipalName, mail: ${v}.mail }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -221,6 +238,15 @@ registerNode({
     const result = await managerFor(resolved.data).createUser(String(inputs.displayName ?? ""), String(inputs.userPrincipalName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.password ?? ""), Boolean(inputs.forceChangePasswordNextSignIn));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateUser(${inputs.credentialName}, ${inputs.displayName}, ${inputs.userPrincipalName}, ${inputs.mailNickname}, ${inputs.password}, ${inputs.forceChangePasswordNextSignIn});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -242,6 +268,12 @@ registerNode({
     const result = await managerFor(resolved.data).updateUser(String(inputs.userId ?? ""), String(inputs.propertiesJson ?? "{}"));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365UpdateUser(${inputs.credentialName}, ${inputs.userId}, ${inputs.propertiesJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -263,6 +295,12 @@ registerNode({
     const result = await managerFor(resolved.data).deleteUser(String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteUser(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -293,6 +331,12 @@ registerNode({
     const result = await managerFor(resolved.data).listGroups(String(inputs.filter ?? ""), Number(inputs.top ?? 100));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListGroups(${inputs.credentialName}, ${inputs.filter}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, groups: `${v}.groups`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -326,6 +370,15 @@ registerNode({
     const result = await managerFor(resolved.data).createGroup(String(inputs.displayName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.description ?? ""), Boolean(inputs.securityEnabled), Boolean(inputs.mailEnabled));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateGroup(${inputs.credentialName}, ${inputs.displayName}, ${inputs.mailNickname}, ${inputs.description}, ${inputs.securityEnabled}, ${inputs.mailEnabled});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -347,6 +400,12 @@ registerNode({
     const result = await managerFor(resolved.data).deleteGroup(String(inputs.groupId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteGroup(${inputs.credentialName}, ${inputs.groupId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -368,6 +427,12 @@ registerNode({
     const result = await managerFor(resolved.data).addGroupMember(String(inputs.groupId ?? ""), String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365AddGroupMember(${inputs.credentialName}, ${inputs.groupId}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -401,6 +466,15 @@ registerNode({
     const result = await managerFor(resolved.data).sendMail(String(inputs.userId ?? ""), (Array.isArray(inputs.to) ? inputs.to : []).map(String), String(inputs.subject ?? ""), String(inputs.body ?? ""), inputs.bodyType === "html" ? "html" : "text", Boolean(inputs.saveToSentItems));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365SendMail(${inputs.credentialName}, ${inputs.userId}, ${inputs.to}, ${inputs.subject}, ${inputs.body}, ${inputs.bodyType}, ${inputs.saveToSentItems});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -432,6 +506,12 @@ registerNode({
     const result = await managerFor(resolved.data).listMessages(String(inputs.userId ?? ""), Number(inputs.top ?? 25), String(inputs.filter ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListMessages(${inputs.credentialName}, ${inputs.userId}, ${inputs.top}, ${inputs.filter});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, messages: `${v}.messages`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -483,6 +563,12 @@ registerNode({
       },
     };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365GetMessage(${inputs.credentialName}, ${inputs.userId}, ${inputs.messageId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, message: `{ subject: ${v}.subject, from: ${v}.from, bodyContent: ${v}.bodyContent, receivedDateTime: ${v}.receivedDateTime }`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -504,6 +590,12 @@ registerNode({
     const result = await managerFor(resolved.data).deleteMessage(String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteMessage(${inputs.credentialName}, ${inputs.userId}, ${inputs.messageId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -534,6 +626,12 @@ registerNode({
     const result = await managerFor(resolved.data).listEvents(String(inputs.userId ?? ""), Number(inputs.top ?? 25));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListEvents(${inputs.credentialName}, ${inputs.userId}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, events: `${v}.events`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -577,6 +675,15 @@ registerNode({
     );
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateEvent(${inputs.credentialName}, ${inputs.userId}, ${inputs.subject}, ${inputs.start}, ${inputs.end}, ${inputs.timeZone}, ${inputs.body}, ${inputs.attendees});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -598,6 +705,12 @@ registerNode({
     const result = await managerFor(resolved.data).deleteEvent(String(inputs.userId ?? ""), String(inputs.eventId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteEvent(${inputs.credentialName}, ${inputs.userId}, ${inputs.eventId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -628,6 +741,12 @@ registerNode({
     const result = await managerFor(resolved.data).listDriveItems(String(inputs.userId ?? ""), String(inputs.folderPath ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListDriveItems(${inputs.credentialName}, ${inputs.userId}, ${inputs.folderPath});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, items: `${v}.items`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -659,6 +778,12 @@ registerNode({
     const result = await managerFor(resolved.data).downloadFile(String(inputs.userId ?? ""), String(inputs.filePath ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DownloadFile(${inputs.credentialName}, ${inputs.userId}, ${inputs.filePath}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, content: `${v}.content`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -690,6 +815,12 @@ registerNode({
     const result = await managerFor(resolved.data).uploadFile(String(inputs.userId ?? ""), String(inputs.filePath ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365UploadFile(${inputs.credentialName}, ${inputs.userId}, ${inputs.filePath}, ${inputs.content}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -711,6 +842,12 @@ registerNode({
     const result = await managerFor(resolved.data).deleteDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -732,6 +869,12 @@ registerNode({
     const result = await managerFor(resolved.data).listJoinedTeams(String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListJoinedTeams(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, teams: `${v}.teams`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -762,6 +905,12 @@ registerNode({
     const result = await managerFor(resolved.data).sendChannelMessage(String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), String(inputs.message ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365SendChannelMessage(${inputs.credentialName}, ${inputs.teamId}, ${inputs.channelId}, ${inputs.message});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -799,6 +948,12 @@ registerNode({
     const result = await managerFor(resolved.data).rawRequest(String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.bodyJson ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365Request(${inputs.credentialName}, ${inputs.method}, ${inputs.path}, ${inputs.bodyJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, status: `${v}.status`, data: `${v}.data`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -828,6 +983,12 @@ registerNode({
     const result = await managerFor(resolved.data).listChannels(String(inputs.teamId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListChannels(${inputs.credentialName}, ${inputs.teamId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, channels: `${v}.channels`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -864,6 +1025,12 @@ registerNode({
     const result = await managerFor(resolved.data).createChannel(String(inputs.teamId ?? ""), String(inputs.displayName ?? ""), String(inputs.description ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateChannel(${inputs.credentialName}, ${inputs.teamId}, ${inputs.displayName}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -895,6 +1062,12 @@ registerNode({
     const result = await managerFor(resolved.data).listChannelMessages(String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), Number(inputs.top ?? 25));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListChannelMessages(${inputs.credentialName}, ${inputs.teamId}, ${inputs.channelId}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, messages: `${v}.messages`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -916,6 +1089,12 @@ registerNode({
     const result = await managerFor(resolved.data).listChats(String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListChats(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, chats: `${v}.chats`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -945,6 +1124,12 @@ registerNode({
     const result = await managerFor(resolved.data).sendChatMessage(String(inputs.chatId ?? ""), String(inputs.message ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365SendChatMessage(${inputs.credentialName}, ${inputs.chatId}, ${inputs.message});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -974,6 +1159,12 @@ registerNode({
     const result = await managerFor(resolved.data).listSites(String(inputs.search ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListSites(${inputs.credentialName}, ${inputs.search});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, sites: `${v}.sites`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1003,6 +1194,12 @@ registerNode({
     const result = await managerFor(resolved.data).listSiteLists(String(inputs.siteId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListSiteLists(${inputs.credentialName}, ${inputs.siteId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, lists: `${v}.lists`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1033,6 +1230,12 @@ registerNode({
     const result = await managerFor(resolved.data).listListItems(String(inputs.siteId ?? ""), String(inputs.listId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListListItems(${inputs.credentialName}, ${inputs.siteId}, ${inputs.listId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, items: `${v}.items`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1064,6 +1267,12 @@ registerNode({
     const result = await managerFor(resolved.data).createListItem(String(inputs.siteId ?? ""), String(inputs.listId ?? ""), String(inputs.fieldsJson ?? "{}"));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateListItem(${inputs.credentialName}, ${inputs.siteId}, ${inputs.listId}, ${inputs.fieldsJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1095,6 +1304,12 @@ registerNode({
     const result = await managerFor(resolved.data).createFolder(String(inputs.userId ?? ""), String(inputs.parentPath ?? ""), String(inputs.name ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateFolder(${inputs.credentialName}, ${inputs.userId}, ${inputs.parentPath}, ${inputs.name});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1125,6 +1340,12 @@ registerNode({
     const result = await managerFor(resolved.data).moveDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365MoveDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.destinationFolderPath});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1156,6 +1377,12 @@ registerNode({
     const result = await managerFor(resolved.data).copyDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""), String(inputs.newName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CopyDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.destinationFolderPath}, ${inputs.newName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1188,6 +1415,12 @@ registerNode({
     const result = await managerFor(resolved.data).createSharingLink(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.type ?? "view"), String(inputs.scope ?? "organization"));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateSharingLink(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.type}, ${inputs.scope});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, link: `${v}.link`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1218,6 +1451,12 @@ registerNode({
     const result = await managerFor(resolved.data).searchDriveItems(String(inputs.userId ?? ""), String(inputs.query ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365SearchDriveItems(${inputs.credentialName}, ${inputs.userId}, ${inputs.query});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, items: `${v}.items`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1248,6 +1487,12 @@ registerNode({
     const result = await managerFor(resolved.data).listWorksheets(String(inputs.userId ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListWorksheets(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, worksheets: `${v}.worksheets`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1280,6 +1525,12 @@ registerNode({
     const result = await managerFor(resolved.data).getWorksheetRange(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365GetWorksheetRange(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.worksheetName}, ${inputs.address});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, valuesJson: `${v}.valuesJson`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1312,6 +1563,15 @@ registerNode({
     const result = await managerFor(resolved.data).setWorksheetRange(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""), String(inputs.valuesJson ?? "[]"));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365SetWorksheetRange(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.worksheetName}, ${inputs.address}, ${inputs.valuesJson});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1342,6 +1602,12 @@ registerNode({
     const result = await managerFor(resolved.data).listTables(String(inputs.userId ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListTables(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, tables: `${v}.tables`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1373,6 +1639,12 @@ registerNode({
     const result = await managerFor(resolved.data).addTableRow(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.tableName ?? ""), String(inputs.valuesJson ?? "[]"));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365AddTableRow(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.tableName}, ${inputs.valuesJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1402,6 +1674,12 @@ registerNode({
     const result = await managerFor(resolved.data).listPlannerPlans(String(inputs.groupId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListPlannerPlans(${inputs.credentialName}, ${inputs.groupId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, plans: `${v}.plans`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1433,6 +1711,12 @@ registerNode({
     const result = await managerFor(resolved.data).createPlannerTask(String(inputs.planId ?? ""), String(inputs.bucketId ?? ""), String(inputs.title ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreatePlannerTask(${inputs.credentialName}, ${inputs.planId}, ${inputs.bucketId}, ${inputs.title});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1462,6 +1746,12 @@ registerNode({
     const result = await managerFor(resolved.data).listPlannerTasks(String(inputs.planId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListPlannerTasks(${inputs.credentialName}, ${inputs.planId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, tasks: `${v}.tasks`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1491,6 +1781,12 @@ registerNode({
     const result = await managerFor(resolved.data).listTodoLists(String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListTodoLists(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, lists: `${v}.lists`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1522,6 +1818,12 @@ registerNode({
     const result = await managerFor(resolved.data).createTodoTask(String(inputs.userId ?? ""), String(inputs.listId ?? ""), String(inputs.title ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateTodoTask(${inputs.credentialName}, ${inputs.userId}, ${inputs.listId}, ${inputs.title});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1552,6 +1854,12 @@ registerNode({
     const result = await managerFor(resolved.data).listTodoTasks(String(inputs.userId ?? ""), String(inputs.listId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListTodoTasks(${inputs.credentialName}, ${inputs.userId}, ${inputs.listId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, tasks: `${v}.tasks`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1581,6 +1889,12 @@ registerNode({
     const result = await managerFor(resolved.data).listContacts(String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListContacts(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, contacts: `${v}.contacts`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1612,6 +1926,12 @@ registerNode({
     const result = await managerFor(resolved.data).createContact(String(inputs.userId ?? ""), String(inputs.displayName ?? ""), String(inputs.email ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateContact(${inputs.credentialName}, ${inputs.userId}, ${inputs.displayName}, ${inputs.email});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1633,6 +1953,12 @@ registerNode({
     const result = await managerFor(resolved.data).deleteContact(String(inputs.userId ?? ""), String(inputs.contactId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteContact(${inputs.credentialName}, ${inputs.userId}, ${inputs.contactId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1662,6 +1988,12 @@ registerNode({
     const result = await managerFor(resolved.data).listApplications(String(inputs.filter ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListApplications(${inputs.credentialName}, ${inputs.filter});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, applications: `${v}.applications`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1683,6 +2015,12 @@ registerNode({
     const result = await managerFor(resolved.data).listDirectoryRoles();
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListDirectoryRoles(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, roles: `${v}.roles`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1704,6 +2042,12 @@ registerNode({
     const result = await managerFor(resolved.data).listUserLicenses(String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListUserLicenses(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, skuIds: `${v}.skuIds`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1736,6 +2080,15 @@ registerNode({
     const result = await managerFor(resolved.data).createSubscription(String(inputs.resource ?? ""), String(inputs.changeType ?? "updated"), String(inputs.notificationUrl ?? ""), String(inputs.expirationDateTime ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateSubscription(${inputs.credentialName}, ${inputs.resource}, ${inputs.changeType}, ${inputs.notificationUrl}, ${inputs.expirationDateTime});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1757,6 +2110,12 @@ registerNode({
     const result = await managerFor(resolved.data).deleteSubscription(String(inputs.subscriptionId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteSubscription(${inputs.credentialName}, ${inputs.subscriptionId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });
 
 registerNode({
@@ -1786,4 +2145,10 @@ registerNode({
     const result = await managerFor(resolved.data).listTrendingDocuments(String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListTrendingDocuments(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, documents: `${v}.documents`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
 });

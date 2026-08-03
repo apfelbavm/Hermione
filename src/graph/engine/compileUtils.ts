@@ -39,6 +39,10 @@ export const FUNCTION_LIBRARY_JIRA_IMPORT = 'import * as functionLibraryJira fro
  * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/dropbox.ts). */
 export const FUNCTION_LIBRARY_DROPBOX_IMPORT = 'import * as functionLibraryDropbox from "../../src/server/functionLibraryDropbox.ts";';
 
+/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryMicrosoft365.ts — kept in its own
+ * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/microsoft365.ts). */
+export const FUNCTION_LIBRARY_MICROSOFT365_IMPORT = 'import * as functionLibraryMicrosoft365 from "../../src/server/functionLibraryMicrosoft365.ts";';
+
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryGithub.ts — kept in its own file
  * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/github.ts). */
 export const FUNCTION_LIBRARY_GITHUB_IMPORT = 'import * as functionLibraryGithub from "../../src/server/functionLibraryGithub.ts";';
