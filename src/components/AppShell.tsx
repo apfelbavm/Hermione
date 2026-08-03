@@ -793,10 +793,14 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     stopButton.addEventListener("click", onStopClick);
 
     async function onSaveClick(): Promise<void> {
+      store.state.activeLowerTabId = null;
+      store.notify();
+      appendLog(i18n.components.app_shell.save_start);
       await scriptEditor.flushDirtyScripts();
       const graphJson = serializeGraph(store.state.rootGraph);
       await saveFlowGraph(projectId, flowId, graphJson);
       lastSavedGraphJsonRef.current = graphJson;
+      appendLog(i18n.components.app_shell.save_complete);
     }
     saveButton.addEventListener("click", onSaveClick);
 
@@ -840,12 +844,16 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     loadFileInput.addEventListener("change", onLoadFileChange);
 
     async function onCompileClick(): Promise<void> {
+      store.state.activeLowerTabId = null;
+      store.notify();
+      appendLog(i18n.components.app_shell.deploy_start);
       await scriptEditor.flushDirtyScripts();
       const graphJson = serializeGraph(store.state.rootGraph);
       try {
         await saveFlowGraph(projectId, flowId, graphJson);
         lastSavedGraphJsonRef.current = graphJson;
         await deployFlow(projectId, flowId, graphJson);
+        appendLog(i18n.components.app_shell.deploy_complete);
       } catch (err) {
         appendLog(i18n.components.app_shell.deploy_error + (err instanceof Error ? err.message : String(err)));
       }
