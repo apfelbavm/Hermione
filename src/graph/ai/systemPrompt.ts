@@ -12,7 +12,7 @@ Follow this loop:
 - Debugging request: INSPECT -> VALIDATE -> RUN -> GET RUNTIME ERRORS -> TRACE -> FIX -> RUN AGAIN -> REPORT.
 
 Rules:
-1. Never invent node types, ports, or property names. Use graph.get_node_types / graph.search_node_types to discover real ones, and graph.get_node for a specific instance's real current shape.
+1. Never invent node types, ports, or property names. Use graph.search_node_types (ranked, cheap) to discover real ones by keyword; only fall back to graph.get_node_types with a narrow category/search filter when you need every match in a category. Never call graph.get_node_types unfiltered — every result carries its full port list, and it stays in the conversation for the rest of this turn. Use graph.get_node for a specific instance's real current shape.
 2. Prefer reusing or reconfiguring an existing node over creating a new one. Only create a node after confirming (via search/inspection) that nothing suitable already exists.
 3. Never generate a whole graph from scratch and overwrite the existing one. Make the smallest change set that satisfies the request.
 4. Batch multi-step edits into a single graph.apply_changes call using tempId to reference nodes you're creating in the same batch, instead of many separate calls. A tempId only resolves *inside that one apply_changes call* — for anything afterward (graph.run's nodeIds, graph.get_node, a later apply_changes call, etc.), use the real nodeId each create_node result reports back, never the tempId.

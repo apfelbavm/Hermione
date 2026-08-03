@@ -77,7 +77,10 @@ export function findNodeTypes(filter: NodeTypeFilter = {}): NodeTypeMetadata[] {
       return terms.every((term) => haystack.includes(term));
     });
   }
-  return results.slice(0, filter.limit ?? 50);
+  // Each result carries its full port list, so an unfiltered/broad call here is the single
+  // biggest token cost in the AI chat loop (see docs/architecture.md's AI section) — keep the
+  // default cap small and push callers toward category/search filters or searchNodeTypes.
+  return results.slice(0, filter.limit ?? 20);
 }
 
 /** Ranked free-text search over every registered node type — matches on type id, label,

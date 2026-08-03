@@ -58,7 +58,7 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
   },
   {
     name: "graph.get_node_types",
-    description: "Available node types and their metadata (ports, properties, category). Supports filtering so you don't need to load every node type at once.",
+    description: "Available node types and their metadata (ports, properties, category). Each result includes its full port list, so this is expensive — always pass category/search (or use graph.search_node_types instead) rather than calling this unfiltered.",
     parameters: { type: "object", properties: { category: { type: "string" }, search: { type: "string" }, limit: { type: "number" } } },
   },
   {
