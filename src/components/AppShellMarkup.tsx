@@ -2,6 +2,7 @@ import { i18n } from "@i18n";
 import type { FunctionDef } from "../graph/engine/types";
 import type { Store } from "../state/store";
 import { useStoreRevision } from "../state/useStore";
+import { AiChatPanel } from "./ai/AiChatPanel";
 import { DetailsPanel } from "./sidebar/DetailsPanel";
 import { FunctionsPanel } from "./sidebar/FunctionsPanel";
 import { GraphTabs } from "./sidebar/GraphTabs";
@@ -95,6 +96,10 @@ export default function AppShellMarkup({ store, flowName }: { store: Store; flow
         <div id="right-sidebar-resizer" className="resizer resizer-vertical" />
         <div id="right-sidebar" className="side-panel">
           <DetailsPanel store={store} />
+        </div>
+        <div id="ai-chat-resizer" className="resizer resizer-vertical" />
+        <div id="ai-chat-panel-container" className="side-panel">
+          <AiChatPanel store={store} />
         </div>
       </div>
       <div id="log-resizer" className="resizer resizer-horizontal" />

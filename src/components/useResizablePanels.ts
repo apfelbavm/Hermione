@@ -61,6 +61,15 @@ export function useResizablePanels(): void {
         getSize: (r) => r.width,
       }),
       wireResizeHandle({
+        handle: document.getElementById("ai-chat-resizer")!,
+        target: document.getElementById("ai-chat-panel-container")!,
+        storageKey: "hermione:ai-chat-panel-width",
+        min: 260,
+        max: () => window.innerWidth * 0.4,
+        getPointerPos: (e) => e.clientX,
+        getSize: (r) => r.width,
+      }),
+      wireResizeHandle({
         handle: document.getElementById("log-resizer")!,
         target: document.getElementById("log-container")!,
         storageKey: "hermione:log-height",
