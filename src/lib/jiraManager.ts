@@ -159,14 +159,17 @@ export class JiraManager {
         authentication: { basic: { email: auth.email, apiToken: auth.apiToken } },
       });
     } else if (auth.kind === "serverPat") {
+      // jira.js 5.x dropped PAT/username-password auth from its Config type (Cloud-only now), so the
+      // Authorization header is set directly instead of going through `authentication`.
       this.serverClient = new Version2Client({
         host: this.baseUrl,
-        authentication: { personalAccessToken: auth.personalAccessToken },
+        baseRequestConfig: { headers: { Authorization: `Bearer ${auth.personalAccessToken}` } },
       });
     } else {
+      const token = Buffer.from(`${auth.username}:${auth.password}`).toString("base64");
       this.serverClient = new Version2Client({
         host: this.baseUrl,
-        authentication: { basic: { username: auth.username, password: auth.password } },
+        baseRequestConfig: { headers: { Authorization: `Basic ${token}` } },
       });
     }
   }
@@ -269,8 +272,8 @@ export class JiraManager {
   async addComment(issueIdOrKey: string, body: string): Promise<JiraAddCommentResult> {
     try {
       const res = await this.run(
-        (client) => client.issueComments.addComment({ issueIdOrKey, body: this.richText(body) as never }),
-        (client) => client.issueComments.addComment({ issueIdOrKey, body: this.richText(body) as never }),
+        (client) => client.issueComments.addComment({ issueIdOrKey, comment: this.richText(body) as never }),
+        (client) => client.issueComments.addComment({ issueIdOrKey, comment: this.richText(body) as never }),
       );
       return { success: true, id: res.id ?? "", error: "" };
     } catch (err) {
@@ -338,10 +341,10 @@ export class JiraManager {
   async listProjects(): Promise<JiraListProjectsResult> {
     try {
       const res = await this.run(
-        (client) => client.projects.getAllProjects(),
-        (client) => client.projects.getAllProjects(),
+        (client) => client.projects.searchProjects(),
+        (client) => client.projects.searchProjects(),
       );
-      const projects = (res ?? []).map((project) => ({ id: project.id ?? "", key: project.key ?? "", name: project.name ?? "" }));
+      const projects = (res.values ?? []).map((project) => ({ id: project.id ?? "", key: project.key ?? "", name: project.name ?? "" }));
       return { success: true, projects, error: "" };
     } catch (err) {
       return { success: false, projects: [], error: jiraErrorMessage(err) };
@@ -390,7 +393,9 @@ export class JiraManager {
     try {
       const res = await this.run(
         (client) => client.users.getUser({ accountId: accountId || undefined }),
-        (client) => client.users.getUser({ username: username || undefined }),
+        // jira.js 5.x's Version2 `GetUser` type dropped `username` (Cloud-only type now), but Jira
+        // Server/Data Center's real v2 REST API still accepts it.
+        (client) => client.users.getUser({ username: username || undefined } as never),
       );
       return {
         success: true,

@@ -29,6 +29,10 @@ export function applyCredentialEnvVars(db: DatabaseManager): void {
     const record = db.getCredential(summary.id);
     if (!record) continue;
     const prefix = credentialEnvPrefix(record.name);
+    // Jira credentials come in three differently-shaped kinds (Cloud/PAT/Basic) sharing the same
+    // node group (see lib/jiraManager.ts) — the compiled reader needs the TYPE, not just its fields,
+    // to know which JiraAuth shape to rebuild (see functionLibrary.ts's jiraCredentialFromEnv).
+    process.env[`${prefix}_CREDENTIAL_TYPE`] = record.type;
     for (const [key, value] of Object.entries(record.data)) {
       process.env[`${prefix}_${camelToEnvKey(key)}`] = String(value ?? "");
     }
