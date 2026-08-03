@@ -83,6 +83,11 @@ export interface AppState {
   wireDrag: WireDragState | null;
   marqueeSelection: MarqueeSelectionState | null;
   sidebarSelection: SidebarSelection | null;
+  /** False until AppShell's async fetch of the Flow's persisted graph resolves and assigns it into
+   * `rootGraph` — that assignment happens wholesale (not a mutation) and would silently discard
+   * any edit made to the placeholder `rootGraph` beforehand (e.g. by the AI chat panel). Anything
+   * that can mutate the graph before the real one is loaded must check this first. */
+  flowLoaded: boolean;
 }
 
 /** The graph currently open for editing on the canvas — the root graph, or a function's body. */

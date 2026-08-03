@@ -61,6 +61,7 @@ export default function RestoreVersionShell({ projectId, flowId }: { projectId: 
       wireDrag: null,
       marqueeSelection: null,
       sidebarSelection: null,
+      flowLoaded: true,
     }),
   );
   const [history] = useState(() => createHistoryManager(store));

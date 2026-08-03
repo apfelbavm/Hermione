@@ -14,6 +14,32 @@ interface ChatRequestBody {
   messages: ChatMessage[];
 }
 
+/** Groq's Llama tool-calling models occasionally emit a malformed inline call (e.g.
+ * `<function=graph.search_node_types={"query":"event"}</function>`) instead of a real tool_calls
+ * entry; Groq's server then rejects the whole request with a 400 `tool_use_failed` instead of
+ * just returning that text. Recover the call the model was clearly trying to make from the
+ * `failed_generation` field so the conversation can continue instead of hard-failing. */
+function recoverToolCallFromFailedGeneration(errorText: string): ChatMessage | null {
+  let parsed: { error?: { code?: string; failed_generation?: string } };
+  try {
+    parsed = JSON.parse(errorText);
+  } catch {
+    return null;
+  }
+  const generation = parsed.error?.code === "tool_use_failed" ? parsed.error.failed_generation : undefined;
+  if (!generation) return null;
+
+  const toolCalls: NonNullable<ChatMessage["tool_calls"]> = [];
+  const pattern = /<function=([\w.]+)=(\{[\s\S]*?\})>?<\/function>/g;
+  let match: RegExpExecArray | null;
+  let index = 0;
+  while ((match = pattern.exec(generation))) {
+    toolCalls.push({ id: `recovered-${Date.now()}-${index++}`, type: "function", function: { name: match[1], arguments: match[2] } });
+  }
+  if (toolCalls.length === 0) return null;
+  return { role: "assistant", content: null, tool_calls: toolCalls };
+}
+
 /** Thin proxy to an OpenAI-compatible chat-completions endpoint (see docs/auth.md's pattern of
  * keeping every provider secret server-side) — this route holds the AI provider's own API key
  * (HERMIONE_AI_API_KEY), never the browser. It only relays messages/tool schemas and returns the

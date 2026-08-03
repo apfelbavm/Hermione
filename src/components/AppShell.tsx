@@ -96,6 +96,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       wireDrag: null,
       marqueeSelection: null,
       sidebarSelection: null,
+      flowLoaded: false,
     }),
   );
   const [history] = useState(() => createHistoryManager(store));
@@ -112,6 +113,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     const canvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
     const container = document.getElementById("canvas-container") as HTMLDivElement;
     const mainArea = document.getElementById("main-area") as HTMLDivElement;
+    const aiChatPanelContainer = document.getElementById("ai-chat-panel-container") as HTMLDivElement | null;
     const overlay = document.getElementById("overlay") as HTMLDivElement;
     const logPanel = document.getElementById("log-panel") as HTMLDivElement;
     const logClearButton = document.getElementById("log-clear-button") as HTMLButtonElement;
@@ -146,6 +148,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
         flowName = flow.name;
         setFlowName(flow.name);
         store.state.rootGraph = graphJson ? deserializeGraph(graphJson) : buildDemoGraph();
+        store.state.flowLoaded = true;
         lastSavedGraphJsonRef.current = serializeGraph(store.state.rootGraph);
         history.reset();
         store.notify();
@@ -356,10 +359,11 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     });
 
     // Only reacts to select-all/undo/redo/copy/cut/paste/etc. while focus last landed inside the
-    // graph canvas or its left/right sidebars (#main-area) — not the toolbar, log/Monaco panel, or
-    // an open dialog.
+    // graph canvas or its left/right sidebars (#main-area) — not the toolbar, log/Monaco panel, an
+    // open dialog, or the AI chat panel (which needs native copy/paste for its own text).
     const shortcutManager = new ShortcutManager(store, history, {
       scopeRoot: mainArea,
+      excludeRoots: aiChatPanelContainer ? [aiChatPanelContainer] : undefined,
       getCursorScreenPos: () => pointerInteraction.getCursorScreenPos(),
     });
 

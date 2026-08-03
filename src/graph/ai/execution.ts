@@ -41,15 +41,21 @@ export async function runGraph(ctx: AiGraphContext, options: RunOptions = {}): P
     },
   });
 
-  const eventRoots = ctx.graph.nodes.filter((n) => {
-    const def = tryGetNodeDef(n.type);
-    if (!def?.eventTrigger) return false;
-    if (options.eventKind && def.eventTrigger.kind !== options.eventKind) return false;
+  const allEventNodes = ctx.graph.nodes.filter((n) => !!tryGetNodeDef(n.type)?.eventTrigger);
+  const eventRoots = allEventNodes.filter((n) => {
+    const def = tryGetNodeDef(n.type)!;
+    if (options.eventKind && def.eventTrigger!.kind !== options.eventKind) return false;
     if (options.nodeIds && !options.nodeIds.includes(n.id)) return false;
     return true;
   });
 
-  if (eventRoots.length === 0) warnings.push("No matching event-trigger node found in the graph — nothing was run.");
+  if (eventRoots.length === 0) {
+    // Distinguish "graph genuinely has no event-trigger node" from "one exists but eventKind/
+    // nodeIds filtered it out" (e.g. a stray tempId instead of the real nodeId create_node
+    // returned) — the latter looks identical from the caller's side otherwise.
+    if (allEventNodes.length === 0) warnings.push("No matching event-trigger node found in the graph — nothing was run.");
+    else warnings.push(`No event-trigger node matched eventKind=${options.eventKind ?? "(any)"}/nodeIds=${options.nodeIds?.join(",") ?? "(any)"}. Real event-trigger nodes present: ${allEventNodes.map((n) => `${n.id} (${n.type})`).join(", ")}.`);
+  }
 
   try {
     for (const root of eventRoots) {

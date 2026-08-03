@@ -20,6 +20,10 @@ export function selectAllCommentBoxes(graph: Graph): Set<string> {
 export interface ShortcutManagerOptions {
   scopeRoot: HTMLElement;
 
+  /** Elements nested inside scopeRoot (e.g. the AI chat panel) that should still be able to use
+   * native browser copy/paste/undo instead of having this manager intercept them. */
+  excludeRoots?: HTMLElement[];
+
   getCursorScreenPos: () => { x: number; y: number };
 }
 
@@ -47,7 +51,12 @@ export class ShortcutManager {
   }
 
   private updateActive(target: EventTarget | null): void {
-    this.active = target instanceof Node && this.options.scopeRoot.contains(target);
+    if (!(target instanceof Node)) {
+      this.active = false;
+      return;
+    }
+    const excluded = this.options.excludeRoots?.some((root) => root.contains(target)) ?? false;
+    this.active = !excluded && this.options.scopeRoot.contains(target);
   }
 
   private onKeyDown(e: KeyboardEvent): void {

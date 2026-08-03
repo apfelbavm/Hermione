@@ -33,6 +33,7 @@ function createFakeStore(rootGraph: Graph): Store {
     wireDrag: null,
     marqueeSelection: null,
     sidebarSelection: null,
+    flowLoaded: true,
   };
   return {
     state,

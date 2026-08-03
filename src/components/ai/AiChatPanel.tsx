@@ -85,7 +85,7 @@ export function AiChatPanel({ store }: { store: Store }) {
         for (const tc of toolCalls) {
           const call: ToolCall = { id: tc.id, name: tc.function.name, arguments: JSON.parse(tc.function.arguments || "{}") };
           const result = await runToolCall(call);
-          conversation = [...conversation, { role: "tool", tool_call_id: tc.id, name: tc.name, content: JSON.stringify(result) } as never];
+          conversation = [...conversation, { role: "tool", tool_call_id: tc.id, name: call.name, content: JSON.stringify(result) } as never];
         }
       }
     } finally {
@@ -94,7 +94,7 @@ export function AiChatPanel({ store }: { store: Store }) {
   }
 
   async function handleSend(): Promise<void> {
-    if (!input.trim() || busy) return;
+    if (!input.trim() || busy || !store.state.flowLoaded) return;
     const userMessage: ChatMessage = { role: "user", content: input };
     setMessages((m) => [...m, userMessage]);
     setInput("");
@@ -141,14 +141,14 @@ export function AiChatPanel({ store }: { store: Store }) {
       <div className="ai-chat-input">
         <input
           value={input}
-          disabled={busy || !!pendingApproval}
+          disabled={busy || !!pendingApproval || !store.state.flowLoaded}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") void handleSend();
           }}
-          placeholder="Ask the AI to inspect, modify, run, or debug this graph..."
+          placeholder={store.state.flowLoaded ? "Ask the AI to inspect, modify, run, or debug this graph..." : "Loading flow..."}
         />
-        <button type="button" className="btn btn-green"onClick={() => void handleSend()} disabled={busy || !!pendingApproval}>
+        <button type="button" className="btn btn-green" onClick={() => void handleSend()} disabled={busy || !!pendingApproval || !store.state.flowLoaded}>
           Send
         </button>
       </div>
