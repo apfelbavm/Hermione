@@ -3,6 +3,7 @@ import type { NodeDef } from "../graph/engine/types";
 import { allEnumTypeDefs } from "../graph/engine/enumRegistry";
 import { allStructTypeDefs } from "../graph/engine/structRegistry";
 import { registerBuiltins } from "../graph/nodes";
+import { computeNodeLayout } from "../graph/render/layout";
 
 /** Why a node's pins aren't documented pin-by-pin like an ordinary node, keyed to which
  * NodeInstance field(s) actually drive its shape — see nodeInstance.ts for all of these fields. */
@@ -29,6 +30,11 @@ function dynamicPinsNote(def: NodeDef): string | undefined {
 function describeNode(def: NodeDef): string {
   const lines: string[] = [`#### \`${def.type}\` — ${def.label}`, def.description];
   if (def.eventTrigger) lines.push(`_Graph entry point (event trigger kind: "${def.eventTrigger.kind}"). Every graph needs at least one of these to run._`);
+
+  if (!def.compact) {
+    const layout = computeNodeLayout(def.label, def.pins, { showAddButton: !!def.addInstancePinEntry, compact: false, headerOnly: !!def.headerOnly });
+    lines.push(`_Size at default width, for spacing on the canvas: ${layout.width}×${layout.height}px (shown pins only — a node with a bound variable/function/script/subType, or extra user-added entry pins, resizes to fit whatever it actually ends up with)._`);
+  }
 
   const dynamicNote = dynamicPinsNote(def);
   if (dynamicNote) lines.push(dynamicNote);
@@ -106,8 +112,10 @@ rejects anything else as not-ours.
   to be globally unique — they only need to be internally consistent so \`connections\` can
   reference them).
 - \`type\`: one of the node type strings documented below (e.g. \`"math.add"\`).
-- \`position\`: canvas coordinates in pixels. Space nodes out left-to-right along their exec/data
-  flow (roughly 260-320px apart horizontally, 120-160px apart vertically for parallel branches) so
+- \`position\`: canvas coordinates in pixels, top-left corner of the node's box. Each node type's own
+  entry below states its rendered width×height at default size — use that plus at least 40-60px of
+  breathing room to space nodes out left-to-right along their exec/data flow (horizontally: the
+  upstream node's width + gap; vertically, for parallel branches: the taller node's height + gap) so
   the pasted graph doesn't land as a pile of overlapping boxes.
 - \`pins\`: one entry per pin **id** declared on that node type (see the per-node pin tables below).
   - An **input** pin holding a literal value: \`{ "value": <the value> }\`.
