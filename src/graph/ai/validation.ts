@@ -32,9 +32,13 @@ export function validatePropertyValue(pinDef: PinDef, value: unknown, nodeId: st
 }
 
 /** A property (non-exec input pin) counts as required only when its PinDef declares no literal
- * fallback at all — every other input pin always has a real default the engine falls back to. */
+ * fallback at all — every other input pin always has a real default the engine falls back to. A
+ * pin can also opt into being required despite having a default via PinDef.required (see its own
+ * doc comment — e.g. sendMail's "to", whose `[]` default is only there to avoid crashing the
+ * engine on an unset pin, not because an empty recipient list is ever a valid choice). */
 export function isRequiredProperty(pinDef: PinDef): boolean {
-  return pinDef.direction === "input" && pinDef.type !== "exec" && pinDef.defaultValue === undefined;
+  if (pinDef.direction !== "input" || pinDef.type === "exec") return false;
+  return pinDef.required === true || pinDef.defaultValue === undefined;
 }
 
 export function validateNode(ctx: AiGraphContext, nodeId: string): ValidationError[] {
@@ -51,7 +55,8 @@ export function validateNode(ctx: AiGraphContext, nodeId: string): ValidationErr
     if (pinDef.direction !== "input" || pinDef.type === "exec") continue;
     const pin = node.pins[pinDef.id];
     if (pin?.connectionId) continue;
-    if (isRequiredProperty(pinDef) && (pin?.value === undefined || pin.value === null)) {
+    const isEmptyContainer = pinDef.container && pinDef.container !== "single" && Array.isArray(pin?.value) && pin.value.length === 0;
+    if (isRequiredProperty(pinDef) && (pin?.value === undefined || pin.value === null || isEmptyContainer)) {
       errors.push({ code: "MISSING_REQUIRED_PROPERTY", nodeId, port: pinDef.id, message: `"${pinDef.label}" is required` });
       continue;
     }

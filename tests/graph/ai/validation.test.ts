@@ -48,4 +48,11 @@ describe("validation", () => {
     connectPins(graph, [], [], { fromNode: start.id, fromPin: "exec-out", toNode: print.id, toPin: "exec-in" });
     expect(validateGraph(rootContext(graph)).valid).toBe(true);
   });
+
+  it("flags an empty array as missing on a pin marked required despite its [] default (e.g. sendMail's 'to')", () => {
+    const graph = buildTestGraph();
+    addBuiltinNode(graph, "microsoft365.sendMail", { x: 0, y: 0 }, "mail-1");
+    const result = validateGraph(rootContext(graph));
+    expect(result.errors.some((e) => e.code === "MISSING_REQUIRED_PROPERTY" && e.nodeId === "mail-1" && e.port === "to")).toBe(true);
+  });
 });

@@ -53,6 +53,11 @@ export interface PinDef {
    * pin is (see structRegistry.ts). Orthogonal to PinType for the same reason `container` is (see
    * PinContainer's own doc comment): keeps every exhaustive `Record<PinType, ...>` map untouched. */
   subType?: string;
+  /** Forces ai/validation.ts's isRequiredProperty to treat this pin as required even though it has
+   * a `defaultValue` — e.g. sendMail's "to" defaults to `[]` (so the widget/engine never crashes
+   * on an unset pin) but an email with no recipients is still a broken flow, not a valid one. Only
+   * needed for that mismatch; most pins with a real default should stay optional. */
+  required?: boolean;
 }
 
 export interface ExecuteResult {

@@ -60,6 +60,19 @@ describe("mutations", () => {
     expect(outcome.errors[0].code).toBe("UNKNOWN_NODE");
   });
 
+  it("sets a per-instance description on create and update, leaving pin values untouched", () => {
+    const graph = buildTestGraph();
+    const created = createNode(rootContext(graph), { op: "create_node", nodeType: "debug.print", properties: { message: "hi" }, description: "Logs the greeting" });
+    expect(created.errors).toEqual([]);
+    const node = graph.nodes.find((n) => n.id === created.nodeId)!;
+    expect(node.description).toBe("Logs the greeting");
+
+    const updated = updateNode(rootContext(graph), { op: "update_node", nodeId: node.id, description: "Logs the greeting (updated)" });
+    expect(updated.errors).toEqual([]);
+    expect(node.description).toBe("Logs the greeting (updated)");
+    expect(node.pins.message.value).toBe("hi");
+  });
+
   it("connects two compatible ports", () => {
     const graph = buildTestGraph();
     const start = addBuiltinNode(graph, "event.start", { x: 0, y: 0 }, "start-1");

@@ -1,17 +1,18 @@
 import { Graph } from "../engine/graph";
-import { connectPins, disconnectOutput, disconnectPin, setPinLiteralValue } from "../engine/graphMutations";
+import { addCommentBox, connectPins, disconnectOutput, disconnectPin, nextId, removeCommentBox, setPinLiteralValue } from "../engine/graphMutations";
 import { NodeInstance } from "../engine/nodeInstance";
 import { getNodeDef, tryGetNodeDef } from "../engine/registry";
 import type { PinDef } from "../engine/types";
 import { type AiGraphContext, visibleFunctions, visibleScripts, visibleVariables } from "./context";
 import { isRequiredProperty, validatePropertyValue } from "./validation";
-import type { ConnectOp, CreateNodeOp, DeleteNodeOp, DisconnectOp, UpdateNodeOp, ValidationError } from "./types";
+import type { ConnectOp, CreateCommentBoxOp, CreateNodeOp, DeleteCommentBoxOp, DeleteNodeOp, DisconnectOp, UpdateNodeOp, ValidationError } from "./types";
 
 export interface MutationOutcome {
   errors: ValidationError[];
   nodeId?: string;
   connectionId?: string;
   removedConnectionIds?: string[];
+  commentBoxId?: string;
   summary?: string;
 }
 
@@ -71,6 +72,7 @@ export function createNode(ctx: AiGraphContext, op: CreateNodeOp, isFunctionBody
   for (const [key, value] of Object.entries(op.properties ?? {})) {
     setPinLiteralValue(ctx.graph, node.id, key, value);
   }
+  if (op.description !== undefined) node.description = op.description;
 
   return { errors: [], nodeId: node.id, summary: `Created ${def.label} node "${node.id}"` };
 }
@@ -79,21 +81,24 @@ export function updateNode(ctx: AiGraphContext, op: UpdateNodeOp): MutationOutco
   const node = ctx.graph.nodes.find((n) => n.id === op.nodeId);
   if (!node) return { errors: [{ code: "UNKNOWN_NODE", nodeId: op.nodeId, message: `Node "${op.nodeId}" not found` }] };
 
+  const properties = op.properties ?? {};
   const pinDefsById = new Map(node.resolvePinDefs(visibleVariables(ctx), visibleFunctions(ctx), visibleScripts(ctx)).map((p) => [p.id, p] as const));
-  const errors = validateProperties(node.id, pinDefsById, op.properties, false);
+  const errors = validateProperties(node.id, pinDefsById, properties, false);
 
-  for (const key of Object.keys(op.properties)) {
+  for (const key of Object.keys(properties)) {
     if (node.pins[key]?.connectionId) {
       errors.push({ code: "INVALID_OPERATION", nodeId: node.id, port: key, message: `"${key}" is connected — disconnect it before setting a literal value` });
     }
   }
   if (errors.length > 0) return { errors };
 
-  for (const [key, value] of Object.entries(op.properties)) {
+  for (const [key, value] of Object.entries(properties)) {
     setPinLiteralValue(ctx.graph, node.id, key, value);
   }
+  if (op.description !== undefined) node.description = op.description;
 
-  return { errors: [], nodeId: node.id, summary: `Updated ${Object.keys(op.properties).join(", ")} on node "${node.id}"` };
+  const updatedFields = [...Object.keys(properties), ...(op.description !== undefined ? ["description"] : [])];
+  return { errors: [], nodeId: node.id, summary: `Updated ${updatedFields.join(", ")} on node "${node.id}"` };
 }
 
 const CONNECT_ERROR_CODES: Array<[string, ValidationError["code"]]> = [
@@ -158,6 +163,24 @@ export function deleteNode(ctx: AiGraphContext, op: DeleteNodeOp): MutationOutco
 
   ctx.graph.removeNode(visibleVariables(ctx), visibleFunctions(ctx), op.nodeId, visibleScripts(ctx));
   return { errors: [], nodeId: op.nodeId, removedConnectionIds: dependentConnections.map((c) => c.id), summary: `Deleted node "${op.nodeId}" (${getNodeDef(node.type).label})` };
+}
+
+export function createCommentBox(ctx: AiGraphContext, op: CreateCommentBoxOp): MutationOutcome {
+  const containedNodeIds = op.containedNodeIds ?? [];
+  const unknownIds = containedNodeIds.filter((id) => !ctx.graph.nodes.some((n) => n.id === id));
+  if (unknownIds.length > 0) return { errors: [{ code: "UNKNOWN_NODE", message: `Unknown node id(s) in containedNodeIds: ${unknownIds.join(", ")}` }] };
+
+  const box = { id: nextId("comment"), text: op.text, position: op.position, size: op.size, containedNodeIds, color: op.color };
+  addCommentBox(ctx.graph, box);
+  return { errors: [], commentBoxId: box.id, summary: `Created comment box "${box.id}" ("${op.text}")` };
+}
+
+export function deleteCommentBox(ctx: AiGraphContext, op: DeleteCommentBoxOp): MutationOutcome {
+  if (!ctx.graph.commentBoxes.some((b) => b.id === op.commentBoxId)) {
+    return { errors: [{ code: "INVALID_OPERATION", message: `Comment box "${op.commentBoxId}" not found` }] };
+  }
+  removeCommentBox(ctx.graph, op.commentBoxId);
+  return { errors: [], commentBoxId: op.commentBoxId, summary: `Deleted comment box "${op.commentBoxId}"` };
 }
 
 // Re-exported so callers of this module don't also need to import graphMutations directly for the

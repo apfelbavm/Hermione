@@ -1,10 +1,11 @@
 import { Graph } from "../engine/graph";
+import { connectPins } from "../engine/graphMutations";
 import { NodeInstance } from "../engine/nodeInstance";
 import { getNodeDef } from "../engine/registry";
 import { deserializeGraph } from "../persistence/load";
 import { serializeGraph } from "../persistence/save";
-import { type AiGraphContext } from "./context";
-import { connect, createNode, deleteNode, disconnect, updateNode } from "./mutations";
+import { type AiGraphContext, visibleFunctions, visibleScripts, visibleVariables } from "./context";
+import { connect, createCommentBox, createNode, deleteCommentBox, deleteNode, disconnect, updateNode } from "./mutations";
 import type { ApplyChangesRequest, ApplyChangesResult, ChangeOp, ChangeResult, ValidationError } from "./types";
 
 export function findGraphById(rootGraph: Graph, id: string): Graph | undefined {
@@ -59,6 +60,10 @@ function resolveOp(op: ChangeOp, tempMap: Map<string, string>): ChangeOp {
       };
     case "delete_node":
       return { ...op, nodeId: resolve(op.nodeId) };
+    case "create_comment_box":
+      return { ...op, containedNodeIds: op.containedNodeIds?.map(resolve) };
+    case "delete_comment_box":
+      return op;
   }
 }
 
@@ -107,16 +112,50 @@ function applyOps(ctx: AiGraphContext, changes: ChangeOp[], isFunctionBody: bool
       results.push({ op: "delete_node", nodeId: outcome.nodeId, summary: outcome.summary! });
       continue;
     }
+    if (op.op === "create_comment_box") {
+      const outcome = createCommentBox(ctx, op);
+      if (outcome.errors.length > 0) return { results, errors: outcome.errors };
+      results.push({ op: "create_comment_box", commentBoxId: outcome.commentBoxId, summary: outcome.summary! });
+      continue;
+    }
+    if (op.op === "delete_comment_box") {
+      const outcome = deleteCommentBox(ctx, op);
+      if (outcome.errors.length > 0) return { results, errors: outcome.errors };
+      results.push({ op: "delete_comment_box", commentBoxId: outcome.commentBoxId, summary: outcome.summary! });
+      continue;
+    }
   }
 
   return { results, errors: [] };
+}
+
+/** Finds the first node (in creation order) among `createdNodeIds` that has an exec input pin
+ * with nothing wired into it yet — i.e. a plausible "start of the chain" the AI forgot to hook up
+ * to a trigger. Returns its id and exec-in pin id, or undefined if every created node already has
+ * something feeding its exec input (or none has an exec input at all, e.g. a pure data node). */
+function findUnwiredExecEntryPoint(ctx: AiGraphContext, createdNodeIds: string[]): { nodeId: string; execInPin: string } | undefined {
+  const variables = visibleVariables(ctx);
+  const functions = visibleFunctions(ctx);
+  const scripts = visibleScripts(ctx);
+  for (const nodeId of createdNodeIds) {
+    const node = ctx.graph.nodes.find((n) => n.id === nodeId);
+    if (!node) continue;
+    const execIn = node.resolvePinDefs(variables, functions, scripts).find((p) => p.direction === "input" && p.type === "exec");
+    if (!execIn) continue;
+    if (ctx.graph.connections.some((c) => c.toNode === nodeId && c.toPin === execIn.id)) continue;
+    return { nodeId, execInPin: execIn.id };
+  }
+  return undefined;
 }
 
 /** The AI is told to include an event-trigger node itself when building something runnable (see
  * systemPrompt.ts rule 8), but it doesn't always remember to. Rather than let the graph end up
  * stuck with no way to run/test it, auto-add one the moment the AI creates any node into a root
  * graph that doesn't have one yet — never on an untouched/empty graph (only a real create_node in
- * this batch triggers it), and never inside a function body (event triggers can't live there). */
+ * this batch triggers it), and never inside a function body (event triggers can't live there).
+ * Also auto-wires its exec-out to the first newly-created node whose exec-in is still unconnected
+ * (see findUnwiredExecEntryPoint) — the AI reliably forgets this wire even when told to add it,
+ * and an unconnected trigger is just as useless to the user as a missing one. */
 function autoAddEventTriggerIfMissing(ctx: AiGraphContext, changes: ChangeOp[], isFunctionBody: boolean, results: ChangeResult[]): void {
   if (isFunctionBody) return;
   if (!changes.some((c) => c.op === "create_node")) return;
@@ -127,7 +166,20 @@ function autoAddEventTriggerIfMissing(ctx: AiGraphContext, changes: ChangeOp[], 
   const minY = ctx.rootGraph.nodes.length > 0 ? Math.min(...ctx.rootGraph.nodes.map((n) => n.position.y)) : 0;
   const node = NodeInstance.createNodeInstance("event.simulate", { x: minX - 260, y: minY }, def.pins);
   ctx.rootGraph.nodes.push(node);
-  results.push({ op: "create_node", nodeId: node.id, summary: `Auto-added an event.simulate trigger node (${node.id}) — this graph had no event-trigger node yet, so it couldn't run. Wire your new logic to its exec-out if appropriate.` });
+
+  const createdNodeIds = results.filter((r) => r.op === "create_node" && r.nodeId).map((r) => r.nodeId!);
+  const entryPoint = findUnwiredExecEntryPoint(ctx, createdNodeIds);
+  let wireSummary = "Wire your new logic to its exec-out if appropriate.";
+  if (entryPoint) {
+    try {
+      connectPins(ctx.graph, visibleVariables(ctx), visibleFunctions(ctx), { fromNode: node.id, fromPin: "exec-out", toNode: entryPoint.nodeId, toPin: entryPoint.execInPin }, visibleScripts(ctx));
+      wireSummary = `Auto-connected its exec-out to "${entryPoint.nodeId}".${entryPoint.execInPin}.`;
+    } catch {
+      // Leave the default hint if wiring somehow fails (e.g. incompatible pin) — never let this
+      // best-effort convenience step fail the whole apply_changes batch.
+    }
+  }
+  results.push({ op: "create_node", nodeId: node.id, summary: `Auto-added an event.simulate trigger node (${node.id}) — this graph had no event-trigger node yet, so it couldn't run. ${wireSummary}` });
 }
 
 export interface ApplyChangesOptions {

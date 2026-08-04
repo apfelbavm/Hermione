@@ -58,6 +58,50 @@ describe("transactions (graph.apply_changes)", () => {
     expect(graph.nodes).toHaveLength(0); // untouched
   });
 
+  it("auto-added event.simulate trigger is auto-connected to the new node's exec-in when it forgets to wire it", () => {
+    const graph = buildTestGraph();
+    const changes: ChangeOp[] = [{ op: "create_node", tempId: "print1", nodeType: "debug.print", properties: { message: "hi" } }];
+
+    const result = applyChanges(rootContext(graph), { changes }, { currentVersion: 0 });
+    expect(result.success).toBe(true);
+    expect(graph.nodes).toHaveLength(2);
+    const trigger = graph.nodes.find((n) => n.type === "event.simulate")!;
+    const print = graph.nodes.find((n) => n.type === "debug.print")!;
+    expect(graph.connections).toHaveLength(1);
+    expect(graph.connections[0]).toMatchObject({ fromNode: trigger.id, fromPin: "exec-out", toNode: print.id, toPin: "exec-in" });
+  });
+
+  it("does not auto-connect the trigger to a node whose exec-in is already wired", () => {
+    const graph = buildTestGraph();
+    const changes: ChangeOp[] = [
+      { op: "create_node", tempId: "print1", nodeType: "debug.print", properties: { message: "hi" } },
+      { op: "create_node", tempId: "print2", nodeType: "debug.print", properties: { message: "bye" } },
+      { op: "connect", source: { nodeId: "print1", port: "exec-out" }, target: { nodeId: "print2", port: "exec-in" } },
+    ];
+
+    const result = applyChanges(rootContext(graph), { changes }, { currentVersion: 0 });
+    expect(result.success).toBe(true);
+    const trigger = graph.nodes.find((n) => n.type === "event.simulate")!;
+    const print1 = graph.nodes.find((n) => n.type === "debug.print" && n.pins.message?.value === "hi")!;
+    // The trigger should wire to print1 (the still-unconnected exec-in), not print2 (already fed by print1).
+    expect(graph.connections.some((c) => c.fromNode === trigger.id && c.toNode === print1.id)).toBe(true);
+  });
+
+  it("create_comment_box / delete_comment_box add and remove a visual annotation", () => {
+    const graph = buildTestGraph();
+    const print = addBuiltinNode(graph, "debug.print", { x: 0, y: 0 }, "print-1");
+
+    const created = applyChanges(rootContext(graph), { changes: [{ op: "create_comment_box", text: "Send the notification", position: { x: 0, y: 0 }, size: { width: 200, height: 200 }, containedNodeIds: [print.id] }] }, { currentVersion: 0 });
+    expect(created.success).toBe(true);
+    expect(graph.commentBoxes).toHaveLength(1);
+    const boxId = graph.commentBoxes[0].id;
+    expect(graph.commentBoxes[0]).toMatchObject({ text: "Send the notification", containedNodeIds: [print.id] });
+
+    const deleted = applyChanges(rootContext(graph), { changes: [{ op: "delete_comment_box", commentBoxId: boxId }] }, { currentVersion: 1 });
+    expect(deleted.success).toBe(true);
+    expect(graph.commentBoxes).toHaveLength(0);
+  });
+
   it("rejects a stale expectedVersion with VERSION_CONFLICT", () => {
     const graph = buildTestGraph();
     const result = applyChanges(rootContext(graph), { changes: [{ op: "create_node", nodeType: "debug.print" }], expectedVersion: 5 }, { currentVersion: 2 });

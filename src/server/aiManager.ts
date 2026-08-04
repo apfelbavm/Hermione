@@ -30,17 +30,18 @@ export class AiManager {
         baseUrl: process.env.HERMIONE_AI_LOCAL_BASE_URL || "http://localhost:11434/v1",
         // deepseek-r1 is a reasoning-only distill and largely ignores the `tools` schema (answers
         // in prose instead of emitting tool_calls); qwen2.5 has solid native tool-calling support.
-        // 14b (9GB) is meaningfully more reliable at staying on-task through multi-step tool
-        // sequences than 7b, at the cost of slower responses — worth it given tool_choice="required"
-        // already fixed the earlier prose-only-reply failure mode independent of model size.
-        // "qwen2.5-14b-16k" is a local Modelfile-derived alias (`FROM qwen2.5:14b` + `PARAMETER
+        // Stepped back down from 14b to 7b (user's 12GB RTX 4070 Super couldn't fit the 14b's ~12GB
+        // weights+KV-cache footprint at all — `ollama ps` showed 85% CPU offload, causing
+        // multi-minute responses to a single small prompt). 7b's ~5GB weights fit fully on GPU with
+        // the 16k context alias below, trading some multi-step tool-calling reliability for speed.
+        // "qwen2.5-7b-16k" is a local Modelfile-derived alias (`FROM qwen2.5:7b` + `PARAMETER
         // num_ctx 16384`) — Ollama's OpenAI-compatible /v1/chat/completions endpoint does NOT
         // honor a request-level `options.num_ctx` override, so the only reliable way to raise the
         // context window is baking it into the model itself via `ollama create`. Without this, the
         // system prompt + full tool schema alone (~4000-4090 tokens) leaves almost no room in the
         // default 4096-token window for the model's actual response, causing it to get cut off
         // after only a handful of tokens and fall back to generic prose instead of a tool call.
-        model: process.env.HERMIONE_AI_LOCAL_MODEL || "qwen2.5-14b-16k",
+        model: process.env.HERMIONE_AI_LOCAL_MODEL || "qwen2.5-7b-16k",
         apiKey: process.env.HERMIONE_AI_LOCAL_API_KEY || "ollama", // Ollama ignores the key but a Bearer value must still be sent
         temperature,
         contextWindow: Number(process.env.HERMIONE_AI_LOCAL_CONTEXT_WINDOW ?? 16384),

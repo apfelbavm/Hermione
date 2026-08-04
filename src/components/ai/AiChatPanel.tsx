@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { AiGraphApi, AI_TOOL_DEFINITIONS, categoryForTool, DEFAULT_APPROVAL_POLICY, dispatchTool } from "../../graph/ai";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AiGraphApi, AI_GRAPH_SYSTEM_PROMPT, AI_TOOL_DEFINITIONS, categoryForTool, DEFAULT_APPROVAL_POLICY, dispatchTool } from "../../graph/ai";
 import type { Store } from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
 import { ChatHistoryStore, newSessionId, sessionTitleFromMessages, type ChatMessage, type ChatSession } from "./chatHistory";
@@ -22,6 +22,14 @@ interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+}
+
+// Rough chars-per-token ratio for English/JSON text — good enough for a "how close to the context
+// window is this" indicator before the real prompt-token count comes back from the provider.
+const ESTIMATED_CHARS_PER_TOKEN = 4;
+
+function estimateTokenCount(text: string): number {
+  return Math.ceil(text.length / ESTIMATED_CHARS_PER_TOKEN);
 }
 
 /** Minimal AI chat UI (section 27, deliverable 15) — the orchestration loop lives here rather than
@@ -49,6 +57,35 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
   // conversation is to overflowing (see contextWindow in aiManager.ts).
   const [contextSize, setContextSize] = useState<number | null>(null);
   const [contextWindow, setContextWindow] = useState<number | null>(null);
+  // Whether the "what are my tokens used for" breakdown popover is open (see the context-usage
+  // span in the status bar below).
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
+  // Per-source estimated token figures (system prompt / tool schema, each sent on EVERY request,
+  // vs. the visible conversation so far) — split out of what used to be one combined estimate so
+  // the breakdown popover can show where the tokens actually go. Same chars/4 heuristic as before;
+  // still just an estimate until the real prompt-token count comes back from the provider.
+  const estimatedSystemPromptTokens = useMemo(() => estimateTokenCount(AI_GRAPH_SYSTEM_PROMPT), []);
+  const estimatedToolSchemaTokens = useMemo(() => {
+    const toolsJson = JSON.stringify(AI_TOOL_DEFINITIONS.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })));
+    return estimateTokenCount(toolsJson);
+  }, []);
+  const estimatedConversationTokens = useMemo(() => messages.reduce((sum, m) => sum + estimateTokenCount(m.content ?? ""), 0), [messages]);
+  const estimatedBaseContextTokens = estimatedSystemPromptTokens + estimatedToolSchemaTokens;
+
+  // Fetch the model's configured context window up front (no API key exposed, see route.ts's GET
+  // handler) so it can be shown alongside the estimate even before the first message is sent.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ai/chat")
+      .then((res) => (res.ok ? (res.json() as Promise<{ contextWindow: number | null }>) : null))
+      .then((data) => {
+        if (!cancelled && data?.contextWindow != null) setContextWindow((prev) => prev ?? data.contextWindow);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Persist every turn as it happens (not just on unmount) so a page reload or crash mid-chat
   // never silently drops the conversation from the history list.
@@ -266,28 +303,60 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
           </div>
         )}
       </div>
-      {(tokenUsage || contextSize !== null || busy) && (
-        <div className="ai-chat-status-bar">
-          <div className="ai-chat-status-info">
-            {tokenUsage && (
-              <span className="ai-chat-token-usage" title={`${tokenUsage.promptTokens} prompt + ${tokenUsage.completionTokens} completion tokens, this chat`}>
-                {tokenUsage.totalTokens.toLocaleString()} tokens used
-              </span>
-            )}
-            {contextSize !== null && (
-              <span className="ai-chat-context-usage" title="Current conversation context size vs. the model's context window limit">
-                context: {contextSize.toLocaleString()}
-                {contextWindow !== null ? ` / ${contextWindow.toLocaleString()}` : ""}
-              </span>
+      <div className="ai-chat-status-bar">
+        <div className="ai-chat-status-info">
+          {tokenUsage && (
+            <span className="ai-chat-token-usage" title={`${tokenUsage.promptTokens} prompt + ${tokenUsage.completionTokens} completion tokens, this chat`}>
+              {tokenUsage.totalTokens.toLocaleString()} tokens used
+            </span>
+          )}
+          <div className="ai-chat-context-breakdown-wrapper">
+            <button
+              type="button"
+              className="ai-chat-context-usage ai-chat-context-usage-btn"
+              onClick={() => setBreakdownOpen((v) => !v)}
+              title={contextSize !== null ? "Current conversation context size vs. the model's context window limit — click for a breakdown" : "Estimated system prompt + tool schema size sent on every turn, before any messages — click for a breakdown"}
+            >
+              context: {contextSize === null ? "~" : ""}
+              {(contextSize ?? estimatedBaseContextTokens).toLocaleString()}
+              {contextWindow !== null ? ` / ${contextWindow.toLocaleString()}` : ""}
+            </button>
+            {breakdownOpen && (
+              <div className="ai-chat-context-breakdown">
+                <div className="ai-chat-context-breakdown-row">
+                  <span>System prompt (every request)</span>
+                  <span>~{estimatedSystemPromptTokens.toLocaleString()}</span>
+                </div>
+                <div className="ai-chat-context-breakdown-row">
+                  <span>Tool schema, {AI_TOOL_DEFINITIONS.length} tools (every request)</span>
+                  <span>~{estimatedToolSchemaTokens.toLocaleString()}</span>
+                </div>
+                <div className="ai-chat-context-breakdown-row">
+                  <span>
+                    Conversation so far ({messages.length} message{messages.length === 1 ? "" : "s"})
+                  </span>
+                  <span>~{estimatedConversationTokens.toLocaleString()}</span>
+                </div>
+                {contextSize !== null && (
+                  <div className="ai-chat-context-breakdown-row ai-chat-context-breakdown-actual">
+                    <span>Actual last request (incl. tool calls/results)</span>
+                    <span>{contextSize.toLocaleString()}</span>
+                  </div>
+                )}
+                <p className="ai-chat-context-breakdown-note">
+                  System prompt/tool schema/conversation figures are estimates (~1 token per 4 characters). Tool-call arguments and tool results sent mid-turn (e.g. graph.get_node_types results) aren&apos;t tracked here individually — they&apos;re included in the actual figure above once a request
+                  completes.
+                </p>
+              </div>
             )}
           </div>
-          {busy && (
-            <button type="button" className="btn btn-ghost ai-chat-stop-btn" onClick={stopGeneration} title="Abort the current AI request">
-              Stop
-            </button>
-          )}
         </div>
-      )}
+        {busy && (
+          <button type="button" className="btn btn-ghost ai-chat-stop-btn" onClick={stopGeneration} title="Abort the current AI request">
+            Stop
+          </button>
+        )}
+      </div>
       <div className="ai-chat-input">
         <input
           value={input}

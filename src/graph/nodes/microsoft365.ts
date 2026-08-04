@@ -445,7 +445,7 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     userIdPin(i18n.nodes.microsoft365.sendMail.pin_from_user_id),
-    { id: "to", label: i18n.nodes.microsoft365.sendMail.pin_to, type: "string", container: "array", direction: "input", defaultValue: [] },
+    { id: "to", label: i18n.nodes.microsoft365.sendMail.pin_to, type: "string", container: "array", direction: "input", defaultValue: [], required: true },
     { id: "subject", label: i18n.nodes.microsoft365.__shared.pin_subject, type: "string", direction: "input", defaultValue: "" },
     { id: "body", label: i18n.nodes.microsoft365.__shared.pin_body, type: "string", direction: "input", defaultValue: "" },
     { id: "bodyType", label: i18n.nodes.microsoft365.__shared.pin_body_type, type: "enum", subType: MICROSOFT365_BODY_TYPE_ENUM_TYPE, direction: "input", defaultValue: "text", options: enumOptionIds(MICROSOFT365_BODY_TYPE_ENUM_TYPE) },

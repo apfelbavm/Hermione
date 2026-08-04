@@ -69,7 +69,8 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
   { name: "graph.validate", description: "Structured validation errors/warnings for the whole graph.", parameters: { type: "object", properties: {} } },
   {
     name: "graph.apply_changes",
-    description: "Apply one or more create_node/update_node/connect/disconnect/delete_node operations as a single atomic, validated transaction. Use tempId on create_node so later ops in the same call can reference the new node. Set dryRun:true to validate/preview without committing.",
+    description:
+      "Apply one or more create_node/update_node/connect/disconnect/delete_node/create_comment_box/delete_comment_box operations as a single atomic, validated transaction. Use tempId on create_node so later ops in the same call can reference the new node (also usable in create_comment_box's containedNodeIds). Set dryRun:true to validate/preview without committing.",
     parameters: {
       type: "object",
       properties: {
@@ -78,7 +79,7 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
           items: {
             type: "object",
             properties: {
-              op: { type: "string", enum: ["create_node", "update_node", "connect", "disconnect", "delete_node"] },
+              op: { type: "string", enum: ["create_node", "update_node", "connect", "disconnect", "delete_node", "create_comment_box", "delete_comment_box"] },
               tempId: { type: "string" },
               nodeType: { type: "string" },
               properties: { type: "object" },
@@ -89,6 +90,12 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
               target: portRefSchema,
               connectionId: { type: "string" },
               cascade: { type: "boolean" },
+              description: { type: "string", description: "create_node/update_node only — sets this one node instance's own documentation note (distinct from the node type's static description), e.g. explaining why this particular node is configured the way it is." },
+              text: { type: "string", description: "create_comment_box's note text." },
+              size: { type: "object", properties: { width: { type: "number" }, height: { type: "number" } }, description: "create_comment_box only." },
+              containedNodeIds: { type: "array", items: { type: "string" }, description: "create_comment_box only — node ids (or tempIds from earlier in this batch) to visually group inside the box." },
+              color: { type: "string", description: "create_comment_box only, optional." },
+              commentBoxId: { type: "string", description: "delete_comment_box only." },
             },
             required: ["op"],
           },
@@ -99,6 +106,7 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
       required: ["changes"],
     },
   },
+
   { name: "graph.undo", description: "Undo the last AI-applied change set.", parameters: { type: "object", properties: {} } },
   { name: "graph.redo", description: "Redo the last undone AI change set.", parameters: { type: "object", properties: {} } },
   { name: "graph.create_snapshot", description: "Create a lightweight snapshot of the current graph before a large/risky operation.", parameters: { type: "object", properties: { label: { type: "string" } } } },

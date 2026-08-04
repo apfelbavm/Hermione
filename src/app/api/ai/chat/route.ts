@@ -96,6 +96,13 @@ function recoverToolCallFromFailedGeneration(errorText: string): ChatMessage | n
   return toolCalls ? { role: "assistant", content: null, tool_calls: toolCalls } : null;
 }
 
+/** Lets the chat UI show the model's context window limit before the user ever sends a message
+ * (see AiChatPanel.tsx) — exposes only the non-secret `contextWindow` figure, never the API key. */
+export async function GET(): Promise<Response> {
+  const config = AiManager.getConfig();
+  return Response.json({ contextWindow: config?.contextWindow ?? null });
+}
+
 /** Thin proxy to an OpenAI-compatible chat-completions endpoint (see docs/auth.md's pattern of
  * keeping every provider secret server-side) — this route never exposes an AI provider's key to
  * the browser. Which provider it proxies to (local Ollama in dev, the configured hosted provider

@@ -132,12 +132,17 @@ export interface CreateNodeOp {
   properties?: Record<string, unknown>;
   position?: { x: number; y: number };
   config?: { elementType?: PinType; elementSubType?: string; mapKeyType?: PinType; subType?: string };
+  /** Sets NodeInstance.description — a per-instance note shown on the canvas, distinct from the
+   * node TYPE's static NodeDef.description (see nodeInstance.ts's own doc comment). */
+  description?: string;
 }
 
 export interface UpdateNodeOp {
   op: "update_node";
   nodeId: string;
-  properties: Record<string, unknown>;
+  properties?: Record<string, unknown>;
+  /** Sets NodeInstance.description — see CreateNodeOp.description's own doc comment. */
+  description?: string;
 }
 
 export interface ConnectOp {
@@ -159,7 +164,25 @@ export interface DeleteNodeOp {
   cascade?: boolean;
 }
 
-export type ChangeOp = CreateNodeOp | UpdateNodeOp | ConnectOp | DisconnectOp | DeleteNodeOp;
+/** A visual annotation the AI can drop around a section of the graph to document intent (e.g. "Send
+ * the notification email") — never affects execution, purely organizational (see engine/types.ts's
+ * own CommentBox doc comment). `containedNodeIds` only needs to list node ids that should be
+ * visually grouped inside the box; it's fine to leave it empty for a free-floating note. */
+export interface CreateCommentBoxOp {
+  op: "create_comment_box";
+  text: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  containedNodeIds?: string[];
+  color?: string;
+}
+
+export interface DeleteCommentBoxOp {
+  op: "delete_comment_box";
+  commentBoxId: string;
+}
+
+export type ChangeOp = CreateNodeOp | UpdateNodeOp | ConnectOp | DisconnectOp | DeleteNodeOp | CreateCommentBoxOp | DeleteCommentBoxOp;
 
 export interface ChangeResult {
   op: ChangeOp["op"];
@@ -167,6 +190,7 @@ export interface ChangeResult {
   nodeId?: string;
   tempId?: string;
   connectionId?: string;
+  commentBoxId?: string;
   summary: string;
 }
 
