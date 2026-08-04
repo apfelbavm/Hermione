@@ -49,7 +49,9 @@ export function AiChatPanel({ store }: { store: Store }) {
     if (store.state.rootGraph !== apiRef.current.rootGraph) {
       apiRef.current.adoptRootGraph(store.state.rootGraph);
     }
+    console.log(`[AiChat] tool call -> ${call.name}`, call.arguments);
     const result = await dispatchTool(apiRef.current, call.name, call.arguments);
+    console.log(`[AiChat] tool result <- ${call.name}`, result);
     syncGraphIntoStore();
     return result;
   }

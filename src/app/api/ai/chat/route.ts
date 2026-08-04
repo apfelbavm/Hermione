@@ -1,4 +1,5 @@
 import { AI_GRAPH_SYSTEM_PROMPT, AI_TOOL_DEFINITIONS } from "../../../../graph/ai";
+import { AiManager } from "../../../../server/aiManager";
 
 export const runtime = "nodejs";
 
@@ -41,14 +42,15 @@ function recoverToolCallFromFailedGeneration(errorText: string): ChatMessage | n
 }
 
 /** Thin proxy to an OpenAI-compatible chat-completions endpoint (see docs/auth.md's pattern of
- * keeping every provider secret server-side) — this route holds the AI provider's own API key
- * (HERMIONE_AI_API_KEY), never the browser. It only relays messages/tool schemas and returns the
+ * keeping every provider secret server-side) — this route never exposes an AI provider's key to
+ * the browser. Which provider it proxies to (local Ollama in dev, the configured hosted provider
+ * once deployed) is decided by `AiManager`. It only relays messages/tool schemas and returns the
  * assistant's reply; it never touches the graph itself — the client executes any requested
  * graph.* tool calls locally via AiGraphApi (see components/ai/AiChatPanel.tsx), since the graph
  * only exists in the editor's own in-memory state. */
 export async function POST(request: Request): Promise<Response> {
-  const apiKey = process.env.HERMIONE_AI_API_KEY;
-  if (!apiKey) {
+  const config = AiManager.getConfig();
+  if (!config) {
     return Response.json({ error: "AI assistant is not configured — set HERMIONE_AI_API_KEY on the server." }, { status: 501 });
   }
 
@@ -62,21 +64,21 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "`messages` must be an array" }, { status: 400 });
   }
 
-  const baseUrl = process.env.HERMIONE_AI_BASE_URL || "https://api.openai.com/v1";
-  const model = process.env.HERMIONE_AI_MODEL || "gpt-4o-mini";
-
   const hasSystemMessage = body.messages.some((m) => m.role === "system");
   const messages = hasSystemMessage ? body.messages : [{ role: "system" as const, content: AI_GRAPH_SYSTEM_PROMPT }, ...body.messages];
 
-  const upstream = await fetch(`${baseUrl}/chat/completions`, {
+  const requestPayload = {
+    model: config.model,
+    messages,
+    tools: AI_TOOL_DEFINITIONS.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })),
+    parallel_tool_calls: false, // reduces how often Groq's Llama models emit the malformed inline calls below
+  };
+  console.log(`[AiChat] -> ${config.baseUrl}/chat/completions`, JSON.stringify(requestPayload, null, 2));
+
+  const upstream = await fetch(`${config.baseUrl}/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      messages,
-      tools: AI_TOOL_DEFINITIONS.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })),
-      parallel_tool_calls: false, // reduces how often Groq's Llama models emit the malformed inline calls below
-    }),
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
+    body: JSON.stringify(requestPayload),
   });
 
   if (!upstream.ok) {
@@ -88,10 +90,13 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: `AI provider request failed (${upstream.status}): ${text}` }, { status: 502 });
   }
 
-  const data = (await upstream.json()) as { choices: Array<{ message: ChatMessage }> };
+  const data = (await upstream.json()) as { choices: Array<{ message: ChatMessage }>; usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number } };
   const message = data.choices[0]?.message;
   if (!message) {
     return Response.json({ error: "AI provider returned no response" }, { status: 502 });
+  }
+  if (data.usage) {
+    console.log(`[AiChat] tokens: ${data.usage.prompt_tokens} prompt + ${data.usage.completion_tokens} completion = ${data.usage.total_tokens} total`);
   }
 
   return Response.json({ message });
