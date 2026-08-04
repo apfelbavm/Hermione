@@ -9,7 +9,7 @@ import type { CredentialRecord, FacebookCredentialData } from "../../../src/cred
 /** FacebookAdsApi.call() goes through axios internally (see facebook-nodejs-business-sdk's
  * http.js), unlike Dropbox's SDK which uses global fetch — mocking the whole SDK module at this
  * boundary tests FacebookManager/the nodes' wiring without depending on that internal transport. */
-let mockCall: ReturnType<typeof vi.fn>;
+let mockCall: (...args: any[]) => any;
 vi.mock("facebook-nodejs-business-sdk", () => ({
   FacebookAdsApi: class {
     accessToken: string;

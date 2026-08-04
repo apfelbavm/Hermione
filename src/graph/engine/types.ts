@@ -137,7 +137,7 @@ export interface NodeDef {
    * its exec-in pin fires, in the sequence dictated by exec wiring (see runExecFrom), and returns
    * which exec-out pin to continue from next. A pure/data node (evaluate below) has no exec pins
    * and never has this — the two are mutually exclusive per node type. */
-  execute: (args: ExecuteArgs) => Promise<ExecuteResult> | ExecuteResult;
+  execute?: (args: ExecuteArgs) => Promise<ExecuteResult> | ExecuteResult;
   /** For a PURE/DATA node only (no exec pins) — computes this node's output pin values on demand,
    * whenever some downstream input pulls them (see resolveDataPin), not on any exec schedule. Must
    * be side-effect-free: it may be called any number of times per tick, though results are cached
