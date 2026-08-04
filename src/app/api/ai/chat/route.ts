@@ -226,5 +226,5 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
-  return Response.json({ message: result.message, usage: usageTotal, contextSize: result.usage?.totalTokens, contextWindow: config.contextWindow });
+  return Response.json({ message: result.message, usage: usageTotal, contextWindow: config.contextWindow });
 }

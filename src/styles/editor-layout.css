@@ -120,6 +120,7 @@
 }
 
 .ai-chat-status-bar {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -154,16 +155,12 @@
   text-decoration: underline;
 }
 
-.ai-chat-context-breakdown-wrapper {
-  position: relative;
-}
-
 .ai-chat-context-breakdown {
   position: absolute;
   bottom: 100%;
-  right: 0;
+  left: 8px;
+  right: 8px;
   z-index: 20;
-  width: 280px;
   padding: 8px 10px;
   margin-bottom: 6px;
   background: var(--pp-surface);
