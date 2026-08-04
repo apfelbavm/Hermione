@@ -92,13 +92,19 @@ export function searchNodeTypes(query: string, limit: number = 15): NodeTypeMeta
 
   const scored = allNodeTypeMetadata()
     .map((m) => {
+      const type = m.type.toLowerCase();
       const label = m.label.toLowerCase();
-      const haystack = `${m.type} ${label} ${m.description} ${m.group} ${m.ports.map((p) => p.label).join(" ")}`.toLowerCase();
+      const haystack = `${type} ${label} ${m.description} ${m.group} ${m.ports.map((p) => p.label).join(" ")}`.toLowerCase();
       let score = 0;
       for (const term of terms) {
-        if (label === term) score += 5;
-        else if (label.includes(term)) score += 3;
+        if (label === term || type === term) score += 5;
+        else if (label.includes(term) || type.includes(term)) score += 3;
         else if (haystack.includes(term)) score += 1;
+        // "trigger"/"event" wording commonly describes what event.* nodes ARE rather than
+        // appearing verbatim in their label/description — without this, unrelated nodes whose
+        // label literally contains "event" (e.g. a calendar "List Events" node) outrank the
+        // actual event-trigger nodes the user means.
+        if (m.isEventTrigger && (term === "trigger" || term === "triggers")) score += 3;
       }
       return { m, score };
     })

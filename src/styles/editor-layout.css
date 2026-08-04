@@ -217,6 +217,12 @@
   color: var(--pp-text-muted);
 }
 
+.ai-chat-stop-btn {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
 .ai-chat-typing-dot {
   width: 6px;
   height: 6px;

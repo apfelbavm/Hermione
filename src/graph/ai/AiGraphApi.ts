@@ -5,7 +5,7 @@ import { type AiGraphContext, rootContext } from "./context";
 import { getConnections, getNode, getNodes, getSummary, findNodes, type ConnectionFilter, type FindNodesQuery, type NodeFilter } from "./inspection";
 import { findNodeTypes, getNodeTypeMetadata, searchNodeTypes, type NodeTypeFilter } from "./metadataAdapter";
 import { getRuntimeErrors, getRuntimeState, runGraph, traceExecution, type RunOptions } from "./execution";
-import { applyChanges, findGraphById } from "./transactions";
+import { applyChanges, findGraphById, type PreparedChanges } from "./transactions";
 import { validateGraph } from "./validation";
 import type { ApplyChangesRequest, ApplyChangesResult, ChangeOp, GraphSummary, RunResult, ValidationResult } from "./types";
 import {
@@ -46,6 +46,12 @@ export class AiGraphApi {
   private redoStack: string[] = [];
   private snapshots = new Map<string, { label?: string; createdAt: string; json: string }>();
   private selectedNodeIds: string[] = [];
+  /** The `PreparedChanges` from the most recent successful dryRun apply_changes call, kept only
+   * long enough for an immediately-following non-dryRun call with the identical request to commit
+   * that exact same clone (see applyChanges below) instead of re-running the ops and minting
+   * different random node ids than the ones already reported back for the dry run. Invalidated by
+   * any intervening mutation (currentVersion changes) or by adoptRootGraph. */
+  private lastDryRun: { signature: string; version: number; prepared: PreparedChanges } | null = null;
 
   constructor(rootGraph: Graph, options: AiGraphApiOptions = {}) {
     this.ctx = rootContext(rootGraph);
@@ -66,6 +72,7 @@ export class AiGraphApi {
     this.ctx = rootContext(rootGraph);
     this.undoStack = [];
     this.redoStack = [];
+    this.lastDryRun = null;
   }
 
   get version(): number {
@@ -147,12 +154,20 @@ export class AiGraphApi {
   // --- Transaction API ----------------------------------------------------------------------
 
   applyChanges(request: ApplyChangesRequest): ApplyChangesResult {
+    const signature = JSON.stringify({ changes: request.changes, expectedVersion: request.expectedVersion });
+
     if (request.dryRun) {
-      return applyChanges(this.ctx, request, { isFunctionBody: this.isFunctionBody, currentVersion: this.currentVersion });
+      let prepared: PreparedChanges | null = null;
+      const result = applyChanges(this.ctx, request, { isFunctionBody: this.isFunctionBody, currentVersion: this.currentVersion }, undefined, (p) => (prepared = p));
+      this.lastDryRun = result.success && prepared ? { signature, version: this.currentVersion, prepared } : null;
+      return result;
     }
 
+    const reuse = this.lastDryRun && this.lastDryRun.signature === signature && this.lastDryRun.version === this.currentVersion ? this.lastDryRun.prepared : undefined;
+    this.lastDryRun = null;
+
     const before = serializeGraph(this.ctx.rootGraph);
-    const result = applyChanges(this.ctx, request, { isFunctionBody: this.isFunctionBody, currentVersion: this.currentVersion });
+    const result = applyChanges(this.ctx, request, { isFunctionBody: this.isFunctionBody, currentVersion: this.currentVersion }, reuse);
     if (result.success) {
       this.undoStack.push(before);
       if (this.undoStack.length > 200) this.undoStack.shift();

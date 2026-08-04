@@ -52,7 +52,9 @@ describe("transactions (graph.apply_changes)", () => {
     const result = applyChanges(rootContext(graph), { changes, dryRun: true }, { currentVersion: 0 });
     expect(result.success).toBe(true);
     expect(result.dryRun).toBe(true);
-    expect(result.changes).toHaveLength(1);
+    // 2, not 1: the graph had no event-trigger node, so the preview also includes the auto-added
+    // event.simulate (see transactions.ts's autoAddEventTriggerIfMissing).
+    expect(result.changes).toHaveLength(2);
     expect(graph.nodes).toHaveLength(0); // untouched
   });
 

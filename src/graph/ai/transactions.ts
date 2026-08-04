@@ -1,4 +1,6 @@
 import { Graph } from "../engine/graph";
+import { NodeInstance } from "../engine/nodeInstance";
+import { getNodeDef } from "../engine/registry";
 import { deserializeGraph } from "../persistence/load";
 import { serializeGraph } from "../persistence/save";
 import { type AiGraphContext } from "./context";
@@ -18,6 +20,24 @@ function cloneContext(ctx: AiGraphContext): AiGraphContext {
   const clonedRoot = deserializeGraph(serializeGraph(ctx.rootGraph));
   const clonedGraph = findGraphById(clonedRoot, ctx.graph.id) ?? clonedRoot;
   return { rootGraph: clonedRoot, graph: clonedGraph };
+}
+
+/** Copies one graph's mutable, op-affected state (nodes/connections/etc) onto another in place —
+ * used to adopt a validated clone's result without replacing the original Graph object's identity,
+ * since callers elsewhere (editor store, undo/redo, tests) keep their own reference to it. */
+function adoptGraphState(target: Graph, source: Graph): void {
+  target.nodes = source.nodes;
+  target.connections = source.connections;
+  target.commentBoxes = source.commentBoxes;
+  target.variables = source.variables;
+  target.scripts = source.scripts;
+}
+
+/** Adopts every graph in `clone`'s document (root + each function body, matched by array position
+ * — ops never add/remove functions) onto the corresponding original graph in `ctx`, in place. */
+function adoptClone(ctx: AiGraphContext, clone: AiGraphContext): void {
+  adoptGraphState(ctx.rootGraph, clone.rootGraph);
+  ctx.rootGraph.functions.forEach((fn, i) => adoptGraphState(fn.body, clone.rootGraph.functions[i].body));
 }
 
 /** Resolves any node/temp-id-shaped field in `op` through `tempMap` (real ids pass through
@@ -92,17 +112,55 @@ function applyOps(ctx: AiGraphContext, changes: ChangeOp[], isFunctionBody: bool
   return { results, errors: [] };
 }
 
+/** The AI is told to include an event-trigger node itself when building something runnable (see
+ * systemPrompt.ts rule 8), but it doesn't always remember to. Rather than let the graph end up
+ * stuck with no way to run/test it, auto-add one the moment the AI creates any node into a root
+ * graph that doesn't have one yet — never on an untouched/empty graph (only a real create_node in
+ * this batch triggers it), and never inside a function body (event triggers can't live there). */
+function autoAddEventTriggerIfMissing(ctx: AiGraphContext, changes: ChangeOp[], isFunctionBody: boolean, results: ChangeResult[]): void {
+  if (isFunctionBody) return;
+  if (!changes.some((c) => c.op === "create_node")) return;
+  if (ctx.rootGraph.nodes.some((n) => !!getNodeDef(n.type).eventTrigger)) return;
+
+  const def = getNodeDef("event.simulate");
+  const minX = ctx.rootGraph.nodes.length > 0 ? Math.min(...ctx.rootGraph.nodes.map((n) => n.position.x)) : 0;
+  const minY = ctx.rootGraph.nodes.length > 0 ? Math.min(...ctx.rootGraph.nodes.map((n) => n.position.y)) : 0;
+  const node = NodeInstance.createNodeInstance("event.simulate", { x: minX - 260, y: minY }, def.pins);
+  ctx.rootGraph.nodes.push(node);
+  results.push({ op: "create_node", nodeId: node.id, summary: `Auto-added an event.simulate trigger node (${node.id}) — this graph had no event-trigger node yet, so it couldn't run. Wire your new logic to its exec-out if appropriate.` });
+}
+
 export interface ApplyChangesOptions {
   isFunctionBody?: boolean;
   currentVersion: number;
 }
 
-/** graph.apply_changes — validates the entire batch against a throwaway clone first (Phase 1,
- * "Prepare"); only once that fully succeeds does it replay the identical ops against the real
- * `ctx` in place (Phase 2, "Commit"), unless `dryRun` is set, in which case the real graph is
- * never touched at all. A commit-phase failure (should be unreachable, since the clone just
- * proved the same ops succeed) restores `ctx.graph`/`ctx.rootGraph` from a pre-commit snapshot. */
-export function applyChanges(ctx: AiGraphContext, request: ApplyChangesRequest, options: ApplyChangesOptions): ApplyChangesResult {
+/** The result of validating a change set against a throwaway clone, before it's either reported
+ * back as a dry run or adopted as the real graph state. Exposed so a caller (AiGraphApi) can cache
+ * one across a dryRun call and its immediately-following non-dryRun call for the identical change
+ * set — see the `reuse` param on `applyChanges` below. */
+export interface PreparedChanges {
+  clone: AiGraphContext;
+  results: ChangeResult[];
+}
+
+function prepareChanges(ctx: AiGraphContext, changes: ChangeOp[], isFunctionBody: boolean): { prepared: PreparedChanges | null; errors: ValidationError[] } {
+  const clone = cloneContext(ctx);
+  const applied = applyOps(clone, changes, isFunctionBody);
+  if (applied.errors.length > 0) return { prepared: null, errors: applied.errors };
+  autoAddEventTriggerIfMissing(clone, changes, isFunctionBody, applied.results);
+  return { prepared: { clone, results: applied.results }, errors: [] };
+}
+
+/** graph.apply_changes — validates the entire batch against a throwaway clone first ("Prepare");
+ * only once that fully succeeds does it adopt that same clone as the real `ctx` state ("Commit"),
+ * unless `dryRun` is set, in which case the real graph is never touched at all. Committing adopts
+ * the already-validated clone verbatim rather than re-running the ops a second time against `ctx`
+ * — re-running would mint fresh random node ids (see NodeInstance.createNodeInstance) that no
+ * longer match whatever a preceding dry run already reported back to the caller. Pass `reuse` (the
+ * `PreparedChanges` from an earlier dry run of this exact same request) to commit that dry run's
+ * own clone instead of preparing again, keeping ids consistent across the two calls. */
+export function applyChanges(ctx: AiGraphContext, request: ApplyChangesRequest, options: ApplyChangesOptions, reuse?: PreparedChanges, onPrepared?: (prepared: PreparedChanges) => void): ApplyChangesResult {
   const transactionId = crypto.randomUUID();
 
   if (request.expectedVersion !== undefined && request.expectedVersion !== options.currentVersion) {
@@ -117,11 +175,23 @@ export function applyChanges(ctx: AiGraphContext, request: ApplyChangesRequest, 
     };
   }
 
-  const clone = cloneContext(ctx);
-  const prepared = applyOps(clone, request.changes, !!options.isFunctionBody);
-  if (prepared.errors.length > 0) {
-    return { success: false, dryRun: !!request.dryRun, transactionId, version: options.currentVersion, errors: prepared.errors, changes: [], summary: [] };
+  if (!Array.isArray(request.changes)) {
+    return {
+      success: false,
+      dryRun: !!request.dryRun,
+      transactionId,
+      version: options.currentVersion,
+      errors: [{ code: "INVALID_OPERATION", message: 'graph.apply_changes requires a "changes" array field (not "ops" or anything else).' }],
+      changes: [],
+      summary: [],
+    };
   }
+
+  const { prepared, errors } = reuse ? { prepared: reuse, errors: [] as ValidationError[] } : prepareChanges(ctx, request.changes, !!options.isFunctionBody);
+  if (!prepared) {
+    return { success: false, dryRun: !!request.dryRun, transactionId, version: options.currentVersion, errors, changes: [], summary: [] };
+  }
+  onPrepared?.(prepared);
 
   if (request.dryRun) {
     return {
@@ -135,30 +205,15 @@ export function applyChanges(ctx: AiGraphContext, request: ApplyChangesRequest, 
     };
   }
 
-  const preCommitSnapshot = serializeGraph(ctx.rootGraph);
-  try {
-    const committed = applyOps(ctx, request.changes, !!options.isFunctionBody);
-    if (committed.errors.length > 0) {
-      // Unreachable in practice (the clone already proved these ops succeed) — restore defensively.
-      const graphId = ctx.graph.id;
-      ctx.rootGraph = deserializeGraph(preCommitSnapshot);
-      ctx.graph = findGraphById(ctx.rootGraph, graphId) ?? ctx.rootGraph;
-      return { success: false, dryRun: false, transactionId, version: options.currentVersion, errors: committed.errors, changes: [], summary: [] };
-    }
-    return {
-      success: true,
-      dryRun: false,
-      transactionId,
-      version: options.currentVersion + 1,
-      errors: [],
-      changes: committed.results,
-      summary: committed.results.map((r) => r.summary),
-    };
-  } catch (err) {
-    const graphId = ctx.graph.id;
-    ctx.rootGraph = deserializeGraph(preCommitSnapshot);
-    ctx.graph = findGraphById(ctx.rootGraph, graphId) ?? ctx.rootGraph;
-    const message = err instanceof Error ? err.message : String(err);
-    return { success: false, dryRun: false, transactionId, version: options.currentVersion, errors: [{ code: "INVALID_OPERATION", message: `Transaction rolled back: ${message}` }], changes: [], summary: [] };
-  }
+  adoptClone(ctx, prepared.clone);
+
+  return {
+    success: true,
+    dryRun: false,
+    transactionId,
+    version: options.currentVersion + 1,
+    errors: [],
+    changes: prepared.results,
+    summary: prepared.results.map((r) => r.summary),
+  };
 }

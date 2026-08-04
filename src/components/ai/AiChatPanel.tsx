@@ -27,13 +27,14 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
   useStoreRevision(store);
   const apiRef = useRef<AiGraphApi>(new AiGraphApi(store.state.rootGraph));
   const historyRef = useRef<ChatHistoryStore>(ChatHistoryStore.forFlow(flowId));
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string>(() => newSessionId());
   const [sessions, setSessions] = useState<ChatSession[]>(() => historyRef.current.list());
   const [historyOpen, setHistoryOpen] = useState(false);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [pendingApproval, setPendingApproval] = useState<{ call: ToolCall; upstream: unknown[] } | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<{ call: ToolCall; upstream: unknown[]; deferredToolCalls: ToolCall[] } | null>(null);
 
   // Persist every turn as it happens (not just on unmount) so a page reload or crash mid-chat
   // never silently drops the conversation from the history list.
@@ -93,6 +94,8 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
 
   async function sendConversation(history: Array<{ role: string; content?: string | null; tool_calls?: unknown; tool_call_id?: string; name?: string }>): Promise<void> {
     setBusy(true);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     try {
       let conversation = history;
       // Bounded loop: the model may chain several tool calls before giving a final answer. The
@@ -100,8 +103,18 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
       // round trips, so this needs real headroom rather than cutting the model off mid-task.
       const maxRounds = 20;
       for (let round = 0; round < maxRounds; round++) {
-        const res = await fetch("/api/ai/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: conversation }) });
-        const data = (await res.json()) as { message?: UpstreamMessage; error?: string };
+        let res: Response;
+        let data: { message?: UpstreamMessage; error?: string };
+        try {
+          res = await fetch("/api/ai/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: conversation }), signal: controller.signal });
+          data = (await res.json()) as { message?: UpstreamMessage; error?: string };
+        } catch (err) {
+          if (err instanceof DOMException && err.name === "AbortError") {
+            setMessages((m) => [...m, { role: "assistant", content: "Stopped by user." }]);
+            return;
+          }
+          throw err;
+        }
         if (!res.ok || data.error) {
           setMessages((m) => [...m, { role: "assistant", content: `Error: ${data.error ?? res.statusText}` }]);
           return;
@@ -114,24 +127,39 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
           return;
         }
 
-        const firstDestructive = toolCalls.map((tc) => ({ id: tc.id, name: tc.function.name, arguments: JSON.parse(tc.function.arguments || "{}") as Record<string, unknown> })).find((c) => DEFAULT_APPROVAL_POLICY.requiresApproval(categoryForTool(c.name)));
-
-        if (firstDestructive) {
-          setPendingApproval({ call: firstDestructive, upstream: [...conversation, message] });
-          return;
-        }
-
+        // The model can (and does) return several tool_calls in one turn, some of which may need
+        // approval (e.g. graph.run after a couple of graph.apply_changes calls). Run each call in
+        // order and only pause at the FIRST one requiring approval — never discard the safe calls
+        // that came before it, or nothing in the batch ever actually executes.
         conversation = [...conversation, message];
-        for (const tc of toolCalls) {
+        let pauseIndex = -1;
+        for (let i = 0; i < toolCalls.length; i++) {
+          const tc = toolCalls[i];
           const call: ToolCall = { id: tc.id, name: tc.function.name, arguments: JSON.parse(tc.function.arguments || "{}") };
+          if (DEFAULT_APPROVAL_POLICY.requiresApproval(categoryForTool(call.name))) {
+            pauseIndex = i;
+            break;
+          }
           const result = await runToolCall(call);
           conversation = [...conversation, { role: "tool", tool_call_id: tc.id, name: call.name, content: JSON.stringify(result) } as never];
+        }
+
+        if (pauseIndex >= 0) {
+          const gatedCall: ToolCall = { id: toolCalls[pauseIndex].id, name: toolCalls[pauseIndex].function.name, arguments: JSON.parse(toolCalls[pauseIndex].function.arguments || "{}") };
+          const deferredToolCalls: ToolCall[] = toolCalls.slice(pauseIndex + 1).map((tc) => ({ id: tc.id, name: tc.function.name, arguments: JSON.parse(tc.function.arguments || "{}") }));
+          setPendingApproval({ call: gatedCall, upstream: conversation, deferredToolCalls });
+          return;
         }
       }
       setMessages((m) => [...m, { role: "assistant", content: `Stopped after ${maxRounds} tool-call rounds without a final answer — the AI may still be mid-task. Try asking it to continue or summarize what it's done so far.` }]);
     } finally {
+      abortControllerRef.current = null;
       setBusy(false);
     }
+  }
+
+  function stopGeneration(): void {
+    abortControllerRef.current?.abort();
   }
 
   async function handleSend(): Promise<void> {
@@ -144,7 +172,7 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
 
   async function approvePending(approved: boolean): Promise<void> {
     if (!pendingApproval) return;
-    const { call, upstream } = pendingApproval;
+    const { call, upstream, deferredToolCalls } = pendingApproval;
     setPendingApproval(null);
     let conversation = upstream;
     if (approved) {
@@ -152,6 +180,12 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
       conversation = [...conversation, { role: "tool", tool_call_id: call.id, name: call.name, content: JSON.stringify(result) } as never];
     } else {
       conversation = [...conversation, { role: "tool", tool_call_id: call.id, name: call.name, content: JSON.stringify({ rejected: true, message: "The user rejected this operation." }) } as never];
+    }
+    // Any tool_calls the model batched after this gated one were never run (they may well have
+    // depended on its result) — every tool_call_id still needs a matching tool message before the
+    // next assistant turn, so report them as skipped rather than silently dropping them.
+    for (const tc of deferredToolCalls) {
+      conversation = [...conversation, { role: "tool", tool_call_id: tc.id, name: tc.name, content: JSON.stringify({ skipped: true, message: "Not run — it was batched after a call that needed user approval. Re-check the graph state and re-plan this step if it's still needed." }) } as never];
     }
     await sendConversation(conversation as never);
   }
@@ -191,6 +225,9 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
             <span className="ai-chat-typing-dot" />
             <span className="ai-chat-typing-dot" />
             <span className="ai-chat-typing-label">AI is working on this...</span>
+            <button type="button" className="btn btn-ghost ai-chat-stop-btn" onClick={stopGeneration} title="Abort the current AI request">
+              Stop
+            </button>
           </div>
         )}
         {pendingApproval && (
