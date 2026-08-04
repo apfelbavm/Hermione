@@ -49,7 +49,12 @@ function applyOps(ctx: AiGraphContext, changes: ChangeOp[], isFunctionBody: bool
   const results: ChangeResult[] = [];
 
   for (const raw of changes) {
-    const op = resolveOp(raw, tempMap);
+    let op: ChangeOp;
+    try {
+      op = resolveOp(raw, tempMap);
+    } catch {
+      return { results, errors: [{ code: "INVALID_OPERATION", message: `Malformed ${raw.op} operation — check it has the fields this op type requires (e.g. "connect" needs source: {nodeId, port} and target: {nodeId, port}, not custom field names).` }] };
+    }
 
     if (op.op === "create_node") {
       const outcome = createNode(ctx, op, isFunctionBody);

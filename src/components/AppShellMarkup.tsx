@@ -11,7 +11,7 @@ import { ScriptsPanel } from "./sidebar/ScriptsPanel";
 import { VariablePanel } from "./sidebar/VariablePanel";
 import { IconManager } from "../shared/iconManager";
 
-export default function AppShellMarkup({ store, flowName }: { store: Store; flowName: string }) {
+export default function AppShellMarkup({ store, flowName, flowId }: { store: Store; flowName: string; flowId: string }) {
   useStoreRevision(store);
 
   const activeFunction: FunctionDef | null = store.state.activeFunctionId ? (store.state.rootGraph.functions.find((f) => f.id === store.state.activeFunctionId) ?? null) : null;
@@ -99,7 +99,7 @@ export default function AppShellMarkup({ store, flowName }: { store: Store; flow
         </div>
         <div id="ai-chat-resizer" className="resizer resizer-vertical" />
         <div id="ai-chat-panel-container" className="side-panel">
-          <AiChatPanel store={store} />
+          <AiChatPanel store={store} flowId={flowId} />
         </div>
       </div>
       <div id="log-resizer" className="resizer resizer-horizontal" />

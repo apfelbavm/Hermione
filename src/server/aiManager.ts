@@ -19,7 +19,9 @@ export class AiManager {
     if (this.isLocalDev()) {
       return {
         baseUrl: process.env.HERMIONE_AI_LOCAL_BASE_URL || "http://localhost:11434/v1",
-        model: process.env.HERMIONE_AI_LOCAL_MODEL || "deepseek-r1:7b",
+        // deepseek-r1 is a reasoning-only distill and largely ignores the `tools` schema (answers
+        // in prose instead of emitting tool_calls); qwen2.5 has solid native tool-calling support.
+        model: process.env.HERMIONE_AI_LOCAL_MODEL || "qwen2.5:7b",
         apiKey: process.env.HERMIONE_AI_LOCAL_API_KEY || "ollama", // Ollama ignores the key but a Bearer value must still be sent
       };
     }

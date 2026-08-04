@@ -961,7 +961,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
   return (
     <>
-      <AppShellMarkup store={store} flowName={flowName} />
+      <AppShellMarkup store={store} flowName={flowName} flowId={flowId} />
       {showUnsavedDialog && (
         <UnsavedChangesDialog
           saving={savingBeforeLeave}

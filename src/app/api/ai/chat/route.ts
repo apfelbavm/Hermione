@@ -95,6 +95,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!message) {
     return Response.json({ error: "AI provider returned no response" }, { status: 502 });
   }
+  console.log(`[AiChat] <- response`, JSON.stringify(message, null, 2));
   if (data.usage) {
     console.log(`[AiChat] tokens: ${data.usage.prompt_tokens} prompt + ${data.usage.completion_tokens} completion = ${data.usage.total_tokens} total`);
   }
