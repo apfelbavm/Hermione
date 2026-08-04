@@ -3,6 +3,10 @@ export interface AiProviderConfig {
   model: string;
   apiKey: string;
   temperature: number;
+  /** The model's context window in tokens, when known — lets the chat UI warn as a conversation
+   * approaches the point where Ollama/the provider will start truncating it. Undefined for hosted
+   * providers whose exact limit for the configured model isn't tracked here. */
+  contextWindow?: number;
 }
 
 /** Picks which AI backend the chat route talks to: a locally hosted Ollama instance while
@@ -39,6 +43,7 @@ export class AiManager {
         model: process.env.HERMIONE_AI_LOCAL_MODEL || "qwen2.5-14b-16k",
         apiKey: process.env.HERMIONE_AI_LOCAL_API_KEY || "ollama", // Ollama ignores the key but a Bearer value must still be sent
         temperature,
+        contextWindow: Number(process.env.HERMIONE_AI_LOCAL_CONTEXT_WINDOW ?? 16384),
       };
     }
 

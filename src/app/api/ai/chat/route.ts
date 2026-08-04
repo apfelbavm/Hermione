@@ -15,6 +15,12 @@ interface ChatRequestBody {
   messages: ChatMessage[];
 }
 
+interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 interface UpstreamChatRequest {
   model: string;
   messages: ChatMessage[];
@@ -116,7 +122,7 @@ export async function POST(request: Request): Promise<Response> {
   const hasSystemMessage = body.messages.some((m) => m.role === "system");
   const messages = hasSystemMessage ? body.messages : [{ role: "system" as const, content: AI_GRAPH_SYSTEM_PROMPT }, ...body.messages];
 
-  async function callUpstream(msgs: ChatMessage[]): Promise<{ message: ChatMessage } | { error: string; status: number }> {
+  async function callUpstream(msgs: ChatMessage[]): Promise<{ message: ChatMessage; usage?: TokenUsage } | { error: string; status: number }> {
     const requestPayload: UpstreamChatRequest = {
       model: config!.model,
       messages: msgs,
@@ -154,10 +160,11 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
     console.log(`[AiChat] <- response`, JSON.stringify(message, null, 2));
-    if (data.usage) {
-      console.log(`[AiChat] tokens: ${data.usage.prompt_tokens} prompt + ${data.usage.completion_tokens} completion = ${data.usage.total_tokens} total`);
+    const usage: TokenUsage | undefined = data.usage && { promptTokens: data.usage.prompt_tokens, completionTokens: data.usage.completion_tokens, totalTokens: data.usage.total_tokens };
+    if (usage) {
+      console.log(`[AiChat] tokens: ${usage.promptTokens} prompt + ${usage.completionTokens} completion = ${usage.totalTokens} total`);
     }
-    return { message };
+    return { message, usage };
   }
 
   // Small local models occasionally ignore the tools schema entirely and answer in prose instead
@@ -197,6 +204,9 @@ export async function POST(request: Request): Promise<Response> {
   let conversationSoFar = messages;
   let nudgeAttempts = 0;
   const MAX_NUDGE_ATTEMPTS = 3;
+  // Nudge retries are extra upstream calls the user never explicitly asked for — accumulate their
+  // token cost too so the reported usage reflects everything this request actually spent.
+  let usageTotal = result.usage;
   while ((result.message.tool_calls?.length ?? 0) === 0 && shouldForceToolCall(conversationSoFar) && nudgeAttempts < MAX_NUDGE_ATTEMPTS) {
     nudgeAttempts++;
     console.log(`[AiChat] model returned prose with no tool call when one was required — nudge attempt ${nudgeAttempts}/${MAX_NUDGE_ATTEMPTS}`);
@@ -204,7 +214,10 @@ export async function POST(request: Request): Promise<Response> {
     const retryResult = await callUpstream(conversationSoFar);
     if ("error" in retryResult) return Response.json({ error: retryResult.error }, { status: retryResult.status });
     result = retryResult;
+    if (result.usage) {
+      usageTotal = usageTotal ? { promptTokens: usageTotal.promptTokens + result.usage.promptTokens, completionTokens: usageTotal.completionTokens + result.usage.completionTokens, totalTokens: usageTotal.totalTokens + result.usage.totalTokens } : result.usage;
+    }
   }
 
-  return Response.json({ message: result.message });
+  return Response.json({ message: result.message, usage: usageTotal, contextSize: result.usage?.totalTokens, contextWindow: config.contextWindow });
 }

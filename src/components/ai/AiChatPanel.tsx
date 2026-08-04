@@ -18,6 +18,12 @@ interface UpstreamMessage {
   tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
 }
 
+interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 /** Minimal AI chat UI (section 27, deliverable 15) — the orchestration loop lives here rather than
  * on the server, since the graph itself only exists in this editor's own in-memory Store; only the
  * LLM call goes through the server (see app/api/ai/chat/route.ts), keeping the provider API key
@@ -35,6 +41,14 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<{ call: ToolCall; upstream: unknown[]; deferredToolCalls: ToolCall[] } | null>(null);
+  // Tokens spent on the current chat session (resets on "New chat") — helps gauge how close a
+  // long conversation is getting to the model's context window, see aiManager.ts/route.ts.
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
+  // Size of the context sent on the most recent request (not cumulative, unlike tokenUsage) and
+  // the model's configured limit, if known — shown together so the user can see how close a
+  // conversation is to overflowing (see contextWindow in aiManager.ts).
+  const [contextSize, setContextSize] = useState<number | null>(null);
+  const [contextWindow, setContextWindow] = useState<number | null>(null);
 
   // Persist every turn as it happens (not just on unmount) so a page reload or crash mid-chat
   // never silently drops the conversation from the history list.
@@ -54,6 +68,8 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
     setMessages([]);
     setInput("");
     setHistoryOpen(false);
+    setTokenUsage(null);
+    setContextSize(null);
   }
 
   function restoreSession(session: ChatSession): void {
@@ -61,6 +77,8 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
     setSessionId(session.id);
     setMessages(session.messages);
     setHistoryOpen(false);
+    setTokenUsage(null);
+    setContextSize(null);
   }
 
   function syncGraphIntoStore(): void {
@@ -104,10 +122,10 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
       const maxRounds = 20;
       for (let round = 0; round < maxRounds; round++) {
         let res: Response;
-        let data: { message?: UpstreamMessage; error?: string };
+        let data: { message?: UpstreamMessage; usage?: TokenUsage; contextSize?: number; contextWindow?: number; error?: string };
         try {
           res = await fetch("/api/ai/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: conversation }), signal: controller.signal });
-          data = (await res.json()) as { message?: UpstreamMessage; error?: string };
+          data = (await res.json()) as { message?: UpstreamMessage; usage?: TokenUsage; contextSize?: number; contextWindow?: number; error?: string };
         } catch (err) {
           if (err instanceof DOMException && err.name === "AbortError") {
             setMessages((m) => [...m, { role: "assistant", content: "Stopped by user." }]);
@@ -119,6 +137,12 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
           setMessages((m) => [...m, { role: "assistant", content: `Error: ${data.error ?? res.statusText}` }]);
           return;
         }
+        if (data.usage) {
+          const u = data.usage;
+          setTokenUsage((prev) => (prev ? { promptTokens: prev.promptTokens + u.promptTokens, completionTokens: prev.completionTokens + u.completionTokens, totalTokens: prev.totalTokens + u.totalTokens } : u));
+        }
+        if (data.contextSize !== undefined) setContextSize(data.contextSize);
+        if (data.contextWindow !== undefined) setContextWindow(data.contextWindow);
 
         const message = data.message!;
         const toolCalls = message.tool_calls ?? [];
@@ -225,9 +249,6 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
             <span className="ai-chat-typing-dot" />
             <span className="ai-chat-typing-dot" />
             <span className="ai-chat-typing-label">AI is working on this...</span>
-            <button type="button" className="btn btn-ghost ai-chat-stop-btn" onClick={stopGeneration} title="Abort the current AI request">
-              Stop
-            </button>
           </div>
         )}
         {pendingApproval && (
@@ -245,6 +266,28 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
           </div>
         )}
       </div>
+      {(tokenUsage || contextSize !== null || busy) && (
+        <div className="ai-chat-status-bar">
+          <div className="ai-chat-status-info">
+            {tokenUsage && (
+              <span className="ai-chat-token-usage" title={`${tokenUsage.promptTokens} prompt + ${tokenUsage.completionTokens} completion tokens, this chat`}>
+                {tokenUsage.totalTokens.toLocaleString()} tokens used
+              </span>
+            )}
+            {contextSize !== null && (
+              <span className="ai-chat-context-usage" title="Current conversation context size vs. the model's context window limit">
+                context: {contextSize.toLocaleString()}
+                {contextWindow !== null ? ` / ${contextWindow.toLocaleString()}` : ""}
+              </span>
+            )}
+          </div>
+          {busy && (
+            <button type="button" className="btn btn-ghost ai-chat-stop-btn" onClick={stopGeneration} title="Abort the current AI request">
+              Stop
+            </button>
+          )}
+        </div>
+      )}
       <div className="ai-chat-input">
         <input
           value={input}

@@ -113,9 +113,32 @@
 .ai-chat-toolbar {
   flex: 0 0 auto;
   display: flex;
+  align-items: center;
   gap: 6px;
   padding: 8px;
   border-bottom: 1px solid var(--pp-border);
+}
+
+.ai-chat-status-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--pp-border);
+}
+
+.ai-chat-status-info {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-chat-token-usage,
+.ai-chat-context-usage {
+  font-size: 11px;
+  color: var(--pp-text-muted);
+  white-space: nowrap;
 }
 
 .ai-chat-history-dropdown {
@@ -218,7 +241,6 @@
 }
 
 .ai-chat-stop-btn {
-  margin-left: auto;
   padding: 2px 8px;
   font-size: 11px;
 }
