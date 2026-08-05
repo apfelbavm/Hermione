@@ -2,8 +2,9 @@
 
 import { useEffect } from "react";
 
-function wireResizeHandle(opts: { handle: HTMLElement; target: HTMLElement; storageKey: string; min: number; max: () => number; getPointerPos: (e: PointerEvent) => number; getSize: (rect: DOMRect) => number; growSign?: 1 | -1 }): () => void {
+function wireResizeHandle(opts: { handle: HTMLElement | null; target: HTMLElement | null; storageKey: string; min: number; max: () => number; getPointerPos: (e: PointerEvent) => number; getSize: (rect: DOMRect) => number; growSign?: 1 | -1 }): () => void {
   const { handle, target, storageKey, min, max, getPointerPos, getSize, growSign = -1 } = opts;
+  if (!handle || !target) return () => {};
 
   const stored = Number(localStorage.getItem(storageKey));
   if (stored > 0) target.style.flexBasis = `${clamp(stored, min, max())}px`;
@@ -42,8 +43,8 @@ export function useResizablePanels(): void {
   useEffect(() => {
     const teardowns = [
       wireResizeHandle({
-        handle: document.getElementById("left-sidebar-resizer")!,
-        target: document.getElementById("left-sidebar")!,
+        handle: document.getElementById("left-sidebar-resizer"),
+        target: document.getElementById("left-sidebar"),
         storageKey: "hermione:left-sidebar-width",
         min: 200,
         max: () => window.innerWidth * 0.35,
@@ -52,8 +53,8 @@ export function useResizablePanels(): void {
         growSign: 1,
       }),
       wireResizeHandle({
-        handle: document.getElementById("right-sidebar-resizer")!,
-        target: document.getElementById("right-sidebar")!,
+        handle: document.getElementById("right-sidebar-resizer"),
+        target: document.getElementById("right-sidebar"),
         storageKey: "hermione:right-sidebar-width",
         min: 200,
         max: () => window.innerWidth * 0.35,
@@ -61,8 +62,8 @@ export function useResizablePanels(): void {
         getSize: (r) => r.width,
       }),
       wireResizeHandle({
-        handle: document.getElementById("ai-chat-resizer")!,
-        target: document.getElementById("ai-chat-panel-container")!,
+        handle: document.getElementById("ai-chat-resizer"),
+        target: document.getElementById("ai-chat-panel-container"),
         storageKey: "hermione:ai-chat-panel-width",
         min: 260,
         max: () => window.innerWidth * 0.4,
@@ -70,8 +71,8 @@ export function useResizablePanels(): void {
         getSize: (r) => r.width,
       }),
       wireResizeHandle({
-        handle: document.getElementById("log-resizer")!,
-        target: document.getElementById("log-container")!,
+        handle: document.getElementById("log-resizer"),
+        target: document.getElementById("log-container"),
         storageKey: "hermione:log-height",
         min: 60,
         max: () => window.innerHeight * 0.7,

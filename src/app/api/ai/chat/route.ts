@@ -39,13 +39,16 @@ interface UpstreamChatRequest {
  * request itself still succeeds, so it never hits the error path above. Occasionally the OPENING
  * tag itself comes back corrupted/mojibake (e.g. a single stray CJK character where `<tool_call>`
  * should be) while the closing `</tool_call>` tag and the JSON payload are still intact — handle
- * that too by falling back to just the JSON blob immediately preceding a closing tag. Recognize
- * all these shapes wherever assistant text shows up (a successful response's `content`, or a
- * failed request's `failed_generation`) so a real tool call never gets silently treated as a chat
- * message. */
+ * that too by falling back to just the JSON blob immediately preceding a closing tag. Groq/Ollama
+ * both also sometimes narrate a plan and then paste the call as a plain markdown ```json fenced
+ * code block (no `<tool_call>`/`<function=...>` wrapper at all) — recognized separately below.
+ * Recognize all these shapes wherever assistant text shows up (a successful response's `content`,
+ * or a failed request's `failed_generation`) so a real tool call never gets silently treated as a
+ * chat message. */
 const TOOL_CALL_TAG_PATTERN = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
 const INLINE_FUNCTION_PATTERN = /<function=([\w.]+)=(\{[\s\S]*?\})>?<\/function>/g;
 const CLOSING_TAG_ONLY_PATTERN = /(\{[\s\S]*?"name"\s*:\s*"[\w.]+"[\s\S]*?\})\s*<\/tool_call>/g;
+const FENCED_JSON_PATTERN = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/g;
 
 function extractInlineToolCalls(text: string): NonNullable<ChatMessage["tool_calls"]> | null {
   const toolCalls: NonNullable<ChatMessage["tool_calls"]> = [];
@@ -77,6 +80,18 @@ function extractInlineToolCalls(text: string): NonNullable<ChatMessage["tool_cal
   const fnPattern = new RegExp(INLINE_FUNCTION_PATTERN.source, "g");
   while ((match = fnPattern.exec(text))) {
     toolCalls.push({ id: `recovered-${Date.now()}-${index++}`, type: "function", function: { name: match[1], arguments: match[2] } });
+  }
+
+  if (toolCalls.length === 0) {
+    const fencedPattern = new RegExp(FENCED_JSON_PATTERN.source, "g");
+    while ((match = fencedPattern.exec(text))) {
+      try {
+        const parsed = JSON.parse(match[1]) as { name?: string; arguments?: unknown };
+        if (parsed.name) toolCalls.push({ id: `recovered-${Date.now()}-${index++}`, type: "function", function: { name: parsed.name, arguments: JSON.stringify(parsed.arguments ?? {}) } });
+      } catch {
+        // Not a name/arguments tool-call JSON blob (or malformed) — skip it, it's just fenced prose.
+      }
+    }
   }
 
   return toolCalls.length > 0 ? toolCalls : null;
