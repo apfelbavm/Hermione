@@ -22,15 +22,18 @@ interface RunManualRequestBody {
 /** Runs a Flow's DEPLOYED compiled output (see api/projects/[projectId]/flows/[flowId]/deploy/route.ts
  * and DatabaseManager.getDeployedScript) — a snapshot taken the last time "Deploy" was clicked in the
  * editor, not whatever the graph currently looks like — rather than the INTERPRETED graph
- * api/simulate's route runs. Only the "On Simulate" trigger (manifest kind "simulate" — nodes/event.ts's
- * event.simulate, which compiles to a function named "eventSimulate" by default) fires here: this is the
- * graph's one designated entry point for a deployed run, same node the editor's own Simulate button
- * fires. If the graph has no such node, that's reported as a log line (see the "EventSimulate" message
- * below), not an error — the deployment itself is still valid, it just has nothing to do. Every
- * credential the graph might need is pulled from the Credential Vault into env vars first (see
- * server/credentialEnv.ts) so a compiled node reading one by name (e.g. oauth2Saml) finds it the same
- * way it would after being deployed standalone. Persists the result as a RunLog the same way Simulate
- * does, tagged kind: "manual" so the Logs page can tell the two apart. */
+ * api/simulate's route runs. Only the "On Deploy" trigger (manifest kind "deploy" — nodes/event.ts's
+ * event.deploy, which compiles to a function named "eventDeploy" by default) fires here: unlike
+ * "On Execute"/"On HTTP Request", which each already have their own real invocation path
+ * (executeDeployedFlow.ts, api/hooks/[projectId]/[flowId]/route.ts), "On Deploy" only ever fires once
+ * automatically right after a deploy (see the deploy route's fireOnDeployEvent) — this button is the
+ * only way to fire it again on demand afterwards. If the graph has no such node, that's reported as a
+ * log line (see the "EventDeploy" message below), not an error — the deployment itself is still valid,
+ * it just has nothing wired to this trigger. Every credential the graph might need is pulled from the
+ * Credential Vault into env vars first (see server/credentialEnv.ts) so a compiled node reading one by
+ * name (e.g. oauth2Saml) finds it the same way it would after being deployed standalone. Persists the
+ * result as a RunLog tagged kind: "manual" so the Logs page can tell it apart from the deploy-triggered
+ * "deploy" run. */
 export async function POST(request: Request): Promise<Response> {
   let body: RunManualRequestBody;
   try {
@@ -55,10 +58,10 @@ export async function POST(request: Request): Promise<Response> {
   const startedAt = new Date().toISOString();
   let executionMs: number | undefined;
   try {
-    const runTrigger = deployed.manifest.triggers.find((t) => t.kind === "simulate");
+    const runTrigger = deployed.manifest.triggers.find((t) => t.kind === "deploy");
 
     if (!runTrigger) {
-      recordLogEntry('The "EventSimulate" function does not exist in this graph.');
+      recordLogEntry('The "EventDeploy" function does not exist in this graph.');
     } else {
       applyCredentialEnvVars(db);
 
