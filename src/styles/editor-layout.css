@@ -241,6 +241,7 @@
 
 .ai-chat-history-title {
   font-size: 12px;
+  color: gray;
 }
 
 .ai-chat-history-date {
@@ -345,9 +346,12 @@
   border-top: 1px solid var(--pp-border);
 }
 
-.ai-chat-input input {
+.ai-chat-input textarea {
   flex: 1 1 auto;
   min-width: 0;
+  max-height: 160px;
+  resize: none;
+  font: inherit;
 }
 
 .resizer {

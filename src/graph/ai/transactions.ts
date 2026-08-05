@@ -5,6 +5,7 @@ import { getNodeDef } from "../engine/registry";
 import { deserializeGraph } from "../persistence/load";
 import { serializeGraph } from "../persistence/save";
 import { type AiGraphContext, visibleFunctions, visibleScripts, visibleVariables } from "./context";
+import { layoutGraph } from "./layoutOperations";
 import { connect, createCommentBox, createNode, deleteCommentBox, deleteNode, disconnect, updateNode } from "./mutations";
 import type { ApplyChangesRequest, ApplyChangesResult, ChangeOp, ChangeResult, ValidationError } from "./types";
 
@@ -182,6 +183,28 @@ function autoAddEventTriggerIfMissing(ctx: AiGraphContext, changes: ChangeOp[], 
   results.push({ op: "create_node", nodeId: node.id, summary: `Auto-added an event.simulate trigger node (${node.id}) — this graph had no event-trigger node yet, so it couldn't run. ${wireSummary}` });
 }
 
+/** create_node ops without an explicit `position` all fall back to the same (0, 0) default (see
+ * mutations.ts's `createNode`), and the AI is only told to follow up with graph.layout/
+ * layout_around to spread them out — it frequently forgets, leaving every such node stacked
+ * exactly on top of the others (and on top of anything else already sitting at the origin, e.g.
+ * a prior batch's auto-added trigger). Matches `changes` against `results` positionally (both are
+ * filtered to "create_node" and iterated in the same order, so they line up 1:1 as long as every
+ * op in `changes` succeeded, which is guaranteed by the time this runs) to find which newly
+ * created nodes never got a real position, then runs the layout engine over just that subset —
+ * "selection" scope + "auto" mode preserves the rest of the graph untouched, arranges the new
+ * nodes relative to each other via their own connections, and nudges the whole cluster away from
+ * any pre-existing node it would otherwise still overlap. */
+function layoutUnpositionedCreatedNodes(ctx: AiGraphContext, changes: ChangeOp[], results: ChangeResult[]): void {
+  const createdOps = changes.filter((c): c is Extract<ChangeOp, { op: "create_node" }> => c.op === "create_node");
+  const createdResults = results.filter((r) => r.op === "create_node");
+  const unpositionedIds = createdOps
+    .map((op, i) => (op.position === undefined ? createdResults[i]?.nodeId : undefined))
+    .filter((id): id is string => !!id);
+
+  if (unpositionedIds.length === 0) return;
+  layoutGraph(ctx, { scope: "selection", nodeIds: unpositionedIds, mode: "auto" });
+}
+
 export interface ApplyChangesOptions {
   isFunctionBody?: boolean;
   currentVersion: number;
@@ -200,6 +223,7 @@ function prepareChanges(ctx: AiGraphContext, changes: ChangeOp[], isFunctionBody
   const clone = cloneContext(ctx);
   const applied = applyOps(clone, changes, isFunctionBody);
   if (applied.errors.length > 0) return { prepared: null, errors: applied.errors };
+  layoutUnpositionedCreatedNodes(clone, changes, applied.results);
   autoAddEventTriggerIfMissing(clone, changes, isFunctionBody, applied.results);
   return { prepared: { clone, results: applied.results }, errors: [] };
 }

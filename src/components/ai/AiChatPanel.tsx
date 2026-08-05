@@ -34,6 +34,7 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
   const apiRef = useRef<AiGraphApi>(new AiGraphApi(store.state.rootGraph));
   const historyRef = useRef<ChatHistoryStore>(ChatHistoryStore.forFlow(flowId));
   const abortControllerRef = useRef<AbortController | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string>(() => newSessionId());
   const [sessions, setSessions] = useState<ChatSession[]>(() => historyRef.current.list());
@@ -68,6 +69,14 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
       cancelled = true;
     };
   }, []);
+
+  // Auto-grows the input textarea to fit its content (up to the CSS max-height, then scrolls).
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
 
   // Persist every turn as it happens (not just on unmount) so a page reload or crash mid-chat
   // never silently drops the conversation from the history list.
@@ -344,14 +353,19 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
         )}
       </div>
       <div className="ai-chat-input">
-        <input
+        <textarea
+          ref={inputRef}
           value={input}
           disabled={busy || !!pendingApproval || !store.state.flowLoaded}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") void handleSend();
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void handleSend();
+            }
           }}
-          placeholder={store.state.flowLoaded ? "Ask the AI to inspect, modify, run, or debug this graph..." : "Loading flow..."}
+          rows={1}
+          placeholder={store.state.flowLoaded ? "Ask the AI to inspect, modify, run, or debug this graph... (Shift+Enter for a new line)" : "Loading flow..."}
         />
         <button type="button" className="btn btn-green" onClick={() => void handleSend()} disabled={busy || !!pendingApproval || !store.state.flowLoaded}>
           Send
