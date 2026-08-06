@@ -76,7 +76,7 @@ export function Sidebar() {
         <span className="app-sidebar-link-icon">
           <IconManager.CollapseIcon />
         </span>
-        <span className="app-sidebar-link-label">{i18n.components.sidebar.collapse}</span>
+        <span className="app-sidebar-link-label"></span>
       </button>
       <ul className="app-sidebar-links">
         {links.map((link) => {

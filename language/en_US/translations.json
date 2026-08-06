@@ -191,7 +191,6 @@
       "close_tab": "Close tab"
     },
     "sidebar": {
-      "collapse": "Collapse",
       "collapse_title": "Collapse/expand sidebar",
       "projects": "Projects",
       "credential_vault": "Credential Vault",
