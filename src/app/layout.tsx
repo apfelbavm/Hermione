@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import "../style.css";
+import { SessionProvider } from "next-auth/react";
 import { THEME_BOOTSTRAP_SCRIPT } from "../client/theme";
 import { SIDEBAR_BOOTSTRAP_SCRIPT } from "../client/sidebar";
+import { TAB_FETCH_BOOTSTRAP_SCRIPT } from "../client/tabFetchPatch";
+import { AuthGate } from "../components/AuthGate";
 
 export const metadata: Metadata = {
   title: "Hermione",
@@ -24,7 +27,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             collapse state (see client/sidebar.ts) — avoids a layout-shift flash from expanded to
             collapsed width while React hydrates. */}
         <script dangerouslySetInnerHTML={{ __html: SIDEBAR_BOOTSTRAP_SCRIPT }} />
-        {children}
+        {/* Patches window.fetch to attach the "per tab" session token (see client/tabFetchPatch.ts)
+            before Next.js's own router/data-fetching code runs any fetches of its own. */}
+        <script dangerouslySetInnerHTML={{ __html: TAB_FETCH_BOOTSTRAP_SCRIPT }} />
+        <SessionProvider>
+          <AuthGate>{children}</AuthGate>
+        </SessionProvider>
       </body>
     </html>
   );

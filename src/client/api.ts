@@ -1,5 +1,6 @@
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
-import type { DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, ProjectSummary, RunLog, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "../server/models";
+import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, ProjectSummary, RunLog, UserAccount, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "../server/models";
+import { getStoredTabToken } from "./authClient";
 
 // Browser-side counterpart to src/server/DatabaseManager.ts — every function here is a thin
 // fetch() wrapper around the API routes under src/app/api/, since the database itself
@@ -8,7 +9,11 @@ import type { DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, F
 // never any runtime value, so this file stays safe to import from "use client" pages/components.
 
 async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(input, init);
+  // When "per tab" session scope is active there's no ambient auth cookie left to rely on (see
+  // authClient.ts/AuthGate.tsx) — every request instead carries its own bearer token explicitly.
+  const tabToken = getStoredTabToken();
+  const headers = tabToken ? { ...init?.headers, Authorization: `Bearer ${tabToken}` } : init?.headers;
+  const res = await fetch(input, { ...init, headers });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((body as { error?: string }).error ?? `${input} failed (${res.status})`);
@@ -212,4 +217,56 @@ export function getWebhookDetail(projectId: string, flowId: string): Promise<{ c
  * browser again after this call. */
 export function regenerateWebhookToken(projectId: string, flowId: string): Promise<WebhookConfig> {
   return requestJson(`/api/projects/${projectId}/webhooks/${flowId}/regenerate-token`, { method: "POST" });
+}
+
+export function getCurrentUser(): Promise<UserAccount> {
+  return requestJson("/api/auth/me");
+}
+
+export function setupTotp(): Promise<{ otpauthUri: string; qrDataUrl: string }> {
+  return requestJson("/api/auth/totp/setup", { method: "POST" });
+}
+
+export function confirmTotp(code: string): Promise<{ ok: true }> {
+  return requestJson("/api/auth/totp/confirm", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ code }),
+  });
+}
+
+export function disableTotp(): Promise<{ ok: true }> {
+  return requestJson("/api/auth/totp/disable", { method: "POST" });
+}
+
+export function getAuthSettings(): Promise<AuthSettings> {
+  return requestJson("/api/auth/settings");
+}
+
+export function setSessionScope(sessionScope: AuthSettings["sessionScope"]): Promise<AuthSettings> {
+  return requestJson("/api/auth/settings", {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ sessionScope }),
+  });
+}
+
+export function listAllowedDomains(): Promise<{ domains: string[] }> {
+  return requestJson("/api/auth/domains");
+}
+
+export function addAllowedDomain(domain: string): Promise<{ domains: string[] }> {
+  return requestJson("/api/auth/domains", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ domain }),
+  });
+}
+
+export function removeAllowedDomain(domain: string): Promise<{ domains: string[] }> {
+  return requestJson("/api/auth/domains", {
+    method: "DELETE",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ domain }),
+  });
 }

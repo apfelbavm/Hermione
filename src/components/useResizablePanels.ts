@@ -11,24 +11,24 @@ function wireResizeHandle(opts: { handle: HTMLElement | null; target: HTMLElemen
 
   function onPointerDown(e: PointerEvent): void {
     e.preventDefault();
-    handle.setPointerCapture(e.pointerId);
+    handle!.setPointerCapture(e.pointerId);
     document.body.classList.add("resizing");
     const startPos = getPointerPos(e);
-    const startSize = getSize(target.getBoundingClientRect());
+    const startSize = getSize(target!.getBoundingClientRect());
 
     function onMove(moveEvent: PointerEvent): void {
       const delta = getPointerPos(moveEvent) - startPos;
-      target.style.flexBasis = `${clamp(startSize + growSign * delta, min, max())}px`;
+      target!.style.flexBasis = `${clamp(startSize + growSign * delta, min, max())}px`;
     }
     function onUp(upEvent: PointerEvent): void {
-      handle.releasePointerCapture(upEvent.pointerId);
-      handle.removeEventListener("pointermove", onMove);
-      handle.removeEventListener("pointerup", onUp);
+      handle!.releasePointerCapture(upEvent.pointerId);
+      handle!.removeEventListener("pointermove", onMove);
+      handle!.removeEventListener("pointerup", onUp);
       document.body.classList.remove("resizing");
-      localStorage.setItem(storageKey, String(getSize(target.getBoundingClientRect())));
+      localStorage.setItem(storageKey, String(getSize(target!.getBoundingClientRect())));
     }
-    handle.addEventListener("pointermove", onMove);
-    handle.addEventListener("pointerup", onUp);
+    handle!.addEventListener("pointermove", onMove);
+    handle!.addEventListener("pointerup", onUp);
   }
 
   handle.addEventListener("pointerdown", onPointerDown);

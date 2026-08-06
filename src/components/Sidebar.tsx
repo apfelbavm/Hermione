@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { signOut, useSession } from "next-auth/react";
 import type { ReactNode } from "react";
 import { i18n } from "@i18n";
 import { toggleSidebar } from "../client/sidebar";
+import { clearStoredTabToken } from "../client/authClient";
 import { IconManager } from "../shared/iconManager";
 
 interface SidebarLinkDef {
@@ -39,10 +42,28 @@ const SIDEBAR_LINKS: SidebarLinkDef[] = [
     label: i18n.components.sidebar.ai_docs,
     icon: <IconManager.AiDocsIcon />,
   },
+  {
+    href: "/account/security",
+    label: "Security",
+    icon: <IconManager.CredentialVaultIcon />,
+  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    setIsAdmin(Boolean(session?.user?.isAdmin));
+  }, [session]);
+
+  const links = isAdmin ? [...SIDEBAR_LINKS, { href: "/admin/security", label: "Admin security", icon: <IconManager.CredentialVaultIcon /> }] : SIDEBAR_LINKS;
+
+  async function handleSignOut(): Promise<void> {
+    clearStoredTabToken();
+    await signOut({ callbackUrl: "/login" });
+  }
 
   return (
     <nav className="app-sidebar">
@@ -53,7 +74,7 @@ export function Sidebar() {
         <span className="app-sidebar-link-label">{i18n.components.sidebar.collapse}</span>
       </button>
       <ul className="app-sidebar-links">
-        {SIDEBAR_LINKS.map((link) => {
+        {links.map((link) => {
           const active = pathname === link.href || pathname?.startsWith(`${link.href}/`);
           return (
             <li key={link.href}>
@@ -64,6 +85,14 @@ export function Sidebar() {
             </li>
           );
         })}
+        <li>
+          <button type="button" className="app-sidebar-link" title="Sign out" onClick={handleSignOut} style={{ width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer" }}>
+            <span className="app-sidebar-link-icon">
+              <IconManager.ClearIcon />
+            </span>
+            <span className="app-sidebar-link-label">Sign out</span>
+          </button>
+        </li>
       </ul>
     </nav>
   );

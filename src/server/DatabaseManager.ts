@@ -1,12 +1,12 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import { nextId } from "../graph/engine/graphMutations.ts";
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
 import { MAX_RUNS_PER_PROJECT } from "../shared/runLogConstants.ts";
 import { MAX_WEBHOOK_DELIVERIES_PER_FLOW } from "../shared/webhookConstants.ts";
-import type { DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, LogEntry, ProjectSummary, RunKind, RunLog, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "./models";
+import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, LogEntry, ProjectSummary, RunKind, RunLog, UserAccount, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "./models";
 import type { TriggerDescriptor } from "../graph/compiler/codegen";
 
 const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "hermione.db");
@@ -97,6 +97,27 @@ interface WebhookDeliveryRow {
   headers_json: string;
   body_text: string;
   error: string | null;
+}
+
+interface UserRow {
+  id: string;
+  email: string;
+  name: string | null;
+  provider: string;
+  is_admin: number;
+  totp_secret: string | null;
+  totp_enabled: number;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+interface EmailLoginCodeRow {
+  id: string;
+  email: string;
+  code_hash: string;
+  expires_at: string;
+  consumed_at: string | null;
+  created_at: string;
 }
 
 /** The one and only place in this app that touches a database — no other module imports
@@ -214,6 +235,48 @@ export class DatabaseManager {
         error TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_flow_id ON webhook_deliveries (flow_id, received_at);
+
+      -- One row per person who has ever signed in, regardless of provider (Entra ID vs email) —
+      -- provider records how they most recently signed in, totp_secret/totp_enabled are only
+      -- ever set for email-provider users who opted into an authenticator app (see server/auth.ts).
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        name TEXT,
+        provider TEXT NOT NULL,
+        is_admin INTEGER NOT NULL DEFAULT 0,
+        totp_secret TEXT,
+        totp_enabled INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        last_login_at TEXT
+      );
+
+      -- Domain allowlist gating email-address login (Entra ID logins aren't checked against this —
+      -- see server/auth.ts's signIn callback). Empty table means no email domain is allowed yet.
+      CREATE TABLE IF NOT EXISTS allowed_email_domains (
+        id TEXT PRIMARY KEY,
+        domain TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL
+      );
+
+      -- One-time email login codes; a new row per requested code, never updated except to mark it
+      -- consumed. Old/expired rows for an email are pruned whenever a new one is requested.
+      CREATE TABLE IF NOT EXISTS email_login_codes (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        code_hash TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        consumed_at TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_email_login_codes_email ON email_login_codes (email, created_at);
+
+      -- Singleton-per-key app-wide settings (e.g. "sessionScope" = "browser" | "tab") — see
+      -- server/authSettings.ts. Not per-user; controlled from the admin security page.
+      CREATE TABLE IF NOT EXISTS auth_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
     `);
   }
 
@@ -696,6 +759,140 @@ export class DatabaseManager {
   listWebhookDeliveries(flowId: string): WebhookDelivery[] {
     const rows = this.db.prepare<[string], WebhookDeliveryRow>("SELECT * FROM webhook_deliveries WHERE flow_id = ? ORDER BY received_at DESC").all(flowId);
     return rows.map((row) => this.toWebhookDelivery(row));
+  }
+
+  // --- Users / login ---
+
+  private toUserAccount(row: UserRow): UserAccount {
+    return {
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      provider: row.provider === "entra" ? "entra" : "email",
+      isAdmin: Boolean(row.is_admin),
+      totpEnabled: Boolean(row.totp_enabled),
+      createdAt: row.created_at,
+      lastLoginAt: row.last_login_at,
+    };
+  }
+
+  getUserByEmail(email: string): UserAccount | undefined {
+    const row = this.db.prepare<[string], UserRow>("SELECT * FROM users WHERE email = ?").get(email.toLowerCase());
+    return row ? this.toUserAccount(row) : undefined;
+  }
+
+  /** Creates the user row on first-ever sign-in, otherwise just refreshes name/provider/last-login
+   * — called once per successful sign-in from server/auth.ts's `jwt` callback. `isAdmin` is
+   * recomputed from the ADMIN_EMAILS env var every time, so removing an email there revokes access
+   * on that user's next sign-in without needing a DB migration. */
+  upsertUserFromLogin(email: string, name: string | null, provider: "entra" | "email", isAdmin: boolean): UserAccount {
+    const normalizedEmail = email.toLowerCase();
+    const now = new Date().toISOString();
+    const existing = this.db.prepare<[string], UserRow>("SELECT * FROM users WHERE email = ?").get(normalizedEmail);
+    if (existing) {
+      this.db.prepare("UPDATE users SET name = ?, provider = ?, is_admin = ?, last_login_at = ? WHERE id = ?").run(name, provider, isAdmin ? 1 : 0, now, existing.id);
+      return this.toUserAccount({ ...existing, name, provider, is_admin: isAdmin ? 1 : 0, last_login_at: now });
+    }
+    const row: UserRow = { id: nextId("user"), email: normalizedEmail, name, provider, is_admin: isAdmin ? 1 : 0, totp_secret: null, totp_enabled: 0, created_at: now, last_login_at: now };
+    this.db.prepare("INSERT INTO users (id, email, name, provider, is_admin, totp_secret, totp_enabled, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(row.id, row.email, row.name, row.provider, row.is_admin, row.totp_secret, row.totp_enabled, row.created_at, row.last_login_at);
+    return this.toUserAccount(row);
+  }
+
+  /** Stores a freshly generated TOTP secret as *pending* (not yet enabled) until confirmed via
+   * confirmUserTotpSecret — never trust a secret the user hasn't proven they can generate codes for. */
+  setPendingUserTotpSecret(email: string, secret: string): void {
+    this.db.prepare("UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE email = ?").run(secret, email.toLowerCase());
+  }
+
+  getUserTotpSecret(email: string): string | undefined {
+    const row = this.db.prepare<[string], Pick<UserRow, "totp_secret">>("SELECT totp_secret FROM users WHERE email = ?").get(email.toLowerCase());
+    return row?.totp_secret ?? undefined;
+  }
+
+  confirmUserTotpEnabled(email: string): void {
+    this.db.prepare("UPDATE users SET totp_enabled = 1 WHERE email = ?").run(email.toLowerCase());
+  }
+
+  disableUserTotp(email: string): void {
+    this.db.prepare("UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE email = ?").run(email.toLowerCase());
+  }
+
+  // --- Allowed email domains ---
+
+  listAllowedDomains(): string[] {
+    return this.db
+      .prepare<[], { domain: string }>("SELECT domain FROM allowed_email_domains ORDER BY domain")
+      .all()
+      .map((row) => row.domain);
+  }
+
+  addAllowedDomain(domain: string): void {
+    const normalized = domain.trim().toLowerCase().replace(/^@/, "");
+    if (!normalized) return;
+    this.db.prepare("INSERT OR IGNORE INTO allowed_email_domains (id, domain, created_at) VALUES (?, ?, ?)").run(nextId("domain"), normalized, new Date().toISOString());
+  }
+
+  removeAllowedDomain(domain: string): void {
+    this.db.prepare("DELETE FROM allowed_email_domains WHERE domain = ?").run(domain.trim().toLowerCase().replace(/^@/, ""));
+  }
+
+  /** Deny-by-default: an email is only accepted for email-based login once its domain has been
+   * explicitly added to the allowlist by an admin. */
+  isEmailDomainAllowed(email: string): boolean {
+    const domain = email.toLowerCase().split("@")[1];
+    if (!domain) return false;
+    const row = this.db.prepare<[string], { domain: string }>("SELECT domain FROM allowed_email_domains WHERE domain = ?").get(domain);
+    return Boolean(row);
+  }
+
+  // --- Email login codes ---
+
+  /** One code at a time per email — clears out any previous unconsumed codes before issuing a new
+   * one, and also opportunistically sweeps anything already expired. */
+  createEmailLoginCode(email: string, code: string, ttlMs: number): void {
+    const normalizedEmail = email.toLowerCase();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const expiresAt = new Date(now.getTime() + ttlMs).toISOString();
+    const codeHash = createHash("sha256").update(code).digest("hex");
+    const insert = this.db.transaction(() => {
+      this.db.prepare("DELETE FROM email_login_codes WHERE email = ? AND consumed_at IS NULL").run(normalizedEmail);
+      this.db.prepare("DELETE FROM email_login_codes WHERE expires_at < ?").run(nowIso);
+      this.db.prepare("INSERT INTO email_login_codes (id, email, code_hash, expires_at, consumed_at, created_at) VALUES (?, ?, ?, ?, NULL, ?)").run(nextId("login_code"), normalizedEmail, codeHash, expiresAt, nowIso);
+    });
+    insert();
+  }
+
+  /** True (and marks the code consumed) only for the most recent, unexpired, unconsumed code for
+   * this email whose hash matches — every other case (wrong code, expired, already used) is false,
+   * with no distinction surfaced to the caller (avoids leaking which case it was). */
+  verifyAndConsumeEmailLoginCode(email: string, code: string): boolean {
+    const normalizedEmail = email.toLowerCase();
+    const codeHash = createHash("sha256").update(code).digest("hex");
+    const now = new Date().toISOString();
+    const row = this.db.prepare<[string, string, string], EmailLoginCodeRow>("SELECT * FROM email_login_codes WHERE email = ? AND code_hash = ? AND consumed_at IS NULL AND expires_at >= ? ORDER BY created_at DESC LIMIT 1").get(normalizedEmail, codeHash, now);
+    if (!row) return false;
+    this.db.prepare("UPDATE email_login_codes SET consumed_at = ? WHERE id = ?").run(now, row.id);
+    return true;
+  }
+
+  /** Guards against spamming the mailer — refuses a new code request within `cooldownMs` of the
+   * last one issued for this email. */
+  wasEmailLoginCodeRequestedRecently(email: string, cooldownMs: number): boolean {
+    const row = this.db.prepare<[string], { created_at: string }>("SELECT created_at FROM email_login_codes WHERE email = ? ORDER BY created_at DESC LIMIT 1").get(email.toLowerCase());
+    if (!row) return false;
+    return Date.now() - new Date(row.created_at).getTime() < cooldownMs;
+  }
+
+  // --- Auth settings (global, admin-controlled) ---
+
+  getAuthSettings(): AuthSettings {
+    const row = this.db.prepare<[string], { value: string }>("SELECT value FROM auth_settings WHERE key = ?").get("sessionScope");
+    return { sessionScope: row?.value === "tab" ? "tab" : "browser" };
+  }
+
+  setSessionScope(scope: "browser" | "tab"): void {
+    this.db.prepare("INSERT INTO auth_settings (key, value) VALUES ('sessionScope', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(scope);
   }
 }
 

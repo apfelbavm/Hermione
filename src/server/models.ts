@@ -119,3 +119,25 @@ export interface WebhookDelivery {
   bodyText: string;
   error?: string;
 }
+
+/** One person who has ever signed in — see DatabaseManager's users table comment for
+ * provider/totp semantics. */
+export interface UserAccount {
+  id: string;
+  email: string;
+  name: string | null;
+  provider: "entra" | "email";
+  isAdmin: boolean;
+  totpEnabled: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+/** Global, admin-controlled login behavior — see DatabaseManager's auth_settings table comment. */
+export interface AuthSettings {
+  /** "browser": a normal shared cookie session (all tabs signed in together, one sign-out signs out
+   * everywhere). "tab": each tab holds its own independent session token in sessionStorage — a
+   * brand-new tab always starts signed out, and closing/signing out of one tab never affects
+   * others. See src/components/AuthGate.tsx for the client-side half of this. */
+  sessionScope: "browser" | "tab";
+}
