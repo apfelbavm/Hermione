@@ -50,7 +50,7 @@ export default function GlobalLogsPage() {
                   project
                     ? {
                         name: project.name,
-                        href: `/projects/${project.id}/logs`,
+                        href: `/projects/${project.id}`,
                       }
                     : undefined
                 }
