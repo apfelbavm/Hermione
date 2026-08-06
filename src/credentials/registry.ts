@@ -303,3 +303,20 @@ registerCredentialType({
     { id: "password", label: "Password", secret: true },
   ],
 });
+
+registerCredentialType({
+  id: "linkedInOAuth2",
+  label: "LinkedIn OAuth2",
+  fields: [
+    { id: "clientId", label: "Client ID" },
+    { id: "clientSecret", label: "Client Secret", secret: true },
+    { id: "redirectUri", label: "Redirect URI", help: "Must match one of the redirect URLs configured on the app's Auth settings page in the LinkedIn Developer Portal." },
+    {
+      id: "authCode",
+      label: "Authorization Code",
+      help: "Single-use code from LinkedIn's OAuth2 consent page (use the LinkedIn Generate Authorization URL node to build the link). Only needed once, to run the LinkedIn Authorize node and obtain an Access Token (and Refresh Token, if enabled) below — it stops working after that first use.",
+    },
+    { id: "accessToken", label: "Access Token", secret: true },
+    { id: "refreshToken", label: "Refresh Token", secret: true, help: "Only present if the app has refresh tokens enabled for the requested scopes." },
+  ],
+});

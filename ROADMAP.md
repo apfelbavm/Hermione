@@ -77,6 +77,8 @@ The 4-layer connector pattern already scales to "many more nodes" without rework
 - [x] Excel / SharePoint / OneDrive — covered by the existing Microsoft 365 connector.
 - [x] Generic SMTP / Twilio
 - [x] Stripe
+- [x] LinkedIn — official `linkedin-api-client` SDK (RestliClient/AuthClient); one node per SDK method (get/batchGet/getAll/finder/batchFinder/create/batchCreate/update/batchUpdate/partialUpdate/batchPartialUpdate/delete/batchDelete/action) since LinkedIn's SDK exposes generic Rest.li verbs rather than per-resource helpers, plus auth nodes (authorize/refresh/2-legged/introspect/generate authorization URL).
+
 
 ### Collaboration & distribution
 

@@ -52,6 +52,7 @@ export const FUNCTION_LIBRARY_WORKDAY_IMPORT = 'import * as functionLibraryWorkd
 export const FUNCTION_LIBRARY_TWILIO_IMPORT = 'import * as functionLibraryTwilio from "../../src/server/functionLibraryTwilio.ts";';
 export const FUNCTION_LIBRARY_SMTP_IMPORT = 'import * as functionLibrarySmtp from "../../src/server/functionLibrarySmtp.ts";';
 export const FUNCTION_LIBRARY_SAP_IMPORT = 'import * as functionLibrarySap from "../../src/server/functionLibrarySap.ts";';
+export const FUNCTION_LIBRARY_LINKEDIN_IMPORT = 'import * as functionLibraryLinkedIn from "../../src/server/functionLibraryLinkedIn.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryGithub.ts — kept in its own file
  * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/github.ts). */

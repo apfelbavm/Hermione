@@ -49,6 +49,7 @@
     "fast-xml-parser": "^5.10.1",
     "googleapis": "^173.0.0",
     "jira.js": "^5.4.0",
+    "linkedin-api-client": "^0.3.0",
     "monaco-editor": "^0.56.0",
     "mongodb": "^7.5.0",
     "next": "^16.2.12",

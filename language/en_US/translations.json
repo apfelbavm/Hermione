@@ -1224,6 +1224,123 @@
         "pin_key_predicate": "Key Predicate (e.g. '0001' or Id='X',Type='Y')"
       }
     },
+    "linkedin": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_client_id": "Client ID",
+        "pin_redirect_uri": "Redirect URI",
+        "pin_access_token": "Access Token",
+        "pin_expires_in": "Expires In (s)",
+        "pin_refresh_token": "Refresh Token",
+        "pin_refresh_token_expires_in": "Refresh Token Expires In (s)",
+        "pin_scope": "Scope",
+        "pin_resource_path": "Resource Path",
+        "pin_id": "ID (JSON)",
+        "pin_ids_json": "IDs (JSON array)",
+        "pin_path_keys_json": "Path Keys (JSON)",
+        "pin_query_params_json": "Query Params (JSON)",
+        "pin_version_string": "Version String (YYYYMM, optional)",
+        "pin_entity_json": "Entity (JSON)",
+        "pin_finder_name": "Finder Name",
+        "pin_result_json": "Result (JSON)"
+      },
+      "token": {
+        "label": "LinkedIn Token"
+      },
+      "generateAuthorizationUrl": {
+        "label": "LinkedIn Generate Authorization URL",
+        "description": "Builds the member authorization URL to send a user to LinkedIn's OAuth consent page for the given scopes.",
+        "pin_scopes": "Scopes",
+        "pin_state": "State (optional, CSRF check)",
+        "pin_url": "Authorization URL"
+      },
+      "authorize": {
+        "label": "LinkedIn Authorize",
+        "description": "One-time setup step: reads a named Credential Vault entry's Client ID/Client Secret/Redirect URI/Authorization Code and exchanges the code for a 3-legged access token (and refresh token, if enabled) to save back into the vault. Every other LinkedIn node uses that access token (via its own Credential Name pin) automatically."
+      },
+      "refreshToken": {
+        "label": "LinkedIn Refresh Token",
+        "description": "Exchanges a named Credential Vault entry's stored Refresh Token for a new access token (and refresh token), without requiring the member to reauthorize."
+      },
+      "getTwoLeggedAccessToken": {
+        "label": "LinkedIn Get Two-Legged Access Token",
+        "description": "Uses the client credentials grant to retrieve a 2-legged access token for member-independent APIs. Requires the app to have client credential flow enabled."
+      },
+      "introspectAccessToken": {
+        "label": "LinkedIn Introspect Access Token",
+        "description": "Inspects a 2-legged, 3-legged, or Enterprise access token to get its status, expiry, and other details. Inspects the given token, or the credential's own stored Access Token if left blank.",
+        "pin_active": "Active",
+        "pin_auth_type": "Auth Type",
+        "pin_created_at": "Created At (epoch s)",
+        "pin_expires_at": "Expires At (epoch s)",
+        "pin_status": "Status"
+      },
+      "get": {
+        "label": "LinkedIn Get",
+        "description": "Makes a Rest.li GET request to fetch a single entity from a LinkedIn API resource."
+      },
+      "batchGet": {
+        "label": "LinkedIn Batch Get",
+        "description": "Makes a Rest.li BATCH_GET request to fetch multiple entities from a LinkedIn API resource in one call."
+      },
+      "getAll": {
+        "label": "LinkedIn Get All",
+        "description": "Makes a Rest.li GET_ALL request to fetch every entity on a LinkedIn API resource."
+      },
+      "finder": {
+        "label": "LinkedIn Finder",
+        "description": "Makes a Rest.li FINDER request to find entities on a LinkedIn API resource matching some search criteria."
+      },
+      "batchFinder": {
+        "label": "LinkedIn Batch Finder",
+        "description": "Makes a Rest.li BATCH_FINDER request to find entities using multiple sets of search criteria in one call.",
+        "pin_finder_criteria_name": "Finder Criteria Name",
+        "pin_finder_criteria_values_json": "Finder Criteria Values (JSON array)"
+      },
+      "create": {
+        "label": "LinkedIn Create",
+        "description": "Makes a Rest.li CREATE request to create a new entity on a LinkedIn API resource.",
+        "pin_created_entity_id": "Created Entity ID"
+      },
+      "batchCreate": {
+        "label": "LinkedIn Batch Create",
+        "description": "Makes a Rest.li BATCH_CREATE request to create multiple entities on a LinkedIn API resource in one call.",
+        "pin_entities_json": "Entities (JSON array)"
+      },
+      "update": {
+        "label": "LinkedIn Update",
+        "description": "Makes a Rest.li UPDATE request to overwrite an entire entity on a LinkedIn API resource."
+      },
+      "batchUpdate": {
+        "label": "LinkedIn Batch Update",
+        "description": "Makes a Rest.li BATCH_UPDATE request to overwrite multiple entities on a LinkedIn API resource in one call."
+      },
+      "partialUpdate": {
+        "label": "LinkedIn Partial Update",
+        "description": "Makes a Rest.li PARTIAL_UPDATE request to update only the given fields of an entity on a LinkedIn API resource.",
+        "pin_patch_set_object_json": "Patch Set Object (JSON)"
+      },
+      "batchPartialUpdate": {
+        "label": "LinkedIn Batch Partial Update",
+        "description": "Makes a Rest.li BATCH_PARTIAL_UPDATE request to partially update multiple entities on a LinkedIn API resource in one call.",
+        "pin_patch_set_objects_json": "Patch Set Objects (JSON array)"
+      },
+      "delete": {
+        "label": "LinkedIn Delete",
+        "description": "Makes a Rest.li DELETE request to delete an entity on a LinkedIn API resource."
+      },
+      "batchDelete": {
+        "label": "LinkedIn Batch Delete",
+        "description": "Makes a Rest.li BATCH_DELETE request to delete multiple entities on a LinkedIn API resource in one call."
+      },
+      "action": {
+        "label": "LinkedIn Action",
+        "description": "Makes a Rest.li ACTION request to perform a custom action on a LinkedIn API resource.",
+        "pin_action_name": "Action Name",
+        "pin_data_json": "Data (JSON)",
+        "pin_value_json": "Value (JSON)"
+      }
+    },
     "facebook": {
       "__shared": {
         "pin_credential_name": "Credential Name",

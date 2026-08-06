@@ -41,6 +41,7 @@ import "./workday";
 import "./twilio";
 import "./smtp";
 import "./sap";
+import "./linkedin";
 
 let registered = false;
 

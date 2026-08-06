@@ -24,7 +24,8 @@ export type CredentialTypeId =
   | "workdayBasicAuth"
   | "twilioApiKey"
   | "smtpCredential"
-  | "sapBasicAuth";
+  | "sapBasicAuth"
+  | "linkedInOAuth2";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -233,6 +234,21 @@ export interface SapBasicAuthCredentialData {
   password: string;
 }
 
+/** A LinkedIn developer app's client id/secret plus (optionally) a member's 3-legged access/refresh
+ * token pair, used with the official `linkedin-api-client` package (RestliClient/AuthClient) — see
+ * lib/linkedinManager.ts. `redirectUri`/`authCode` are only a staging area for the one-time
+ * authorization code exchange (see nodes/linkedin.ts's linkedin.authorize), irrelevant to every
+ * other LinkedIn node's normal per-run flow. `refreshToken` is only present if the app has refresh
+ * tokens enabled; `accessToken` is what every Rest.li call node actually sends. */
+export interface LinkedInOAuth2CredentialData {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  authCode: string;
+  accessToken: string;
+  refreshToken: string;
+}
+
 export type CredentialData =
   | UsernamePasswordCredentialData
   | Oauth2SamlBearerCredentialData
@@ -255,7 +271,8 @@ export type CredentialData =
   | WorkdayBasicAuthCredentialData
   | TwilioApiKeyCredentialData
   | SmtpCredentialData
-  | SapBasicAuthCredentialData;
+  | SapBasicAuthCredentialData
+  | LinkedInOAuth2CredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */
