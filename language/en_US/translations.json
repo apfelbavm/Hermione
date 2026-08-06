@@ -553,6 +553,677 @@
         "label": "Dropbox Space Usage"
       }
     },
+    "slack": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_encoding": "Encoding"
+      },
+      "postMessage": {
+        "label": "Slack Post Message",
+        "description": "Posts a text message to a Slack channel (or as a threaded reply if a Thread Timestamp is given).",
+        "pin_channel": "Channel",
+        "pin_text": "Text",
+        "pin_thread_ts": "Thread Timestamp (optional)",
+        "pin_ts": "Message Timestamp"
+      },
+      "updateMessage": {
+        "label": "Slack Update Message",
+        "description": "Edits the text of an existing message.",
+        "pin_channel": "Channel",
+        "pin_ts": "Message Timestamp",
+        "pin_text": "Text",
+        "pin_channel_out": "Channel",
+        "pin_ts_out": "Message Timestamp"
+      },
+      "deleteMessage": {
+        "label": "Slack Delete Message",
+        "description": "Deletes an existing message.",
+        "pin_channel": "Channel",
+        "pin_ts": "Message Timestamp"
+      },
+      "postEphemeral": {
+        "label": "Slack Post Ephemeral Message",
+        "description": "Posts a message visible only to a single user in a channel.",
+        "pin_channel": "Channel",
+        "pin_user": "User",
+        "pin_text": "Text",
+        "pin_message_ts": "Message Timestamp"
+      },
+      "scheduleMessage": {
+        "label": "Slack Schedule Message",
+        "description": "Schedules a message to be posted at a future Unix timestamp (in seconds).",
+        "pin_channel": "Channel",
+        "pin_text": "Text",
+        "pin_post_at": "Post At (Unix seconds)",
+        "pin_scheduled_message_id": "Scheduled Message ID",
+        "pin_post_at_out": "Post At (Unix seconds)"
+      },
+      "listConversations": {
+        "label": "Slack List Conversations",
+        "description": "Lists channels the bot can see in the workspace.",
+        "pin_limit": "Limit",
+        "pin_types": "Types",
+        "pin_channels": "Channels"
+      },
+      "createConversation": {
+        "label": "Slack Create Conversation",
+        "description": "Creates a new public or private channel.",
+        "pin_name": "Name",
+        "pin_is_private": "Is Private",
+        "pin_channel_id": "Channel ID",
+        "pin_name_out": "Name"
+      },
+      "archiveConversation": {
+        "label": "Slack Archive Conversation",
+        "description": "Archives an existing channel.",
+        "pin_channel": "Channel"
+      },
+      "inviteToConversation": {
+        "label": "Slack Invite To Conversation",
+        "description": "Invites one or more users to a channel.",
+        "pin_channel": "Channel",
+        "pin_user_ids": "User IDs (comma-separated)"
+      },
+      "kickFromConversation": {
+        "label": "Slack Kick From Conversation",
+        "description": "Removes a user from a channel.",
+        "pin_channel": "Channel",
+        "pin_user": "User"
+      },
+      "joinConversation": {
+        "label": "Slack Join Conversation",
+        "description": "Joins the bot to an existing channel.",
+        "pin_channel": "Channel"
+      },
+      "getConversationHistory": {
+        "label": "Slack Get Conversation History",
+        "description": "Fetches recent messages from a channel.",
+        "pin_channel": "Channel",
+        "pin_limit": "Limit",
+        "pin_messages": "Messages"
+      },
+      "getConversationInfo": {
+        "label": "Slack Get Conversation Info",
+        "description": "Fetches metadata about a channel.",
+        "pin_channel": "Channel",
+        "pin_id": "ID",
+        "pin_name": "Name",
+        "pin_is_private": "Is Private",
+        "pin_is_archived": "Is Archived",
+        "pin_topic": "Topic",
+        "pin_purpose": "Purpose",
+        "pin_member_count": "Member Count"
+      },
+      "getConversationMembers": {
+        "label": "Slack Get Conversation Members",
+        "description": "Lists the user IDs that are members of a channel.",
+        "pin_channel": "Channel",
+        "pin_limit": "Limit",
+        "pin_member_ids": "Member IDs"
+      },
+      "setConversationTopic": {
+        "label": "Slack Set Conversation Topic",
+        "description": "Sets a channel's topic.",
+        "pin_channel": "Channel",
+        "pin_topic": "Topic"
+      },
+      "setConversationPurpose": {
+        "label": "Slack Set Conversation Purpose",
+        "description": "Sets a channel's purpose.",
+        "pin_channel": "Channel",
+        "pin_purpose": "Purpose"
+      },
+      "renameConversation": {
+        "label": "Slack Rename Conversation",
+        "description": "Renames an existing channel.",
+        "pin_channel": "Channel",
+        "pin_name": "Name"
+      },
+      "listUsers": {
+        "label": "Slack List Users",
+        "description": "Lists the workspace's members.",
+        "pin_limit": "Limit",
+        "pin_users": "Users"
+      },
+      "getUserInfo": {
+        "label": "Slack Get User Info",
+        "description": "Fetches profile information for a single user.",
+        "pin_user": "User",
+        "pin_id": "ID",
+        "pin_name": "Name",
+        "pin_real_name": "Real Name",
+        "pin_email": "Email",
+        "pin_is_bot": "Is Bot"
+      },
+      "lookupUserByEmail": {
+        "label": "Slack Lookup User By Email",
+        "description": "Finds a user by their email address.",
+        "pin_email": "Email",
+        "pin_id": "ID",
+        "pin_name": "Name",
+        "pin_real_name": "Real Name"
+      },
+      "uploadFile": {
+        "label": "Slack Upload File",
+        "description": "Uploads a file to Slack and shares it to a channel.",
+        "pin_channel": "Channel",
+        "pin_filename": "Filename",
+        "pin_content": "Content",
+        "pin_initial_comment": "Initial Comment (optional)",
+        "pin_file_id": "File ID",
+        "pin_permalink": "Permalink"
+      },
+      "deleteFile": {
+        "label": "Slack Delete File",
+        "description": "Deletes an uploaded file.",
+        "pin_file_id": "File ID"
+      },
+      "getFileInfo": {
+        "label": "Slack Get File Info",
+        "description": "Fetches metadata about an uploaded file.",
+        "pin_file_id": "File ID",
+        "pin_id": "ID",
+        "pin_name": "Name",
+        "pin_title": "Title",
+        "pin_permalink": "Permalink",
+        "pin_size": "Size (bytes)"
+      },
+      "addReaction": {
+        "label": "Slack Add Reaction",
+        "description": "Adds an emoji reaction to an existing message.",
+        "pin_channel": "Channel",
+        "pin_timestamp": "Message Timestamp",
+        "pin_emoji_name": "Emoji Name"
+      },
+      "removeReaction": {
+        "label": "Slack Remove Reaction",
+        "description": "Removes an emoji reaction from an existing message.",
+        "pin_channel": "Channel",
+        "pin_timestamp": "Message Timestamp",
+        "pin_emoji_name": "Emoji Name"
+      },
+      "addPin": {
+        "label": "Slack Add Pin",
+        "description": "Pins a message to a channel.",
+        "pin_channel": "Channel",
+        "pin_timestamp": "Message Timestamp"
+      },
+      "removePin": {
+        "label": "Slack Remove Pin",
+        "description": "Unpins a message from a channel.",
+        "pin_channel": "Channel",
+        "pin_timestamp": "Message Timestamp"
+      },
+      "listPins": {
+        "label": "Slack List Pins",
+        "description": "Lists pinned items in a channel.",
+        "pin_channel": "Channel",
+        "pin_items": "Items"
+      },
+      "searchMessages": {
+        "label": "Slack Search Messages",
+        "description": "Searches messages across the workspace (requires a user token; bot tokens are not supported by this Slack endpoint).",
+        "pin_query": "Query",
+        "pin_count": "Count",
+        "pin_matches": "Matches"
+      },
+      "getTeamInfo": {
+        "label": "Slack Get Team Info",
+        "description": "Fetches metadata about the workspace/team.",
+        "pin_id": "ID",
+        "pin_name": "Name",
+        "pin_domain": "Domain"
+      },
+      "listUserGroups": {
+        "label": "Slack List User Groups",
+        "description": "Lists the workspace's user groups.",
+        "pin_groups": "Groups"
+      },
+      "createUserGroup": {
+        "label": "Slack Create User Group",
+        "description": "Creates a new user group.",
+        "pin_name": "Name",
+        "pin_handle": "Handle (optional)",
+        "pin_id": "ID"
+      },
+      "updateUserGroup": {
+        "label": "Slack Update User Group",
+        "description": "Updates a user group's name and/or handle.",
+        "pin_usergroup": "User Group ID",
+        "pin_name": "Name (optional)",
+        "pin_handle": "Handle (optional)"
+      },
+      "updateUserGroupUsers": {
+        "label": "Slack Update User Group Users",
+        "description": "Replaces the full member list of a user group.",
+        "pin_usergroup": "User Group ID",
+        "pin_user_ids": "User IDs (comma-separated)"
+      },
+      "addReminder": {
+        "label": "Slack Add Reminder",
+        "description": "Creates a reminder from text and a time (Unix seconds, or a natural language description).",
+        "pin_text": "Text",
+        "pin_time": "Time",
+        "pin_user": "User (optional, deprecated by Slack)",
+        "pin_reminder_id": "Reminder ID"
+      },
+      "listReminders": {
+        "label": "Slack List Reminders",
+        "description": "Lists the bot/user's reminders.",
+        "pin_reminders": "Reminders"
+      },
+      "deleteReminder": {
+        "label": "Slack Delete Reminder",
+        "description": "Deletes an existing reminder.",
+        "pin_reminder_id": "Reminder ID"
+      },
+      "channel": {
+        "label": "Slack Channel",
+        "pin_id": "ID",
+        "pin_name": "Name",
+        "pin_is_private": "Is Private",
+        "pin_is_archived": "Is Archived"
+      },
+      "user": {
+        "label": "Slack User",
+        "pin_id": "ID",
+        "pin_name": "Name",
+        "pin_real_name": "Real Name",
+        "pin_email": "Email",
+        "pin_is_bot": "Is Bot"
+      },
+      "message": {
+        "label": "Slack Message",
+        "pin_ts": "Timestamp",
+        "pin_user": "User",
+        "pin_text": "Text"
+      },
+      "pinItem": {
+        "label": "Slack Pin Item",
+        "pin_type": "Type",
+        "pin_channel": "Channel",
+        "pin_ts": "Timestamp"
+      },
+      "searchMatch": {
+        "label": "Slack Search Match",
+        "pin_channel": "Channel",
+        "pin_user": "User",
+        "pin_text": "Text",
+        "pin_ts": "Timestamp"
+      },
+      "userGroup": {
+        "label": "Slack User Group",
+        "pin_id": "ID",
+        "pin_name": "Name",
+        "pin_handle": "Handle"
+      },
+      "reminder": {
+        "label": "Slack Reminder",
+        "pin_id": "ID",
+        "pin_text": "Text",
+        "pin_time": "Time"
+      }
+    },
+    "stripe": {
+      "__shared": {
+        "pin_credential_name": "Credential Name"
+      },
+      "createCustomer": {
+        "label": "Stripe Create Customer",
+        "description": "Creates a new Stripe customer.",
+        "pin_email": "Email",
+        "pin_name": "Name",
+        "pin_description": "Description",
+        "pin_customer_id": "Customer ID",
+        "pin_customer_email": "Customer Email"
+      },
+      "getCustomer": {
+        "label": "Stripe Get Customer",
+        "description": "Retrieves an existing Stripe customer by ID.",
+        "pin_customer_id": "Customer ID",
+        "pin_id": "Customer ID",
+        "pin_email": "Email",
+        "pin_name": "Name"
+      },
+      "deleteCustomer": {
+        "label": "Stripe Delete Customer",
+        "description": "Permanently deletes a Stripe customer by ID.",
+        "pin_customer_id": "Customer ID",
+        "pin_deleted": "Deleted"
+      },
+      "listCustomers": {
+        "label": "Stripe List Customers",
+        "description": "Lists customers, optionally filtered by email.",
+        "pin_email": "Email (optional)",
+        "pin_limit": "Limit",
+        "pin_customers": "Customers"
+      },
+      "createPaymentIntent": {
+        "label": "Stripe Create Payment Intent",
+        "description": "Creates a payment intent for a given amount (in the smallest currency unit, e.g. cents) and currency, optionally attached to a customer.",
+        "pin_amount": "Amount",
+        "pin_currency": "Currency",
+        "pin_customer_id": "Customer ID",
+        "pin_description": "Description",
+        "pin_payment_intent_id": "Payment Intent ID",
+        "pin_client_secret": "Client Secret",
+        "pin_status": "Status"
+      },
+      "getPaymentIntent": {
+        "label": "Stripe Get Payment Intent",
+        "description": "Retrieves a payment intent by ID.",
+        "pin_payment_intent_id": "Payment Intent ID",
+        "pin_status": "Status",
+        "pin_amount": "Amount",
+        "pin_currency": "Currency"
+      },
+      "cancelPaymentIntent": {
+        "label": "Stripe Cancel Payment Intent",
+        "description": "Cancels a payment intent that has not yet been captured.",
+        "pin_payment_intent_id": "Payment Intent ID",
+        "pin_status": "Status"
+      },
+      "createRefund": {
+        "label": "Stripe Create Refund",
+        "description": "Refunds a payment intent, fully if Amount is 0 or partially otherwise.",
+        "pin_payment_intent_id": "Payment Intent ID",
+        "pin_amount": "Amount (0 = full refund)",
+        "pin_refund_id": "Refund ID",
+        "pin_status": "Status"
+      },
+      "listCharges": {
+        "label": "Stripe List Charges",
+        "description": "Lists charges, optionally filtered to a single customer.",
+        "pin_customer_id": "Customer ID",
+        "pin_limit": "Limit",
+        "pin_charges": "Charges"
+      },
+      "charge": {
+        "label": "Stripe Charge",
+        "pin_id": "ID",
+        "pin_amount": "Amount",
+        "pin_currency": "Currency",
+        "pin_status": "Status",
+        "pin_description": "Description"
+      },
+      "customer": {
+        "label": "Stripe Customer",
+        "pin_id": "ID",
+        "pin_email": "Email",
+        "pin_name": "Name"
+      }
+    },
+    "salesforce": {
+      "__shared": {
+        "pin_credential_name": "Credential Name"
+      },
+      "query": {
+        "label": "Salesforce Query",
+        "description": "Runs a SOQL query and returns the matching records as a JSON array.",
+        "pin_soql": "SOQL",
+        "pin_records_json": "Records (JSON)",
+        "pin_total_size": "Total Size",
+        "pin_done": "Done"
+      },
+      "createRecord": {
+        "label": "Salesforce Create Record",
+        "description": "Creates a new record of the given sObject type from a JSON object of field values.",
+        "pin_sobject_type": "sObject Type",
+        "pin_fields_json": "Fields (JSON)",
+        "pin_id": "Record ID"
+      },
+      "getRecord": {
+        "label": "Salesforce Get Record",
+        "description": "Retrieves a record by ID, optionally limited to a comma-separated list of fields.",
+        "pin_sobject_type": "sObject Type",
+        "pin_id": "Record ID",
+        "pin_fields": "Fields (comma-separated)",
+        "pin_record_json": "Record (JSON)"
+      },
+      "updateRecord": {
+        "label": "Salesforce Update Record",
+        "description": "Updates an existing record's fields from a JSON object of field values.",
+        "pin_sobject_type": "sObject Type",
+        "pin_id": "Record ID",
+        "pin_fields_json": "Fields (JSON)"
+      },
+      "deleteRecord": {
+        "label": "Salesforce Delete Record",
+        "description": "Deletes a record by ID.",
+        "pin_sobject_type": "sObject Type",
+        "pin_id": "Record ID"
+      },
+      "upsertRecord": {
+        "label": "Salesforce Upsert Record",
+        "description": "Creates or updates a record identified by an external ID field/value instead of the Salesforce record ID.",
+        "pin_sobject_type": "sObject Type",
+        "pin_external_id_field": "External ID Field",
+        "pin_external_id_value": "External ID Value",
+        "pin_fields_json": "Fields (JSON)",
+        "pin_id": "Record ID"
+      },
+      "describeSobject": {
+        "label": "Salesforce Describe sObject",
+        "description": "Retrieves the field metadata (name, label, type) for the given sObject type.",
+        "pin_sobject_type": "sObject Type",
+        "pin_fields": "Fields"
+      },
+      "describeField": {
+        "label": "Salesforce Describe Field",
+        "pin_name": "Name",
+        "pin_label": "Label",
+        "pin_type": "Type"
+      }
+    },
+    "workday": {
+      "__shared": {
+        "pin_credential_name": "Credential Name"
+      },
+      "getWorkers": {
+        "label": "Workday Get Workers",
+        "description": "Retrieves a page of worker records, optionally filtered by a search term.",
+        "pin_limit": "Limit",
+        "pin_offset": "Offset",
+        "pin_search_term": "Search Term",
+        "pin_workers_json": "Workers (JSON)",
+        "pin_total": "Total"
+      },
+      "getWorker": {
+        "label": "Workday Get Worker",
+        "description": "Retrieves a single worker record by Worker ID.",
+        "pin_worker_id": "Worker ID",
+        "pin_worker_json": "Worker (JSON)"
+      },
+      "searchWorkers": {
+        "label": "Workday Search Workers",
+        "description": "Searches worker records matching a query string and returns the matching workers as a JSON array.",
+        "pin_query": "Query",
+        "pin_limit": "Limit",
+        "pin_workers_json": "Workers (JSON)",
+        "pin_total": "Total"
+      },
+      "getStaffingOrganizations": {
+        "label": "Workday Get Staffing Organizations",
+        "description": "Retrieves a page of staffing organization records.",
+        "pin_limit": "Limit",
+        "pin_offset": "Offset",
+        "pin_organizations_json": "Organizations (JSON)",
+        "pin_total": "Total"
+      },
+      "getOrganization": {
+        "label": "Workday Get Organization",
+        "description": "Retrieves a single organization record by Organization ID.",
+        "pin_organization_id": "Organization ID",
+        "pin_organization_json": "Organization (JSON)"
+      }
+    },
+    "twilio": {
+      "__shared": {
+        "pin_credential_name": "Credential Name"
+      },
+      "sendSms": {
+        "label": "Twilio Send SMS",
+        "description": "Sends an SMS text message to a phone number.",
+        "pin_to": "To",
+        "pin_from": "From",
+        "pin_body": "Body",
+        "pin_sid": "Message SID",
+        "pin_status": "Status"
+      },
+      "getMessage": {
+        "label": "Twilio Get Message",
+        "description": "Retrieves a message record by Message SID.",
+        "pin_message_sid": "Message SID",
+        "pin_message": "Message"
+      },
+      "listMessages": {
+        "label": "Twilio List Messages",
+        "description": "Lists messages, optionally filtered by To and/or From phone numbers.",
+        "pin_to": "To (optional)",
+        "pin_from": "From (optional)",
+        "pin_limit": "Limit",
+        "pin_messages": "Messages"
+      },
+      "deleteMessage": {
+        "label": "Twilio Delete Message",
+        "description": "Deletes a message record by Message SID.",
+        "pin_message_sid": "Message SID",
+        "pin_deleted": "Deleted"
+      },
+      "makeCall": {
+        "label": "Twilio Make Call",
+        "description": "Places an outbound voice call, fetching call instructions from the given TwiML URL.",
+        "pin_to": "To",
+        "pin_from": "From",
+        "pin_twiml_url": "TwiML URL",
+        "pin_sid": "Call SID",
+        "pin_status": "Status"
+      },
+      "getCall": {
+        "label": "Twilio Get Call",
+        "description": "Retrieves a call record by Call SID.",
+        "pin_call_sid": "Call SID",
+        "pin_status": "Status",
+        "pin_duration": "Duration (seconds)",
+        "pin_to": "To",
+        "pin_from": "From"
+      },
+      "sendWhatsApp": {
+        "label": "Twilio Send WhatsApp Message",
+        "description": "Sends a WhatsApp message to a phone number via Twilio's WhatsApp channel.",
+        "pin_to": "To",
+        "pin_from": "From",
+        "pin_body": "Body",
+        "pin_sid": "Message SID",
+        "pin_status": "Status"
+      },
+      "listCalls": {
+        "label": "Twilio List Calls",
+        "description": "Lists calls, optionally filtered by To and/or From phone numbers.",
+        "pin_to": "To (optional)",
+        "pin_from": "From (optional)",
+        "pin_limit": "Limit",
+        "pin_calls": "Calls"
+      },
+      "hangupCall": {
+        "label": "Twilio Hang Up Call",
+        "description": "Ends an in-progress call by Call SID.",
+        "pin_call_sid": "Call SID",
+        "pin_status": "Status"
+      },
+      "lookupPhoneNumber": {
+        "label": "Twilio Lookup Phone Number",
+        "description": "Looks up formatting, validity, caller name, and line type info for a phone number via the Twilio Lookup API.",
+        "pin_phone_number": "Phone Number",
+        "pin_valid": "Valid",
+        "pin_country_code": "Country Code",
+        "pin_national_format": "National Format",
+        "pin_caller_name": "Caller Name",
+        "pin_line_type": "Line Type"
+      },
+      "message": {
+        "label": "Twilio Message",
+        "pin_sid": "SID",
+        "pin_status": "Status",
+        "pin_body": "Body",
+        "pin_to": "To",
+        "pin_from": "From",
+        "pin_date_sent": "Date Sent"
+      },
+      "call": {
+        "label": "Twilio Call",
+        "pin_sid": "SID",
+        "pin_status": "Status",
+        "pin_duration": "Duration (seconds)",
+        "pin_to": "To",
+        "pin_from": "From"
+      }
+    },
+    "smtp": {
+      "__shared": {
+        "pin_credential_name": "Credential Name"
+      },
+      "sendMail": {
+        "label": "SMTP Send Mail",
+        "description": "Sends an email over SMTP using the given credential.",
+        "pin_to": "To",
+        "pin_subject": "Subject",
+        "pin_text": "Text (optional)",
+        "pin_html": "HTML (optional)",
+        "pin_cc": "CC (optional)",
+        "pin_bcc": "BCC (optional)",
+        "pin_from": "From (optional override)",
+        "pin_message_id": "Message ID"
+      },
+      "verifyConnection": {
+        "label": "SMTP Verify Connection",
+        "description": "Tests that the given SMTP credential can authenticate with the server."
+      }
+    },
+    "sap": {
+      "__shared": {
+        "pin_credential_name": "Credential Name"
+      },
+      "getEntitySet": {
+        "label": "SAP Get Entity Set",
+        "description": "Fetches an OData entity set (collection) from a SAP OData/Gateway service, e.g. /sap/opu/odata/sap/API_BUSINESS_PARTNER's A_BusinessPartner.",
+        "pin_service_path": "Service Path",
+        "pin_entity_set": "Entity Set",
+        "pin_query_options": "Query Options (optional, e.g. $filter=...&$top=50)",
+        "pin_results_json": "Results (JSON)"
+      },
+      "getEntity": {
+        "label": "SAP Get Entity",
+        "description": "Fetches a single OData entity from a SAP OData/Gateway service by its key predicate.",
+        "pin_service_path": "Service Path",
+        "pin_entity_set": "Entity Set",
+        "pin_key_predicate": "Key Predicate (e.g. '0001' or Id='X',Type='Y')",
+        "pin_entity_json": "Entity (JSON)"
+      },
+      "createEntity": {
+        "label": "SAP Create Entity",
+        "description": "Creates an OData entity in a SAP OData/Gateway service, handling the CSRF token handshake SAP requires for write operations.",
+        "pin_service_path": "Service Path",
+        "pin_entity_set": "Entity Set",
+        "pin_body_json": "Body (JSON)",
+        "pin_entity_json": "Entity (JSON)"
+      },
+      "updateEntity": {
+        "label": "SAP Update Entity",
+        "description": "Updates (MERGE) an OData entity in a SAP OData/Gateway service by its key predicate, handling the CSRF token handshake SAP requires for write operations.",
+        "pin_service_path": "Service Path",
+        "pin_entity_set": "Entity Set",
+        "pin_key_predicate": "Key Predicate (e.g. '0001' or Id='X',Type='Y')",
+        "pin_body_json": "Body (JSON)"
+      },
+      "deleteEntity": {
+        "label": "SAP Delete Entity",
+        "description": "Deletes an OData entity from a SAP OData/Gateway service by its key predicate, handling the CSRF token handshake SAP requires for write operations.",
+        "pin_service_path": "Service Path",
+        "pin_entity_set": "Entity Set",
+        "pin_key_predicate": "Key Predicate (e.g. '0001' or Id='X',Type='Y')"
+      }
+    },
     "facebook": {
       "__shared": {
         "pin_credential_name": "Credential Name",

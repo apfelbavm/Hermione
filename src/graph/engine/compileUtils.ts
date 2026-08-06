@@ -43,6 +43,16 @@ export const FUNCTION_LIBRARY_DROPBOX_IMPORT = 'import * as functionLibraryDropb
  * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/microsoft365.ts). */
 export const FUNCTION_LIBRARY_MICROSOFT365_IMPORT = 'import * as functionLibraryMicrosoft365 from "../../src/server/functionLibraryMicrosoft365.ts";';
 
+/** Sibling of FUNCTION_LIBRARY_IMPORT for each new enterprise connector's own functionLibrary file —
+ * same one-node-family-per-file convention as above (see nodes/slack.ts, nodes/stripe.ts, etc.). */
+export const FUNCTION_LIBRARY_SLACK_IMPORT = 'import * as functionLibrarySlack from "../../src/server/functionLibrarySlack.ts";';
+export const FUNCTION_LIBRARY_STRIPE_IMPORT = 'import * as functionLibraryStripe from "../../src/server/functionLibraryStripe.ts";';
+export const FUNCTION_LIBRARY_SALESFORCE_IMPORT = 'import * as functionLibrarySalesforce from "../../src/server/functionLibrarySalesforce.ts";';
+export const FUNCTION_LIBRARY_WORKDAY_IMPORT = 'import * as functionLibraryWorkday from "../../src/server/functionLibraryWorkday.ts";';
+export const FUNCTION_LIBRARY_TWILIO_IMPORT = 'import * as functionLibraryTwilio from "../../src/server/functionLibraryTwilio.ts";';
+export const FUNCTION_LIBRARY_SMTP_IMPORT = 'import * as functionLibrarySmtp from "../../src/server/functionLibrarySmtp.ts";';
+export const FUNCTION_LIBRARY_SAP_IMPORT = 'import * as functionLibrarySap from "../../src/server/functionLibrarySap.ts";';
+
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryGithub.ts — kept in its own file
  * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/github.ts). */
 export const FUNCTION_LIBRARY_GITHUB_IMPORT = 'import * as functionLibraryGithub from "../../src/server/functionLibraryGithub.ts";';

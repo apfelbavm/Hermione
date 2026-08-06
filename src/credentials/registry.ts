@@ -236,3 +236,70 @@ registerCredentialType({
     { id: "defaultDatabase", label: "Default Database (optional)", help: "Used when a node's own Database pin is left blank." },
   ],
 });
+
+registerCredentialType({
+  id: "slackBotToken",
+  label: "Slack Bot Token",
+  fields: [{ id: "botToken", label: "Bot User OAuth Token", secret: true, help: "Starts with xoxb-. From your Slack app's OAuth & Permissions page." }],
+});
+
+registerCredentialType({
+  id: "stripeApiKey",
+  label: "Stripe API Key",
+  fields: [{ id: "secretKey", label: "Secret Key", secret: true, help: "sk_live_... or sk_test_..., from the Stripe Dashboard's API keys page." }],
+});
+
+registerCredentialType({
+  id: "salesforceOAuth2PasswordFlow",
+  label: "Salesforce OAuth2 (Password Flow)",
+  fields: [
+    { id: "loginUrl", label: "Login URL", help: "e.g. https://login.salesforce.com or https://test.salesforce.com for a sandbox." },
+    { id: "clientId", label: "Consumer Key" },
+    { id: "clientSecret", label: "Consumer Secret", secret: true },
+    { id: "username", label: "Username" },
+    { id: "password", label: "Password", secret: true },
+    { id: "securityToken", label: "Security Token", secret: true, help: "Appended to the password unless the org's login IP ranges already allowlist Hermione's server." },
+  ],
+});
+
+registerCredentialType({
+  id: "workdayBasicAuth",
+  label: "Workday Basic Auth",
+  fields: [
+    { id: "tenantUrl", label: "Tenant REST API Base URL", help: "e.g. https://wdN-services1.myworkday.com/ccx/api/v1/yourtenant" },
+    { id: "username", label: "Integration System User" },
+    { id: "password", label: "Password", secret: true },
+  ],
+});
+
+registerCredentialType({
+  id: "twilioApiKey",
+  label: "Twilio",
+  fields: [
+    { id: "accountSid", label: "Account SID" },
+    { id: "authToken", label: "Auth Token", secret: true },
+  ],
+});
+
+registerCredentialType({
+  id: "smtpCredential",
+  label: "SMTP",
+  fields: [
+    { id: "host", label: "Host" },
+    { id: "port", label: "Port", help: "Usually 587 (STARTTLS) or 465 (implicit TLS)." },
+    { id: "secure", label: "Secure (true/false)", help: "true for implicit TLS (port 465), false to use STARTTLS on the given port." },
+    { id: "username", label: "Username" },
+    { id: "password", label: "Password", secret: true },
+  ],
+});
+
+registerCredentialType({
+  id: "sapBasicAuth",
+  label: "SAP Basic Auth",
+  fields: [
+    { id: "baseUrl", label: "Base URL", help: "e.g. https://your-sap-host:8443 — the host serving /sap/opu/odata/... services." },
+    { id: "client", label: "Client", help: "The SAP client number, e.g. 100. Sent as the sap-client query parameter." },
+    { id: "username", label: "Username" },
+    { id: "password", label: "Password", secret: true },
+  ],
+});

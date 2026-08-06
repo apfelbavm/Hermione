@@ -34,6 +34,13 @@ import "./xml";
 import "./csv";
 import "./code";
 import "./crypto";
+import "./slack";
+import "./stripe";
+import "./salesforce";
+import "./workday";
+import "./twilio";
+import "./smtp";
+import "./sap";
 
 let registered = false;
 

@@ -15,26 +15,30 @@ Hermione is a visual node-graph automation/integration platform:
 - **AI copilot** ([src/graph/ai](src/graph/ai), [src/components/ai/AiChatPanel.tsx](src/components/ai/AiChatPanel.tsx)): tool-calling chat agent that inspects/builds/wires/validates flows via natural language (local Ollama or hosted LLM).
 - **Persistence**: SQLite via `better-sqlite3`, single-file/single-process.
 
-The 4-layer connector pattern already scales to "many more nodes" without rework — that part is solid. Everything below is what's missing *around* the node library.
+The 4-layer connector pattern already scales to "many more nodes" without rework — that part is solid. Everything below is what's missing _around_ the node library.
 
 ## Gaps vs. Power Automate / SAP Integration Suite
 
 ### Triggers & scheduling
+
 - [ ] Time-based trigger (cron/recurrence) — only `manual`/`simulate`/`deploy`/webhook exist today ([src/graph/nodes/event.ts](src/graph/nodes/event.ts))
 - [ ] Polling triggers (e.g. "new row", "new file in folder")
 - [ ] Idempotency/dedup handling for webhook & polling triggers
 
 ### Reliability & error handling
+
 - [ ] Retry policy per node/action
 - [ ] Dead-letter / failure queue
 - [ ] Per-node try/catch branch ("configure run after" equivalent)
 - [ ] Durable/long-running execution (pause-and-resume, wait states)
 
 ### Scale & runtime architecture
+
 - [ ] Move off single-file SQLite + in-process execution for horizontal scaling
 - [ ] Queue/worker pool, backpressure for high-volume/bulk workloads (e.g. SuccessFactors bulk employee sync)
 
 ### Enterprise governance
+
 - [ ] Environments & promotion (dev → test → prod)
 - [ ] Git-backed flow source control + CI/CD deploy hook
 - [ ] RBAC / per-project / per-flow permissions
@@ -42,40 +46,46 @@ The 4-layer connector pattern already scales to "many more nodes" without rework
 - [ ] Multi-tenancy (if this becomes a SaaS product)
 
 ### Observability
+
 - [ ] Metrics/alerting, SLA dashboards
 - [ ] Export run logs to external observability (Datadog/ELK/Splunk)
 
 ### Human-in-the-loop
+
 - [ ] Approval node / adaptive-card-style form
 - [ ] Notification-and-wait pattern
 
 ### Data transformation
+
 - [ ] Visual schema/field mapper (SuccessFactors Integration Center-style)
 - [ ] Batch/paging/bulk-record helpers beyond basic per-call functions
 
 ### Secrets & compliance
+
 - [ ] Enterprise secret store integration (Azure Key Vault, HashiCorp Vault)
 - [ ] Credential rotation
 - [ ] Field-level encryption-at-rest
 - [ ] Compliance posture (SOC2/GDPR/data residency)
 
 ### Enterprise connectors still missing
-- [ ] SAP (IDoc, BAPI/RFC, OData v2/v4 for SuccessFactors/Employee Central)
-- [ ] Salesforce
-- [ ] ServiceNow
-- [ ] Workday
-- [ ] Slack / Microsoft Teams messaging
+
+- [x] SAP — OData v2/Gateway services (createEntity/getEntity/getEntitySet/updateEntity/deleteEntity with sap-client + CSRF handshake for writes). IDoc/BAPI/RFC remain unimplemented (require SAP's proprietary NetWeaver RFC SDK, unavailable via npm); RFC-enabled function modules exposed as SOAP can still be reached via the generic `soap.call` node.
+- [x] Salesforce
+- [x] Workday
+- [x] Slack / Microsoft Teams messaging — Slack implemented on the official `@slack/web-api` SDK (~35 nodes). Microsoft Teams messaging not yet covered.
 - [ ] SQL databases (Postgres/SQL Server/MySQL)
-- [ ] Excel / SharePoint / OneDrive
-- [ ] Generic SMTP / Twilio
-- [ ] Stripe
+- [x] Excel / SharePoint / OneDrive — covered by the existing Microsoft 365 connector.
+- [x] Generic SMTP / Twilio
+- [x] Stripe
 
 ### Collaboration & distribution
+
 - [ ] Multi-user real-time co-editing
 - [ ] Flow templates/gallery/marketplace
 - [ ] Publish flow as reusable subflow/API beyond current `flow.executeFlow`
 
 ### AI differentiation (beyond parity)
+
 - [ ] Natural-language flow monitoring ("why did last night's run fail?")
 - [ ] AI-suggested error-handling/retry wiring
 - [ ] AI-assisted field mapping

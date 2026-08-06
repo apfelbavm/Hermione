@@ -35,6 +35,12 @@ const nextConfig = {
       mongodb: {
         browser: "./src/lib/mongoBrowserStub.ts",
       },
+      // @slack/web-api's entry point transitively pulls in a Node-only dependency that
+      // unconditionally requires 'node:fs' — same problem as facebook-nodejs-business-sdk/
+      // googleapis/mongodb above, same fix.
+      "@slack/web-api": {
+        browser: "./src/lib/slackSdkBrowserStub.ts",
+      },
     },
   },
 };

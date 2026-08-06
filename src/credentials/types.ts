@@ -17,7 +17,14 @@ export type CredentialTypeId =
   | "googleServiceAccount"
   | "googleOAuth2"
   | "awsAccessKey"
-  | "mongoConnectionString";
+  | "mongoConnectionString"
+  | "slackBotToken"
+  | "stripeApiKey"
+  | "salesforceOAuth2PasswordFlow"
+  | "workdayBasicAuth"
+  | "twilioApiKey"
+  | "smtpCredential"
+  | "sapBasicAuth";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -162,6 +169,70 @@ export interface MongoConnectionStringCredentialData {
   defaultDatabase: string;
 }
 
+/** A Slack app's Bot User OAuth Token (`xoxb-...`), used as a plain Bearer token against Slack's Web
+ * API — see lib/slackManager.ts. Slack has no refresh flow for bot tokens; re-issue from the app's
+ * OAuth & Permissions page if it's ever revoked. */
+export interface SlackBotTokenCredentialData {
+  botToken: string;
+}
+
+/** A Stripe account's secret API key (`sk_live_...`/`sk_test_...`), used as HTTP Basic auth's
+ * username with an empty password against the Stripe REST API — see lib/stripeManager.ts. */
+export interface StripeApiKeyCredentialData {
+  secretKey: string;
+}
+
+/** A Salesforce Connected App's consumer key/secret plus a running user's username/password+security
+ * token, used with the OAuth2 Resource Owner Password Credentials grant — the flow Salesforce
+ * documents for server-to-server integration users with no interactive login. See
+ * lib/salesforceManager.ts, which exchanges these for an access token + the org's own instance URL. */
+export interface SalesforceOAuth2PasswordFlowCredentialData {
+  loginUrl: string;
+  clientId: string;
+  clientSecret: string;
+  username: string;
+  password: string;
+  securityToken: string;
+}
+
+/** A Workday tenant's REST API base URL (e.g. `https://wdN-services1.workday.com/ccx/api/v1/<tenant>`)
+ * plus an Integration System User's username/password (Basic auth) — see lib/workdayManager.ts. */
+export interface WorkdayBasicAuthCredentialData {
+  tenantUrl: string;
+  username: string;
+  password: string;
+}
+
+/** A Twilio account's SID (as the Basic auth username) and Auth Token (as the password) — see
+ * lib/twilioManager.ts, which calls the Twilio REST API directly. */
+export interface TwilioApiKeyCredentialData {
+  accountSid: string;
+  authToken: string;
+}
+
+/** SMTP server connection details for outbound mail — see lib/smtpManager.ts (nodemailer). `port`/
+ * `secure` are stored as strings like every other credential field and parsed by the manager. */
+export interface SmtpCredentialData {
+  host: string;
+  port: string;
+  secure: string;
+  username: string;
+  password: string;
+}
+
+/** An SAP system's OData/Gateway base URL (e.g. an S/4HANA or SAP Gateway host serving
+ * `/sap/opu/odata/...` services), its client number (`sap-client` header, e.g. "100"), and a
+ * dedicated user's Basic auth credentials — see lib/sapManager.ts. Only SAP's OData/Gateway
+ * surface is reachable this way; IDoc/BAPI/RFC calls require SAP's proprietary NetWeaver RFC SDK
+ * (not available via npm) and are out of scope, though RFC-enabled function modules exposed as a
+ * SOAP web service can still be reached via the existing generic soap.call node. */
+export interface SapBasicAuthCredentialData {
+  baseUrl: string;
+  client: string;
+  username: string;
+  password: string;
+}
+
 export type CredentialData =
   | UsernamePasswordCredentialData
   | Oauth2SamlBearerCredentialData
@@ -177,7 +248,14 @@ export type CredentialData =
   | GoogleServiceAccountCredentialData
   | GoogleOAuth2CredentialData
   | AwsAccessKeyCredentialData
-  | MongoConnectionStringCredentialData;
+  | MongoConnectionStringCredentialData
+  | SlackBotTokenCredentialData
+  | StripeApiKeyCredentialData
+  | SalesforceOAuth2PasswordFlowCredentialData
+  | WorkdayBasicAuthCredentialData
+  | TwilioApiKeyCredentialData
+  | SmtpCredentialData
+  | SapBasicAuthCredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */
