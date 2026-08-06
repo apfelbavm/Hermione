@@ -2,9 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AiGraphApi, AI_TOOL_DEFINITIONS, categoryForTool, DEFAULT_APPROVAL_POLICY, dispatchTool } from "../../graph/ai";
+import { IconManager } from "../../shared/iconManager";
 import type { Store } from "../../state/store";
 import { useStoreRevision } from "../../state/useStore";
 import { ChatHistoryStore, newSessionId, sessionTitleFromMessages, type ChatMessage, type ChatSession } from "./chatHistory";
+
+const COLLAPSED_STORAGE_KEY = "hermione:ai-chat-panel-collapsed";
 
 interface ToolCall {
   id: string;
@@ -22,6 +25,21 @@ interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+}
+
+/** A real final answer is prose; a model that dumps a raw tool-result object/array as its content
+ * instead of narrating it (violates systemPrompt.ts rule 10) is never producing legitimate JSON
+ * prose, so parsing successfully as JSON is a safe, cheap tell. */
+function looksLikeRawToolResult(content: string | null | undefined): boolean {
+  if (!content) return false;
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return false;
+  try {
+    JSON.parse(trimmed);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Minimal AI chat UI (section 27, deliverable 15) — the orchestration loop lives here rather than
@@ -54,6 +72,21 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
   // Whether the "what are my tokens used for" breakdown popover is open (see the context-usage
   // span in the status bar below).
   const [breakdownOpen, setBreakdownOpen] = useState(false);
+  // Collapses this panel to a narrow strip, mirroring the plain-page Sidebar's collapse (see
+  // components/Sidebar.tsx) — AppShell is loaded ssr:false, so it's safe to read localStorage
+  // directly in the initializer without a hydration mismatch.
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_STORAGE_KEY) === "1");
+
+  // Widening/narrowing #ai-chat-panel-container lives outside this component's own DOM subtree
+  // (see AppShellMarkup.tsx), so it's toggled imperatively here rather than through CSS alone; the
+  // drag resizer is hidden the same way since collapsing overrides its stored width.
+  useEffect(() => {
+    localStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
+    const container = document.getElementById("ai-chat-panel-container");
+    const resizer = document.getElementById("ai-chat-resizer");
+    container?.classList.toggle("ai-chat-panel-container-collapsed", collapsed);
+    if (resizer) resizer.style.display = collapsed ? "none" : "";
+  }, [collapsed]);
 
   // Fetch the model's configured context window up front (no API key exposed, see route.ts's GET
   // handler) so it can be shown alongside the estimate even before the first message is sent.
@@ -175,6 +208,18 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
         const message = data.message!;
         const toolCalls = message.tool_calls ?? [];
         if (toolCalls.length === 0) {
+          // A raw JSON dump instead of prose means the model narrated a tool result as if it were
+          // its final answer (rule 10 violation) instead of actually finishing the task — nudge it
+          // to keep going rather than silently accepting broken JSON as "done" (bounded by
+          // maxRounds like every other round, so this can't loop forever).
+          if (looksLikeRawToolResult(message.content) && round < maxRounds - 1) {
+            conversation = [
+              ...conversation,
+              { role: "assistant", content: message.content },
+              { role: "user", content: "That was raw tool JSON, not an answer. Summarize what you've actually done in plain language, and if any part of the original request is still not done, call the right graph.* tool now instead of describing or dumping data." },
+            ];
+            continue;
+          }
           setMessages((m) => [...m, { role: "assistant", content: message.content ?? "" }]);
           return;
         }
@@ -242,6 +287,16 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
     await sendConversation(conversation as never);
   }
 
+  if (collapsed) {
+    return (
+      <div className="ai-chat-panel ai-chat-panel-collapsed">
+        <button type="button" className="ai-chat-collapse-toggle btn btn-ghost" onClick={() => setCollapsed(false)} title="Expand AI chat">
+          <IconManager.CollapseIcon />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="ai-chat-panel">
       <div className="ai-chat-toolbar">
@@ -264,6 +319,9 @@ export function AiChatPanel({ store, flowId }: { store: Store; flowId: string })
             </div>
           )}
         </div>
+        <button type="button" className="ai-chat-collapse-toggle btn btn-ghost" onClick={() => setCollapsed(true)} title="Collapse AI chat">
+          <IconManager.CollapseIcon />
+        </button>
       </div>
       <div className="ai-chat-messages">
         {messages.map((m, i) => (

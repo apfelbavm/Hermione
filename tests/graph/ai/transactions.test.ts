@@ -52,9 +52,10 @@ describe("transactions (graph.apply_changes)", () => {
     const result = applyChanges(rootContext(graph), { changes, dryRun: true }, { currentVersion: 0 });
     expect(result.success).toBe(true);
     expect(result.dryRun).toBe(true);
-    // 2, not 1: the graph had no event-trigger node, so the preview also includes the auto-added
-    // event.simulate (see transactions.ts's autoAddEventTriggerIfMissing).
-    expect(result.changes).toHaveLength(2);
+    // 3, not 1: the graph had no event-trigger node, so the preview also includes the auto-added
+    // event.simulate AND the auto-connect wiring it to the new node (see transactions.ts's
+    // autoAddEventTriggerIfMissing).
+    expect(result.changes).toHaveLength(3);
     expect(graph.nodes).toHaveLength(0); // untouched
   });
 
@@ -69,6 +70,11 @@ describe("transactions (graph.apply_changes)", () => {
     const print = graph.nodes.find((n) => n.type === "debug.print")!;
     expect(graph.connections).toHaveLength(1);
     expect(graph.connections[0]).toMatchObject({ fromNode: trigger.id, fromPin: "exec-out", toNode: print.id, toPin: "exec-in" });
+    // The auto-connected node must land in the horizontal chain layout (to the right, roughly
+    // level with the trigger) rather than wherever the earlier collision-avoidance-only pass left
+    // it (e.g. stacked directly below) — see layoutAround call in autoAddEventTriggerIfMissing.
+    expect(print.position.x).toBeGreaterThan(trigger.position.x);
+    expect(Math.abs(print.position.y - trigger.position.y)).toBeLessThan(20);
   });
 
   it("does not auto-connect the trigger to a node whose exec-in is already wired", () => {
@@ -85,6 +91,43 @@ describe("transactions (graph.apply_changes)", () => {
     const print1 = graph.nodes.find((n) => n.type === "debug.print" && n.pins.message?.value === "hi")!;
     // The trigger should wire to print1 (the still-unconnected exec-in), not print2 (already fed by print1).
     expect(graph.connections.some((c) => c.fromNode === trigger.id && c.toNode === print1.id)).toBe(true);
+  });
+
+  it("chains multiple independently-unwired islands created in the same batch, in order", () => {
+    const graph = buildTestGraph();
+    const changes: ChangeOp[] = [
+      { op: "create_node", tempId: "print1", nodeType: "debug.print", properties: { message: "hi" } },
+      { op: "create_node", tempId: "print2", nodeType: "debug.print", properties: { message: "bye" } },
+    ];
+
+    const result = applyChanges(rootContext(graph), { changes }, { currentVersion: 0 });
+    expect(result.success).toBe(true);
+    const trigger = graph.nodes.find((n) => n.type === "event.simulate")!;
+    const print1 = graph.nodes.find((n) => n.type === "debug.print" && n.pins.message?.value === "hi")!;
+    const print2 = graph.nodes.find((n) => n.type === "debug.print" && n.pins.message?.value === "bye")!;
+    expect(graph.connections.some((c) => c.fromNode === trigger.id && c.toNode === print1.id)).toBe(true);
+    expect(graph.connections.some((c) => c.fromNode === print1.id && c.toNode === print2.id)).toBe(true);
+  });
+
+  it("appends a later task's unwired node to the END of an already-wired chain instead of leaving it disconnected", () => {
+    const graph = buildTestGraph();
+
+    // Turn 1: "print hello world" — creates its own trigger + print node, already wired (as if the
+    // AI remembered this time), simulating a prior conversation turn's already-committed batch.
+    const firstTurn = applyChanges(rootContext(graph), { changes: [{ op: "create_node", tempId: "print1", nodeType: "debug.print", properties: { message: "Hello, world!" } }] }, { currentVersion: 0 });
+    expect(firstTurn.success).toBe(true);
+    const trigger = graph.nodes.find((n) => n.type === "event.simulate")!;
+    const print1 = graph.nodes.find((n) => n.type === "debug.print")!;
+    expect(graph.connections.some((c) => c.fromNode === trigger.id && c.toNode === print1.id)).toBe(true);
+
+    // Turn 2: "also send an email" — creates a second node into a graph that already has a trigger
+    // AND an existing wired chain. Should be appended after print1, not left dangling, and the
+    // existing trigger -> print1 wire must survive untouched.
+    const secondTurn = applyChanges(rootContext(graph), { changes: [{ op: "create_node", tempId: "print2", nodeType: "debug.print", properties: { message: "sent" } }] }, { currentVersion: 1 });
+    expect(secondTurn.success).toBe(true);
+    const print2 = graph.nodes.find((n) => n.type === "debug.print" && n.pins.message?.value === "sent")!;
+    expect(graph.connections.some((c) => c.fromNode === trigger.id && c.toNode === print1.id)).toBe(true);
+    expect(graph.connections.some((c) => c.fromNode === print1.id && c.toNode === print2.id)).toBe(true);
   });
 
   it("create_comment_box / delete_comment_box add and remove a visual annotation", () => {

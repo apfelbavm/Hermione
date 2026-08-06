@@ -5,7 +5,7 @@ import { getNodeDef } from "../engine/registry";
 import { deserializeGraph } from "../persistence/load";
 import { serializeGraph } from "../persistence/save";
 import { type AiGraphContext, visibleFunctions, visibleScripts, visibleVariables } from "./context";
-import { layoutGraph } from "./layoutOperations";
+import { layoutAround, layoutGraph } from "./layoutOperations";
 import { connect, createCommentBox, createNode, deleteCommentBox, deleteNode, disconnect, updateNode } from "./mutations";
 import type { ApplyChangesRequest, ApplyChangesResult, ChangeOp, ChangeResult, ValidationError } from "./types";
 
@@ -149,38 +149,82 @@ function findUnwiredExecEntryPoint(ctx: AiGraphContext, createdNodeIds: string[]
   return undefined;
 }
 
+/** Walks a single-output "exec-out" chain starting at `startNodeId`, following each node's
+ * outgoing exec-out connection, until it reaches a node whose exec-out has nothing wired after it
+ * (the current end of the runnable chain) — or the start node itself, if it has no outgoing exec
+ * connection at all. Only follows the pin id "exec-out" specifically, so branching nodes with
+ * multiple named exec outputs (e.g. a condition's true/false) are treated as a dead end rather
+ * than guessed at. Bounded by `graph.connections.length` hops to stay safe against a malformed
+ * cyclic graph. */
+function findExecChainTail(ctx: AiGraphContext, startNodeId: string): string {
+  let current = startNodeId;
+  for (let i = 0; i < ctx.graph.connections.length; i++) {
+    const next = ctx.graph.connections.find((c) => c.fromNode === current && c.fromPin === "exec-out");
+    if (!next) return current;
+    current = next.toNode;
+  }
+  return current;
+}
+
 /** The AI is told to include an event-trigger node itself when building something runnable (see
  * systemPrompt.ts rule 8), but it doesn't always remember to. Rather than let the graph end up
  * stuck with no way to run/test it, auto-add one the moment the AI creates any node into a root
  * graph that doesn't have one yet — never on an untouched/empty graph (only a real create_node in
  * this batch triggers it), and never inside a function body (event triggers can't live there).
- * Also auto-wires its exec-out to the first newly-created node whose exec-in is still unconnected
- * (see findUnwiredExecEntryPoint) — the AI reliably forgets this wire even when told to add it,
- * and an unconnected trigger is just as useless to the user as a missing one. */
+ *
+ * Also auto-wires any newly-created node whose exec-in is still unconnected (see
+ * findUnwiredExecEntryPoint) onto the END of whatever exec chain already exists off the trigger
+ * (see findExecChainTail) — not just when this call is the one adding the trigger. A later task in
+ * the same conversation (e.g. "now also send an email") typically creates its node(s) into a graph
+ * that ALREADY has a trigger (added by an earlier task, or by the AI itself in the very same
+ * batch), so gating the wiring on "we just added the trigger" left every later task's node
+ * permanently disconnected — the AI reliably forgets this wire even when told to add it, and an
+ * unconnected node is just as useless to the user as a missing trigger. Appending to the tail
+ * (rather than always rewiring the trigger's own exec-out) avoids silently detaching whatever an
+ * earlier task already wired, since an exec-out can only ever drive one next step. */
 function autoAddEventTriggerIfMissing(ctx: AiGraphContext, changes: ChangeOp[], isFunctionBody: boolean, results: ChangeResult[]): void {
   if (isFunctionBody) return;
   if (!changes.some((c) => c.op === "create_node")) return;
-  if (ctx.rootGraph.nodes.some((n) => !!getNodeDef(n.type).eventTrigger)) return;
 
-  const def = getNodeDef("event.simulate");
-  const minX = ctx.rootGraph.nodes.length > 0 ? Math.min(...ctx.rootGraph.nodes.map((n) => n.position.x)) : 0;
-  const minY = ctx.rootGraph.nodes.length > 0 ? Math.min(...ctx.rootGraph.nodes.map((n) => n.position.y)) : 0;
-  const node = NodeInstance.createNodeInstance("event.simulate", { x: minX - 260, y: minY }, def.pins);
-  ctx.rootGraph.nodes.push(node);
+  let triggerNode = ctx.rootGraph.nodes.find((n) => !!getNodeDef(n.type).eventTrigger);
+  if (!triggerNode) {
+    const def = getNodeDef("event.simulate");
+    const minX = ctx.rootGraph.nodes.length > 0 ? Math.min(...ctx.rootGraph.nodes.map((n) => n.position.x)) : 0;
+    const minY = ctx.rootGraph.nodes.length > 0 ? Math.min(...ctx.rootGraph.nodes.map((n) => n.position.y)) : 0;
+    triggerNode = NodeInstance.createNodeInstance("event.simulate", { x: minX - 260, y: minY }, def.pins);
+    ctx.rootGraph.nodes.push(triggerNode);
+    results.push({ op: "create_node", nodeId: triggerNode.id, summary: `Auto-added an event.simulate trigger node (${triggerNode.id}) — this graph had no event-trigger node yet, so it couldn't run.` });
+  }
 
   const createdNodeIds = results.filter((r) => r.op === "create_node" && r.nodeId).map((r) => r.nodeId!);
-  const entryPoint = findUnwiredExecEntryPoint(ctx, createdNodeIds);
-  let wireSummary = "Wire your new logic to its exec-out if appropriate.";
-  if (entryPoint) {
+
+  // Loop rather than a single connect: one batch can contain several independently-unwired islands
+  // (e.g. the AI built both a print node and a send-mail node in the same turn, wiring neither to
+  // anything) — each pass appends the next dangling island onto the tail, then the tail moves
+  // forward to it, so the whole batch ends up chained one after another instead of only the first
+  // island getting rescued. Bounded by createdNodeIds.length since each successful connect removes
+  // exactly one candidate from contention (its exec-in is no longer unwired on the next pass).
+  for (let i = 0; i < createdNodeIds.length; i++) {
+    const entryPoint = findUnwiredExecEntryPoint(ctx, createdNodeIds);
+    if (!entryPoint || entryPoint.nodeId === triggerNode.id) return;
+
+    const tailNodeId = findExecChainTail(ctx, triggerNode.id);
+    if (tailNodeId === entryPoint.nodeId) return;
     try {
-      connectPins(ctx.graph, visibleVariables(ctx), visibleFunctions(ctx), { fromNode: node.id, fromPin: "exec-out", toNode: entryPoint.nodeId, toPin: entryPoint.execInPin }, visibleScripts(ctx));
-      wireSummary = `Auto-connected its exec-out to "${entryPoint.nodeId}".${entryPoint.execInPin}.`;
+      const connection = connectPins(ctx.graph, visibleVariables(ctx), visibleFunctions(ctx), { fromNode: tailNodeId, fromPin: "exec-out", toNode: entryPoint.nodeId, toPin: entryPoint.execInPin }, visibleScripts(ctx));
+      results.push({ op: "connect", connectionId: connection.id, summary: `Auto-connected "${tailNodeId}".exec-out to "${entryPoint.nodeId}".${entryPoint.execInPin} so the new node actually runs.` });
+      // layoutUnpositionedCreatedNodes (which already ran, see prepareChanges) had no connection to
+      // go on yet when it placed entryPoint, so it only nudged it clear of overlaps — reposition it
+      // properly now that the real edge exists, so it lands next to its predecessor in the chain
+      // instead of wherever collision-avoidance happened to leave it (e.g. stacked underneath).
+      layoutAround(ctx, { anchorNodeId: tailNodeId, nodeIds: [entryPoint.nodeId] });
     } catch {
-      // Leave the default hint if wiring somehow fails (e.g. incompatible pin) — never let this
-      // best-effort convenience step fail the whole apply_changes batch.
+      // Leave it unwired if wiring somehow fails (e.g. incompatible pin) — never let this best-effort
+      // convenience step fail the whole apply_changes batch, and stop trying further islands since
+      // findUnwiredExecEntryPoint would just return the same one again.
+      return;
     }
   }
-  results.push({ op: "create_node", nodeId: node.id, summary: `Auto-added an event.simulate trigger node (${node.id}) — this graph had no event-trigger node yet, so it couldn't run. ${wireSummary}` });
 }
 
 /** create_node ops without an explicit `position` all fall back to the same (0, 0) default (see
@@ -197,9 +241,7 @@ function autoAddEventTriggerIfMissing(ctx: AiGraphContext, changes: ChangeOp[], 
 function layoutUnpositionedCreatedNodes(ctx: AiGraphContext, changes: ChangeOp[], results: ChangeResult[]): void {
   const createdOps = changes.filter((c): c is Extract<ChangeOp, { op: "create_node" }> => c.op === "create_node");
   const createdResults = results.filter((r) => r.op === "create_node");
-  const unpositionedIds = createdOps
-    .map((op, i) => (op.position === undefined ? createdResults[i]?.nodeId : undefined))
-    .filter((id): id is string => !!id);
+  const unpositionedIds = createdOps.map((op, i) => (op.position === undefined ? createdResults[i]?.nodeId : undefined)).filter((id): id is string => !!id);
 
   if (unpositionedIds.length === 0) return;
   layoutGraph(ctx, { scope: "selection", nodeIds: unpositionedIds, mode: "auto" });

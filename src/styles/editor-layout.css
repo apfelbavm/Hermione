@@ -104,10 +104,32 @@
   overflow: hidden;
 }
 
+/* Overrides both the base .side-panel flex-basis and any width the drag resizer (see
+   useResizablePanels.ts) persisted to localStorage — collapsing always wins over a stored width. */
+#ai-chat-panel-container.ai-chat-panel-container-collapsed {
+  flex-basis: 40px !important;
+  width: 40px;
+  min-width: 40px;
+}
+
 .ai-chat-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+
+.ai-chat-panel-collapsed {
+  align-items: center;
+  padding-top: 8px;
+}
+
+.ai-chat-collapse-toggle {
+  flex: 0 0 auto;
+  padding: 6px;
+}
+
+.ai-chat-toolbar .ai-chat-collapse-toggle {
+  margin-left: auto;
 }
 
 .ai-chat-toolbar {
