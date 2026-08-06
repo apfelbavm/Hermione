@@ -42,6 +42,7 @@ import "./twilio";
 import "./smtp";
 import "./sap";
 import "./linkedin";
+import "./sendgrid";
 
 let registered = false;
 

@@ -25,7 +25,8 @@ export type CredentialTypeId =
   | "twilioApiKey"
   | "smtpCredential"
   | "sapBasicAuth"
-  | "linkedInOAuth2";
+  | "linkedInOAuth2"
+  | "sendGridApiKey";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -249,6 +250,13 @@ export interface LinkedInOAuth2CredentialData {
   refreshToken: string;
 }
 
+/** A SendGrid API key ("SG...."), used as a Bearer token against both the official `@sendgrid/mail`
+ * (Mail Send) and `@sendgrid/client` (the rest of the v3 Web API — API Keys, Marketing contacts/
+ * lists, suppressions, stats, sender verification) packages — see lib/sendGridManager.ts. */
+export interface SendGridApiKeyCredentialData {
+  apiKey: string;
+}
+
 export type CredentialData =
   | UsernamePasswordCredentialData
   | Oauth2SamlBearerCredentialData
@@ -272,7 +280,8 @@ export type CredentialData =
   | TwilioApiKeyCredentialData
   | SmtpCredentialData
   | SapBasicAuthCredentialData
-  | LinkedInOAuth2CredentialData;
+  | LinkedInOAuth2CredentialData
+  | SendGridApiKeyCredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */

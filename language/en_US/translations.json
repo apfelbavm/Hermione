@@ -1159,6 +1159,186 @@
         "pin_from": "From"
       }
     },
+    "sendgrid": {
+      "__shared": {
+        "pin_credential_name": "Credential Name"
+      },
+      "sendEmail": {
+        "label": "SendGrid Send Email",
+        "description": "Sends an email via SendGrid's Mail Send API.",
+        "pin_to": "To",
+        "pin_from": "From",
+        "pin_subject": "Subject",
+        "pin_text": "Text (optional)",
+        "pin_html": "HTML (optional)",
+        "pin_cc": "CC (optional)",
+        "pin_bcc": "BCC (optional)",
+        "pin_reply_to": "Reply-To (optional)",
+        "pin_message_id": "Message ID"
+      },
+      "sendTemplateEmail": {
+        "label": "SendGrid Send Template Email",
+        "description": "Sends an email using a SendGrid dynamic template.",
+        "pin_to": "To",
+        "pin_from": "From",
+        "pin_template_id": "Template ID",
+        "pin_dynamic_template_data_json": "Dynamic Template Data (JSON)",
+        "pin_message_id": "Message ID"
+      },
+      "sendMultiple": {
+        "label": "SendGrid Send Multiple",
+        "description": "Sends the same email individually to multiple recipients (each gets their own personalization, not a shared To list).",
+        "pin_to_emails_json": "To Emails (JSON array)",
+        "pin_from": "From",
+        "pin_subject": "Subject",
+        "pin_text": "Text (optional)",
+        "pin_html": "HTML (optional)",
+        "pin_message_id": "Message ID"
+      },
+      "createApiKey": {
+        "label": "SendGrid Create API Key",
+        "description": "Creates a new SendGrid API key, optionally restricted to a set of scopes.",
+        "pin_name": "Name",
+        "pin_scopes_json": "Scopes (JSON array, optional = full access)",
+        "pin_api_key_id": "API Key ID",
+        "pin_api_key_value": "API Key Value"
+      },
+      "listApiKeys": {
+        "label": "SendGrid List API Keys",
+        "description": "Lists the API keys on the account.",
+        "pin_api_keys": "API Keys"
+      },
+      "deleteApiKey": {
+        "label": "SendGrid Delete API Key",
+        "description": "Deletes an API key by ID.",
+        "pin_api_key_id": "API Key ID"
+      },
+      "upsertContacts": {
+        "label": "SendGrid Upsert Contacts",
+        "description": "Creates or updates one or more Marketing Contacts, optionally adding them to lists.",
+        "pin_contacts_json": "Contacts (JSON array)",
+        "pin_list_ids_json": "List IDs (JSON array, optional)",
+        "pin_job_id": "Job ID"
+      },
+      "getContactByEmail": {
+        "label": "SendGrid Get Contact By Email",
+        "description": "Searches Marketing Contacts for one matching the given email address.",
+        "pin_email": "Email",
+        "pin_contact": "Contact"
+      },
+      "deleteContacts": {
+        "label": "SendGrid Delete Contacts",
+        "description": "Deletes Marketing Contacts by ID, or all contacts on the account.",
+        "pin_contact_ids_json": "Contact IDs (JSON array)",
+        "pin_delete_all": "Delete All",
+        "pin_job_id": "Job ID"
+      },
+      "createList": {
+        "label": "SendGrid Create List",
+        "description": "Creates a new Marketing Contacts list.",
+        "pin_name": "Name",
+        "pin_list_id": "List ID",
+        "pin_list_name": "Name"
+      },
+      "listContactLists": {
+        "label": "SendGrid List Contact Lists",
+        "description": "Lists the Marketing Contacts lists on the account.",
+        "pin_lists": "Lists"
+      },
+      "deleteList": {
+        "label": "SendGrid Delete List",
+        "description": "Deletes a Marketing Contacts list by ID.",
+        "pin_list_id": "List ID"
+      },
+      "getBounces": {
+        "label": "SendGrid Get Bounces",
+        "description": "Lists bounce suppression events, optionally filtered by a start/end time range.",
+        "pin_start_time": "Start Time (unix seconds, optional)",
+        "pin_end_time": "End Time (unix seconds, optional)",
+        "pin_bounces": "Bounces"
+      },
+      "deleteBounce": {
+        "label": "SendGrid Delete Bounce",
+        "description": "Removes a bounce suppression entry for an email address, or clears all bounces.",
+        "pin_email": "Email",
+        "pin_delete_all": "Delete All",
+        "pin_bounces": "Bounces"
+      },
+      "getSpamReports": {
+        "label": "SendGrid Get Spam Reports",
+        "description": "Lists spam report suppression events.",
+        "pin_spam_reports": "Spam Reports"
+      },
+      "getGlobalUnsubscribes": {
+        "label": "SendGrid Get Global Unsubscribes",
+        "description": "Lists global unsubscribe suppression events.",
+        "pin_unsubscribes": "Unsubscribes"
+      },
+      "getEmailStats": {
+        "label": "SendGrid Get Email Stats",
+        "description": "Fetches daily global email statistics for a date range.",
+        "pin_start_date": "Start Date (YYYY-MM-DD)",
+        "pin_end_date": "End Date (YYYY-MM-DD, optional)",
+        "pin_stats": "Stats"
+      },
+      "getVerifiedSenders": {
+        "label": "SendGrid Get Verified Senders",
+        "description": "Lists the account's verified sender identities.",
+        "pin_senders": "Verified Senders"
+      },
+      "contact": {
+        "label": "SendGrid Contact",
+        "pin_id": "ID",
+        "pin_email": "Email",
+        "pin_first_name": "First Name",
+        "pin_last_name": "Last Name"
+      },
+      "apiKeySummary": {
+        "label": "SendGrid API Key",
+        "pin_id": "ID",
+        "pin_name": "Name"
+      },
+      "contactList": {
+        "label": "SendGrid Contact List",
+        "pin_id": "ID",
+        "pin_name": "Name",
+        "pin_contact_count": "Contact Count"
+      },
+      "bounceEvent": {
+        "label": "SendGrid Bounce Event",
+        "pin_email": "Email",
+        "pin_reason": "Reason",
+        "pin_status": "Status",
+        "pin_created_at": "Created At"
+      },
+      "spamReport": {
+        "label": "SendGrid Spam Report",
+        "pin_email": "Email",
+        "pin_created_at": "Created At"
+      },
+      "globalUnsubscribe": {
+        "label": "SendGrid Global Unsubscribe",
+        "pin_email": "Email",
+        "pin_created_at": "Created At"
+      },
+      "emailStat": {
+        "label": "SendGrid Email Stat",
+        "pin_date": "Date",
+        "pin_requests": "Requests",
+        "pin_delivered": "Delivered",
+        "pin_opens": "Opens",
+        "pin_clicks": "Clicks",
+        "pin_bounces": "Bounces",
+        "pin_spam_reports": "Spam Reports"
+      },
+      "verifiedSender": {
+        "label": "SendGrid Verified Sender",
+        "pin_id": "ID",
+        "pin_nickname": "Nickname",
+        "pin_from_email": "From Email",
+        "pin_verified": "Verified"
+      }
+    },
     "smtp": {
       "__shared": {
         "pin_credential_name": "Credential Name"

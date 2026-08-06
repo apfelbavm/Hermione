@@ -53,6 +53,7 @@ export const FUNCTION_LIBRARY_TWILIO_IMPORT = 'import * as functionLibraryTwilio
 export const FUNCTION_LIBRARY_SMTP_IMPORT = 'import * as functionLibrarySmtp from "../../src/server/functionLibrarySmtp.ts";';
 export const FUNCTION_LIBRARY_SAP_IMPORT = 'import * as functionLibrarySap from "../../src/server/functionLibrarySap.ts";';
 export const FUNCTION_LIBRARY_LINKEDIN_IMPORT = 'import * as functionLibraryLinkedIn from "../../src/server/functionLibraryLinkedIn.ts";';
+export const FUNCTION_LIBRARY_SENDGRID_IMPORT = 'import * as functionLibrarySendGrid from "../../src/server/functionLibrarySendGrid.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryGithub.ts — kept in its own file
  * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/github.ts). */

@@ -282,6 +282,12 @@ registerCredentialType({
 });
 
 registerCredentialType({
+  id: "sendGridApiKey",
+  label: "SendGrid",
+  fields: [{ id: "apiKey", label: "API Key", secret: true, help: "A SendGrid API key with the scopes needed by the nodes you use (Mail Send, Marketing, etc.)." }],
+});
+
+registerCredentialType({
   id: "smtpCredential",
   label: "SMTP",
   fields: [

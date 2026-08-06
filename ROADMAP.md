@@ -78,6 +78,7 @@ The 4-layer connector pattern already scales to "many more nodes" without rework
 - [x] Generic SMTP / Twilio
 - [x] Stripe
 - [x] LinkedIn — official `linkedin-api-client` SDK (RestliClient/AuthClient); one node per SDK method (get/batchGet/getAll/finder/batchFinder/create/batchCreate/update/batchUpdate/partialUpdate/batchPartialUpdate/delete/batchDelete/action) since LinkedIn's SDK exposes generic Rest.li verbs rather than per-resource helpers, plus auth nodes (authorize/refresh/2-legged/introspect/generate authorization URL).
+- [x] SendGrid — official `@sendgrid/mail` (Mail Send) and `@sendgrid/client` (v3 Web API) SDKs: send email/template email/multi-recipient send, API key management, Marketing contacts/lists, suppressions (bounces/spam reports/global unsubscribes), email activity stats, and verified senders.
 
 
 ### Collaboration & distribution
