@@ -95,7 +95,7 @@ export function Sidebar() {
         <li>
           <button type="button" className="app-sidebar-link" title="Sign out" onClick={handleSignOut} style={{ width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer" }}>
             <span className="app-sidebar-link-icon">
-              <IconManager.ClearIcon />
+              <IconManager.SignOutIcon />
             </span>
             <span className="app-sidebar-link-label">Sign out</span>
           </button>

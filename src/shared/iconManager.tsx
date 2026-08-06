@@ -7,6 +7,16 @@ export class IconManager {
     );
   }
 
+  static SignOutIcon() {
+    return (
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6.5 14H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h3.5" />
+        <path d="M10.5 11.5 14 8l-3.5-3.5" />
+        <path d="M14 8H6" />
+      </svg>
+    );
+  }
+
   static CredentialVaultIcon() {
     return (
       <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
