@@ -143,6 +143,10 @@
   padding: 0;
 }
 
+.app-sidebar-footer {
+  margin-top: auto;
+}
+
 .app-sidebar-link {
   display: flex;
   align-items: center;

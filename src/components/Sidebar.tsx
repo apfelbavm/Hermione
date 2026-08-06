@@ -90,6 +90,8 @@ export function Sidebar() {
             </li>
           );
         })}
+      </ul>
+      <ul className="app-sidebar-links app-sidebar-footer">
         <li>
           <button type="button" className="app-sidebar-link" title="Sign out" onClick={handleSignOut} style={{ width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer" }}>
             <span className="app-sidebar-link-icon">
