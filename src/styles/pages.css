@@ -136,6 +136,76 @@
   word-break: break-word;
 }
 
+/* Hand-written human docs page (src/app/docs/page.tsx). Smooth-scrolls this scroll container
+   (not the whole window) when a .page-toc link's #anchor targets a heading in here. */
+.docs-content {
+  scroll-behavior: smooth;
+  max-width: 860px;
+}
+
+.docs-section {
+  margin-top: 40px;
+}
+
+.docs-section:first-of-type {
+  margin-top: 24px;
+}
+
+.docs-section h2 {
+  scroll-margin-top: 16px;
+  font-size: 20px;
+  margin: 0 0 12px;
+}
+
+.docs-section h3 {
+  scroll-margin-top: 16px;
+  font-size: 15px;
+  margin: 24px 0 8px;
+  color: var(--pp-text-muted-strong);
+}
+
+.docs-section p {
+  margin: 0 0 12px;
+  line-height: 1.6;
+  color: var(--pp-text);
+}
+
+.docs-section ul {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+
+.docs-section li {
+  margin-bottom: 6px;
+}
+
+.docs-section code {
+  background: var(--pp-button-bg);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+}
+
+.docs-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 16px;
+  font-size: 13px;
+}
+
+.docs-table th,
+.docs-table td {
+  border: 1px solid var(--pp-border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.docs-table th {
+  background: var(--pp-surface-alt);
+}
+
 .project-description-box {
   position: relative;
   width: 100%;

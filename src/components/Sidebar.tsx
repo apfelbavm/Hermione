@@ -38,6 +38,11 @@ const SIDEBAR_LINKS: SidebarLinkDef[] = [
     icon: <IconManager.LogsIcon />,
   },
   {
+    href: "/docs",
+    label: i18n.components.sidebar.docs,
+    icon: <IconManager.DocsIcon />,
+  },
+  {
     href: "/ai-docs",
     label: i18n.components.sidebar.ai_docs,
     icon: <IconManager.AiDocsIcon />,

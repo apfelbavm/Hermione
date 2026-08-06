@@ -18,13 +18,22 @@ function PageFooter() {
   return <footer className="page-bottom-footer" />;
 }
 
-export function PageShell({ children, contentClassName }: { children: ReactNode; contentClassName?: string }) {
+export function PageShell({
+  children,
+  contentClassName,
+  aside,
+}: {
+  children: ReactNode;
+  contentClassName?: string;
+  aside?: ReactNode;
+}) {
   return (
     <div className="page-frame">
       <PageHeader />
       <div className="page-body">
         <Sidebar />
         <main className={contentClassName ? `page-content ${contentClassName}` : "page-content"}>{children}</main>
+        {aside && <aside className="page-toc">{aside}</aside>}
       </div>
       <PageFooter />
     </div>

@@ -113,6 +113,17 @@ export class IconManager {
     );
   }
 
+  static DocsIcon() {
+    return (
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3 2H9L13 6V14H3V2Z" />
+        <path d="M9 2V6H13" />
+        <path d="M5.5 8.5H10.5" />
+        <path d="M5.5 11H10.5" />
+      </svg>
+    );
+  }
+
   static UndoIcon() {
     return (
       <svg viewBox="0 1.5 16 17.5" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -11,6 +11,11 @@
       "copy": "Copy to clipboard",
       "copied": "Copied!"
     },
+    "docs": {
+      "page_title": "Docs",
+      "description": "How Hermione is put together — architecture, execution paths, auth/credentials, and integrations.",
+      "toc_title": "On this page"
+    },
     "emulate": {
       "loading_editor": "Loading editor…",
       "empty_note": "Run the last successfully compiled and deployed Flow directly on this machine",
@@ -192,7 +197,8 @@
       "credential_vault": "Credential Vault",
       "logs": "Logs",
       "emulate": "Emulate",
-      "ai_docs": "AI Docs"
+      "ai_docs": "AI Docs",
+      "docs": "Docs"
     },
     "theme_toggle": {
       "title": "Toggle light/dark theme",
