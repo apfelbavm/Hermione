@@ -6,7 +6,7 @@ import { nextId } from "../graph/engine/graphMutations.ts";
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
 import { MAX_RUNS_PER_PROJECT } from "../shared/runLogConstants.ts";
 import { MAX_WEBHOOK_DELIVERIES_PER_FLOW } from "../shared/webhookConstants.ts";
-import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, LogEntry, ProjectSummary, RunKind, RunLog, UserAccount, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "./models";
+import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, LogEntry, ProjectSummary, RunKind, RunLog, UserAccount, UserRole, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "./models";
 import type { TriggerDescriptor } from "../graph/compiler/codegen";
 
 const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "hermione.db");
@@ -104,7 +104,9 @@ interface UserRow {
   email: string;
   name: string | null;
   provider: string;
+  role: string;
   is_admin: number;
+  blocked: number;
   totp_secret: string | null;
   totp_enabled: number;
   created_at: string;
@@ -239,12 +241,16 @@ export class DatabaseManager {
       -- One row per person who has ever signed in, regardless of provider (Entra ID vs email) —
       -- provider records how they most recently signed in, totp_secret/totp_enabled are only
       -- ever set for email-provider users who opted into an authenticator app (see server/auth.ts).
+      -- role is the source of truth for permissions ('viewer' | 'editor' | 'admin'); is_admin is
+      -- kept in sync with role === 'admin' for convenience. blocked users are refused sign-in.
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         email TEXT NOT NULL UNIQUE,
         name TEXT,
         provider TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'viewer',
         is_admin INTEGER NOT NULL DEFAULT 0,
+        blocked INTEGER NOT NULL DEFAULT 0,
         totp_secret TEXT,
         totp_enabled INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
@@ -278,6 +284,22 @@ export class DatabaseManager {
         value TEXT NOT NULL
       );
     `);
+    this.migrateUsersTable();
+  }
+
+  /** Adds role/blocked to `users` for databases created before those columns existed — the CREATE
+   * TABLE IF NOT EXISTS above only applies to brand new databases. Backfills role from the older
+   * is_admin flag so nobody silently loses admin access. */
+  private migrateUsersTable(): void {
+    const columns = this.db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
+    const hasColumn = (name: string) => columns.some((c) => c.name === name);
+    if (!hasColumn("role")) {
+      this.db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'viewer'");
+      this.db.exec("UPDATE users SET role = 'admin' WHERE is_admin = 1");
+    }
+    if (!hasColumn("blocked")) {
+      this.db.exec("ALTER TABLE users ADD COLUMN blocked INTEGER NOT NULL DEFAULT 0");
+    }
   }
 
   // --- Row -> model mapping — the only place a snake_case column name is ever read. ---
@@ -764,12 +786,15 @@ export class DatabaseManager {
   // --- Users / login ---
 
   private toUserAccount(row: UserRow): UserAccount {
+    const role = row.role === "admin" || row.role === "editor" || row.role === "viewer" ? row.role : "viewer";
     return {
       id: row.id,
       email: row.email,
       name: row.name,
       provider: row.provider === "entra" ? "entra" : "email",
-      isAdmin: Boolean(row.is_admin),
+      role,
+      isAdmin: role === "admin",
+      blocked: Boolean(row.blocked),
       totpEnabled: Boolean(row.totp_enabled),
       createdAt: row.created_at,
       lastLoginAt: row.last_login_at,
@@ -781,21 +806,48 @@ export class DatabaseManager {
     return row ? this.toUserAccount(row) : undefined;
   }
 
+  getUserById(id: string): UserAccount | undefined {
+    const row = this.db.prepare<[string], UserRow>("SELECT * FROM users WHERE id = ?").get(id);
+    return row ? this.toUserAccount(row) : undefined;
+  }
+
+  /** Everyone who has ever signed in, newest sign-up first — feeds the /admin/users page. */
+  listUsers(): UserAccount[] {
+    const rows = this.db.prepare<[], UserRow>("SELECT * FROM users ORDER BY created_at DESC").all();
+    return rows.map((row) => this.toUserAccount(row));
+  }
+
   /** Creates the user row on first-ever sign-in, otherwise just refreshes name/provider/last-login
-   * — called once per successful sign-in from server/auth.ts's `jwt` callback. `isAdmin` is
-   * recomputed from the ADMIN_EMAILS env var every time, so removing an email there revokes access
-   * on that user's next sign-in without needing a DB migration. */
-  upsertUserFromLogin(email: string, name: string | null, provider: "entra" | "email", isAdmin: boolean): UserAccount {
+   * — called once per successful sign-in from server/auth.ts's `jwt` callback. `forcedAdmin` comes
+   * from the ADMIN_EMAILS env var and always wins; otherwise an existing user's admin-assigned role
+   * is left untouched, and a brand new user starts out as 'viewer'. */
+  upsertUserFromLogin(email: string, name: string | null, provider: "entra" | "email", forcedAdmin: boolean): UserAccount {
     const normalizedEmail = email.toLowerCase();
     const now = new Date().toISOString();
     const existing = this.db.prepare<[string], UserRow>("SELECT * FROM users WHERE email = ?").get(normalizedEmail);
     if (existing) {
-      this.db.prepare("UPDATE users SET name = ?, provider = ?, is_admin = ?, last_login_at = ? WHERE id = ?").run(name, provider, isAdmin ? 1 : 0, now, existing.id);
-      return this.toUserAccount({ ...existing, name, provider, is_admin: isAdmin ? 1 : 0, last_login_at: now });
+      const role: UserRole = forcedAdmin ? "admin" : (existing.role as UserRole);
+      this.db.prepare("UPDATE users SET name = ?, provider = ?, role = ?, is_admin = ?, last_login_at = ? WHERE id = ?").run(name, provider, role, role === "admin" ? 1 : 0, now, existing.id);
+      return this.toUserAccount({ ...existing, name, provider, role, is_admin: role === "admin" ? 1 : 0, last_login_at: now });
     }
-    const row: UserRow = { id: nextId("user"), email: normalizedEmail, name, provider, is_admin: isAdmin ? 1 : 0, totp_secret: null, totp_enabled: 0, created_at: now, last_login_at: now };
-    this.db.prepare("INSERT INTO users (id, email, name, provider, is_admin, totp_secret, totp_enabled, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(row.id, row.email, row.name, row.provider, row.is_admin, row.totp_secret, row.totp_enabled, row.created_at, row.last_login_at);
+    const role: UserRole = forcedAdmin ? "admin" : "viewer";
+    const row: UserRow = { id: nextId("user"), email: normalizedEmail, name, provider, role, is_admin: role === "admin" ? 1 : 0, blocked: 0, totp_secret: null, totp_enabled: 0, created_at: now, last_login_at: now };
+    this.db
+      .prepare("INSERT INTO users (id, email, name, provider, role, is_admin, blocked, totp_secret, totp_enabled, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(row.id, row.email, row.name, row.provider, row.role, row.is_admin, row.blocked, row.totp_secret, row.totp_enabled, row.created_at, row.last_login_at);
     return this.toUserAccount(row);
+  }
+
+  setUserRole(id: string, role: UserRole): void {
+    this.db.prepare("UPDATE users SET role = ?, is_admin = ? WHERE id = ?").run(role, role === "admin" ? 1 : 0, id);
+  }
+
+  setUserBlocked(id: string, blocked: boolean): void {
+    this.db.prepare("UPDATE users SET blocked = ? WHERE id = ?").run(blocked ? 1 : 0, id);
+  }
+
+  deleteUser(id: string): void {
+    this.db.prepare("DELETE FROM users WHERE id = ?").run(id);
   }
 
   /** Stores a freshly generated TOTP secret as *pending* (not yet enabled) until confirmed via

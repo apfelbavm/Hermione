@@ -11,14 +11,15 @@ into the app itself:
 - `src/proxy.ts` — gates every page/API route except `/login` and `/api/auth/*`, accepting
   either a normal next-auth cookie session or an `Authorization: Bearer` tab token.
 - `src/server/tabToken.ts` / `src/client/authClient.ts` / `src/components/AuthGate.tsx` — the
-  "per tab vs per browser" session scope (`AuthSettings.sessionScope`, set on `/admin/security`):
-  in "tab" mode, AuthGate exchanges the cookie for a sessionStorage-held bearer token right after
-  sign-in and the server clears the cookie in that same response, so a brand-new tab always starts
-  signed out and one tab's sign-out never affects another's.
-- `/account/security` — a signed-in email-provider user enrolls/disables their own authenticator
-  app (TOTP, `src/server/totp.ts`).
-- `/admin/security` — admins (see `AUTH_ADMIN_EMAILS`) manage the allowed email domains and the
-  session scope setting.
+  "per tab vs per browser" session scope (`AuthSettings.sessionScope`, set on `/account/security`
+  for admins): in "tab" mode, AuthGate exchanges the cookie for a sessionStorage-held bearer token
+  right after sign-in and the server clears the cookie in that same response, so a brand-new tab
+  always starts signed out and one tab's sign-out never affects another's.
+- `/account/security` — every signed-in email-provider user enrolls/disables their own
+  authenticator app (TOTP, `src/server/totp.ts`) here; admins (see `AUTH_ADMIN_EMAILS`) additionally
+  see sections on the same page for the allowed email domains and the session scope setting.
+- `/admin/users` — admins manage every user's role (`viewer`/`editor`/`admin`), block/unblock
+  sign-in, or delete their account.
 - Required env vars are documented in `.env.example` at the repo root (`AUTH_SECRET`,
   `AUTH_MICROSOFT_ENTRA_ID_*`, `AUTH_SMTP_*`, `AUTH_ADMIN_EMAILS`).
 

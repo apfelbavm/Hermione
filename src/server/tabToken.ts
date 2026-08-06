@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
+import type { UserRole } from "./models";
 
 /** The bearer token minted for "per tab" session scope (see models.ts's AuthSettings) — a short-
  * lived, self-contained credential the client stores in sessionStorage instead of relying on the
@@ -18,6 +19,7 @@ export interface TabTokenPayload {
   email: string;
   name: string | null;
   provider: "entra" | "email";
+  role: UserRole;
   isAdmin: boolean;
 }
 
@@ -29,12 +31,14 @@ export async function verifyTabToken(token: string): Promise<TabTokenPayload | n
   try {
     const { payload } = await jwtVerify(token, secretKey());
     if (typeof payload.uid !== "string" || typeof payload.email !== "string") return null;
+    const role = payload.role === "admin" || payload.role === "editor" ? payload.role : "viewer";
     return {
       uid: payload.uid,
       email: payload.email,
       name: typeof payload.name === "string" ? payload.name : null,
       provider: payload.provider === "entra" ? "entra" : "email",
-      isAdmin: Boolean(payload.isAdmin),
+      role,
+      isAdmin: role === "admin",
     };
   } catch {
     return null;

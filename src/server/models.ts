@@ -120,6 +120,11 @@ export interface WebhookDelivery {
   error?: string;
 }
 
+/** "admin" can manage users (see /admin/users); "editor" and "viewer" don't yet have any
+ * enforced permission difference elsewhere in the app — they exist so an admin can record
+ * intended access level ahead of finer-grained permission checks being added. */
+export type UserRole = "viewer" | "editor" | "admin";
+
 /** One person who has ever signed in — see DatabaseManager's users table comment for
  * provider/totp semantics. */
 export interface UserAccount {
@@ -127,7 +132,11 @@ export interface UserAccount {
   email: string;
   name: string | null;
   provider: "entra" | "email";
+  role: UserRole;
+  /** Convenience for `role === "admin"` — kept because most of the app's admin gates already
+   * check this boolean. */
   isAdmin: boolean;
+  blocked: boolean;
   totpEnabled: boolean;
   createdAt: string;
   lastLoginAt: string | null;

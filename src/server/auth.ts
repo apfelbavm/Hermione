@@ -5,7 +5,8 @@ import { getDatabaseManager } from "./DatabaseManager";
 import { verifyTotpCode } from "./totp";
 
 /** Emails in this list become admins (able to manage the domain allowlist and session-scope
- * setting under /admin/security) on their next sign-in — see DatabaseManager.upsertUserFromLogin.
+ * setting under /account/security, plus user roles under /admin/users) on their next sign-in —
+ * see DatabaseManager.upsertUserFromLogin.
  * There's no in-app "grant admin" UI on purpose: it's a deployment-level decision, made by whoever
  * controls the server's env vars, not by another admin inside the app. */
 function adminEmails(): Set<string> {
@@ -72,6 +73,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!email) return false;
       const provider = account?.provider === "microsoft-entra-id" ? "entra" : "email";
       if (provider === "email" && !getDatabaseManager().isEmailDomainAllowed(email)) return false;
+      if (getDatabaseManager().getUserByEmail(email)?.blocked) return false;
       return true;
     },
     async jwt({ token, user, account }) {
@@ -84,6 +86,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.email = dbUser.email;
         token.name = dbUser.name ?? undefined;
         token.provider = dbUser.provider;
+        token.role = dbUser.role;
         token.isAdmin = dbUser.isAdmin;
       }
       return token;
@@ -92,6 +95,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = String(token.uid ?? "");
         session.user.provider = token.provider === "entra" ? "entra" : "email";
+        session.user.role = token.role === "admin" || token.role === "editor" ? token.role : "viewer";
         session.user.isAdmin = Boolean(token.isAdmin);
       }
       return session;

@@ -1,5 +1,5 @@
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
-import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, ProjectSummary, RunLog, UserAccount, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "../server/models";
+import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, ProjectSummary, RunLog, UserAccount, UserRole, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "../server/models";
 import { getStoredTabToken } from "./authClient";
 
 // Browser-side counterpart to src/server/DatabaseManager.ts — every function here is a thin
@@ -269,4 +269,28 @@ export function removeAllowedDomain(domain: string): Promise<{ domains: string[]
     headers: JSON_HEADERS,
     body: JSON.stringify({ domain }),
   });
+}
+
+export function listUsers(): Promise<{ users: UserAccount[] }> {
+  return requestJson("/api/admin/users");
+}
+
+export function setUserRole(userId: string, role: UserRole): Promise<UserAccount> {
+  return requestJson(`/api/admin/users/${userId}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function setUserBlocked(userId: string, blocked: boolean): Promise<UserAccount> {
+  return requestJson(`/api/admin/users/${userId}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ blocked }),
+  });
+}
+
+export function deleteUser(userId: string): Promise<void> {
+  return requestJson(`/api/admin/users/${userId}`, { method: "DELETE" });
 }

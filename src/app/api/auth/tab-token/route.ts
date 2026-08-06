@@ -25,6 +25,7 @@ export async function POST() {
     email: session.user.email ?? "",
     name: session.user.name ?? null,
     provider: session.user.provider,
+    role: session.user.role,
     isAdmin: session.user.isAdmin,
   });
 

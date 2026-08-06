@@ -11,5 +11,5 @@ export async function getRequestUser(req: Request): Promise<TabTokenPayload | nu
   }
   const session = await auth();
   if (!session?.user) return null;
-  return { uid: session.user.id, email: session.user.email ?? "", name: session.user.name ?? null, provider: session.user.provider, isAdmin: session.user.isAdmin };
+  return { uid: session.user.id, email: session.user.email ?? "", name: session.user.name ?? null, provider: session.user.provider, role: session.user.role, isAdmin: session.user.isAdmin };
 }
