@@ -12,6 +12,12 @@ const TOC: TocEntry[] = [
   { id: "overview", label: "Overview" },
   { id: "top-level-layout", label: "Top-level layout" },
   { id: "graph-internals", label: "graph internals", sub: true },
+  { id: "graph", label: "How the graph works" },
+  { id: "graph-canvas", label: "Canvas basics", sub: true },
+  { id: "graph-pins", label: "Pins & wiring", sub: true },
+  { id: "graph-execution", label: "Execution model", sub: true },
+  { id: "graph-special-nodes", label: "Variables, functions & events", sub: true },
+  { id: "graph-compiler", label: "The compiler", sub: true },
   { id: "execution-paths", label: "Two execution paths" },
   { id: "data-persistence", label: "Data & persistence" },
   { id: "user-sign-in", label: "User sign-in" },
@@ -99,6 +105,99 @@ export default function DocsPage() {
             <code>structs/</code>, <code>enum/</code> — per-provider struct/enum definitions surfaced as pin types (mirrors the provider list in <code>nodes/</code>).
           </li>
         </ul>
+      </section>
+
+      <section id="graph" className="docs-section">
+        <h2>How the graph works</h2>
+        <p>A Flow is a visual node graph, similar in spirit to Unreal Engine&apos;s Blueprints: you drop nodes onto a canvas, wire them together, and that wiring is both the program&apos;s logic and its persisted representation (saved as JSON, not source code).</p>
+
+        <h3 id="graph-canvas">Canvas basics</h3>
+        <ul>
+          <li>
+            Each open Flow is a <code>Graph</code> (<code>engine/graph.ts</code>): a flat list of <code>NodeInstance</code>s, their connections, the graph&apos;s <code>Variable</code>s, and any nested <code>FunctionDef</code> bodies (themselves small graphs of their own).
+          </li>
+          <li>
+            <code>render/</code> draws the grid, nodes, wires, and comments straight onto a <code>&lt;canvas&gt;</code>; <code>interaction/</code> turns pointer/keyboard input into graph mutations (drag a node, draw a wire, delete a selection, box-select, etc.) via <code>graphMutations.ts</code>.
+          </li>
+          <li>
+            Every node type is registered once, up front, in <code>engine/registry.ts</code> as a <code>NodeDef</code> (see <code>nodes/*.ts</code>) — the create-node search menu, tooltips, and the canvas itself all read from that same registry, so a new node type only has to be defined in one place
+            to appear everywhere.
+          </li>
+        </ul>
+
+        <h3 id="graph-pins">Pins & wiring</h3>
+        <p>
+          A node exposes typed <code>PinDef</code>s (<code>exec</code>, <code>number</code>, <code>boolean</code>, <code>string</code>, <code>object</code>, <code>date</code>, <code>enum</code>, <code>struct</code>), each either an input or an output, optionally a container (<code>array</code>/
+          <code>set</code>/<code>map</code> of that type instead of a single value). Two pins can be wired together only when their types (and, for <code>enum</code>/<code>struct</code>, their exact registered subtype) are compatible.
+        </p>
+        <p>Pins come in two flavors that drive everything else about how a node behaves:</p>
+        <ul>
+          <li>
+            <strong>Exec pins</strong> (<code>exec</code>) are the white, arrow-shaped control-flow wires — &quot;do this, then that&quot; — the same idea as Blueprints&apos; white exec wires.
+          </li>
+          <li>
+            <strong>Data pins</strong> (every other type) carry values and are pulled on demand rather than pushed — see the execution model below.
+          </li>
+        </ul>
+        <p>
+          An unwired input pin simply uses its literal value, edited inline on the node itself via a type-appropriate widget (a checkbox, a dropdown for an <code>options</code> pin, a rounding number box for an <code>integer</code> pin, and so on).
+        </p>
+
+        <h3 id="graph-execution">Execution model (the interpreter)</h3>
+        <p>
+          A <code>NodeDef</code> is exactly one of two mutually-exclusive kinds, and this split is the core of how a Flow actually runs:
+        </p>
+        <ul>
+          <li>
+            An <strong>exec node</strong> declares <code>execute()</code>: it has exec pins, runs its side effect exactly once when its exec-in pin fires, and returns which exec-out pin to continue from next (see <code>executor.ts</code>&apos;s <code>runExecFrom</code>, which walks this chain
+            node-by-node — an HTTP call, a Jira API call, an <code>If</code> branch, a loop).
+          </li>
+          <li>
+            A <strong>pure/data node</strong> declares <code>evaluate()</code> instead: no exec pins, no side effects, and its output pins are computed lazily, only when something downstream actually reads them (see <code>resolveDataPin</code>) — arithmetic, string formatting, comparisons, a{" "}
+            <code>Get Variable</code>. Each pure node&apos;s result is cached per &quot;tick&quot; keyed by its output pin, so a value read by several downstream nodes in the same step is only computed once.
+          </li>
+        </ul>
+        <p>
+          A graph always starts from an <strong>event trigger</strong> node (<code>NodeDef.eventTrigger</code>, the <code>BeginPlay</code>/<code>EventTick</code> equivalent) — e.g. &quot;On HTTP Request&quot;, &quot;On Interval&quot;, or manually pressing Run in Emulate/Simulate — whose exec-out pin
+          kicks off the first <code>runExecFrom</code> call.
+        </p>
+
+        <h3 id="graph-special-nodes">Variables, functions & events</h3>
+        <ul>
+          <li>
+            <strong>Variables</strong> — declared once on the graph, read/written anywhere via matching <code>Get</code>/<code>Set</code> node instances (<code>NodeDef.derivePins</code> derives that instance&apos;s pins from the bound <code>Variable</code>&apos;s type). A node called from inside a
+            function body can see both the function&apos;s own local variables and the graph&apos;s global ones (see <code>visibleVariables</code>).
+          </li>
+          <li>
+            <strong>Functions</strong> — a reusable sub-graph with its own Entry/Return nodes and a <code>Call</code> node elsewhere that invokes it, all keyed off a shared <code>FunctionDef</code>.
+          </li>
+          <li>
+            Some node types don&apos;t take a fixed pin list at all — <code>deriveInstancePins</code>/<code>configurableElementType</code> let a single node type (e.g. Array Length, Append String) adapt its pins to whatever element type or arity the user configures on that specific instance, instead
+            of registering one variant per type.
+          </li>
+        </ul>
+
+        <h3 id="graph-compiler">The compiler</h3>
+        <p>
+          Every exec/pure node pair (<code>execute</code>/<code>evaluate</code>) has a matching <code>compileExecute</code>/<code>compileEvaluate</code> that produces plain JavaScript instead of running the node live:
+        </p>
+        <ul>
+          <li>
+            <code>compileEvaluate</code> returns a JS expression string per output pin (safe to inline anywhere a consumer needs it, since it must stay side-effect-free just like <code>evaluate</code>).
+          </li>
+          <li>
+            <code>compileExecute</code> returns JS statement strings spliced into the compiled function body at that node&apos;s position, then continues the exec chain via a supplied <code>compileFrom</code> callback — mirroring <code>runExecFrom</code>&apos;s traversal, but writing code instead of
+            executing it.
+          </li>
+          <li>
+            A node can also contribute <code>compileHelpers</code> (named helper source snippets, e.g. a <code>delay</code> function) and <code>compileImports</code> (literal ESM import lines), both deduped once across the whole generated file.
+          </li>
+        </ul>
+        <p>
+          <code>compiler/codegen.ts</code> walks the graph from each event trigger and assembles all of this into one standalone <code>.mjs</code> script (a <code>CompileResult</code> with the generated <code>code</code> plus a manifest of its triggers/variables), written to{" "}
+          <code>data/deployed-scripts/</code> and later run by <code>server/executeDeployedFlow.ts</code>. This is why every node type <strong>must</strong> implement both halves — the interpreter and compiler paths have to stay in lockstep, or a Flow could behave differently in Emulate than once
+          actually deployed.
+        </p>
       </section>
 
       <section id="execution-paths" className="docs-section">
