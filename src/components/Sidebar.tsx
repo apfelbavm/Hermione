@@ -63,7 +63,7 @@ export function Sidebar() {
     setIsAdmin(Boolean(session?.user?.isAdmin));
   }, [session]);
 
-  const links = isAdmin ? [...SIDEBAR_LINKS, { href: "/admin/users", label: "Users", icon: <IconManager.CredentialVaultIcon /> }] : SIDEBAR_LINKS;
+  const links = isAdmin ? [...SIDEBAR_LINKS, { href: "/admin/users", label: "Users", icon: <IconManager.UsersIcon /> }] : SIDEBAR_LINKS;
 
   async function handleSignOut(): Promise<void> {
     clearStoredTabToken();

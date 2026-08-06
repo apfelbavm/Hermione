@@ -15,6 +15,15 @@ export class IconManager {
     );
   }
 
+  static UsersIcon() {
+    return (
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+        <path d="M6 8a2.75 2.75 0 1 0 0-5.5A2.75 2.75 0 0 0 6 8zm0 1.25c-2.34 0-5 1.15-5 3.4V14h10v-1.35c0-2.25-2.66-3.4-5-3.4z" />
+        <path d="M11.1 8a2.4 2.4 0 1 0-.75-4.68 3.75 3.75 0 0 1 0 4.3c.24.24.5.38.75.38zm.5 1.25c-.32 0-.63.03-.93.09.9.62 1.53 1.5 1.53 2.66V14h2.35v-1.1c0-1.9-1.9-2.85-2.95-2.85z" />
+      </svg>
+    );
+  }
+
   static LogsIcon() {
     return (
       <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
