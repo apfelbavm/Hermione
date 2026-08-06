@@ -406,6 +406,128 @@
   border-top: 1px solid var(--pp-border);
 }
 
+.webhook-row {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.webhook-row-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.webhook-endpoint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.webhook-endpoint-label {
+  font-size: 12px;
+  color: var(--pp-text-muted);
+  flex: 0 0 auto;
+}
+
+.webhook-endpoint-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-all;
+  background: var(--pp-surface-hover-alt);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.webhook-deliveries-toggle {
+  align-self: flex-start;
+}
+
+.webhook-deliveries {
+  border-top: 1px solid var(--pp-border);
+  padding-top: 10px;
+}
+
+.webhook-deliveries-title {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.webhook-delivery-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.webhook-delivery-row {
+  border: 1px solid var(--pp-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--pp-surface);
+}
+
+.webhook-delivery-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.webhook-delivery-status {
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.webhook-delivery-status-ok {
+  background: var(--pp-surface-hover-alt);
+  color: var(--pp-accent);
+}
+
+.webhook-delivery-status-fail {
+  background: var(--pp-surface-hover-alt);
+  color: #d33;
+}
+
+.webhook-delivery-method {
+  color: var(--pp-text-muted);
+}
+
+.webhook-delivery-error {
+  color: #d33;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webhook-delivery-detail-label {
+  font-size: 11px;
+  color: var(--pp-text-muted);
+  margin: 4px 0 2px;
+}
+
+.webhook-delivery-body {
+  background: var(--pp-surface-hover-alt);
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
 .log-entry {
   display: flex;
   gap: 4px;

@@ -8,6 +8,7 @@ import "./variable";
 import "./function";
 import "./string";
 import "./http";
+import "./webhook";
 import "./odata";
 import "./sftp";
 import "./soap";

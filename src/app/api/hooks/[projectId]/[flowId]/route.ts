@@ -46,21 +46,50 @@ async function handle(request: Request, { params }: { params: Params }): Promise
     return Response.json({ error: 'The "On HTTP Request" event does not exist in this graph.' }, { status: 404 });
   }
 
+  const requestHeaders: Record<string, string> = {};
+  request.headers.forEach((value, key) => {
+    requestHeaders[key] = key.toLowerCase() === "authorization" ? "[redacted]" : value;
+  });
+
+  const rawBody = await request.text();
   let jsonBody: Record<string, unknown> = {};
   try {
-    jsonBody = (await request.json()) as Record<string, unknown>;
+    jsonBody = rawBody ? (JSON.parse(rawBody) as Record<string, unknown>) : {};
   } catch {
     // No/invalid JSON body is fine — a GET request, or one relying only on query params, has none.
   }
   const queryParams = Object.fromEntries(new URL(request.url).searchParams.entries());
   const merged: Record<string, unknown> = { ...queryParams, ...jsonBody }; // JSON body wins over query params on name conflicts
 
+  const startedAt = new Date().toISOString();
+
+  // See DatabaseManager.getOrCreateWebhookConfig — every deployed Flow with an "On HTTP Request"
+  // trigger gets a (lazily-created) webhook config with a bearer token the first time it's read
+  // here, and every call must present it — there is no way to disable this check.
+  const webhookConfig = db.getOrCreateWebhookConfig(flowId, projectId);
+  const authHeader = request.headers.get("authorization") ?? "";
+  const suppliedToken = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : "";
+  if (suppliedToken !== webhookConfig.token) {
+    db.recordWebhookDelivery({
+      id: nextId("webhook_delivery"),
+      flowId,
+      projectId,
+      receivedAt: startedAt,
+      method: request.method,
+      status: 401,
+      success: false,
+      headersJson: JSON.stringify(requestHeaders),
+      bodyText: rawBody,
+      error: "Unauthorized — missing or invalid bearer token.",
+    });
+    return Response.json({ error: "Unauthorized — missing or invalid bearer token." }, { status: 401 });
+  }
+
   // Declared by event.request's own describeInstance, in the exact same order codegen.ts compiled
   // its trigger method's real parameters — see eventTriggerArgNamesByNode.
   const declaredFields = (requestTrigger.details.params as RequestFieldDescriptor[] | undefined) ?? [];
   const args = declaredFields.map((field) => (field.name in merged ? merged[field.name] : field.defaultValue));
 
-  const startedAt = new Date().toISOString();
   const entries: LogEntry[] = [];
   function record(message: string): void {
     entries.push({ id: nextId("log"), message, format: "text", timestamp: new Date().toISOString() });
@@ -68,6 +97,7 @@ async function handle(request: Request, { params }: { params: Params }): Promise
 
   let executionMs: number | undefined;
   let response: Response;
+  let deliveryError: string | undefined;
   try {
     applyCredentialEnvVars(db);
 
@@ -90,9 +120,23 @@ async function handle(request: Request, { params }: { params: Params }): Promise
     response = Response.json(returned && typeof returned === "object" ? returned : {}, { status: 200 });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    deliveryError = message;
     record(`Error: ${message}`);
     response = Response.json({ error: message }, { status: 500 });
   }
+
+  db.recordWebhookDelivery({
+    id: nextId("webhook_delivery"),
+    flowId,
+    projectId,
+    receivedAt: startedAt,
+    method: request.method,
+    status: response.status,
+    success: response.status < 400,
+    headersJson: JSON.stringify(requestHeaders),
+    bodyText: rawBody,
+    error: deliveryError,
+  });
 
   const runLog: RunLog = {
     id: nextId("run"),

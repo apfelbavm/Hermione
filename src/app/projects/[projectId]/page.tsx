@@ -231,6 +231,9 @@ export default function ProjectPage() {
       <Link href={`/projects/${projectId}/logs`} className="logs-link">
         {i18n.pages.project.view_logs}
       </Link>
+      <Link href={`/projects/${projectId}/webhooks`} className="logs-link">
+        {i18n.pages.project.view_webhooks}
+      </Link>
 
       <h2 className="section-heading">{i18n.pages.project.flows_heading}</h2>
       <div className="search-create-row">

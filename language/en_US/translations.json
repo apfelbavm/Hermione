@@ -71,6 +71,7 @@
       "flow_version_prefix": "V",
       "meta_created": "Created {date}",
       "meta_updated": "Updated {date}",
+      "view_webhooks": "View Webhooks",
       "delete_flow_confirm": "Delete Flow \"{name}\"? This can't be undone.",
       "duplicate_title": "Duplicate Flow",
       "duplicate_new_name": "New name",
@@ -112,6 +113,32 @@
       "modal_name_required": "Name is required",
       "modal_cancel": "Cancel",
       "modal_save": "Save"
+    },
+    "project_webhooks": {
+      "back": "Back",
+      "title": "Webhooks",
+      "project_fallback": "Project",
+      "refresh": "Refresh",
+      "description": "Every deployed Flow with an \"On HTTP Request\" trigger gets a live endpoint here, secured with a required bearer token.",
+      "empty": "No Flows with an \"On HTTP Request\" trigger are deployed in this project yet.",
+      "endpoint": "Endpoint",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "token_label": "Token",
+      "token_show": "Show",
+      "token_hide": "Hide",
+      "regenerate_token": "Regenerate token",
+      "regenerate_confirm": "Regenerate the token for \"{name}\"? Any caller using the old token will start getting 401s immediately.",
+      "deliveries_title": "Recent deliveries",
+      "deliveries_empty": "No calls received yet.",
+      "deliveries_show": "Show deliveries",
+      "deliveries_hide": "Hide deliveries",
+      "delivery_status": "Status",
+      "delivery_method": "Method",
+      "delivery_received": "Received",
+      "delivery_body": "Body",
+      "delivery_headers": "Headers",
+      "delivery_error": "Error"
     }
   },
   "components": {
@@ -2345,6 +2372,21 @@
         "pin_body": "Body",
         "pin_response_body": "Response Body",
         "pin_response_headers": "Response Headers"
+      }
+    },
+    "webhook": {
+      "send": {
+        "label": "Send Webhook",
+        "description": "POSTs a JSON payload to an external URL, with optional HMAC-SHA256 request signing and a bounded retry loop with linear backoff for transient failures.",
+        "pin_url": "URL",
+        "pin_payload": "Payload (JSON)",
+        "pin_headers": "Headers (JSON)",
+        "pin_secret": "Signing Secret",
+        "pin_signature_header": "Signature Header",
+        "pin_retry_count": "Retry Count",
+        "pin_retry_delay_ms": "Retry Delay Base (ms)",
+        "pin_response_body": "Response Body",
+        "pin_attempts": "Attempts"
       }
     },
     "map": {

@@ -1,10 +1,12 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { randomBytes } from "node:crypto";
 import { nextId } from "../graph/engine/graphMutations.ts";
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
 import { MAX_RUNS_PER_PROJECT } from "../shared/runLogConstants.ts";
-import type { DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, LogEntry, ProjectSummary, RunKind, RunLog } from "./models";
+import { MAX_WEBHOOK_DELIVERIES_PER_FLOW } from "../shared/webhookConstants.ts";
+import type { DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, LogEntry, ProjectSummary, RunKind, RunLog, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "./models";
 import type { TriggerDescriptor } from "../graph/compiler/codegen";
 
 const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "hermione.db");
@@ -73,6 +75,28 @@ interface DeployedScriptRow {
   version: number;
   revision: number;
   deployed_at: string;
+}
+
+interface WebhookConfigRow {
+  id: string;
+  flow_id: string;
+  project_id: string;
+  token: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface WebhookDeliveryRow {
+  id: string;
+  flow_id: string;
+  project_id: string;
+  received_at: string;
+  method: string;
+  status: number;
+  success: number;
+  headers_json: string;
+  body_text: string;
+  error: string | null;
 }
 
 /** The one and only place in this app that touches a database — no other module imports
@@ -163,6 +187,33 @@ export class DatabaseManager {
         deployed_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_deployed_scripts_project_id ON deployed_scripts (project_id);
+
+      -- One row per Flow, created lazily on first read (see getOrCreateWebhookConfig) with a token
+      -- auto-generated immediately — every inbound webhook call always requires it.
+      CREATE TABLE IF NOT EXISTS webhook_configs (
+        id TEXT PRIMARY KEY,
+        flow_id TEXT NOT NULL UNIQUE,
+        project_id TEXT NOT NULL,
+        token TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      -- Every recorded inbound call against a Flow's webhook endpoint, newest first, capped per Flow
+      -- at MAX_WEBHOOK_DELIVERIES_PER_FLOW the same way runs is capped per project.
+      CREATE TABLE IF NOT EXISTS webhook_deliveries (
+        id TEXT PRIMARY KEY,
+        flow_id TEXT NOT NULL,
+        project_id TEXT NOT NULL,
+        received_at TEXT NOT NULL,
+        method TEXT NOT NULL,
+        status INTEGER NOT NULL,
+        success INTEGER NOT NULL,
+        headers_json TEXT NOT NULL,
+        body_text TEXT NOT NULL,
+        error TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_flow_id ON webhook_deliveries (flow_id, received_at);
     `);
   }
 
@@ -256,6 +307,31 @@ export class DatabaseManager {
     return { ...this.toDeployedScriptSummary(row), code: row.code };
   }
 
+  private toWebhookConfig(row: WebhookConfigRow): WebhookConfig {
+    return {
+      flowId: row.flow_id,
+      projectId: row.project_id,
+      token: row.token,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private toWebhookDelivery(row: WebhookDeliveryRow): WebhookDelivery {
+    return {
+      id: row.id,
+      flowId: row.flow_id,
+      projectId: row.project_id,
+      receivedAt: row.received_at,
+      method: row.method,
+      status: row.status,
+      success: Boolean(row.success),
+      headersJson: row.headers_json,
+      bodyText: row.body_text,
+      error: row.error ?? undefined,
+    };
+  }
+
   // --- Projects ---
 
   listProjects(): ProjectSummary[] {
@@ -302,6 +378,8 @@ export class DatabaseManager {
   deleteProject(projectId: string): void {
     const del = this.db.transaction((id: string) => {
       this.db.prepare("DELETE FROM runs WHERE project_id = ?").run(id);
+      this.db.prepare("DELETE FROM webhook_deliveries WHERE project_id = ?").run(id);
+      this.db.prepare("DELETE FROM webhook_configs WHERE project_id = ?").run(id);
       this.db.prepare("DELETE FROM deployed_scripts WHERE project_id = ?").run(id);
       this.db.prepare("DELETE FROM flow_versions WHERE flow_id IN (SELECT id FROM flows WHERE project_id = ?)").run(id);
       this.db.prepare("DELETE FROM flows WHERE project_id = ?").run(id);
@@ -346,6 +424,8 @@ export class DatabaseManager {
 
   deleteFlow(projectId: string, flowId: string): void {
     const del = this.db.transaction((pId: string, fId: string) => {
+      this.db.prepare("DELETE FROM webhook_deliveries WHERE flow_id = ?").run(fId);
+      this.db.prepare("DELETE FROM webhook_configs WHERE flow_id = ?").run(fId);
       this.db.prepare("DELETE FROM deployed_scripts WHERE flow_id = ?").run(fId);
       this.db.prepare("DELETE FROM flow_versions WHERE flow_id = ?").run(fId);
       this.db.prepare("DELETE FROM flows WHERE project_id = ? AND id = ?").run(pId, fId);
@@ -552,6 +632,70 @@ export class DatabaseManager {
         deployedAt: record.deployedAt,
       });
     return record;
+  }
+
+  // --- Webhooks ---
+
+  /** Every Flow in `projectId` with a deployed "On HTTP Request" trigger, newest-deployed-first,
+   * each combined with its WebhookConfig (lazily created/defaulted — see getOrCreateWebhookConfig).
+   * Feeds the Webhooks page's list. */
+  listWebhookFlows(projectId: string): WebhookFlowSummary[] {
+    const rows = this.db.prepare<[string], DeployedScriptRow>("SELECT * FROM deployed_scripts WHERE project_id = ? ORDER BY deployed_at DESC").all(projectId);
+    return rows
+      .filter((row) => (JSON.parse(row.manifest_json) as { triggers: TriggerDescriptor[] }).triggers.some((t) => t.kind === "request"))
+      .map((row) => ({
+        flowId: row.flow_id,
+        flowName: row.flow_name,
+        projectId: row.project_id,
+        deployedAt: row.deployed_at,
+        config: this.getOrCreateWebhookConfig(row.flow_id, row.project_id),
+      }));
+  }
+
+  /** Reads this Flow's webhook security config, creating a row with a freshly generated token the
+   * first time it's ever asked for — every deployed Flow with an "On HTTP Request" trigger has
+   * exactly one of these once read, never conjured on the fly by the hooks route itself. */
+  getOrCreateWebhookConfig(flowId: string, projectId: string): WebhookConfig {
+    const existing = this.db.prepare<[string], WebhookConfigRow>("SELECT * FROM webhook_configs WHERE flow_id = ?").get(flowId);
+    if (existing) return this.toWebhookConfig(existing);
+    const now = new Date().toISOString();
+    const row: WebhookConfigRow = { id: nextId("webhook_config"), flow_id: flowId, project_id: projectId, token: randomBytes(24).toString("hex"), created_at: now, updated_at: now };
+    this.db.prepare("INSERT INTO webhook_configs (id, flow_id, project_id, token, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)").run(row.id, row.flow_id, row.project_id, row.token, row.created_at, row.updated_at);
+    return this.toWebhookConfig(row);
+  }
+
+  /** Issues a brand new bearer token, invalidating the previous one immediately — any caller still
+   * using the old value starts getting 401s the next call. */
+  regenerateWebhookToken(flowId: string, projectId: string): WebhookConfig {
+    this.getOrCreateWebhookConfig(flowId, projectId);
+    const token = randomBytes(24).toString("hex");
+    const now = new Date().toISOString();
+    this.db.prepare("UPDATE webhook_configs SET token = ?, updated_at = ? WHERE flow_id = ?").run(token, now, flowId);
+    return this.getOrCreateWebhookConfig(flowId, projectId);
+  }
+
+  /** Persists one inbound call against a Flow's webhook endpoint and caps its history at
+   * MAX_WEBHOOK_DELIVERIES_PER_FLOW, same pattern as appendRun's per-project cap. */
+  recordWebhookDelivery(delivery: WebhookDelivery): void {
+    const insertAndCap = this.db.transaction((d: WebhookDelivery) => {
+      this.db
+        .prepare("INSERT INTO webhook_deliveries (id, flow_id, project_id, received_at, method, status, success, headers_json, body_text, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(d.id, d.flowId, d.projectId, d.receivedAt, d.method, d.status, d.success ? 1 : 0, d.headersJson, d.bodyText, d.error ?? null);
+
+      const staleIds = this.db.prepare<[string, number], { id: string }>("SELECT id FROM webhook_deliveries WHERE flow_id = ? ORDER BY received_at DESC LIMIT -1 OFFSET ?").all(d.flowId, MAX_WEBHOOK_DELIVERIES_PER_FLOW);
+      if (staleIds.length > 0) {
+        const placeholders = staleIds.map(() => "?").join(", ");
+        this.db.prepare(`DELETE FROM webhook_deliveries WHERE id IN (${placeholders})`).run(...staleIds.map((row) => row.id));
+      }
+    });
+    insertAndCap(delivery);
+  }
+
+  /** Every recorded delivery for this Flow, newest first — feeds the Webhooks page's per-flow
+   * delivery inspector. */
+  listWebhookDeliveries(flowId: string): WebhookDelivery[] {
+    const rows = this.db.prepare<[string], WebhookDeliveryRow>("SELECT * FROM webhook_deliveries WHERE flow_id = ? ORDER BY received_at DESC").all(flowId);
+    return rows.map((row) => this.toWebhookDelivery(row));
   }
 }
 

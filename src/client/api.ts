@@ -1,5 +1,5 @@
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
-import type { DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, ProjectSummary, RunLog } from "../server/models";
+import type { DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, ProjectSummary, RunLog, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "../server/models";
 
 // Browser-side counterpart to src/server/DatabaseManager.ts — every function here is a thin
 // fetch() wrapper around the API routes under src/app/api/, since the database itself
@@ -193,4 +193,23 @@ export function updateCredential(id: string, name: string, type: CredentialTypeI
 
 export function deleteCredential(id: string): Promise<void> {
   return requestJson(`/api/credentials/${id}`, { method: "DELETE" });
+}
+
+/** Every deployed Flow with an "On HTTP Request" trigger in this project, each combined with its
+ * webhook security config — feeds the Webhooks page's list. */
+export function listProjectWebhooks(projectId: string): Promise<WebhookFlowSummary[]> {
+  return requestJson(`/api/projects/${projectId}/webhooks`);
+}
+
+/** This Flow's webhook config plus its recent delivery history — feeds the Webhooks page's
+ * per-flow expandable delivery inspector. */
+export function getWebhookDetail(projectId: string, flowId: string): Promise<{ config: WebhookConfig; deliveries: WebhookDelivery[] }> {
+  return requestJson(`/api/projects/${projectId}/webhooks/${flowId}`);
+}
+
+/** Issues a brand new bearer token for this Flow's endpoint, invalidating the previous one
+ * immediately. The returned config is the only time the plaintext token is ever sent to the
+ * browser again after this call. */
+export function regenerateWebhookToken(projectId: string, flowId: string): Promise<WebhookConfig> {
+  return requestJson(`/api/projects/${projectId}/webhooks/${flowId}/regenerate-token`, { method: "POST" });
 }

@@ -81,3 +81,41 @@ export interface DeployedScriptSummary {
 export interface DeployedScript extends DeployedScriptSummary {
   code: string;
 }
+
+/** Per-Flow inbound webhook security settings — one row per Flow, created lazily (with a token
+ * auto-generated) the first time it's ever read. See DatabaseManager.getOrCreateWebhookConfig. */
+export interface WebhookConfig {
+  flowId: string;
+  projectId: string;
+  /** Bearer token a caller must send as `Authorization: Bearer <token>` — always required, never
+   * null (see DatabaseManager.getOrCreateWebhookConfig/regenerateWebhookToken). */
+  token: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One flow with an inbound "On HTTP Request" trigger, for the Webhooks page's list — combines the
+ * deployed script's own manifest info with this Flow's WebhookConfig. */
+export interface WebhookFlowSummary {
+  flowId: string;
+  flowName: string;
+  projectId: string;
+  deployedAt: string;
+  config: WebhookConfig;
+}
+
+/** One recorded inbound call against a Flow's webhook endpoint — feeds the Webhooks page's
+ * delivery inspector. Captured regardless of whether the call was authorized/succeeded. */
+export interface WebhookDelivery {
+  id: string;
+  flowId: string;
+  projectId: string;
+  receivedAt: string;
+  method: string;
+  status: number;
+  success: boolean;
+  /** JSON-stringified headers map — the Authorization header's value is redacted before storing. */
+  headersJson: string;
+  bodyText: string;
+  error?: string;
+}
