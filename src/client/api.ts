@@ -1,5 +1,6 @@
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
-import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, ProjectSummary, RunLog, UserAccount, UserRole, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "../server/models";
+import type { VaultProviderId } from "../credentials/vaultProviders";
+import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, ProjectSummary, RunLog, UserAccount, UserRole, VaultConnectionRecord, VaultConnectionSummary, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "../server/models";
 import { getStoredTabToken } from "./authClient";
 
 // Browser-side counterpart to src/server/DatabaseManager.ts — every function here is a thin
@@ -198,6 +199,34 @@ export function updateCredential(id: string, name: string, type: CredentialTypeI
 
 export function deleteCredential(id: string): Promise<void> {
   return requestJson(`/api/credentials/${id}`, { method: "DELETE" });
+}
+
+/** Every connected external vault (in addition to the built-in one above) — feeds the Credential
+ * Vault page's tab strip, one tab per connection. */
+export function listVaultConnections(): Promise<VaultConnectionSummary[]> {
+  return requestJson("/api/vault-connections");
+}
+
+export function createVaultConnection(name: string, provider: VaultProviderId, config: Record<string, string>): Promise<VaultConnectionRecord> {
+  return requestJson("/api/vault-connections", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name, provider, config }),
+  });
+}
+
+export function deleteVaultConnection(id: string): Promise<void> {
+  return requestJson(`/api/vault-connections/${id}`, { method: "DELETE" });
+}
+
+/** Live-browses a connected vault's own secrets (read-only) — feeds that vault's own tab. */
+export function listVaultSecrets(connectionId: string): Promise<{ id: string; name: string }[]> {
+  return requestJson(`/api/vault-connections/${connectionId}/secrets`);
+}
+
+/** One secret's own fields, fetched on demand (e.g. when a user expands it in the vault tab). */
+export function getVaultSecret(connectionId: string, secretId: string): Promise<Record<string, string>> {
+  return requestJson(`/api/vault-connections/${connectionId}/secrets/${encodeURIComponent(secretId)}`);
 }
 
 /** Every deployed Flow with an "On HTTP Request" trigger in this project, each combined with its

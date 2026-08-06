@@ -16,6 +16,11 @@ export interface CredentialTypeDef {
   id: CredentialTypeId;
   label: string;
   fields: CredentialFieldDef[];
+  /** False for a type that's only ever populated automatically (currently just
+   * "externalVaultSecret" — see server/vaultCredentials.ts) — hidden from the Credential Vault's
+   * own Add/Edit type dropdown (see selectableCredentialTypeDefs), which only offers types a user
+   * can meaningfully fill in by hand. Omitted (undefined) means selectable, same as `true`. */
+  selectable?: boolean;
 }
 
 const registry = new Map<CredentialTypeId, CredentialTypeDef>();
@@ -35,6 +40,12 @@ export function getCredentialTypeDef(id: CredentialTypeId): CredentialTypeDef {
 
 export function allCredentialTypeDefs(): CredentialTypeDef[] {
   return [...registry.values()];
+}
+
+/** Every type a user can pick from the Credential Vault's own Add/Edit dialog — excludes types
+ * only ever populated automatically (see CredentialTypeDef.selectable's own doc comment). */
+export function selectableCredentialTypeDefs(): CredentialTypeDef[] {
+  return allCredentialTypeDefs().filter((def) => def.selectable !== false);
 }
 
 registerCredentialType({
@@ -325,4 +336,14 @@ registerCredentialType({
     { id: "accessToken", label: "Access Token", secret: true },
     { id: "refreshToken", label: "Refresh Token", secret: true, help: "Only present if the app has refresh tokens enabled for the requested scopes." },
   ],
+});
+
+/** Never shown in the Add/Edit dialog (see `selectable: false`) — a record of this type is always
+ * synthesized live from an external vault connection's own secret data (see
+ * server/vaultCredentials.ts), never created/edited by hand through this registry's usual dialog. */
+registerCredentialType({
+  id: "externalVaultSecret",
+  label: "External Vault Secret",
+  fields: [],
+  selectable: false,
 });

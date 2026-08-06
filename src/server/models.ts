@@ -1,5 +1,6 @@
 import type { LogFormat } from "../graph/engine/types";
 import type { TriggerDescriptor } from "../graph/compiler/codegen";
+import type { VaultProviderId } from "../credentials/vaultProviders";
 
 /** Plain data shapes returned by DatabaseManager — never anything SQL/row-shaped (see that file's
  * own doc comment). Safe to import (type-only) from anywhere, including client components, since
@@ -149,4 +150,21 @@ export interface AuthSettings {
    * brand-new tab always starts signed out, and closing/signing out of one tab never affects
    * others. See src/components/AuthGate.tsx for the client-side half of this. */
   sessionScope: "browser" | "tab";
+}
+
+/** A never-includes-config summary of one connected external vault — the Credential Vault page's
+ * tab strip (one tab per connection) only ever needs this. See VaultConnectionRecord for the full
+ * row (auth config included), only read server-side when actually talking to that vault. */
+export interface VaultConnectionSummary {
+  id: string;
+  name: string;
+  provider: VaultProviderId;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The full row, connection config (server URL, tokens/keys, etc.) included — only ever read
+ * server-side, right before calling out to that vault's own API (see server/vaultProviders/). */
+export interface VaultConnectionRecord extends VaultConnectionSummary {
+  config: Record<string, string>;
 }

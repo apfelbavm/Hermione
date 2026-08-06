@@ -1,4 +1,5 @@
 import type { DatabaseManager } from "./DatabaseManager";
+import { resolveAllCredentials } from "./vaultCredentials.ts";
 
 /** Mirrors nodes/oauth2Saml.ts's own hand-written CREDENTIAL_FROM_ENV_SOURCE naming convention —
  * "HERMIONE_CRED_" followed by the credential's own name, uppercased and sanitized to
@@ -15,8 +16,9 @@ function camelToEnvKey(key: string): string {
   return key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase();
 }
 
-/** Populates `process.env` with every stored credential's fields, under the same
- * `HERMIONE_CRED_<SANITIZED NAME>_<FIELD>` names a compiled node's own env-reading helper (see
+/** Populates `process.env` with every stored credential's fields — from both the built-in vault
+ * AND every connected external vault (see vaultCredentials.ts's resolveAllCredentials) — under the
+ * same `HERMIONE_CRED_<SANITIZED NAME>_<FIELD>` names a compiled node's own env-reading helper (see
  * nodes/oauth2Saml.ts's credentialFromEnv) looks them up by — so a Flow whose compiled output reads
  * a credential by name actually finds it when run server-side (see
  * api/emulate/run/route.ts), the same way it would after being deployed standalone with
@@ -24,10 +26,8 @@ function camelToEnvKey(key: string): string {
  * hand-listing fields per type, so any future credential type gets this for free the moment its own
  * node type adds a compileExecute that reads env vars the same way. Only meaningful for the one
  * compiled module import that follows — not meant to be a permanent process-wide side effect. */
-export function applyCredentialEnvVars(db: DatabaseManager): void {
-  for (const summary of db.listCredentials()) {
-    const record = db.getCredential(summary.id);
-    if (!record) continue;
+export async function applyCredentialEnvVars(db: DatabaseManager): Promise<void> {
+  for (const record of (await resolveAllCredentials(db)).values()) {
     const prefix = credentialEnvPrefix(record.name);
     // Jira credentials come in three differently-shaped kinds (Cloud/PAT/Basic) sharing the same
     // node group (see lib/jiraManager.ts) — the compiled reader needs the TYPE, not just its fields,

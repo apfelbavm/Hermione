@@ -2,13 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { i18n } from "@i18n";
-import { createCredential, deleteCredential, getCredential, listCredentials, updateCredential } from "../../client/api";
-import { allCredentialTypeDefs, getCredentialTypeDef } from "../../credentials/registry";
+import { createCredential, createVaultConnection, deleteCredential, deleteVaultConnection, getCredential, getVaultSecret, listCredentials, listVaultConnections, listVaultSecrets, updateCredential } from "../../client/api";
+import { getCredentialTypeDef, selectableCredentialTypeDefs } from "../../credentials/registry";
 import type { CredentialData, CredentialSummary, CredentialTypeId } from "../../credentials/types";
+import { allVaultProviderDefs, getVaultProviderDef } from "../../credentials/vaultProviders";
+import type { VaultProviderId } from "../../credentials/vaultProviders";
+import type { VaultConnectionSummary } from "../../server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 
-const DEFAULT_TYPE: CredentialTypeId = allCredentialTypeDefs()[0].id;
+const DEFAULT_TYPE: CredentialTypeId = selectableCredentialTypeDefs()[0].id;
+const BUILTIN_TAB = "__builtin__";
+const ADD_VAULT_TAB = "__add__";
 
 /** Editing state for the Add/Edit modal — `id` is null while creating a brand new credential,
  * set while editing an existing one (so submit knows whether to POST or PATCH). `fields` is a
@@ -64,7 +69,7 @@ function CredentialDialog({ initial, onClose, onSaved }: { initial: DialogState;
         <label className="modal-field-row">
           <span className="modal-field-label">{i18n.pages.credential_vault.modal_type_label}</span>
           <select value={state.type} onChange={(e) => changeType(e.target.value as CredentialTypeId)} disabled={state.id !== null}>
-            {allCredentialTypeDefs().map((def) => (
+            {selectableCredentialTypeDefs().map((def) => (
               <option key={def.id} value={def.id}>
                 {def.label}
               </option>
@@ -111,7 +116,9 @@ function CredentialDialog({ initial, onClose, onSaved }: { initial: DialogState;
   );
 }
 
-export default function CredentialVaultPage() {
+/** The built-in vault's own list/add/edit/delete UI — exactly what this page used to be before it
+ * became one tab among several (see CredentialVaultPage). */
+function BuiltInVaultTab() {
   const [credentials, setCredentials] = useState<CredentialSummary[]>([]);
   const [dialog, setDialog] = useState<DialogState | null>(null);
 
@@ -144,10 +151,7 @@ export default function CredentialVaultPage() {
   }
 
   return (
-    <PageShell>
-      <Breadcrumbs items={[{ label: i18n.pages.credential_vault.title }]} />
-      <h1>{i18n.pages.credential_vault.title}</h1>
-
+    <>
       <div className="credentials-create-row">
         <button type="button" className="btn btn-green" onClick={() => setDialog(blankDialogState())}>
           {i18n.pages.credential_vault.add}
@@ -183,6 +187,262 @@ export default function CredentialVaultPage() {
           onSaved={() => {
             setDialog(null);
             void refresh();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/** One connected external vault's own tab — read-only browsing of its secrets (see this feature's
+ * own scoping: external vaults are for selecting/using existing secrets, never created/edited from
+ * here — that stays the responsibility of the external vault itself). */
+function ExternalVaultTab({ connection, onRemoved }: { connection: VaultConnectionSummary; onRemoved: () => void }) {
+  const [secrets, setSecrets] = useState<{ id: string; name: string }[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedFields, setExpandedFields] = useState<Record<string, string> | null>(null);
+
+  async function refresh(): Promise<void> {
+    setError(null);
+    try {
+      setSecrets(await listVaultSecrets(connection.id));
+    } catch (err) {
+      setSecrets([]);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+    setExpandedId(null);
+    setExpandedFields(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection.id]);
+
+  async function toggleView(secretId: string): Promise<void> {
+    if (expandedId === secretId) {
+      setExpandedId(null);
+      setExpandedFields(null);
+      return;
+    }
+    setExpandedId(secretId);
+    setExpandedFields(null);
+    try {
+      setExpandedFields(await getVaultSecret(connection.id, secretId));
+    } catch (err) {
+      setExpandedFields({ error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  async function handleRemove(): Promise<void> {
+    if (!confirm(i18n.pages.credential_vault.remove_vault_confirm.replace("{name}", connection.name))) return;
+    await deleteVaultConnection(connection.id);
+    onRemoved();
+  }
+
+  return (
+    <>
+      <div className="credentials-create-row">
+        <span className="entity-type-tag">{getVaultProviderDef(connection.provider).label}</span>
+        <button type="button" className="btn btn-gray" onClick={() => void refresh()}>
+          {i18n.pages.credential_vault.secrets_refresh}
+        </button>
+        <button type="button" className="btn btn-gray" onClick={() => void handleRemove()}>
+          {i18n.pages.credential_vault.remove_vault}
+        </button>
+      </div>
+
+      {error && <p className="modal-error">{i18n.pages.credential_vault.load_error.replace("{error}", error)}</p>}
+
+      {secrets === null ? null : secrets.length === 0 ? (
+        <p className="page-empty-note">{i18n.pages.credential_vault.secrets_empty}</p>
+      ) : (
+        <ul className="entity-list">
+          {secrets.map((secret) => (
+            <li key={secret.id} className="entity-row">
+              <span className="entity-name">{secret.name}</span>
+              <div className="entity-actions">
+                <button type="button" className="btn btn-gray btn-sm" onClick={() => void toggleView(secret.id)}>
+                  {expandedId === secret.id ? i18n.pages.credential_vault.secret_hide : i18n.pages.credential_vault.secret_view}
+                </button>
+              </div>
+              {expandedId === secret.id && (
+                <div className="modal-field-row" style={{ width: "100%" }}>
+                  {expandedFields === null
+                    ? "…"
+                    : Object.entries(expandedFields).map(([key, value]) => (
+                        <div key={key}>
+                          <strong>{key}:</strong> {value}
+                        </div>
+                      ))}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+/** Field state for the "Connect Vault" dialog — mirrors DialogState's own shape for the built-in
+ * vault's Add/Edit dialog, one plain string per the picked provider's own config fields (see
+ * credentials/vaultProviders.ts). */
+interface AddVaultDialogState {
+  name: string;
+  provider: VaultProviderId;
+  fields: Record<string, string>;
+}
+
+function blankAddVaultDialogState(provider: VaultProviderId = allVaultProviderDefs()[0].id): AddVaultDialogState {
+  const fields: Record<string, string> = {};
+  for (const field of getVaultProviderDef(provider).fields) fields[field.id] = "";
+  return { name: "", provider, fields };
+}
+
+function AddVaultConnectionDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (connection: VaultConnectionSummary) => void }) {
+  const [state, setState] = useState<AddVaultDialogState>(blankAddVaultDialogState());
+  const [error, setError] = useState<string | null>(null);
+  const providerDef = getVaultProviderDef(state.provider);
+
+  function changeProvider(provider: VaultProviderId): void {
+    setState((s) => ({ ...blankAddVaultDialogState(provider), name: s.name }));
+  }
+
+  async function handleSubmit(): Promise<void> {
+    if (!state.name.trim()) {
+      setError(i18n.pages.credential_vault.modal_name_required);
+      return;
+    }
+    try {
+      const connection = await createVaultConnection(state.name.trim(), state.provider, state.fields);
+      onSaved(connection);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
+        <h2 className="modal-title">{i18n.pages.credential_vault.add_vault_title}</h2>
+
+        <label className="modal-field-row">
+          <span className="modal-field-label">{i18n.pages.credential_vault.modal_name_label}</span>
+          <input type="text" value={state.name} onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))} autoFocus />
+        </label>
+
+        <label className="modal-field-row">
+          <span className="modal-field-label">{i18n.pages.credential_vault.add_vault_provider_label}</span>
+          <select value={state.provider} onChange={(e) => changeProvider(e.target.value as VaultProviderId)}>
+            {allVaultProviderDefs().map((def) => (
+              <option key={def.id} value={def.id}>
+                {def.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {providerDef.fields.map((field) => (
+          <label className="modal-field-row" key={field.id}>
+            <span className="modal-field-label">
+              {field.label}
+              {field.help && (
+                <span className="modal-field-help" title={field.help}>
+                  ?
+                </span>
+              )}
+            </span>
+            <input
+              type="text"
+              value={state.fields[field.id] ?? ""}
+              onChange={(e) =>
+                setState((s) => ({
+                  ...s,
+                  fields: { ...s.fields, [field.id]: e.target.value },
+                }))
+              }
+            />
+          </label>
+        ))}
+
+        {error && <p className="modal-error">{error}</p>}
+
+        <div className="modal-actions">
+          <button type="button" className="btn btn-gray" onClick={onClose}>
+            {i18n.pages.credential_vault.modal_cancel}
+          </button>
+          <button type="button" className="btn btn-green" onClick={() => void handleSubmit()}>
+            {i18n.pages.credential_vault.add_vault_save}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function CredentialVaultPage() {
+  const [vaultConnections, setVaultConnections] = useState<VaultConnectionSummary[]>([]);
+  const [activeTab, setActiveTab] = useState<string>(BUILTIN_TAB);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+
+  async function refreshVaultConnections(): Promise<void> {
+    setVaultConnections(await listVaultConnections());
+  }
+
+  useEffect(() => {
+    void refreshVaultConnections();
+  }, []);
+
+  function selectTab(key: string): void {
+    if (key === ADD_VAULT_TAB) {
+      setShowAddDialog(true);
+      return;
+    }
+    setActiveTab(key);
+  }
+
+  const activeConnection = vaultConnections.find((c) => c.id === activeTab);
+
+  return (
+    <PageShell>
+      <Breadcrumbs items={[{ label: i18n.pages.credential_vault.title }]} />
+      <h1>{i18n.pages.credential_vault.title}</h1>
+
+      <nav className="project-tabs" aria-label="Credential vaults">
+        <button type="button" className={`project-tab${activeTab === BUILTIN_TAB ? " project-tab-active" : ""}`} onClick={() => selectTab(BUILTIN_TAB)}>
+          {i18n.pages.credential_vault.tab_builtin}
+        </button>
+        {vaultConnections.map((connection) => (
+          <button key={connection.id} type="button" className={`project-tab${activeTab === connection.id ? " project-tab-active" : ""}`} onClick={() => selectTab(connection.id)}>
+            {connection.name}
+          </button>
+        ))}
+        <button type="button" className="project-tab" onClick={() => selectTab(ADD_VAULT_TAB)}>
+          {i18n.pages.credential_vault.tab_add}
+        </button>
+      </nav>
+
+      {activeTab === BUILTIN_TAB && <BuiltInVaultTab />}
+      {activeConnection && (
+        <ExternalVaultTab
+          key={activeConnection.id}
+          connection={activeConnection}
+          onRemoved={() => {
+            setActiveTab(BUILTIN_TAB);
+            void refreshVaultConnections();
+          }}
+        />
+      )}
+
+      {showAddDialog && (
+        <AddVaultConnectionDialog
+          onClose={() => setShowAddDialog(false)}
+          onSaved={(connection) => {
+            setShowAddDialog(false);
+            setActiveTab(connection.id);
+            void refreshVaultConnections();
           }}
         />
       )}

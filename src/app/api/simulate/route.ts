@@ -8,6 +8,7 @@ import type { Graph } from "../../../graph/engine/graph";
 import type { LogFormat } from "../../../graph/engine/types";
 import { getDatabaseManager } from "../../../server/DatabaseManager";
 import { executeDeployedFlow } from "../../../server/executeDeployedFlow";
+import { resolveAllCredentials } from "../../../server/vaultCredentials";
 import type { LogEntry, RunLog } from "../../../server/models";
 
 // Must run under the Node runtime (not edge) — the interpreter and node implementations
@@ -106,12 +107,17 @@ export async function POST(request: Request): Promise<Response> {
         return;
       }
 
+      // Resolved once per run — every node in this graph that references a credential by name
+      // (e.g. oauth2Saml) shares the same built-in-vault-plus-external-vaults lookup (see
+      // server/vaultCredentials.ts), instead of each hitting external vaults' APIs separately.
+      const credentialsByName = await resolveAllCredentials(db);
+
       const execCtx = createExecutionContext(graph, {
         log: (message, format) => {
           send("log", { message, format });
           recordLogEntry(message, format);
         },
-        getCredential: (name) => db.getCredentialByName(name),
+        getCredential: (name) => credentialsByName.get(name),
         executeFlow: (targetProjectId, targetFlowId, params) => executeDeployedFlow(targetProjectId, targetFlowId, params),
         onNodeStart: async (nodeId) => {
           if (aborted) throw new Error("Simulation aborted by client");

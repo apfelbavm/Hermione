@@ -26,7 +26,8 @@ export type CredentialTypeId =
   | "smtpCredential"
   | "sapBasicAuth"
   | "linkedInOAuth2"
-  | "sendGridApiKey";
+  | "sendGridApiKey"
+  | "externalVaultSecret";
 
 export interface UsernamePasswordCredentialData {
   username: string;
@@ -257,6 +258,11 @@ export interface SendGridApiKeyCredentialData {
   apiKey: string;
 }
 
+/** A secret pulled live from an externally-connected vault (see credentials/vaultProviders.ts,
+ * server/vaultCredentials.ts) — shape is whatever that vault returned for it, verbatim, since an
+ * external vault's own secrets aren't constrained to any of the typed shapes above. */
+export type ExternalVaultSecretCredentialData = Record<string, string>;
+
 export type CredentialData =
   | UsernamePasswordCredentialData
   | Oauth2SamlBearerCredentialData
@@ -281,7 +287,8 @@ export type CredentialData =
   | SmtpCredentialData
   | SapBasicAuthCredentialData
   | LinkedInOAuth2CredentialData
-  | SendGridApiKeyCredentialData;
+  | SendGridApiKeyCredentialData
+  | ExternalVaultSecretCredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that
  * doesn't need the actual secret) should only ever see this. */

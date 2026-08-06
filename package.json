@@ -32,8 +32,10 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1101.0",
     "@aws-sdk/client-kinesis": "^3.1101.0",
+    "@aws-sdk/client-secrets-manager": "^3.1104.0",
     "@aws-sdk/lib-dynamodb": "^3.1101.0",
     "@azure/identity": "^4.13.1",
+    "@azure/keyvault-secrets": "^4.11.2",
     "@azure/storage-blob": "^12.33.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@monaco-editor/react": "^4.7.0",

@@ -6,8 +6,9 @@ import { nextId } from "../graph/engine/graphMutations.ts";
 import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
 import { MAX_RUNS_PER_PROJECT } from "../shared/runLogConstants.ts";
 import { MAX_WEBHOOK_DELIVERIES_PER_FLOW } from "../shared/webhookConstants.ts";
-import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, LogEntry, ProjectSummary, RunKind, RunLog, UserAccount, UserRole, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "./models";
+import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, LogEntry, ProjectSummary, RunKind, RunLog, UserAccount, UserRole, VaultConnectionRecord, VaultConnectionSummary, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "./models";
 import type { TriggerDescriptor } from "../graph/compiler/codegen";
+import type { VaultProviderId } from "../credentials/vaultProviders";
 
 const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "hermione.db");
 
@@ -75,6 +76,15 @@ interface DeployedScriptRow {
   version: number;
   revision: number;
   deployed_at: string;
+}
+
+interface VaultConnectionRow {
+  id: string;
+  name: string;
+  provider: VaultProviderId;
+  config_json: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface WebhookConfigRow {
@@ -194,6 +204,20 @@ export class DatabaseManager {
         name TEXT NOT NULL UNIQUE,
         type TEXT NOT NULL,
         data_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      -- One row per externally-connected vault (see credentials/vaultProviders.ts for the supported
+      -- provider ids) — the Credential Vault page shows one tab per row here, in addition to its own
+      -- built-in "credentials" table above. config_json holds whatever that provider's own auth/
+      -- connection fields are (server URL, token, key pair, etc.) — read only server-side, never
+      -- returned by listVaultConnections (see VaultConnectionSummary vs VaultConnectionRecord).
+      CREATE TABLE IF NOT EXISTS vault_connections (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        provider TEXT NOT NULL,
+        config_json TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -370,6 +394,23 @@ export class DatabaseManager {
     return {
       ...this.toCredentialSummary(row),
       data: JSON.parse(row.data_json) as CredentialData,
+    };
+  }
+
+  private toVaultConnectionSummary(row: VaultConnectionRow): VaultConnectionSummary {
+    return {
+      id: row.id,
+      name: row.name,
+      provider: row.provider,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private toVaultConnectionRecord(row: VaultConnectionRow): VaultConnectionRecord {
+    return {
+      ...this.toVaultConnectionSummary(row),
+      config: JSON.parse(row.config_json) as Record<string, string>,
     };
   }
 
@@ -664,6 +705,42 @@ export class DatabaseManager {
 
   deleteCredential(id: string): void {
     this.db.prepare("DELETE FROM credentials WHERE id = ?").run(id);
+  }
+
+  // --- Vault connections (external credential vaults, in addition to the built-in one above) ---
+
+  /** Never includes `config` (server URL, token/key material) — the tab strip's list only needs
+   * enough to render one tab per connection. */
+  listVaultConnections(): VaultConnectionSummary[] {
+    const rows = this.db.prepare<[], VaultConnectionRow>("SELECT * FROM vault_connections ORDER BY created_at").all();
+    return rows.map((row) => this.toVaultConnectionSummary(row));
+  }
+
+  getVaultConnection(id: string): VaultConnectionRecord | undefined {
+    const row = this.db.prepare<[string], VaultConnectionRow>("SELECT * FROM vault_connections WHERE id = ?").get(id);
+    return row ? this.toVaultConnectionRecord(row) : undefined;
+  }
+
+  createVaultConnection(name: string, provider: VaultProviderId, config: Record<string, string>): VaultConnectionRecord {
+    const now = new Date().toISOString();
+    const record: VaultConnectionRecord = {
+      id: nextId("vault_connection"),
+      name,
+      provider,
+      config,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.db.prepare("INSERT INTO vault_connections (id, name, provider, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)").run(record.id, record.name, record.provider, JSON.stringify(record.config), record.createdAt, record.updatedAt);
+    return record;
+  }
+
+  updateVaultConnection(id: string, name: string, config: Record<string, string>): void {
+    this.db.prepare("UPDATE vault_connections SET name = ?, config_json = ?, updated_at = ? WHERE id = ?").run(name, JSON.stringify(config), new Date().toISOString(), id);
+  }
+
+  deleteVaultConnection(id: string): void {
+    this.db.prepare("DELETE FROM vault_connections WHERE id = ?").run(id);
   }
 
   // --- Deployed scripts ---

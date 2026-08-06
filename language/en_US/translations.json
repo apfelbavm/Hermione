@@ -120,7 +120,19 @@
       "modal_type_label": "Type",
       "modal_name_required": "Name is required",
       "modal_cancel": "Cancel",
-      "modal_save": "Save"
+      "modal_save": "Save",
+      "tab_builtin": "Built-in Vault",
+      "tab_add": "+ Add Vault",
+      "add_vault_title": "Connect Vault",
+      "add_vault_provider_label": "Provider",
+      "add_vault_save": "Connect",
+      "remove_vault": "Remove Vault",
+      "remove_vault_confirm": "Remove vault connection \"{name}\"? Any node referencing one of its secrets by name will start failing.",
+      "secrets_refresh": "Refresh",
+      "secrets_empty": "No secrets found in this vault.",
+      "secret_view": "View",
+      "secret_hide": "Hide",
+      "load_error": "Failed to load secrets: {error}"
     },
     "project_webhooks": {
       "back": "Back",

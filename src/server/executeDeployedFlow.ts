@@ -56,7 +56,7 @@ export async function executeDeployedFlow(projectId: string, flowId: string, par
     if (!executeTrigger) {
       result = { success: false, error: 'The "On Execute" event does not exist in this graph.', outputs: {} };
     } else {
-      applyCredentialEnvVars(db);
+      await applyCredentialEnvVars(db);
 
       // Cache-bust the import so a redeploy between two calls in the same server process isn't served
       // Node's stale cached module for this same path — same reasoning as api/emulate/run/route.ts.

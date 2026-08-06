@@ -63,7 +63,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!runTrigger) {
       recordLogEntry('The "EventDeploy" function does not exist in this graph.');
     } else {
-      applyCredentialEnvVars(db);
+      await applyCredentialEnvVars(db);
 
       // The file on disk always reflects the LATEST deploy (see writeDeployedScriptFile) — cache-bust
       // the import so a redeploy between two runs in the same server process isn't served Node's
