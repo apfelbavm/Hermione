@@ -559,3 +559,305 @@ export async function smartRecruitersRemoveUserFromAccessGroup(credentialName: s
   if (!cred.ok) return { success: false, error: cred.error };
   return SmartRecruitersManager.forAuth(cred.auth).removeUserFromAccessGroup(accessGroupId, userId);
 }
+
+// --- Interviews & Events (Phase 6) ----------------------------------------------------------
+
+export async function smartRecruitersSearchInterviews(credentialName: string, applicationId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, interviews: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).searchInterviews(applicationId);
+}
+
+export async function smartRecruitersCreateInterview(credentialName: string, interviewJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+  const parsed = parseJsonRecord(interviewJson, "interviewJson");
+  if (!parsed.ok) return { success: false, interview: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).createInterview(parsed.value);
+}
+
+export async function smartRecruitersGetInterview(credentialName: string, interviewId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getInterview(interviewId);
+}
+
+export async function smartRecruitersUpdateInterview(credentialName: string, interviewId: string, patchJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+  const parsed = parseJsonRecord(patchJson, "patchJson");
+  if (!parsed.ok) return { success: false, interview: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateInterview(interviewId, parsed.value);
+}
+
+export async function smartRecruitersDeleteInterview(credentialName: string, interviewId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deleteInterview(interviewId);
+}
+
+export async function smartRecruitersListInterviewTypes(credentialName: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, interviewTypes: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).listInterviewTypes();
+}
+
+export async function smartRecruitersAddInterviewTypes(credentialName: string, interviewTypesJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  const parsed = parseJsonArray(interviewTypesJson, "interviewTypesJson");
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).addInterviewTypes(parsed.value as unknown as string[]);
+}
+
+export async function smartRecruitersDeleteInterviewType(credentialName: string, interviewType: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deleteInterviewType(interviewType);
+}
+
+export async function smartRecruitersCreateInterviewTimeslot(credentialName: string, interviewId: string, timeslotJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, timeslot: {}, error: cred.error };
+  const parsed = parseJsonRecord(timeslotJson, "timeslotJson");
+  if (!parsed.ok) return { success: false, timeslot: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).createInterviewTimeslot(interviewId, parsed.value);
+}
+
+export async function smartRecruitersGetInterviewTimeslot(credentialName: string, interviewId: string, timeslotId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, timeslot: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getInterviewTimeslot(interviewId, timeslotId);
+}
+
+export async function smartRecruitersUpdateInterviewTimeslot(credentialName: string, interviewId: string, timeslotId: string, timeslotJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, timeslot: {}, error: cred.error };
+  const parsed = parseJsonRecord(timeslotJson, "timeslotJson");
+  if (!parsed.ok) return { success: false, timeslot: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateInterviewTimeslot(interviewId, timeslotId, parsed.value);
+}
+
+export async function smartRecruitersDeleteInterviewTimeslot(credentialName: string, interviewId: string, timeslotId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deleteInterviewTimeslot(interviewId, timeslotId);
+}
+
+export async function smartRecruitersSetInterviewTimeslotNoShow(credentialName: string, interviewId: string, timeslotId: string, value: boolean) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).setInterviewTimeslotNoShow(interviewId, timeslotId, value);
+}
+
+export async function smartRecruitersUpdateInterviewCandidateStatus(credentialName: string, interviewId: string, status: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateInterviewCandidateStatus(interviewId, status);
+}
+
+export async function smartRecruitersUpdateTimeslotCandidateStatus(credentialName: string, interviewId: string, timeslotId: string, status: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateTimeslotCandidateStatus(interviewId, timeslotId, status);
+}
+
+export async function smartRecruitersUpdateTimeslotInterviewerStatus(credentialName: string, interviewId: string, timeslotId: string, userId: string, status: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateTimeslotInterviewerStatus(interviewId, timeslotId, userId, status);
+}
+
+export async function smartRecruitersGetSchedulePreferences(credentialName: string, userId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, preferences: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getSchedulePreferences(userId);
+}
+
+export async function smartRecruitersCreateEvent(credentialName: string, eventJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, event: {}, error: cred.error };
+  const parsed = parseJsonRecord(eventJson, "eventJson");
+  if (!parsed.ok) return { success: false, event: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).createEvent(parsed.value);
+}
+
+export async function smartRecruitersGetEvent(credentialName: string, eventId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, event: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getEvent(eventId);
+}
+
+export async function smartRecruitersUpdateEvent(credentialName: string, eventId: string, eventJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, event: {}, error: cred.error };
+  const parsed = parseJsonRecord(eventJson, "eventJson");
+  if (!parsed.ok) return { success: false, event: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateEvent(eventId, parsed.value);
+}
+
+export async function smartRecruitersDeleteEvent(credentialName: string, eventId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deleteEvent(eventId);
+}
+
+export async function smartRecruitersListJobEvents(credentialName: string, jobId: string, state: string, page: number, pageSize: number) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, events: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).listJobEvents(jobId, state, page, pageSize);
+}
+
+export async function smartRecruitersGetEventsForCandidate(credentialName: string, profileId: string, state: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, events: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getEventsForCandidate(profileId, state);
+}
+
+export async function smartRecruitersGetEventsForApplication(credentialName: string, applicationId: string, state: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, events: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getEventsForApplication(applicationId, state);
+}
+
+export async function smartRecruitersGetEventSession(credentialName: string, eventId: string, sessionId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, session: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getEventSession(eventId, sessionId);
+}
+
+export async function smartRecruitersDeleteEventSession(credentialName: string, eventId: string, sessionId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deleteEventSession(eventId, sessionId);
+}
+
+export async function smartRecruitersAddSessionInterviewers(credentialName: string, eventId: string, sessionId: string, interviewerIdsJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, interviewers: [], error: cred.error };
+  const parsed = parseJsonArray(interviewerIdsJson, "interviewerIdsJson");
+  if (!parsed.ok) return { success: false, interviewers: [], error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).addSessionInterviewers(eventId, sessionId, parsed.value as unknown as string[]);
+}
+
+export async function smartRecruitersRemoveSessionInterviewers(credentialName: string, eventId: string, sessionId: string, interviewerIdsJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  const parsed = parseJsonArray(interviewerIdsJson, "interviewerIdsJson");
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).removeSessionInterviewers(eventId, sessionId, parsed.value as unknown as string[]);
+}
+
+export async function smartRecruitersGetAllEventApplicants(credentialName: string, eventId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, applicants: [], totalFound: 0, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getAllEventApplicants(eventId);
+}
+
+export async function smartRecruitersGetEventPoolApplicants(credentialName: string, eventId: string, page: number, pageSize: number) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, applicants: [], totalFound: 0, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getEventPoolApplicants(eventId, page, pageSize);
+}
+
+export async function smartRecruitersAddApplicantsToEvent(credentialName: string, eventId: string, applicantIdsJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  const parsed = parseJsonArray(applicantIdsJson, "applicantIdsJson");
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).addApplicantsToEvent(eventId, parsed.value as unknown as string[]);
+}
+
+export async function smartRecruitersAddApplicantsToSession(credentialName: string, eventId: string, sessionId: string, applicantIdsJson: string, allowOverbooking: boolean) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, applicants: [], error: cred.error };
+  const parsed = parseJsonArray(applicantIdsJson, "applicantIdsJson");
+  if (!parsed.ok) return { success: false, applicants: [], error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).addApplicantsToSession(eventId, sessionId, parsed.value as unknown as string[], allowOverbooking);
+}
+
+export async function smartRecruitersMoveApplicantsToSession(credentialName: string, eventId: string, sessionId: string, fromSessionId: string, applicantIdsJson: string, allowOverbooking: boolean) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, applicants: [], error: cred.error };
+  const parsed = parseJsonArray(applicantIdsJson, "applicantIdsJson");
+  if (!parsed.ok) return { success: false, applicants: [], error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).moveApplicantsToSession(eventId, sessionId, fromSessionId, parsed.value as unknown as string[], allowOverbooking);
+}
+
+export async function smartRecruitersSearchSelfSchedules(credentialName: string, applicationId: string, withInterviews: boolean, limit: number, offset: number) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, selfSchedules: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).searchSelfSchedules(applicationId, withInterviews, limit, offset);
+}
+
+export async function smartRecruitersGetSelfSchedule(credentialName: string, selfScheduleId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, selfSchedule: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getSelfSchedule(selfScheduleId);
+}
+
+export async function smartRecruitersCancelSelfSchedule(credentialName: string, selfScheduleId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).cancelSelfSchedule(selfScheduleId);
+}
+
+export async function smartRecruitersGetApplicationSelfSchedule(credentialName: string, selfScheduleId: string, applicationUuid: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, selfSchedule: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getApplicationSelfSchedule(selfScheduleId, applicationUuid);
+}
+
+export async function smartRecruitersGetSelfScheduleSlots(credentialName: string, selfScheduleId: string, applicationUuid: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, slots: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getSelfScheduleSlots(selfScheduleId, applicationUuid);
+}
+
+export async function smartRecruitersCreateSelfScheduleInterview(credentialName: string, selfScheduleId: string, applicationUuid: string, startsAt: string, endsAt: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).createSelfScheduleInterview(selfScheduleId, applicationUuid, startsAt, endsAt);
+}
+
+export async function smartRecruitersUpdateSelfScheduleInterview(credentialName: string, selfScheduleId: string, applicationUuid: string, startsAt: string, endsAt: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateSelfScheduleInterview(selfScheduleId, applicationUuid, startsAt, endsAt);
+}
+
+export async function smartRecruitersGetSelfScheduledInterview(credentialName: string, selfScheduleId: string, applicationUuid: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getSelfScheduledInterview(selfScheduleId, applicationUuid);
+}
+
+export async function smartRecruitersCreateAutomatedSelfSchedule(credentialName: string, applicationUuid: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, selfScheduleId: "", error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).createAutomatedSelfSchedule(applicationUuid);
+}
+
+export async function smartRecruitersUpdateAutomatedSelfScheduleInvite(credentialName: string, configJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  const parsed = parseJsonRecord(configJson, "configJson");
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateAutomatedSelfScheduleInvite(parsed.value);
+}
+
+export async function smartRecruitersRequestAutomatedSelfReschedule(credentialName: string, configJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  const parsed = parseJsonRecord(configJson, "configJson");
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).requestAutomatedSelfReschedule(parsed.value);
+}
+
+export async function smartRecruitersGetAutomatedScheduleAvailableSlotsCount(credentialName: string, scheduleType: string, applicationUuid: string, interviewerIdsByRoleJson: string, startDate: string, endDate: string, slotsAvailabilityLimitInDays: number) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, count: 0, error: cred.error };
+  const parsed = parseJsonRecord(interviewerIdsByRoleJson, "interviewerIdsByRoleJson");
+  if (!parsed.ok) return { success: false, count: 0, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getAutomatedScheduleAvailableSlotsCount(scheduleType, applicationUuid, parsed.value as unknown as Record<string, string[]>, startDate, endDate, slotsAvailabilityLimitInDays);
+}

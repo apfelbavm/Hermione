@@ -110,3 +110,41 @@ registerEnumType({
     { id: "ONBOARDING_FAILED", label: "Onboarding Failed" },
   ],
 });
+
+export const SMARTRECRUITERS_ATTENDEE_STATUS_ENUM_TYPE = "smartRecruitersAttendeeStatus";
+
+registerEnumType({
+  id: SMARTRECRUITERS_ATTENDEE_STATUS_ENUM_TYPE,
+  label: "SmartRecruiters Attendee Status",
+  category: "SmartRecruiters",
+  values: [
+    { id: "accepted", label: "Accepted" },
+    { id: "declined", label: "Declined" },
+    { id: "pending", label: "Pending" },
+    { id: "tentative", label: "Tentative" },
+  ],
+});
+
+export const SMARTRECRUITERS_EVENT_STATE_ENUM_TYPE = "smartRecruitersEventState";
+
+registerEnumType({
+  id: SMARTRECRUITERS_EVENT_STATE_ENUM_TYPE,
+  label: "SmartRecruiters Event State",
+  category: "SmartRecruiters",
+  values: [
+    { id: "PAST", label: "Past" },
+    { id: "ACTIVE", label: "Active" },
+  ],
+});
+
+export const SMARTRECRUITERS_SELF_SCHEDULE_TYPE_ENUM_TYPE = "smartRecruitersSelfScheduleType";
+
+registerEnumType({
+  id: SMARTRECRUITERS_SELF_SCHEDULE_TYPE_ENUM_TYPE,
+  label: "SmartRecruiters Self Schedule Type",
+  category: "SmartRecruiters",
+  values: [
+    { id: "INDIVIDUAL", label: "Individual" },
+    { id: "GROUP", label: "Group" },
+  ],
+});

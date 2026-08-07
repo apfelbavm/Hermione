@@ -157,6 +157,75 @@ export interface SmartRecruitersAccessGroupResult extends SmartRecruitersOpResul
   accessGroup: Record<string, unknown>;
 }
 
+export interface SmartRecruitersInterviewsListResult extends SmartRecruitersOpResult {
+  interviews: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersInterviewResult extends SmartRecruitersOpResult {
+  interview: Record<string, unknown>;
+}
+
+export interface SmartRecruitersInterviewTypesResult extends SmartRecruitersOpResult {
+  interviewTypes: string[];
+}
+
+export interface SmartRecruitersTimeslotResult extends SmartRecruitersOpResult {
+  timeslot: Record<string, unknown>;
+}
+
+export interface SmartRecruitersSchedulePreferencesResult extends SmartRecruitersOpResult {
+  preferences: Record<string, unknown>;
+}
+
+export interface SmartRecruitersEventResult extends SmartRecruitersOpResult {
+  event: Record<string, unknown>;
+}
+
+export interface SmartRecruitersEventsListResult extends SmartRecruitersOpResult {
+  events: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersEventSessionResult extends SmartRecruitersOpResult {
+  session: Record<string, unknown>;
+}
+
+export interface SmartRecruitersInterviewersListResult extends SmartRecruitersOpResult {
+  interviewers: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersApplicantsListResult extends SmartRecruitersOpResult {
+  applicants: Record<string, unknown>[];
+  totalFound: number;
+}
+
+export interface SmartRecruitersSessionApplicantsResult extends SmartRecruitersOpResult {
+  applicants: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersSelfSchedulesListResult extends SmartRecruitersOpResult {
+  selfSchedules: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersSelfScheduleResult extends SmartRecruitersOpResult {
+  selfSchedule: Record<string, unknown>;
+}
+
+export interface SmartRecruitersSelfScheduleIdResult extends SmartRecruitersOpResult {
+  selfScheduleId: string;
+}
+
+export interface SmartRecruitersSelfScheduleInterviewResult extends SmartRecruitersOpResult {
+  interview: Record<string, unknown>;
+}
+
+export interface SmartRecruitersSelfScheduleSlotsResult extends SmartRecruitersOpResult {
+  slots: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersAvailableSlotsCountResult extends SmartRecruitersOpResult {
+  count: number;
+}
+
 interface CachedToken {
   accessToken: string;
   expiresAt: number;
@@ -801,5 +870,329 @@ export class SmartRecruitersManager {
     const result = await this.request("DELETE", `user-api/v201804/access-groups/${encodeURIComponent(accessGroupId)}/users/${encodeURIComponent(userId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
+  }
+
+  // --- Interviews & Events (Phase 6) -------------------------------------------------------
+  // `interviews-api/v201904` (candidate/timeslot/interviewer-status-centric — update/delete are
+  // documented as supported only for interviews created via the Public API) and
+  // `event-management-api` (sessions, applicant pools, richer invitations/reminders) are two
+  // genuinely separate, still-active resource families confirmed via live docs — not a Phase-5-style
+  // duplicate, so both are implemented in full. Self-Scheduling API (`self-scheduling`) is a third
+  // family layered on top for candidate-facing slot picking. Schedule preferences has only a
+  // documented GET — no update endpoint exists — so it's read-only here (same kind of scope
+  // correction as the Phase 3 EEO drop / Phase 4 consent drop / Phase 5 "me" drop).
+
+  async searchInterviews(applicationId: string): Promise<SmartRecruitersInterviewsListResult> {
+    const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", "interviews-api/v201904/interviews", { query: { applicationId } });
+    if (!result.success) return { success: false, interviews: [], error: result.error };
+    const interviews = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
+    return { success: true, interviews, error: "" };
+  }
+
+  async createInterview(interview: Record<string, unknown>): Promise<SmartRecruitersInterviewResult> {
+    const result = await this.request<Record<string, unknown>>("POST", "interviews-api/v201904/interviews", { body: interview });
+    if (!result.success) return { success: false, interview: {}, error: result.error };
+    return { success: true, interview: result.data, error: "" };
+  }
+
+  async getInterview(interviewId: string): Promise<SmartRecruitersInterviewResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}`);
+    if (!result.success) return { success: false, interview: {}, error: result.error };
+    return { success: true, interview: result.data, error: "" };
+  }
+
+  /** PATCH — documented as supported only for interviews created via the Public API. */
+  async updateInterview(interviewId: string, patch: Record<string, unknown>): Promise<SmartRecruitersInterviewResult> {
+    const result = await this.request<Record<string, unknown>>("PATCH", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}`, { body: patch });
+    if (!result.success) return { success: false, interview: {}, error: result.error };
+    return { success: true, interview: result.data, error: "" };
+  }
+
+  /** DELETE — same Public-API-only caveat as updateInterview. */
+  async deleteInterview(interviewId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async listInterviewTypes(): Promise<SmartRecruitersInterviewTypesResult> {
+    const result = await this.request<string[]>("GET", "interviews-api/v201904/interview-types");
+    if (!result.success) return { success: false, interviewTypes: [], error: result.error };
+    return { success: true, interviewTypes: Array.isArray(result.data) ? result.data : [], error: "" };
+  }
+
+  /** PATCH — additive; appends to the existing type set rather than replacing it (no full-replace
+   * endpoint is documented). */
+  async addInterviewTypes(interviewTypes: string[]): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("PATCH", "interviews-api/v201904/interview-types", { body: interviewTypes });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** Interview type names double as their id — there is no separate numeric/uuid id. */
+  async deleteInterviewType(interviewType: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `interviews-api/v201904/interview-types/${encodeURIComponent(interviewType)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async createInterviewTimeslot(interviewId: string, timeslot: Record<string, unknown>): Promise<SmartRecruitersTimeslotResult> {
+    const result = await this.request<Record<string, unknown>>("POST", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots`, { body: timeslot });
+    if (!result.success) return { success: false, timeslot: {}, error: result.error };
+    return { success: true, timeslot: result.data, error: "" };
+  }
+
+  async getInterviewTimeslot(interviewId: string, timeslotId: string): Promise<SmartRecruitersTimeslotResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}`);
+    if (!result.success) return { success: false, timeslot: {}, error: result.error };
+    return { success: true, timeslot: result.data, error: "" };
+  }
+
+  async updateInterviewTimeslot(interviewId: string, timeslotId: string, timeslot: Record<string, unknown>): Promise<SmartRecruitersTimeslotResult> {
+    const result = await this.request<Record<string, unknown>>("PATCH", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}`, { body: timeslot });
+    if (!result.success) return { success: false, timeslot: {}, error: result.error };
+    return { success: true, timeslot: result.data, error: "" };
+  }
+
+  /** 409 if this would remove an interview's last timeslot. */
+  async deleteInterviewTimeslot(interviewId: string, timeslotId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** PATCH — `value` travels as a query param, not a body field. */
+  async setInterviewTimeslotNoShow(interviewId: string, timeslotId: string, value: boolean): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("PATCH", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}/noshow`, { query: { value } });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** Deprecated, interview-scoped (not per-timeslot) — kept alongside updateTimeslotCandidateStatus
+   * for the same exhaustive-coverage reason as Phase 3/5's deprecated-variant methods. Public-API-only. */
+  async updateInterviewCandidateStatus(interviewId: string, status: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("PUT", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/candidate/status`, { body: { status } });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async updateTimeslotCandidateStatus(interviewId: string, timeslotId: string, status: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("PUT", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}/candidateStatus`, { body: { status } });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async updateTimeslotInterviewerStatus(interviewId: string, timeslotId: string, userId: string, status: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("PUT", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}/interviewers/${encodeURIComponent(userId)}/status`, { body: { status } });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** GET-only — no documented update endpoint exists for schedule preferences (verified via live
+   * docs), so this connector exposes it read-only. Lives under the separate `interview-templates`
+   * sub-API, not `interviews-api`. */
+  async getSchedulePreferences(userId: string): Promise<SmartRecruitersSchedulePreferencesResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `interview-templates/schedule/preferences/users/${encodeURIComponent(userId)}`);
+    if (!result.success) return { success: false, preferences: {}, error: result.error };
+    return { success: true, preferences: result.data, error: "" };
+  }
+
+  async createEvent(event: Record<string, unknown>): Promise<SmartRecruitersEventResult> {
+    const result = await this.request<Record<string, unknown>>("POST", "event-management-api/events", { body: event });
+    if (!result.success) return { success: false, event: {}, error: result.error };
+    return { success: true, event: result.data, error: "" };
+  }
+
+  async getEvent(eventId: string): Promise<SmartRecruitersEventResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `event-management-api/events/${encodeURIComponent(eventId)}`);
+    if (!result.success) return { success: false, event: {}, error: result.error };
+    return { success: true, event: result.data, error: "" };
+  }
+
+  async updateEvent(eventId: string, event: Record<string, unknown>): Promise<SmartRecruitersEventResult> {
+    const result = await this.request<Record<string, unknown>>("PUT", `event-management-api/events/${encodeURIComponent(eventId)}`, { body: event });
+    if (!result.success) return { success: false, event: {}, error: result.error };
+    return { success: true, event: result.data, error: "" };
+  }
+
+  async deleteEvent(eventId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `event-management-api/events/${encodeURIComponent(eventId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** GET /events — job-scoped list ("Get job's events"); state is required (PAST|ACTIVE). */
+  async listJobEvents(jobId: string, state: string, page: number, pageSize: number): Promise<SmartRecruitersEventsListResult> {
+    const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", "event-management-api/events", { query: { jobId, state, page, pageSize } });
+    if (!result.success) return { success: false, events: [], error: result.error };
+    const events = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
+    return { success: true, events, error: "" };
+  }
+
+  async getEventsForCandidate(profileId: string, state: string): Promise<SmartRecruitersEventsListResult> {
+    const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", `event-management-api/events/candidates/${encodeURIComponent(profileId)}`, {
+      query: { state },
+    });
+    if (!result.success) return { success: false, events: [], error: result.error };
+    const events = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
+    return { success: true, events, error: "" };
+  }
+
+  async getEventsForApplication(applicationId: string, state: string): Promise<SmartRecruitersEventsListResult> {
+    const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", `event-management-api/events/applications/${encodeURIComponent(applicationId)}`, {
+      query: { state },
+    });
+    if (!result.success) return { success: false, events: [], error: result.error };
+    const events = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
+    return { success: true, events, error: "" };
+  }
+
+  async getEventSession(eventId: string, sessionId: string): Promise<SmartRecruitersEventSessionResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}`);
+    if (!result.success) return { success: false, session: {}, error: result.error };
+    return { success: true, session: result.data, error: "" };
+  }
+
+  /** Sessions have no standalone create/update endpoint — they're only created/updated as part of
+   * the parent event's body (createEvent/updateEvent's `sessions` array). */
+  async deleteEventSession(eventId: string, sessionId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async addSessionInterviewers(eventId: string, sessionId: string, interviewerIds: string[]): Promise<SmartRecruitersInterviewersListResult> {
+    const result = await this.request<Record<string, unknown>[]>("PUT", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}/interviewers`, {
+      body: { interviewers: interviewerIds },
+    });
+    if (!result.success) return { success: false, interviewers: [], error: result.error };
+    return { success: true, interviewers: Array.isArray(result.data) ? result.data : [], error: "" };
+  }
+
+  async removeSessionInterviewers(eventId: string, sessionId: string, interviewerIds: string[]): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}/interviewers`, {
+      body: { interviewers: interviewerIds },
+    });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** Combines both event-applicants-pool and session-applicants, unpaginated per the docs — use
+   * getEventPoolApplicants instead for the paginated, pool-only view. */
+  async getAllEventApplicants(eventId: string): Promise<SmartRecruitersApplicantsListResult> {
+    const result = await this.request<Record<string, unknown>[] | { content?: Record<string, unknown>[] }>("GET", `event-management-api/events/${encodeURIComponent(eventId)}/applicants`);
+    if (!result.success) return { success: false, applicants: [], totalFound: 0, error: result.error };
+    const applicants = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
+    return { success: true, applicants, totalFound: applicants.length, error: "" };
+  }
+
+  async getEventPoolApplicants(eventId: string, page: number, pageSize: number): Promise<SmartRecruitersApplicantsListResult> {
+    const result = await this.request<{ content?: Record<string, unknown>[]; totalFound?: number }>("GET", `event-management-api/events/${encodeURIComponent(eventId)}/pool-applicants`, {
+      query: { page, pageSize },
+    });
+    if (!result.success) return { success: false, applicants: [], totalFound: 0, error: result.error };
+    return { success: true, applicants: result.data.content ?? [], totalFound: result.data.totalFound ?? 0, error: "" };
+  }
+
+  async addApplicantsToEvent(eventId: string, applicantIds: string[]): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("POST", `event-management-api/events/${encodeURIComponent(eventId)}/applicants`, { body: { applicantIds } });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async addApplicantsToSession(eventId: string, sessionId: string, applicantIds: string[], allowOverbooking: boolean): Promise<SmartRecruitersSessionApplicantsResult> {
+    const result = await this.request<Record<string, unknown>[]>("POST", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}/applicants`, {
+      body: { applicantIds, allowOverbooking },
+    });
+    if (!result.success) return { success: false, applicants: [], error: result.error };
+    return { success: true, applicants: Array.isArray(result.data) ? result.data : [], error: "" };
+  }
+
+  async moveApplicantsToSession(eventId: string, sessionId: string, fromSessionId: string, applicantIds: string[], allowOverbooking: boolean): Promise<SmartRecruitersSessionApplicantsResult> {
+    const result = await this.request<Record<string, unknown>[]>("PUT", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}/applicants`, {
+      body: { fromSessionId, applicantIds, allowOverbooking },
+    });
+    if (!result.success) return { success: false, applicants: [], error: result.error };
+    return { success: true, applicants: Array.isArray(result.data) ? result.data : [], error: "" };
+  }
+
+  async searchSelfSchedules(applicationId: string, withInterviews: boolean | undefined, limit: number, offset: number): Promise<SmartRecruitersSelfSchedulesListResult> {
+    const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", "self-scheduling/self-schedules", {
+      query: { applicationId, withInterviews, limit, offset },
+    });
+    if (!result.success) return { success: false, selfSchedules: [], error: result.error };
+    const selfSchedules = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
+    return { success: true, selfSchedules, error: "" };
+  }
+
+  async getSelfSchedule(selfScheduleId: string): Promise<SmartRecruitersSelfScheduleResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}`);
+    if (!result.success) return { success: false, selfSchedule: {}, error: result.error };
+    return { success: true, selfSchedule: result.data, error: "" };
+  }
+
+  async cancelSelfSchedule(selfScheduleId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async getApplicationSelfSchedule(selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}/application/${encodeURIComponent(applicationUuid)}`);
+    if (!result.success) return { success: false, selfSchedule: {}, error: result.error };
+    return { success: true, selfSchedule: result.data, error: "" };
+  }
+
+  async getSelfScheduleSlots(selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleSlotsResult> {
+    const result = await this.request<Record<string, unknown>[]>("GET", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}/application/${encodeURIComponent(applicationUuid)}/slots`);
+    if (!result.success) return { success: false, slots: [], error: result.error };
+    return { success: true, slots: Array.isArray(result.data) ? result.data : [], error: "" };
+  }
+
+  async createSelfScheduleInterview(selfScheduleId: string, applicationUuid: string, startsAt: string, endsAt: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
+    const result = await this.request<Record<string, unknown>>("POST", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}/application/${encodeURIComponent(applicationUuid)}/interview`, { body: { startsAt, endsAt } });
+    if (!result.success) return { success: false, interview: {}, error: result.error };
+    return { success: true, interview: result.data, error: "" };
+  }
+
+  async updateSelfScheduleInterview(selfScheduleId: string, applicationUuid: string, startsAt: string, endsAt: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
+    const result = await this.request<Record<string, unknown>>("PUT", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}/application/${encodeURIComponent(applicationUuid)}/interview`, { body: { startsAt, endsAt } });
+    if (!result.success) return { success: false, interview: {}, error: result.error };
+    return { success: true, interview: result.data, error: "" };
+  }
+
+  async getSelfScheduledInterview(selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}/application/${encodeURIComponent(applicationUuid)}/interview`);
+    if (!result.success) return { success: false, interview: {}, error: result.error };
+    return { success: true, interview: result.data, error: "" };
+  }
+
+  /** Returns only a generated `selfScheduleId` — the candidate-facing flow (invite, slots, interview
+   * creation) is driven by the rest of the automated-self-schedules sub-family below. */
+  async createAutomatedSelfSchedule(applicationUuid: string): Promise<SmartRecruitersSelfScheduleIdResult> {
+    const result = await this.request<{ selfScheduleId?: string }>("POST", "self-scheduling/automated-self-schedules", { body: { applicationUuid } });
+    if (!result.success) return { success: false, selfScheduleId: "", error: result.error };
+    return { success: true, selfScheduleId: result.data.selfScheduleId ?? "", error: "" };
+  }
+
+  async updateAutomatedSelfScheduleInvite(config: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("POST", "self-scheduling/automated-self-schedules/update-invite", { body: config });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async requestAutomatedSelfReschedule(config: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("POST", "self-scheduling/automated-self-schedules/reschedule", { body: config });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** `scheduleType` (INDIVIDUAL|GROUP) is a path segment, not a body field. */
+  async getAutomatedScheduleAvailableSlotsCount(scheduleType: string, applicationUuid: string, interviewerIdsByRole: Record<string, string[]>, startDate: string, endDate: string, slotsAvailabilityLimitInDays: number): Promise<SmartRecruitersAvailableSlotsCountResult> {
+    const result = await this.request<{ count?: number }>("POST", `self-scheduling/automated-self-schedules/${encodeURIComponent(scheduleType)}/application/${encodeURIComponent(applicationUuid)}/slots/count/by-role`, {
+      body: { interviewerIdsByRole, startDate: startDate || undefined, endDate: endDate || undefined, slotsAvailabilityLimitInDays: slotsAvailabilityLimitInDays || undefined },
+    });
+    if (!result.success) return { success: false, count: 0, error: result.error };
+    return { success: true, count: result.data.count ?? 0, error: "" };
   }
 }

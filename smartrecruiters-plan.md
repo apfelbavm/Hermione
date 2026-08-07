@@ -163,11 +163,53 @@ clientSecret, tokenUrl}`. `static forAuth(auth)` caches instances per auth (mirr
       subagent passes against live docs (a first pass found conflicting path prefixes across
       reference pages; a second pass resolved it — the docs render endpoint paths relative to a
       selectable server base, not an inconsistency). Verified: tsc clean, prettier clean.
-- [ ] **Phase 6 — Interviews & Events**: interviews CRUD, interview types CRUD,
-      events (create/get/update/delete, sessions, interviewers add/remove, applicants
-      move/add, get events for job/candidate/application), self-scheduling
-      (create/update/get/cancel/search, slots), timeslots CRUD + statuses, schedule
-      preferences.
+- [x] **Phase 6 — Interviews & Events** (done 2026-08-07): searchInterviews/createInterview/
+      getInterview/updateInterview/deleteInterview (`interviews-api/v201904/interviews` — update/
+      delete are documented as supported only for interviews created via the Public API);
+      listInterviewTypes/addInterviewTypes/deleteInterviewType (`interview-types` is a flat list of
+      strings, not objects with ids — addInterviewTypes is additive/PATCH, no full-replace endpoint
+      exists, and delete uses the name itself as the path segment); timeslots nested under an
+      interview — createInterviewTimeslot/getInterviewTimeslot/updateInterviewTimeslot/
+      deleteInterviewTimeslot/setInterviewTimeslotNoShow (no standalone timeslot search — always
+      interview-scoped; delete 409s on an interview's last timeslot); status sub-resources —
+      updateInterviewCandidateStatus (deprecated, interview-scoped, Public-API-only, kept for
+      exhaustive coverage same as prior phases' deprecated variants), updateTimeslotCandidateStatus,
+      updateTimeslotInterviewerStatus; getSchedulePreferences (`interview-templates/schedule/
+      preferences/users/{userId}` — a third, separately-named sub-API). Events implemented as a full
+      second family under `event-management-api`: createEvent/getEvent/updateEvent/deleteEvent,
+      listJobEvents/getEventsForCandidate/getEventsForApplication, getEventSession/
+      deleteEventSession (sessions have no standalone create/update — only via the parent event's
+      `sessions` array), addSessionInterviewers/removeSessionInterviewers, getAllEventApplicants/
+      getEventPoolApplicants/addApplicantsToEvent/addApplicantsToSession/moveApplicantsToSession.
+      Self-Scheduling implemented as a third family under `self-scheduling`: searchSelfSchedules/
+      getSelfSchedule/cancelSelfSchedule/getApplicationSelfSchedule/getSelfScheduleSlots/
+      createSelfScheduleInterview/updateSelfScheduleInterview/getSelfScheduledInterview, plus the
+      automated-self-schedule sub-family (createAutomatedSelfSchedule/
+      updateAutomatedSelfScheduleInvite/requestAutomatedSelfReschedule/
+      getAutomatedScheduleAvailableSlotsCount). **Interviews-api vs. event-management-api resolved
+      as two genuinely separate, still-documented resource families** (not a Phase-5-style
+      duplicate) — confirmed via two independent live-docs research passes: interviews-api is the
+      older, narrower, timeslot/interviewer-status-centric family explicitly restricted to
+      Public-API-created interviews for update/delete; event-management-api is the actively
+      developed family (sessions, applicant pools, richer invitations/reminders) with its own
+      changelog. Both were implemented in full rather than picking one. **Schedule preferences has
+      no update endpoint** — only a documented GET exists, so it's read-only here, same kind of
+      scope correction as the Phase 3 EEO drop / Phase 4 consent drop / Phase 5 "me" drop. Interview
+      Templates CRUD (get/update/delete by id under `interview-templates`) was intentionally left
+      out of this phase's scope — that's Phase 7's explicit subject ("Interview Templates"), so it
+      wasn't duplicated here even though schedule preferences shares the same sub-API host. Added 3
+      enums: attendee status (accepted/declined/pending/tentative, used by the interview/timeslot
+      status endpoints), event state (PAST/ACTIVE, used by the events-list endpoints), self
+      schedule type (INDIVIDUAL/GROUP, used by the automated-schedule slots-count endpoint).
+      Interview/timeslot/event bodies stayed JSON-string pins (large/nested, mirrors Job/JobAd);
+      id-array bodies (interview types, session interviewers, event/session applicants) used
+      JSON-array pins mirroring Phase 3's candidate-tags pattern; small fixed-shape bodies (status
+      updates, self-schedule interview time range, no-show flag) got discrete pins. Endpoint shapes
+      verified against developers.smartrecruiters.com live reference docs via direct WebFetch of the
+      `llms.txt` endpoint index plus ~35 individual `/reference/*.md` pages (not from training-data
+      memory), cross-checked against an independent research subagent pass that reached the same
+      endpoint list and the same interviews-api/event-management-api "two real families" conclusion.
+      Verified: tsc clean, prettier clean.
 - [ ] **Phase 7 — Interview Templates**: templates CRUD (new + deprecated), job-level
       templates, job managed steps, search by job/application ids.
 - [ ] **Phase 8 — Offers & Approvals**: candidate offers (list/get/search/latest

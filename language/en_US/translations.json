@@ -1389,7 +1389,14 @@
         "pin_candidate_id": "Candidate ID",
         "pin_job_application_id": "Job Application ID",
         "pin_user_id": "User ID",
-        "pin_access_group_id": "Access Group ID"
+        "pin_access_group_id": "Access Group ID",
+        "pin_interview_id": "Interview ID",
+        "pin_timeslot_id": "Timeslot ID",
+        "pin_event_id": "Event ID",
+        "pin_session_id": "Session ID",
+        "pin_self_schedule_id": "Self Schedule ID",
+        "pin_application_uuid": "Application UUID",
+        "pin_application_id": "Application ID"
       },
       "apiCall": {
         "label": "SmartRecruiters API Call",
@@ -1842,6 +1849,259 @@
       "removeUserFromAccessGroup": {
         "label": "SmartRecruiters Remove User From Access Group",
         "description": "Removes a user from an access group."
+      },
+      "searchInterviews": {
+        "label": "SmartRecruiters Search Interviews",
+        "description": "Lists interviews for a given job application.",
+        "pin_interviews_json": "Interviews (JSON)"
+      },
+      "createInterview": {
+        "label": "SmartRecruiters Create Interview",
+        "description": "Creates an interview with one or more timeslots.",
+        "pin_interview_json": "Interview (JSON)",
+        "pin_created_interview_json": "Created Interview (JSON)"
+      },
+      "getInterview": {
+        "label": "SmartRecruiters Get Interview",
+        "description": "Fetches a single interview by id.",
+        "pin_interview_json": "Interview (JSON)"
+      },
+      "updateInterview": {
+        "label": "SmartRecruiters Update Interview",
+        "description": "Updates an interview's location, timezone, or candidate status. Supported only for interviews created via the Public API.",
+        "pin_patch_json": "Patch (JSON)",
+        "pin_interview_json": "Interview (JSON)"
+      },
+      "deleteInterview": {
+        "label": "SmartRecruiters Delete Interview",
+        "description": "Deletes an interview. Supported only for interviews created via the Public API."
+      },
+      "listInterviewTypes": {
+        "label": "SmartRecruiters List Interview Types",
+        "description": "Lists the company's interview type names.",
+        "pin_interview_types_json": "Interview Types (JSON)"
+      },
+      "addInterviewTypes": {
+        "label": "SmartRecruiters Add Interview Types",
+        "description": "Adds interview type names to the company's existing set (additive, not a full replace).",
+        "pin_interview_types_json": "Interview Types (JSON)"
+      },
+      "deleteInterviewType": {
+        "label": "SmartRecruiters Delete Interview Type",
+        "description": "Removes an interview type by name.",
+        "pin_interview_type": "Interview Type Name"
+      },
+      "createInterviewTimeslot": {
+        "label": "SmartRecruiters Create Interview Timeslot",
+        "description": "Adds a timeslot to an interview.",
+        "pin_timeslot_json": "Timeslot (JSON)",
+        "pin_created_timeslot_json": "Created Timeslot (JSON)"
+      },
+      "getInterviewTimeslot": {
+        "label": "SmartRecruiters Get Interview Timeslot",
+        "description": "Fetches a single timeslot of an interview.",
+        "pin_timeslot_json": "Timeslot (JSON)"
+      },
+      "updateInterviewTimeslot": {
+        "label": "SmartRecruiters Update Interview Timeslot",
+        "description": "Updates a timeslot's time range, interviewers, or other fields.",
+        "pin_timeslot_json": "Timeslot (JSON)",
+        "pin_updated_timeslot_json": "Updated Timeslot (JSON)"
+      },
+      "deleteInterviewTimeslot": {
+        "label": "SmartRecruiters Delete Interview Timeslot",
+        "description": "Deletes a timeslot from an interview. Fails if it's the interview's last remaining timeslot."
+      },
+      "setInterviewTimeslotNoShow": {
+        "label": "SmartRecruiters Set Interview Timeslot No-Show",
+        "description": "Marks whether the candidate was a no-show for a timeslot.",
+        "pin_value": "No-Show"
+      },
+      "updateInterviewCandidateStatus": {
+        "label": "SmartRecruiters Update Interview Candidate Status (Deprecated)",
+        "description": "Deprecated, interview-scoped candidate status update. Supported only for interviews created via the Public API — prefer Update Timeslot Candidate Status.",
+        "pin_status": "Status"
+      },
+      "updateTimeslotCandidateStatus": {
+        "label": "SmartRecruiters Update Timeslot Candidate Status",
+        "description": "Updates the candidate's response status for a specific timeslot.",
+        "pin_status": "Status"
+      },
+      "updateTimeslotInterviewerStatus": {
+        "label": "SmartRecruiters Update Timeslot Interviewer Status",
+        "description": "Updates an interviewer's response status for a specific timeslot.",
+        "pin_status": "Status"
+      },
+      "getSchedulePreferences": {
+        "label": "SmartRecruiters Get Schedule Preferences",
+        "description": "Fetches a user's interview scheduling preferences (availability hours, buffer/advance time, daily limit). Read-only — no update endpoint is documented.",
+        "pin_preferences_json": "Preferences (JSON)"
+      },
+      "createEvent": {
+        "label": "SmartRecruiters Create Event",
+        "description": "Creates an interview event with sessions, invitations, and reminders.",
+        "pin_event_json": "Event (JSON)",
+        "pin_created_event_json": "Created Event (JSON)"
+      },
+      "getEvent": {
+        "label": "SmartRecruiters Get Event",
+        "description": "Fetches a single event's details.",
+        "pin_event_json": "Event (JSON)"
+      },
+      "updateEvent": {
+        "label": "SmartRecruiters Update Event",
+        "description": "Replaces an event's details, invitations, and reminders.",
+        "pin_event_json": "Event (JSON)",
+        "pin_updated_event_json": "Updated Event (JSON)"
+      },
+      "deleteEvent": {
+        "label": "SmartRecruiters Delete Event",
+        "description": "Deletes an event."
+      },
+      "listJobEvents": {
+        "label": "SmartRecruiters List Job Events",
+        "description": "Lists past or active events for a job.",
+        "pin_state": "State",
+        "pin_page": "Page",
+        "pin_page_size": "Page Size",
+        "pin_events_json": "Events (JSON)"
+      },
+      "getEventsForCandidate": {
+        "label": "SmartRecruiters Get Events For Candidate",
+        "description": "Lists past or active events for a candidate.",
+        "pin_state": "State",
+        "pin_events_json": "Events (JSON)"
+      },
+      "getEventsForApplication": {
+        "label": "SmartRecruiters Get Events For Application",
+        "description": "Lists past or active events for a job application.",
+        "pin_state": "State",
+        "pin_events_json": "Events (JSON)"
+      },
+      "getEventSession": {
+        "label": "SmartRecruiters Get Event Session",
+        "description": "Fetches a single session's details within an event.",
+        "pin_session_json": "Session (JSON)"
+      },
+      "deleteEventSession": {
+        "label": "SmartRecruiters Delete Event Session",
+        "description": "Deletes a session from an event. Sessions can only be created/updated as part of the parent event's body."
+      },
+      "addSessionInterviewers": {
+        "label": "SmartRecruiters Add Session Interviewers",
+        "description": "Adds interviewers to an event session.",
+        "pin_interviewer_ids_json": "Interviewer IDs (JSON)",
+        "pin_interviewers_json": "Interviewers (JSON)"
+      },
+      "removeSessionInterviewers": {
+        "label": "SmartRecruiters Remove Session Interviewers",
+        "description": "Removes interviewers from an event session.",
+        "pin_interviewer_ids_json": "Interviewer IDs (JSON)"
+      },
+      "getAllEventApplicants": {
+        "label": "SmartRecruiters Get All Event Applicants",
+        "description": "Fetches all applicants (both the event pool and session applicants) for an event.",
+        "pin_applicants_json": "Applicants (JSON)",
+        "pin_total_found": "Total Found"
+      },
+      "getEventPoolApplicants": {
+        "label": "SmartRecruiters Get Event Pool Applicants",
+        "description": "Fetches an event's pool applicants (not yet assigned to a session), paginated.",
+        "pin_page": "Page",
+        "pin_page_size": "Page Size",
+        "pin_applicants_json": "Applicants (JSON)",
+        "pin_total_found": "Total Found"
+      },
+      "addApplicantsToEvent": {
+        "label": "SmartRecruiters Add Applicants To Event",
+        "description": "Adds applicants to an event's applicant pool.",
+        "pin_applicant_ids_json": "Applicant IDs (JSON)"
+      },
+      "addApplicantsToSession": {
+        "label": "SmartRecruiters Add Applicants To Session",
+        "description": "Assigns applicants from an event's pool to a specific session.",
+        "pin_applicant_ids_json": "Applicant IDs (JSON)",
+        "pin_allow_overbooking": "Allow Overbooking",
+        "pin_applicants_json": "Session Applicants (JSON)"
+      },
+      "moveApplicantsToSession": {
+        "label": "SmartRecruiters Move Applicants To Session",
+        "description": "Moves applicants from one session to another within the same event.",
+        "pin_from_session_id": "From Session ID",
+        "pin_applicant_ids_json": "Applicant IDs (JSON)",
+        "pin_allow_overbooking": "Allow Overbooking",
+        "pin_applicants_json": "Session Applicants (JSON)"
+      },
+      "searchSelfSchedules": {
+        "label": "SmartRecruiters Search Self Schedules",
+        "description": "Searches self-scheduling instances for a job application.",
+        "pin_with_interviews": "With Interviews Only",
+        "pin_limit": "Limit",
+        "pin_offset": "Offset",
+        "pin_self_schedules_json": "Self Schedules (JSON)"
+      },
+      "getSelfSchedule": {
+        "label": "SmartRecruiters Get Self Schedule",
+        "description": "Fetches a self-scheduling instance by id.",
+        "pin_self_schedule_json": "Self Schedule (JSON)"
+      },
+      "cancelSelfSchedule": {
+        "label": "SmartRecruiters Cancel Self Schedule",
+        "description": "Cancels a self-scheduling instance."
+      },
+      "getApplicationSelfSchedule": {
+        "label": "SmartRecruiters Get Application Self Schedule",
+        "description": "Fetches application-scoped details for a self-scheduling instance (e.g. the candidate-facing link).",
+        "pin_self_schedule_json": "Self Schedule (JSON)"
+      },
+      "getSelfScheduleSlots": {
+        "label": "SmartRecruiters Get Self Schedule Slots",
+        "description": "Fetches the available interview time slots a candidate can pick from.",
+        "pin_slots_json": "Slots (JSON)"
+      },
+      "createSelfScheduleInterview": {
+        "label": "SmartRecruiters Create Self Schedule Interview",
+        "description": "Creates the interview for a self-scheduling instance once a candidate has picked a slot.",
+        "pin_starts_at": "Starts At",
+        "pin_ends_at": "Ends At",
+        "pin_interview_json": "Interview (JSON)"
+      },
+      "updateSelfScheduleInterview": {
+        "label": "SmartRecruiters Update Self Schedule Interview",
+        "description": "Updates the chosen time range of a self-scheduled interview.",
+        "pin_starts_at": "Starts At",
+        "pin_ends_at": "Ends At",
+        "pin_interview_json": "Interview (JSON)"
+      },
+      "getSelfScheduledInterview": {
+        "label": "SmartRecruiters Get Self Scheduled Interview",
+        "description": "Fetches the interview created from a self-scheduling instance.",
+        "pin_interview_json": "Interview (JSON)"
+      },
+      "createAutomatedSelfSchedule": {
+        "label": "SmartRecruiters Create Automated Self Schedule",
+        "description": "Triggers automated self scheduling for a job application, returning a new self-schedule id.",
+        "pin_self_schedule_id": "Self Schedule ID"
+      },
+      "updateAutomatedSelfScheduleInvite": {
+        "label": "SmartRecruiters Update Automated Self Schedule Invite",
+        "description": "Updates the invite for an automated self-schedule (only if the applicant hasn't picked a slot yet). Config includes format, interviewers by hiring-team role, reminders, and candidate communication settings.",
+        "pin_config_json": "Config (JSON)"
+      },
+      "requestAutomatedSelfReschedule": {
+        "label": "SmartRecruiters Request Automated Self Reschedule",
+        "description": "Requests that a candidate pick a new interview time for an automated self-schedule (only if a slot was already picked and an interview exists).",
+        "pin_config_json": "Config (JSON)"
+      },
+      "getAutomatedScheduleAvailableSlotsCount": {
+        "label": "SmartRecruiters Get Automated Schedule Available Slots Count",
+        "description": "Returns the count of available automated-scheduling slots based on interviewer availability and hiring-team roles.",
+        "pin_schedule_type": "Schedule Type",
+        "pin_interviewer_ids_by_role_json": "Interviewer IDs By Role (JSON)",
+        "pin_start_date": "Start Date",
+        "pin_end_date": "End Date",
+        "pin_slots_availability_limit_in_days": "Slots Availability Limit (Days)",
+        "pin_count": "Available Slots Count"
       }
     },
     "sap": {
