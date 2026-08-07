@@ -1377,6 +1377,21 @@
         "description": "Tests that the given SMTP credential can authenticate with the server."
       }
     },
+    "smartRecruiters": {
+      "__shared": {
+        "pin_credential_name": "Credential Name",
+        "pin_method": "Method",
+        "pin_path": "Path",
+        "pin_query_json": "Query Params (JSON)",
+        "pin_body_json": "Body (JSON)"
+      },
+      "apiCall": {
+        "label": "SmartRecruiters API Call",
+        "description": "Calls any documented SmartRecruiters REST endpoint directly (escape hatch for endpoints without a dedicated node yet).",
+        "pin_status": "HTTP Status",
+        "pin_data_json": "Data (JSON)"
+      }
+    },
     "sap": {
       "__shared": {
         "pin_credential_name": "Credential Name"

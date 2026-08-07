@@ -43,6 +43,7 @@ import "@hermione/graph/nodes/smtp";
 import "@hermione/graph/nodes/sap";
 import "@hermione/graph/nodes/linkedin";
 import "@hermione/graph/nodes/sendgrid";
+import "@hermione/graph/nodes/smartRecruiters";
 
 let registered = false;
 

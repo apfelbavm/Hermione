@@ -27,6 +27,8 @@ export type CredentialTypeId =
   | "sapBasicAuth"
   | "linkedInOAuth2"
   | "sendGridApiKey"
+  | "smartRecruitersApiKey"
+  | "smartRecruitersOAuth2ClientCredentials"
   | "externalVaultSecret";
 
 export interface UsernamePasswordCredentialData {
@@ -258,6 +260,25 @@ export interface SendGridApiKeyCredentialData {
   apiKey: string;
 }
 
+/** A SmartRecruiters API key, sent as the `X-SmartToken` header on every request — see
+ * lib/smartRecruitersManager.ts. The simpler of SmartRecruiters' two auth options (full access,
+ * scoped only by the key's own permissions), recommended by SmartRecruiters for testing/simple
+ * integrations over the OAuth2 client-credentials grant below. */
+export interface SmartRecruitersApiKeyCredentialData {
+  apiKey: string;
+}
+
+/** A SmartRecruiters OAuth2 app's client id/secret plus its token endpoint, used with the
+ * client-credentials grant ("machine to machine", no signed-in user) — see
+ * lib/smartRecruitersManager.ts, which exchanges these for a short-lived Bearer access token and
+ * caches/refreshes it automatically. SmartRecruiters recommends this over a plain API key for
+ * production integrations since access can be scoped down by the app registration. */
+export interface SmartRecruitersOAuth2ClientCredentialsData {
+  clientId: string;
+  clientSecret: string;
+  tokenUrl: string;
+}
+
 /** A secret pulled live from an externally-connected vault (see credentials/vaultProviders.ts,
  * server/vaultCredentials.ts) — shape is whatever that vault returned for it, verbatim, since an
  * external vault's own secrets aren't constrained to any of the typed shapes above. */
@@ -288,6 +309,8 @@ export type CredentialData =
   | SapBasicAuthCredentialData
   | LinkedInOAuth2CredentialData
   | SendGridApiKeyCredentialData
+  | SmartRecruitersApiKeyCredentialData
+  | SmartRecruitersOAuth2ClientCredentialsData
   | ExternalVaultSecretCredentialData;
 
 /** A summary never carries `data` — the Credential Vault's own list view (and anything else that

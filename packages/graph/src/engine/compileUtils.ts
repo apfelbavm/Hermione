@@ -91,6 +91,11 @@ export const FUNCTION_LIBRARY_KINESIS_IMPORT = 'import * as functionLibraryKines
  * nodes/mongo.ts). */
 export const FUNCTION_LIBRARY_MONGO_IMPORT = 'import * as functionLibraryMongo from "../../packages/core/src/server/functionLibraryMongo.ts";';
 
+/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibrarySmartRecruiters.ts — kept in
+ * its own file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see
+ * nodes/smartRecruiters.ts). */
+export const FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT = 'import * as functionLibrarySmartRecruiters from "../../packages/core/src/server/functionLibrarySmartRecruiters.ts";';
+
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/executeDeployedFlow.ts — used by
  * flow.executeFlow's compileExecute (see nodes/flow.ts) so a deployed flow's own "Execute Flow"
  * node dynamic-imports the target Flow's DEPLOYED script exactly the same way the interpreter's

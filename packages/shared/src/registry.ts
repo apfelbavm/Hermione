@@ -299,6 +299,22 @@ registerCredentialType({
 });
 
 registerCredentialType({
+  id: "smartRecruitersApiKey",
+  label: "SmartRecruiters API Key",
+  fields: [{ id: "apiKey", label: "API Key", secret: true, help: "From your SmartRecruiters Credential Manager. Sent as the X-SmartToken header on every request." }],
+});
+
+registerCredentialType({
+  id: "smartRecruitersOAuth2ClientCredentials",
+  label: "SmartRecruiters OAuth2 (Client Credentials)",
+  fields: [
+    { id: "clientId", label: "Client ID" },
+    { id: "clientSecret", label: "Client Secret", secret: true },
+    { id: "tokenUrl", label: "Token URL", help: "SmartRecruiters' OAuth2 token endpoint, e.g. https://api.smartrecruiters.com/identity/oauth/token" },
+  ],
+});
+
+registerCredentialType({
   id: "smtpCredential",
   label: "SMTP",
   fields: [
