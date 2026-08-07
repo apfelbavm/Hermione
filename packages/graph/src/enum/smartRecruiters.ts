@@ -70,3 +70,43 @@ registerEnumType({
     { id: "INTERNAL", label: "Internal" },
   ],
 });
+
+export const SMARTRECRUITERS_ATTACHMENT_TYPE_ENUM_TYPE = "smartRecruitersAttachmentType";
+
+registerEnumType({
+  id: SMARTRECRUITERS_ATTACHMENT_TYPE_ENUM_TYPE,
+  label: "SmartRecruiters Attachment Type",
+  category: "SmartRecruiters",
+  values: [
+    { id: "RESUME", label: "Resume" },
+    { id: "COVER_LETTER", label: "Cover Letter" },
+    { id: "GENERIC_FILE", label: "Generic File" },
+  ],
+});
+
+export const SMARTRECRUITERS_PROPERTY_CONTEXT_ENUM_TYPE = "smartRecruitersPropertyContext";
+
+registerEnumType({
+  id: SMARTRECRUITERS_PROPERTY_CONTEXT_ENUM_TYPE,
+  label: "SmartRecruiters Property Context",
+  category: "SmartRecruiters",
+  values: [
+    { id: "PROFILE", label: "Profile" },
+    { id: "OFFER_FORM", label: "Offer Form" },
+    { id: "HIRE_FORM", label: "Hire Form" },
+    { id: "OFFER_APPROVAL_FORM", label: "Offer Approval Form" },
+  ],
+});
+
+export const SMARTRECRUITERS_ONBOARDING_STATUS_ENUM_TYPE = "smartRecruitersOnboardingStatus";
+
+registerEnumType({
+  id: SMARTRECRUITERS_ONBOARDING_STATUS_ENUM_TYPE,
+  label: "SmartRecruiters Onboarding Status",
+  category: "SmartRecruiters",
+  values: [
+    { id: "READY_TO_ONBOARD", label: "Ready to Onboard" },
+    { id: "ONBOARDING_SUCCESSFUL", label: "Onboarding Successful" },
+    { id: "ONBOARDING_FAILED", label: "Onboarding Failed" },
+  ],
+});

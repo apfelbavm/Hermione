@@ -91,12 +91,36 @@ here immediately after finishing + verifying it (tsc clean, prettier run).
   Added 3 enums: hiring team role, position type, job ad posting visibility.
   Endpoint shapes verified against developers.smartrecruiters.com reference docs
   (fetched live, not from training-data memory). Verified: tsc clean, prettier clean.
-- [ ] **Phase 3 — Candidates core**: search candidates, add candidate (talent pool),
-  add candidate to job, resume parse (+ add resume / add-to-job variants), get,
-  delete, update, tags (add/get/replace/delete), status update/history, source
-  update, consent (request/status/decisions), EEO, properties get/update (job +
-  non-job variants), attachments (list/add/get/delete, job-scoped variants),
-  onboarding status (candidate + job-scoped), screening answers.
+- [x] **Phase 3 — Candidates core** (done 2026-08-07): searchCandidates
+  (`/candidates`, `nextPageId`-based pagination — NOT offset like Jobs), addCandidate
+  (talent pool), addCandidateToJob, parseResume/parseResumeForJob (multipart
+  `POST .../candidates/cv`, file passed as base64+filename+contentType pins and
+  converted to a `Blob`/`FormData` in the manager — no existing repo precedent for
+  multipart uploads via raw fetch, added a `buildFileFormData` helper + a `formData`
+  option on `request()`), getCandidate, deleteCandidate, updateCandidate (JSON merge
+  patch), tags (get/add/replace/delete — delete clears all, no selective API),
+  updateCandidateJobStatus + getCandidateJobStatusHistory (job-scoped, confirmed via
+  live docs at `/candidates/{id}/jobs/{jobId}/status...`), updateCandidateSource
+  (job-scoped only, no talent-pool-level variant exists), consent
+  (requestCandidateConsent batch + getCandidateConsentStatus +
+  getCandidateConsentDecisions), candidate properties (both the deprecated
+  non-job-scoped `getCandidateProperties`/`updateCandidateProperty` and the current
+  job-scoped `getCandidateJobProperties`/`updateCandidateJobProperties` batch
+  endpoint — kept both per the "job + non-job variants" scope), attachments
+  (listCandidateAttachments/addCandidateAttachment/getCandidateAttachment — **no
+  delete-attachment endpoint exists** in the API and **no job-scoped attachment
+  variant exists** either, verified against live docs, so neither was added),
+  onboarding status (both deprecated global and current job-scoped
+  get/update), getCandidateScreeningAnswers (job-scoped only).
+  **EEO was dropped from scope**: verified against live SmartRecruiters reference
+  docs that no standalone EEO endpoint exists — `eeo` is just one of several
+  screening-question `type` values returned by getCandidateScreeningAnswers, not a
+  separate resource. Endpoint shapes verified against developers.smartrecruiters.com
+  live docs via a research subagent (not from training-data memory), including a
+  second verification pass on job-scoped properties/status-history/onboarding paths
+  that were only named in deprecation-notice text on other pages. Added 3 enums
+  (attachment type, property context, onboarding status). Verified: tsc clean,
+  prettier clean.
 - [ ] **Phase 4 — Job Applications**: get by id, delete by id, consent
   request/decision.
 - [ ] **Phase 5 — Users & Access**: list/create/get/update users, me, password

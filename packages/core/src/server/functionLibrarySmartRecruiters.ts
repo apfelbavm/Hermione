@@ -224,3 +224,210 @@ export async function smartRecruitersRemoveHiringTeamMember(credentialName: stri
   if (!cred.ok) return { success: false, error: cred.error };
   return SmartRecruitersManager.forAuth(cred.auth).removeHiringTeamMember(jobId, userId);
 }
+
+// --- Candidates core (Phase 3) --------------------------------------------------------------
+
+function parseJsonArray(json: string, label: string): { ok: true; value: Record<string, unknown>[] } | { ok: false; error: string } {
+  try {
+    const parsed = json ? JSON.parse(json) : [];
+    return { ok: true, value: Array.isArray(parsed) ? parsed : [] };
+  } catch {
+    return { ok: false, error: `${label} is not valid JSON` };
+  }
+}
+
+export async function smartRecruitersSearchCandidates(credentialName: string, queryJson: string, pageId: string, limit: number) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, candidates: [], totalFound: 0, nextPageId: "", error: cred.error };
+  const parsedQuery = parseJsonRecord(queryJson, "queryJson");
+  if (!parsedQuery.ok) return { success: false, candidates: [], totalFound: 0, nextPageId: "", error: parsedQuery.error };
+  return SmartRecruitersManager.forAuth(cred.auth).searchCandidates({ ...parsedQuery.value, pageId: pageId || undefined, limit });
+}
+
+export async function smartRecruitersAddCandidate(credentialName: string, candidateJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+  const parsed = parseJsonRecord(candidateJson, "candidateJson");
+  if (!parsed.ok) return { success: false, candidate: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).addCandidate(parsed.value);
+}
+
+export async function smartRecruitersAddCandidateToJob(credentialName: string, jobId: string, candidateJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+  const parsed = parseJsonRecord(candidateJson, "candidateJson");
+  if (!parsed.ok) return { success: false, candidate: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).addCandidateToJob(jobId, parsed.value);
+}
+
+export async function smartRecruitersParseResume(credentialName: string, fileBase64: string, fileName: string, fileContentType: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string, internal: boolean) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).parseResume(fileBase64, fileName, fileContentType, sourceTypeId, sourceSubTypeId, sourceId, internal);
+}
+
+export async function smartRecruitersParseResumeForJob(credentialName: string, jobId: string, fileBase64: string, fileName: string, fileContentType: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string, internal: boolean) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).parseResumeForJob(jobId, fileBase64, fileName, fileContentType, sourceTypeId, sourceSubTypeId, sourceId, internal);
+}
+
+export async function smartRecruitersGetCandidate(credentialName: string, candidateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getCandidate(candidateId);
+}
+
+export async function smartRecruitersDeleteCandidate(credentialName: string, candidateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deleteCandidate(candidateId);
+}
+
+export async function smartRecruitersUpdateCandidate(credentialName: string, candidateId: string, patchJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+  const parsed = parseJsonRecord(patchJson, "patchJson");
+  if (!parsed.ok) return { success: false, candidate: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateCandidate(candidateId, parsed.value);
+}
+
+export async function smartRecruitersGetCandidateTags(credentialName: string, candidateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, tags: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getCandidateTags(candidateId);
+}
+
+export async function smartRecruitersAddCandidateTags(credentialName: string, candidateId: string, tagsJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, tags: [], error: cred.error };
+  const parsed = parseJsonArray(tagsJson, "tagsJson");
+  if (!parsed.ok) return { success: false, tags: [], error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).addCandidateTags(candidateId, parsed.value as unknown as string[]);
+}
+
+export async function smartRecruitersReplaceCandidateTags(credentialName: string, candidateId: string, tagsJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, tags: [], error: cred.error };
+  const parsed = parseJsonArray(tagsJson, "tagsJson");
+  if (!parsed.ok) return { success: false, tags: [], error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).replaceCandidateTags(candidateId, parsed.value as unknown as string[]);
+}
+
+export async function smartRecruitersDeleteCandidateTags(credentialName: string, candidateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deleteCandidateTags(candidateId);
+}
+
+export async function smartRecruitersUpdateCandidateJobStatus(credentialName: string, candidateId: string, jobId: string, status: string, subStatus: string, startsOn: string, reason: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateCandidateJobStatus(candidateId, jobId, status, subStatus, startsOn, reason);
+}
+
+export async function smartRecruitersGetCandidateJobStatusHistory(credentialName: string, candidateId: string, jobId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, history: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getCandidateJobStatusHistory(candidateId, jobId);
+}
+
+export async function smartRecruitersUpdateCandidateSource(credentialName: string, candidateId: string, jobId: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateCandidateSource(candidateId, jobId, sourceTypeId, sourceSubTypeId, sourceId);
+}
+
+export async function smartRecruitersRequestCandidateConsent(credentialName: string, candidateIdsJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, results: [], error: cred.error };
+  const parsed = parseJsonArray(candidateIdsJson, "candidateIdsJson");
+  if (!parsed.ok) return { success: false, results: [], error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).requestCandidateConsent(parsed.value as unknown as string[]);
+}
+
+export async function smartRecruitersGetCandidateConsentStatus(credentialName: string, candidateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, status: "", date: "", error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getCandidateConsentStatus(candidateId);
+}
+
+export async function smartRecruitersGetCandidateConsentDecisions(credentialName: string, candidateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, decisions: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getCandidateConsentDecisions(candidateId);
+}
+
+export async function smartRecruitersGetCandidateProperties(credentialName: string, candidateId: string, context: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, properties: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getCandidateProperties(candidateId, context);
+}
+
+export async function smartRecruitersUpdateCandidateProperty(credentialName: string, candidateId: string, propertyId: string, value: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateCandidateProperty(candidateId, propertyId, value);
+}
+
+export async function smartRecruitersGetCandidateJobProperties(credentialName: string, candidateId: string, jobId: string, context: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, properties: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getCandidateJobProperties(candidateId, jobId, context);
+}
+
+export async function smartRecruitersUpdateCandidateJobProperties(credentialName: string, candidateId: string, jobId: string, propertiesJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  const parsed = parseJsonArray(propertiesJson, "propertiesJson");
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateCandidateJobProperties(candidateId, jobId, parsed.value as unknown as { id: string; value: unknown }[]);
+}
+
+export async function smartRecruitersListCandidateAttachments(credentialName: string, candidateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, attachments: [], totalFound: 0, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).listCandidateAttachments(candidateId);
+}
+
+export async function smartRecruitersAddCandidateAttachment(credentialName: string, candidateId: string, attachmentType: string, fileBase64: string, fileName: string, fileContentType: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, attachment: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).addCandidateAttachment(candidateId, attachmentType, fileBase64, fileName, fileContentType);
+}
+
+export async function smartRecruitersGetCandidateAttachment(credentialName: string, candidateId: string, attachmentId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, contentBase64: "", contentType: "", error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getCandidateAttachment(candidateId, attachmentId);
+}
+
+export async function smartRecruitersGetCandidateOnboardingStatus(credentialName: string, candidateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, onboardingStatus: "", error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getCandidateOnboardingStatus(candidateId);
+}
+
+export async function smartRecruitersUpdateCandidateOnboardingStatus(credentialName: string, candidateId: string, onboardingStatus: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, onboardingStatus: "", error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateCandidateOnboardingStatus(candidateId, onboardingStatus);
+}
+
+export async function smartRecruitersGetCandidateJobOnboardingStatus(credentialName: string, candidateId: string, jobId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, onboardingStatus: "", error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getCandidateJobOnboardingStatus(candidateId, jobId);
+}
+
+export async function smartRecruitersUpdateCandidateJobOnboardingStatus(credentialName: string, candidateId: string, jobId: string, onboardingStatus: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, onboardingStatus: "", error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateCandidateJobOnboardingStatus(candidateId, jobId, onboardingStatus);
+}
+
+export async function smartRecruitersGetCandidateScreeningAnswers(credentialName: string, candidateId: string, jobId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, answers: [], totalFound: 0, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getCandidateScreeningAnswers(candidateId, jobId);
+}

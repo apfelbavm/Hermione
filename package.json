@@ -8,12 +8,15 @@
   ],
   "scripts": {
     "run": "node scripts/checkNodeVersion.mjs && npm run run-dev",
-    "--------------------------": "",
+    "__________________________": "",
     "build": "next build",
     "run-dev": "cross-env NODE_OPTIONS=--experimental-strip-types next dev",
     "run-prod": "cross-env NODE_OPTIONS=--experimental-strip-types next start",
     "test": "vitest run",
-    "compile": "tsx scripts/compileGraph.ts"
+    "compile": "tsx scripts/compileGraph.ts",
+    "_____________AI Helpers_____________": "",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@microsoft/microsoft-graph-types": "^2.43.1",

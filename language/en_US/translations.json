@@ -1385,7 +1385,8 @@
         "pin_query_json": "Query Params (JSON)",
         "pin_body_json": "Body (JSON)",
         "pin_job_id": "Job ID",
-        "pin_job_ad_id": "Job Ad ID"
+        "pin_job_ad_id": "Job Ad ID",
+        "pin_candidate_id": "Candidate ID"
       },
       "apiCall": {
         "label": "SmartRecruiters API Call",
@@ -1549,6 +1550,197 @@
         "label": "SmartRecruiters Remove Hiring Team Member",
         "description": "Removes a user from a job's hiring team.",
         "pin_user_id": "User ID"
+      },
+      "searchCandidates": {
+        "label": "SmartRecruiters Search Candidates",
+        "description": "Searches/lists candidates, with pagination and optional query filters.",
+        "pin_page_id": "Page ID",
+        "pin_limit": "Limit",
+        "pin_candidates_json": "Candidates (JSON)",
+        "pin_total_found": "Total Found",
+        "pin_next_page_id": "Next Page ID"
+      },
+      "addCandidate": {
+        "label": "SmartRecruiters Add Candidate",
+        "description": "Adds a new candidate to the talent pool (not tied to any job).",
+        "pin_candidate_json": "Candidate (JSON)",
+        "pin_created_candidate_json": "Created Candidate (JSON)"
+      },
+      "addCandidateToJob": {
+        "label": "SmartRecruiters Add Candidate to Job",
+        "description": "Adds a new candidate directly to a job's pipeline.",
+        "pin_candidate_json": "Candidate (JSON)",
+        "pin_created_candidate_json": "Created Candidate (JSON)"
+      },
+      "parseResume": {
+        "label": "SmartRecruiters Parse Resume",
+        "description": "Parses a resume file and creates a talent-pool candidate from it.",
+        "pin_file_base64": "File (Base64)",
+        "pin_file_name": "File Name",
+        "pin_file_content_type": "File Content Type",
+        "pin_source_type_id": "Source Type ID",
+        "pin_source_sub_type_id": "Source Sub-Type ID",
+        "pin_source_id": "Source ID",
+        "pin_internal": "Internal",
+        "pin_created_candidate_json": "Created Candidate (JSON)"
+      },
+      "parseResumeForJob": {
+        "label": "SmartRecruiters Parse Resume for Job",
+        "description": "Parses a resume file and creates a candidate attached directly to a job.",
+        "pin_file_base64": "File (Base64)",
+        "pin_file_name": "File Name",
+        "pin_file_content_type": "File Content Type",
+        "pin_source_type_id": "Source Type ID",
+        "pin_source_sub_type_id": "Source Sub-Type ID",
+        "pin_source_id": "Source ID",
+        "pin_internal": "Internal",
+        "pin_created_candidate_json": "Created Candidate (JSON)"
+      },
+      "getCandidate": {
+        "label": "SmartRecruiters Get Candidate",
+        "description": "Fetches a single candidate by id.",
+        "pin_candidate_json": "Candidate (JSON)"
+      },
+      "deleteCandidate": {
+        "label": "SmartRecruiters Delete Candidate",
+        "description": "Deletes a candidate."
+      },
+      "updateCandidate": {
+        "label": "SmartRecruiters Update Candidate",
+        "description": "Partially updates a candidate's personal details via JSON Merge Patch (RFC 7396) — only the fields present in the patch are changed.",
+        "pin_patch_json": "Patch (JSON)",
+        "pin_candidate_json": "Candidate (JSON)"
+      },
+      "getCandidateTags": {
+        "label": "SmartRecruiters Get Candidate Tags",
+        "description": "Fetches a candidate's tags.",
+        "pin_tags_json": "Tags (JSON)"
+      },
+      "addCandidateTags": {
+        "label": "SmartRecruiters Add Candidate Tags",
+        "description": "Adds tags to a candidate, keeping any existing tags.",
+        "pin_tags_json": "Tags (JSON)",
+        "pin_result_tags_json": "Tags (JSON)"
+      },
+      "replaceCandidateTags": {
+        "label": "SmartRecruiters Replace Candidate Tags",
+        "description": "Replaces a candidate's full tag set.",
+        "pin_tags_json": "Tags (JSON)",
+        "pin_result_tags_json": "Tags (JSON)"
+      },
+      "deleteCandidateTags": {
+        "label": "SmartRecruiters Delete Candidate Tags",
+        "description": "Clears all tags from a candidate — the API has no selective single-tag delete."
+      },
+      "updateCandidateJobStatus": {
+        "label": "SmartRecruiters Update Candidate Job Status",
+        "description": "Updates a candidate's pipeline status within a specific job.",
+        "pin_status": "Status",
+        "pin_sub_status": "Sub-Status",
+        "pin_starts_on": "Starts On",
+        "pin_reason": "Reason"
+      },
+      "getCandidateJobStatusHistory": {
+        "label": "SmartRecruiters Get Candidate Job Status History",
+        "description": "Fetches the pipeline status change history of a candidate within a specific job.",
+        "pin_history_json": "Status History (JSON)"
+      },
+      "updateCandidateSource": {
+        "label": "SmartRecruiters Update Candidate Source",
+        "description": "Updates the source attribution of a candidate within a specific job.",
+        "pin_source_type_id": "Source Type ID",
+        "pin_source_sub_type_id": "Source Sub-Type ID",
+        "pin_source_id": "Source ID"
+      },
+      "requestCandidateConsent": {
+        "label": "SmartRecruiters Request Candidate Consent",
+        "description": "Requests GDPR-style data consent from up to 1000 candidates in a single batch.",
+        "pin_candidate_ids_json": "Candidate IDs (JSON)",
+        "pin_results_json": "Results (JSON)"
+      },
+      "getCandidateConsentStatus": {
+        "label": "SmartRecruiters Get Candidate Consent Status",
+        "description": "Fetches a candidate's current consent status.",
+        "pin_status": "Status",
+        "pin_date": "Date"
+      },
+      "getCandidateConsentDecisions": {
+        "label": "SmartRecruiters Get Candidate Consent Decisions",
+        "description": "Fetches a candidate's history of consent decisions.",
+        "pin_decisions_json": "Decisions (JSON)"
+      },
+      "getCandidateProperties": {
+        "label": "SmartRecruiters Get Candidate Properties",
+        "description": "Fetches a candidate's custom properties (deprecated non-job-scoped variant — prefer Get Candidate Job Properties where a job context applies).",
+        "pin_context": "Context",
+        "pin_properties_json": "Properties (JSON)"
+      },
+      "updateCandidateProperty": {
+        "label": "SmartRecruiters Update Candidate Property",
+        "description": "Updates a single custom property on a candidate (deprecated non-job-scoped variant — prefer Update Candidate Job Properties where a job context applies).",
+        "pin_property_id": "Property ID",
+        "pin_value": "Value"
+      },
+      "getCandidateJobProperties": {
+        "label": "SmartRecruiters Get Candidate Job Properties",
+        "description": "Fetches a candidate's custom properties within a specific job context.",
+        "pin_context": "Context",
+        "pin_properties_json": "Properties (JSON)"
+      },
+      "updateCandidateJobProperties": {
+        "label": "SmartRecruiters Update Candidate Job Properties",
+        "description": "Batch-updates a candidate's custom properties within a specific job context (1-100 properties per call).",
+        "pin_properties_json": "Properties (JSON)"
+      },
+      "listCandidateAttachments": {
+        "label": "SmartRecruiters List Candidate Attachments",
+        "description": "Lists a candidate's attachments (resumes, cover letters, generic files).",
+        "pin_attachments_json": "Attachments (JSON)",
+        "pin_total_found": "Total Found"
+      },
+      "addCandidateAttachment": {
+        "label": "SmartRecruiters Add Candidate Attachment",
+        "description": "Uploads a file attachment to an existing candidate.",
+        "pin_attachment_type": "Attachment Type",
+        "pin_file_base64": "File (Base64)",
+        "pin_file_name": "File Name",
+        "pin_file_content_type": "File Content Type",
+        "pin_attachment_json": "Attachment (JSON)"
+      },
+      "getCandidateAttachment": {
+        "label": "SmartRecruiters Get Candidate Attachment",
+        "description": "Downloads a candidate attachment's binary content (deprecated endpoint, still the only documented way to fetch attachment content).",
+        "pin_attachment_id": "Attachment ID",
+        "pin_content_base64": "Content (Base64)",
+        "pin_content_type": "Content Type"
+      },
+      "getCandidateOnboardingStatus": {
+        "label": "SmartRecruiters Get Candidate Onboarding Status",
+        "description": "Fetches a candidate's onboarding status (deprecated non-job-scoped variant — prefer Get Candidate Job Onboarding Status where a job context applies).",
+        "pin_onboarding_status": "Onboarding Status"
+      },
+      "updateCandidateOnboardingStatus": {
+        "label": "SmartRecruiters Update Candidate Onboarding Status",
+        "description": "Updates a candidate's onboarding status (deprecated non-job-scoped variant — prefer Update Candidate Job Onboarding Status where a job context applies).",
+        "pin_onboarding_status": "Onboarding Status",
+        "pin_result_onboarding_status": "Onboarding Status"
+      },
+      "getCandidateJobOnboardingStatus": {
+        "label": "SmartRecruiters Get Candidate Job Onboarding Status",
+        "description": "Fetches a candidate's onboarding status within a specific job.",
+        "pin_onboarding_status": "Onboarding Status"
+      },
+      "updateCandidateJobOnboardingStatus": {
+        "label": "SmartRecruiters Update Candidate Job Onboarding Status",
+        "description": "Updates a candidate's onboarding status within a specific job.",
+        "pin_onboarding_status": "Onboarding Status",
+        "pin_result_onboarding_status": "Onboarding Status"
+      },
+      "getCandidateScreeningAnswers": {
+        "label": "SmartRecruiters Get Candidate Screening Answers",
+        "description": "Fetches a candidate's screening question answers (including EEO responses, which SmartRecruiters models as a screening question type rather than a standalone resource) within a specific job.",
+        "pin_answers_json": "Answers (JSON)",
+        "pin_total_found": "Total Found"
       }
     },
     "sap": {
