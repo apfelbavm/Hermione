@@ -136,6 +136,27 @@ export interface SmartRecruitersJobApplicationResult extends SmartRecruitersOpRe
   jobApplication: Record<string, unknown>;
 }
 
+export interface SmartRecruitersUsersListResult extends SmartRecruitersOpResult {
+  users: Record<string, unknown>[];
+  nextPageId: string;
+}
+
+export interface SmartRecruitersUserResult extends SmartRecruitersOpResult {
+  user: Record<string, unknown>;
+}
+
+export interface SmartRecruitersSystemRolesResult extends SmartRecruitersOpResult {
+  roles: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersAccessGroupsListResult extends SmartRecruitersOpResult {
+  accessGroups: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersAccessGroupResult extends SmartRecruitersOpResult {
+  accessGroup: Record<string, unknown>;
+}
+
 interface CachedToken {
   accessToken: string;
   expiresAt: number;
@@ -652,6 +673,132 @@ export class SmartRecruitersManager {
 
   async deleteJobApplication(jobApplicationId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `job-applications-api/v202112/job-applications/${encodeURIComponent(jobApplicationId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  // --- Users & Access (Phase 5) -----------------------------------------------------------
+  // Users/system-roles/the legacy access-groups list+membership endpoints live under the
+  // separately-versioned `user-api/v201804` sub-API (same "own versioned host path" pattern as
+  // Job Applications in Phase 4); full access-group CRUD lives under the newer `configuration`
+  // sub-API instead — confirmed via live reference docs, not assumed. There is no documented
+  // "get current user / me" endpoint, so it was dropped from this phase's scope (same kind of
+  // scope correction as the Phase 3 EEO drop and Phase 4 consent drop). `systemRole` is a
+  // company-defined `{id, name}` reference, not a fixed enum — callers should look the id up via
+  // listSystemRoles() rather than a hardcoded enum of role names.
+
+  async searchUsers(query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersUsersListResult> {
+    const result = await this.request<{ nextPageId?: string; content?: Record<string, unknown>[] }>("GET", "user-api/v201804/users", { query });
+    if (!result.success) return { success: false, users: [], nextPageId: "", error: result.error };
+    return { success: true, users: result.data.content ?? [], nextPageId: result.data.nextPageId ?? "", error: "" };
+  }
+
+  async createUser(user: Record<string, unknown>): Promise<SmartRecruitersUserResult> {
+    const result = await this.request<Record<string, unknown>>("POST", "user-api/v201804/users", { body: user });
+    if (!result.success) return { success: false, user: {}, error: result.error };
+    return { success: true, user: result.data, error: "" };
+  }
+
+  async getUser(userId: string): Promise<SmartRecruitersUserResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `user-api/v201804/users/${encodeURIComponent(userId)}`);
+    if (!result.success) return { success: false, user: {}, error: result.error };
+    return { success: true, user: result.data, error: "" };
+  }
+
+  /** RFC 6902 JSON Patch — `patch` is the raw operations array (`[{op, path, value}, ...]`), unlike
+   * patchJob/updateCandidate's RFC 7396 merge-patch object. */
+  async updateUser(userId: string, patch: unknown[]): Promise<SmartRecruitersUserResult> {
+    const result = await this.request<Record<string, unknown>>("PATCH", `user-api/v201804/users/${encodeURIComponent(userId)}`, { body: patch, contentType: "application/json-patch+json" });
+    if (!result.success) return { success: false, user: {}, error: result.error };
+    return { success: true, user: result.data, error: "" };
+  }
+
+  /** Only triggers a reset email — SmartRecruiters has no endpoint to set a password directly. */
+  async resetUserPassword(userId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("POST", `user-api/v201804/users/${encodeURIComponent(userId)}/reset-password`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async sendUserActivationEmail(userId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("POST", `user-api/v201804/users/${encodeURIComponent(userId)}/activation-email`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async activateUser(userId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("PUT", `user-api/v201804/users/${encodeURIComponent(userId)}/activation`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** DELETE .../activation — the older `DELETE /users/{id}` is documented as a deprecated alias
+   * for this, so it was not added separately. */
+  async deactivateUser(userId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `user-api/v201804/users/${encodeURIComponent(userId)}/activation`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async updateUserAvatar(userId: string, fileBase64: string, fileName: string, fileContentType: string): Promise<SmartRecruitersUserResult> {
+    const formData = this.buildFileFormData({}, "file", fileBase64, fileName, fileContentType);
+    const result = await this.request<Record<string, unknown>>("PUT", `user-api/v201804/users/${encodeURIComponent(userId)}/avatar`, { formData });
+    if (!result.success) return { success: false, user: {}, error: result.error };
+    return { success: true, user: result.data, error: "" };
+  }
+
+  async listSystemRoles(): Promise<SmartRecruitersSystemRolesResult> {
+    const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", "user-api/v201804/system-roles");
+    if (!result.success) return { success: false, roles: [], error: result.error };
+    const roles = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
+    return { success: true, roles, error: "" };
+  }
+
+  /** GET /configuration/access-groups — the newer Configuration API variant, chosen over the
+   * legacy `user-api/v201804/access-groups` list (which has no create/get/update/delete
+   * counterpart) so this phase's list/create/get/update/delete set is one consistent resource. */
+  async listAccessGroups(): Promise<SmartRecruitersAccessGroupsListResult> {
+    const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", "configuration/access-groups");
+    if (!result.success) return { success: false, accessGroups: [], error: result.error };
+    const accessGroups = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
+    return { success: true, accessGroups, error: "" };
+  }
+
+  async createAccessGroup(accessGroup: Record<string, unknown>): Promise<SmartRecruitersAccessGroupResult> {
+    const result = await this.request<Record<string, unknown>>("POST", "configuration/access-groups", { body: accessGroup });
+    if (!result.success) return { success: false, accessGroup: {}, error: result.error };
+    return { success: true, accessGroup: result.data, error: "" };
+  }
+
+  async getAccessGroup(accessGroupId: string): Promise<SmartRecruitersAccessGroupResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `configuration/access-groups/${encodeURIComponent(accessGroupId)}`);
+    if (!result.success) return { success: false, accessGroup: {}, error: result.error };
+    return { success: true, accessGroup: result.data, error: "" };
+  }
+
+  async updateAccessGroup(accessGroupId: string, accessGroup: Record<string, unknown>): Promise<SmartRecruitersAccessGroupResult> {
+    const result = await this.request<Record<string, unknown>>("PUT", `configuration/access-groups/${encodeURIComponent(accessGroupId)}`, { body: accessGroup });
+    if (!result.success) return { success: false, accessGroup: {}, error: result.error };
+    return { success: true, accessGroup: result.data, error: "" };
+  }
+
+  async deleteAccessGroup(accessGroupId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `configuration/access-groups/${encodeURIComponent(accessGroupId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** POST — bulk assign (up to 5000 user ids); membership assign/remove only exists under the
+   * legacy `user-api/v201804/access-groups` path, not the Configuration API. */
+  async assignUsersToAccessGroup(accessGroupId: string, userIds: string[]): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("POST", `user-api/v201804/access-groups/${encodeURIComponent(accessGroupId)}/users`, { body: { UserIds: userIds } });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** DELETE — removes a single user; no bulk-remove variant is documented. */
+  async removeUserFromAccessGroup(accessGroupId: string, userId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `user-api/v201804/access-groups/${encodeURIComponent(accessGroupId)}/users/${encodeURIComponent(userId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }

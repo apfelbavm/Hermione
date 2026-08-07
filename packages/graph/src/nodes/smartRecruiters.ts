@@ -87,6 +87,14 @@ function jobApplicationIdPin() {
   return { id: "jobApplicationId", label: i18n.nodes.smartRecruiters.__shared.pin_job_application_id, type: "string" as const, direction: "input" as const, defaultValue: "" };
 }
 
+function userIdPin() {
+  return { id: "userId", label: i18n.nodes.smartRecruiters.__shared.pin_user_id, type: "string" as const, direction: "input" as const, defaultValue: "" };
+}
+
+function accessGroupIdPin() {
+  return { id: "accessGroupId", label: i18n.nodes.smartRecruiters.__shared.pin_access_group_id, type: "string" as const, direction: "input" as const, defaultValue: "" };
+}
+
 function fileFieldPins(labels: { fileBase64: string; fileName: string; fileContentType: string }) {
   return [
     { id: "fileBase64", label: labels.fileBase64, type: "string" as const, direction: "input" as const, defaultValue: "" },
@@ -1947,6 +1955,462 @@ registerNode({
     return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersDeleteJobApplication(${inputs.credentialName}, ${inputs.jobApplicationId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+// --- Users & Access (Phase 5) ----------------------------------------------------------------
+
+registerNode({
+  type: "smartRecruiters.searchUsers",
+  label: i18n.nodes.smartRecruiters.searchUsers.label,
+  description: i18n.nodes.smartRecruiters.searchUsers.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    { id: "queryJson", label: i18n.nodes.smartRecruiters.__shared.pin_query_json, type: "string", direction: "input", defaultValue: "{}" },
+    { id: "pageId", label: i18n.nodes.smartRecruiters.searchUsers.pin_page_id, type: "string", direction: "input", defaultValue: "" },
+    { id: "limit", label: i18n.nodes.smartRecruiters.searchUsers.pin_limit, type: "number", direction: "input", defaultValue: 20 },
+    execOutPin(),
+    successPin(),
+    { id: "usersJson", label: i18n.nodes.smartRecruiters.searchUsers.pin_users_json, type: "string", direction: "output" },
+    { id: "nextPageId", label: i18n.nodes.smartRecruiters.searchUsers.pin_next_page_id, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, usersJson: "[]", nextPageId: "", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.searchUsers({ ...parseJsonRecord(String(inputs.queryJson ?? "")), pageId: String(inputs.pageId ?? "") || undefined, limit: Number(inputs.limit ?? 20) });
+    return { nextExec: "exec-out", outputs: { success: result.success, usersJson: JSON.stringify(result.users), nextPageId: result.nextPageId, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersSearchUsers(${inputs.credentialName}, ${inputs.queryJson}, ${inputs.pageId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, usersJson: `JSON.stringify(${v}.users)`, nextPageId: `${v}.nextPageId`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.createUser",
+  label: i18n.nodes.smartRecruiters.createUser.label,
+  description: i18n.nodes.smartRecruiters.createUser.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    { id: "userJson", label: i18n.nodes.smartRecruiters.createUser.pin_user_json, type: "string", direction: "input", defaultValue: "{}" },
+    execOutPin(),
+    successPin(),
+    { id: "createdUserJson", label: i18n.nodes.smartRecruiters.createUser.pin_created_user_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, createdUserJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.createUser(parseJsonRecord(String(inputs.userJson ?? "")) as Record<string, unknown>);
+    return { nextExec: "exec-out", outputs: { success: result.success, createdUserJson: JSON.stringify(result.user), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersCreateUser(${inputs.credentialName}, ${inputs.userJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, createdUserJson: `JSON.stringify(${v}.user)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.getUser",
+  label: i18n.nodes.smartRecruiters.getUser.label,
+  description: i18n.nodes.smartRecruiters.getUser.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), userIdPin(), execOutPin(), successPin(), { id: "userJson", label: i18n.nodes.smartRecruiters.getUser.pin_user_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, userJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.getUser(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, userJson: JSON.stringify(result.user), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersGetUser(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, userJson: `JSON.stringify(${v}.user)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.updateUser",
+  label: i18n.nodes.smartRecruiters.updateUser.label,
+  description: i18n.nodes.smartRecruiters.updateUser.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    userIdPin(),
+    { id: "patchJson", label: i18n.nodes.smartRecruiters.updateUser.pin_patch_json, type: "string", direction: "input", defaultValue: "[]" },
+    execOutPin(),
+    successPin(),
+    { id: "userJson", label: i18n.nodes.smartRecruiters.updateUser.pin_user_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, userJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const patch = parseJsonBody(String(inputs.patchJson ?? ""));
+    const result = await manager.updateUser(String(inputs.userId ?? ""), Array.isArray(patch) ? patch : []);
+    return { nextExec: "exec-out", outputs: { success: result.success, userJson: JSON.stringify(result.user), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersUpdateUser(${inputs.credentialName}, ${inputs.userId}, ${inputs.patchJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, userJson: `JSON.stringify(${v}.user)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.resetUserPassword",
+  label: i18n.nodes.smartRecruiters.resetUserPassword.label,
+  description: i18n.nodes.smartRecruiters.resetUserPassword.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), userIdPin(), execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.resetUserPassword(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersResetUserPassword(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.sendUserActivationEmail",
+  label: i18n.nodes.smartRecruiters.sendUserActivationEmail.label,
+  description: i18n.nodes.smartRecruiters.sendUserActivationEmail.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), userIdPin(), execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.sendUserActivationEmail(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersSendUserActivationEmail(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.activateUser",
+  label: i18n.nodes.smartRecruiters.activateUser.label,
+  description: i18n.nodes.smartRecruiters.activateUser.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), userIdPin(), execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.activateUser(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersActivateUser(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.deactivateUser",
+  label: i18n.nodes.smartRecruiters.deactivateUser.label,
+  description: i18n.nodes.smartRecruiters.deactivateUser.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), userIdPin(), execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.deactivateUser(String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersDeactivateUser(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.updateUserAvatar",
+  label: i18n.nodes.smartRecruiters.updateUserAvatar.label,
+  description: i18n.nodes.smartRecruiters.updateUserAvatar.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    userIdPin(),
+    ...fileFieldPins({
+      fileBase64: i18n.nodes.smartRecruiters.updateUserAvatar.pin_file_base64,
+      fileName: i18n.nodes.smartRecruiters.updateUserAvatar.pin_file_name,
+      fileContentType: i18n.nodes.smartRecruiters.updateUserAvatar.pin_file_content_type,
+    }),
+    execOutPin(),
+    successPin(),
+    { id: "userJson", label: i18n.nodes.smartRecruiters.updateUserAvatar.pin_user_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, userJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.updateUserAvatar(String(inputs.userId ?? ""), String(inputs.fileBase64 ?? ""), String(inputs.fileName ?? ""), String(inputs.fileContentType ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, userJson: JSON.stringify(result.user), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersUpdateUserAvatar(${inputs.credentialName}, ${inputs.userId}, ${inputs.fileBase64}, ${inputs.fileName}, ${inputs.fileContentType});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, userJson: `JSON.stringify(${v}.user)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.listSystemRoles",
+  label: i18n.nodes.smartRecruiters.listSystemRoles.label,
+  description: i18n.nodes.smartRecruiters.listSystemRoles.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "rolesJson", label: i18n.nodes.smartRecruiters.listSystemRoles.pin_roles_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, rolesJson: "[]", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.listSystemRoles();
+    return { nextExec: "exec-out", outputs: { success: result.success, rolesJson: JSON.stringify(result.roles), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersListSystemRoles(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, rolesJson: `JSON.stringify(${v}.roles)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.listAccessGroups",
+  label: i18n.nodes.smartRecruiters.listAccessGroups.label,
+  description: i18n.nodes.smartRecruiters.listAccessGroups.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "accessGroupsJson", label: i18n.nodes.smartRecruiters.listAccessGroups.pin_access_groups_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, accessGroupsJson: "[]", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.listAccessGroups();
+    return { nextExec: "exec-out", outputs: { success: result.success, accessGroupsJson: JSON.stringify(result.accessGroups), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersListAccessGroups(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, accessGroupsJson: `JSON.stringify(${v}.accessGroups)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.createAccessGroup",
+  label: i18n.nodes.smartRecruiters.createAccessGroup.label,
+  description: i18n.nodes.smartRecruiters.createAccessGroup.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    { id: "accessGroupJson", label: i18n.nodes.smartRecruiters.createAccessGroup.pin_access_group_json, type: "string", direction: "input", defaultValue: "{}" },
+    execOutPin(),
+    successPin(),
+    { id: "createdAccessGroupJson", label: i18n.nodes.smartRecruiters.createAccessGroup.pin_created_access_group_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, createdAccessGroupJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.createAccessGroup(parseJsonRecord(String(inputs.accessGroupJson ?? "")) as Record<string, unknown>);
+    return { nextExec: "exec-out", outputs: { success: result.success, createdAccessGroupJson: JSON.stringify(result.accessGroup), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersCreateAccessGroup(${inputs.credentialName}, ${inputs.accessGroupJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, createdAccessGroupJson: `JSON.stringify(${v}.accessGroup)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.getAccessGroup",
+  label: i18n.nodes.smartRecruiters.getAccessGroup.label,
+  description: i18n.nodes.smartRecruiters.getAccessGroup.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), accessGroupIdPin(), execOutPin(), successPin(), { id: "accessGroupJson", label: i18n.nodes.smartRecruiters.getAccessGroup.pin_access_group_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, accessGroupJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.getAccessGroup(String(inputs.accessGroupId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, accessGroupJson: JSON.stringify(result.accessGroup), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersGetAccessGroup(${inputs.credentialName}, ${inputs.accessGroupId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, accessGroupJson: `JSON.stringify(${v}.accessGroup)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.updateAccessGroup",
+  label: i18n.nodes.smartRecruiters.updateAccessGroup.label,
+  description: i18n.nodes.smartRecruiters.updateAccessGroup.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    accessGroupIdPin(),
+    { id: "accessGroupJson", label: i18n.nodes.smartRecruiters.updateAccessGroup.pin_access_group_json, type: "string", direction: "input", defaultValue: "{}" },
+    execOutPin(),
+    successPin(),
+    { id: "updatedAccessGroupJson", label: i18n.nodes.smartRecruiters.updateAccessGroup.pin_updated_access_group_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, updatedAccessGroupJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.updateAccessGroup(String(inputs.accessGroupId ?? ""), parseJsonRecord(String(inputs.accessGroupJson ?? "")) as Record<string, unknown>);
+    return { nextExec: "exec-out", outputs: { success: result.success, updatedAccessGroupJson: JSON.stringify(result.accessGroup), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersUpdateAccessGroup(${inputs.credentialName}, ${inputs.accessGroupId}, ${inputs.accessGroupJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, updatedAccessGroupJson: `JSON.stringify(${v}.accessGroup)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.deleteAccessGroup",
+  label: i18n.nodes.smartRecruiters.deleteAccessGroup.label,
+  description: i18n.nodes.smartRecruiters.deleteAccessGroup.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), accessGroupIdPin(), execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.deleteAccessGroup(String(inputs.accessGroupId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersDeleteAccessGroup(${inputs.credentialName}, ${inputs.accessGroupId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.assignUsersToAccessGroup",
+  label: i18n.nodes.smartRecruiters.assignUsersToAccessGroup.label,
+  description: i18n.nodes.smartRecruiters.assignUsersToAccessGroup.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), accessGroupIdPin(), { id: "userIdsJson", label: i18n.nodes.smartRecruiters.assignUsersToAccessGroup.pin_user_ids_json, type: "string", direction: "input", defaultValue: "[]" }, execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const userIds = parseJsonBody(String(inputs.userIdsJson ?? ""));
+    const result = await manager.assignUsersToAccessGroup(String(inputs.accessGroupId ?? ""), Array.isArray(userIds) ? (userIds as string[]) : []);
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersAssignUsersToAccessGroup(${inputs.credentialName}, ${inputs.accessGroupId}, ${inputs.userIdsJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.removeUserFromAccessGroup",
+  label: i18n.nodes.smartRecruiters.removeUserFromAccessGroup.label,
+  description: i18n.nodes.smartRecruiters.removeUserFromAccessGroup.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), accessGroupIdPin(), userIdPin(), execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.removeUserFromAccessGroup(String(inputs.accessGroupId ?? ""), String(inputs.userId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersRemoveUserFromAccessGroup(${inputs.credentialName}, ${inputs.accessGroupId}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };

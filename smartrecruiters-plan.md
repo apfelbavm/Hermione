@@ -139,9 +139,30 @@ clientSecret, tokenUrl}`. `static forAuth(auth)` caches instances per auth (mirr
       doesn't actually expose. If a job-application-scoped consent flow is ever needed, it has to go
       through the candidate id (available via a job application's `profileId` field), not a
       dedicated endpoint. Verified: tsc clean, prettier clean.
-- [ ] **Phase 5 — Users & Access**: list/create/get/update users, me, password
-      reset, activation email/activate/deactivate, avatar update, system roles list,
-      access groups (list/create/get/update/delete, assign/remove users).
+- [x] **Phase 5 — Users & Access** (done 2026-08-07): searchUsers (`user-api/v201804/users`,
+      `nextPageId`-based pagination like Candidates), createUser, getUser, updateUser (RFC 6902
+      JSON Patch array via `application/json-patch+json` — NOT a merge-patch object like
+      patchJob/updateCandidate), resetUserPassword (only triggers a reset email, no
+      set-password-directly endpoint exists), sendUserActivationEmail, activateUser,
+      deactivateUser (the older `DELETE /users/{id}` is a documented deprecated alias for this,
+      not added separately), updateUserAvatar (multipart file upload, reused the Phase 3
+      `buildFileFormData` helper), listSystemRoles, and access groups: listAccessGroups/
+      createAccessGroup/getAccessGroup/updateAccessGroup/deleteAccessGroup (all via the newer
+      `configuration/access-groups` sub-API, chosen over the legacy `user-api/v201804/access-groups`
+      list-only endpoint so the CRUD set is one consistent resource), assignUsersToAccessGroup/
+      removeUserFromAccessGroup (these membership operations only exist under the legacy
+      `user-api/v201804/access-groups/{id}/users` path, not under `configuration` — confirmed via
+      two live-docs research passes since the two access-group resource families overlap).
+      **"me" was dropped from scope**: two research passes against live developers.smartrecruiters.com
+      reference docs found no documented get-current-user endpoint — same kind of scope
+      correction as the Phase 3 EEO drop and Phase 4 consent drop. User/systemRole bodies stay
+      JSON-string pins (not enums/structs): `systemRole` is a company-defined `{id, name}`
+      reference, not a fixed enum — confirmed live docs explicitly state companies can define
+      custom system roles, so no enum was added for it; call listSystemRoles() to discover the
+      real ids instead. No new enums this phase. Endpoint shapes verified via two research
+      subagent passes against live docs (a first pass found conflicting path prefixes across
+      reference pages; a second pass resolved it — the docs render endpoint paths relative to a
+      selectable server base, not an inconsistency). Verified: tsc clean, prettier clean.
 - [ ] **Phase 6 — Interviews & Events**: interviews CRUD, interview types CRUD,
       events (create/get/update/delete, sessions, interviewers add/remove, applicants
       move/add, get events for job/candidate/application), self-scheduling

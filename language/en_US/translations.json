@@ -1387,7 +1387,9 @@
         "pin_job_id": "Job ID",
         "pin_job_ad_id": "Job Ad ID",
         "pin_candidate_id": "Candidate ID",
-        "pin_job_application_id": "Job Application ID"
+        "pin_job_application_id": "Job Application ID",
+        "pin_user_id": "User ID",
+        "pin_access_group_id": "Access Group ID"
       },
       "apiCall": {
         "label": "SmartRecruiters API Call",
@@ -1751,6 +1753,95 @@
       "deleteJobApplication": {
         "label": "SmartRecruiters Delete Job Application",
         "description": "Deletes a job application."
+      },
+      "searchUsers": {
+        "label": "SmartRecruiters Search Users",
+        "description": "Searches/lists users, optionally filtered by a text query.",
+        "pin_page_id": "Page ID",
+        "pin_limit": "Limit",
+        "pin_users_json": "Users (JSON)",
+        "pin_next_page_id": "Next Page ID"
+      },
+      "createUser": {
+        "label": "SmartRecruiters Create User",
+        "description": "Creates a new user account.",
+        "pin_user_json": "User (JSON)",
+        "pin_created_user_json": "Created User (JSON)"
+      },
+      "getUser": {
+        "label": "SmartRecruiters Get User",
+        "description": "Fetches a single user by id.",
+        "pin_user_json": "User (JSON)"
+      },
+      "updateUser": {
+        "label": "SmartRecruiters Update User",
+        "description": "Updates a user via an RFC 6902 JSON Patch operations array.",
+        "pin_patch_json": "Patch Operations (JSON)",
+        "pin_user_json": "User (JSON)"
+      },
+      "resetUserPassword": {
+        "label": "SmartRecruiters Reset User Password",
+        "description": "Sends the user a password reset email."
+      },
+      "sendUserActivationEmail": {
+        "label": "SmartRecruiters Send User Activation Email",
+        "description": "Sends the user an activation email."
+      },
+      "activateUser": {
+        "label": "SmartRecruiters Activate User",
+        "description": "Activates a user account."
+      },
+      "deactivateUser": {
+        "label": "SmartRecruiters Deactivate User",
+        "description": "Deactivates a user account."
+      },
+      "updateUserAvatar": {
+        "label": "SmartRecruiters Update User Avatar",
+        "description": "Uploads a new avatar image for a user.",
+        "pin_file_base64": "File (Base64)",
+        "pin_file_name": "File Name",
+        "pin_file_content_type": "File Content Type",
+        "pin_user_json": "User (JSON)"
+      },
+      "listSystemRoles": {
+        "label": "SmartRecruiters List System Roles",
+        "description": "Lists the system roles available in the company.",
+        "pin_roles_json": "System Roles (JSON)"
+      },
+      "listAccessGroups": {
+        "label": "SmartRecruiters List Access Groups",
+        "description": "Lists the company's access groups.",
+        "pin_access_groups_json": "Access Groups (JSON)"
+      },
+      "createAccessGroup": {
+        "label": "SmartRecruiters Create Access Group",
+        "description": "Creates a new access group.",
+        "pin_access_group_json": "Access Group (JSON)",
+        "pin_created_access_group_json": "Created Access Group (JSON)"
+      },
+      "getAccessGroup": {
+        "label": "SmartRecruiters Get Access Group",
+        "description": "Fetches a single access group by id.",
+        "pin_access_group_json": "Access Group (JSON)"
+      },
+      "updateAccessGroup": {
+        "label": "SmartRecruiters Update Access Group",
+        "description": "Updates an access group.",
+        "pin_access_group_json": "Access Group (JSON)",
+        "pin_updated_access_group_json": "Updated Access Group (JSON)"
+      },
+      "deleteAccessGroup": {
+        "label": "SmartRecruiters Delete Access Group",
+        "description": "Deletes an access group."
+      },
+      "assignUsersToAccessGroup": {
+        "label": "SmartRecruiters Assign Users To Access Group",
+        "description": "Assigns one or more users to an access group.",
+        "pin_user_ids_json": "User IDs (JSON)"
+      },
+      "removeUserFromAccessGroup": {
+        "label": "SmartRecruiters Remove User From Access Group",
+        "description": "Removes a user from an access group."
       }
     },
     "sap": {

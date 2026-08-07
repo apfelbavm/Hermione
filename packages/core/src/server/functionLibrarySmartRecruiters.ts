@@ -443,3 +443,119 @@ export async function smartRecruitersDeleteJobApplication(credentialName: string
   if (!cred.ok) return { success: false, error: cred.error };
   return SmartRecruitersManager.forAuth(cred.auth).deleteJobApplication(jobApplicationId);
 }
+
+// --- Users & Access (Phase 5) ----------------------------------------------------------------
+
+export async function smartRecruitersSearchUsers(credentialName: string, queryJson: string, pageId: string, limit: number) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, users: [], nextPageId: "", error: cred.error };
+  const parsedQuery = parseJsonRecord(queryJson, "queryJson");
+  if (!parsedQuery.ok) return { success: false, users: [], nextPageId: "", error: parsedQuery.error };
+  return SmartRecruitersManager.forAuth(cred.auth).searchUsers({ ...parsedQuery.value, pageId: pageId || undefined, limit });
+}
+
+export async function smartRecruitersCreateUser(credentialName: string, userJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, user: {}, error: cred.error };
+  const parsed = parseJsonRecord(userJson, "userJson");
+  if (!parsed.ok) return { success: false, user: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).createUser(parsed.value);
+}
+
+export async function smartRecruitersGetUser(credentialName: string, userId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, user: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getUser(userId);
+}
+
+export async function smartRecruitersUpdateUser(credentialName: string, userId: string, patchJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, user: {}, error: cred.error };
+  const parsed = parseJsonArray(patchJson, "patchJson");
+  if (!parsed.ok) return { success: false, user: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateUser(userId, parsed.value);
+}
+
+export async function smartRecruitersResetUserPassword(credentialName: string, userId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).resetUserPassword(userId);
+}
+
+export async function smartRecruitersSendUserActivationEmail(credentialName: string, userId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).sendUserActivationEmail(userId);
+}
+
+export async function smartRecruitersActivateUser(credentialName: string, userId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).activateUser(userId);
+}
+
+export async function smartRecruitersDeactivateUser(credentialName: string, userId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deactivateUser(userId);
+}
+
+export async function smartRecruitersUpdateUserAvatar(credentialName: string, userId: string, fileBase64: string, fileName: string, fileContentType: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, user: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateUserAvatar(userId, fileBase64, fileName, fileContentType);
+}
+
+export async function smartRecruitersListSystemRoles(credentialName: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, roles: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).listSystemRoles();
+}
+
+export async function smartRecruitersListAccessGroups(credentialName: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, accessGroups: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).listAccessGroups();
+}
+
+export async function smartRecruitersCreateAccessGroup(credentialName: string, accessGroupJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, accessGroup: {}, error: cred.error };
+  const parsed = parseJsonRecord(accessGroupJson, "accessGroupJson");
+  if (!parsed.ok) return { success: false, accessGroup: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).createAccessGroup(parsed.value);
+}
+
+export async function smartRecruitersGetAccessGroup(credentialName: string, accessGroupId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, accessGroup: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getAccessGroup(accessGroupId);
+}
+
+export async function smartRecruitersUpdateAccessGroup(credentialName: string, accessGroupId: string, accessGroupJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, accessGroup: {}, error: cred.error };
+  const parsed = parseJsonRecord(accessGroupJson, "accessGroupJson");
+  if (!parsed.ok) return { success: false, accessGroup: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateAccessGroup(accessGroupId, parsed.value);
+}
+
+export async function smartRecruitersDeleteAccessGroup(credentialName: string, accessGroupId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deleteAccessGroup(accessGroupId);
+}
+
+export async function smartRecruitersAssignUsersToAccessGroup(credentialName: string, accessGroupId: string, userIdsJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  const parsed = parseJsonArray(userIdsJson, "userIdsJson");
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).assignUsersToAccessGroup(accessGroupId, parsed.value as unknown as string[]);
+}
+
+export async function smartRecruitersRemoveUserFromAccessGroup(credentialName: string, accessGroupId: string, userId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).removeUserFromAccessGroup(accessGroupId, userId);
+}
