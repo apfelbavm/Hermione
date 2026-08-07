@@ -83,6 +83,10 @@ function candidateIdPin() {
   return { id: "candidateId", label: i18n.nodes.smartRecruiters.__shared.pin_candidate_id, type: "string" as const, direction: "input" as const, defaultValue: "" };
 }
 
+function jobApplicationIdPin() {
+  return { id: "jobApplicationId", label: i18n.nodes.smartRecruiters.__shared.pin_job_application_id, type: "string" as const, direction: "input" as const, defaultValue: "" };
+}
+
 function fileFieldPins(labels: { fileBase64: string; fileName: string; fileContentType: string }) {
   return [
     { id: "fileBase64", label: labels.fileBase64, type: "string" as const, direction: "input" as const, defaultValue: "" },
@@ -1900,6 +1904,52 @@ registerNode({
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, answersJson: `JSON.stringify(${v}.answers)`, totalFound: `${v}.totalFound`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.getJobApplication",
+  label: i18n.nodes.smartRecruiters.getJobApplication.label,
+  description: i18n.nodes.smartRecruiters.getJobApplication.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), jobApplicationIdPin(), execOutPin(), successPin(), { id: "jobApplicationJson", label: i18n.nodes.smartRecruiters.getJobApplication.pin_job_application_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, jobApplicationJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.getJobApplication(String(inputs.jobApplicationId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, jobApplicationJson: JSON.stringify(result.jobApplication), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersGetJobApplication(${inputs.credentialName}, ${inputs.jobApplicationId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, jobApplicationJson: `JSON.stringify(${v}.jobApplication)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.deleteJobApplication",
+  label: i18n.nodes.smartRecruiters.deleteJobApplication.label,
+  description: i18n.nodes.smartRecruiters.deleteJobApplication.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), jobApplicationIdPin(), execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.deleteJobApplication(String(inputs.jobApplicationId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersDeleteJobApplication(${inputs.credentialName}, ${inputs.jobApplicationId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
   },
   compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
 });

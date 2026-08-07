@@ -132,6 +132,10 @@ export interface SmartRecruitersScreeningAnswersResult extends SmartRecruitersOp
   totalFound: number;
 }
 
+export interface SmartRecruitersJobApplicationResult extends SmartRecruitersOpResult {
+  jobApplication: Record<string, unknown>;
+}
+
 interface CachedToken {
   accessToken: string;
   expiresAt: number;
@@ -633,5 +637,22 @@ export class SmartRecruitersManager {
     const result = await this.request<{ totalFound?: number; content?: Record<string, unknown>[] }>("GET", `/candidates/${encodeURIComponent(candidateId)}/jobs/${encodeURIComponent(jobId)}/screening-answers`);
     if (!result.success) return { success: false, answers: [], totalFound: 0, error: result.error };
     return { success: true, answers: result.data.content ?? [], totalFound: result.data.totalFound ?? 0, error: "" };
+  }
+
+  // --- Job Applications (Phase 4) ---------------------------------------------------------
+  // Job Applications live under a separately-versioned sub-API (`job-applications-api/v202112`)
+  // on the same host, unlike the unversioned `/jobs` and `/candidates` paths above — confirmed
+  // against the live OpenAPI spec's `servers` entry, not assumed from the other resources' shape.
+
+  async getJobApplication(jobApplicationId: string): Promise<SmartRecruitersJobApplicationResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `job-applications-api/v202112/job-applications/${encodeURIComponent(jobApplicationId)}`);
+    if (!result.success) return { success: false, jobApplication: {}, error: result.error };
+    return { success: true, jobApplication: result.data, error: "" };
+  }
+
+  async deleteJobApplication(jobApplicationId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `job-applications-api/v202112/job-applications/${encodeURIComponent(jobApplicationId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
   }
 }

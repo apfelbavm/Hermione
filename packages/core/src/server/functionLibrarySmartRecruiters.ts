@@ -431,3 +431,15 @@ export async function smartRecruitersGetCandidateScreeningAnswers(credentialName
   if (!cred.ok) return { success: false, answers: [], totalFound: 0, error: cred.error };
   return SmartRecruitersManager.forAuth(cred.auth).getCandidateScreeningAnswers(candidateId, jobId);
 }
+
+export async function smartRecruitersGetJobApplication(credentialName: string, jobApplicationId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, jobApplication: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getJobApplication(jobApplicationId);
+}
+
+export async function smartRecruitersDeleteJobApplication(credentialName: string, jobApplicationId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deleteJobApplication(jobApplicationId);
+}

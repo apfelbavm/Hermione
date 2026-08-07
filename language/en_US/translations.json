@@ -1386,7 +1386,8 @@
         "pin_body_json": "Body (JSON)",
         "pin_job_id": "Job ID",
         "pin_job_ad_id": "Job Ad ID",
-        "pin_candidate_id": "Candidate ID"
+        "pin_candidate_id": "Candidate ID",
+        "pin_job_application_id": "Job Application ID"
       },
       "apiCall": {
         "label": "SmartRecruiters API Call",
@@ -1741,6 +1742,15 @@
         "description": "Fetches a candidate's screening question answers (including EEO responses, which SmartRecruiters models as a screening question type rather than a standalone resource) within a specific job.",
         "pin_answers_json": "Answers (JSON)",
         "pin_total_found": "Total Found"
+      },
+      "getJobApplication": {
+        "label": "SmartRecruiters Get Job Application",
+        "description": "Fetches a single job application by id.",
+        "pin_job_application_json": "Job Application (JSON)"
+      },
+      "deleteJobApplication": {
+        "label": "SmartRecruiters Delete Job Application",
+        "description": "Deletes a job application."
       }
     },
     "sap": {
