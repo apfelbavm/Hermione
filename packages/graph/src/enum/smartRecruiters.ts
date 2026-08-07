@@ -31,3 +31,42 @@ registerEnumType({
     { id: "ON_HOLD", label: "On Hold" },
   ],
 });
+
+export const SMARTRECRUITERS_HIRING_TEAM_ROLE_ENUM_TYPE = "smartRecruitersHiringTeamRole";
+
+registerEnumType({
+  id: SMARTRECRUITERS_HIRING_TEAM_ROLE_ENUM_TYPE,
+  label: "SmartRecruiters Hiring Team Role",
+  category: "SmartRecruiters",
+  values: [
+    { id: "HIRING_MANAGER", label: "Hiring Manager" },
+    { id: "INTERVIEW_TEAM", label: "Interview Team" },
+    { id: "RECRUITER", label: "Recruiter" },
+    { id: "EXECUTIVE", label: "Executive" },
+    { id: "COORDINATOR", label: "Coordinator" },
+  ],
+});
+
+export const SMARTRECRUITERS_POSITION_TYPE_ENUM_TYPE = "smartRecruitersPositionType";
+
+registerEnumType({
+  id: SMARTRECRUITERS_POSITION_TYPE_ENUM_TYPE,
+  label: "SmartRecruiters Position Type",
+  category: "SmartRecruiters",
+  values: [
+    { id: "NEW", label: "New" },
+    { id: "REPLACEMENT", label: "Replacement" },
+  ],
+});
+
+export const SMARTRECRUITERS_JOB_AD_POSTING_VISIBILITY_ENUM_TYPE = "smartRecruitersJobAdPostingVisibility";
+
+registerEnumType({
+  id: SMARTRECRUITERS_JOB_AD_POSTING_VISIBILITY_ENUM_TYPE,
+  label: "SmartRecruiters Job Ad Posting Visibility",
+  category: "SmartRecruiters",
+  values: [
+    { id: "PUBLIC", label: "Public" },
+    { id: "INTERNAL", label: "Internal" },
+  ],
+});

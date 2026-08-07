@@ -40,6 +40,40 @@ export interface SmartRecruitersJobNoteResult extends SmartRecruitersOpResult {
   note: Record<string, unknown>;
 }
 
+export interface SmartRecruitersJobAdsListResult extends SmartRecruitersOpResult {
+  jobAds: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersJobAdResult extends SmartRecruitersOpResult {
+  jobAd: Record<string, unknown>;
+}
+
+export interface SmartRecruitersPostingStatusResult extends SmartRecruitersOpResult {
+  status: string;
+}
+
+export interface SmartRecruitersPostingsListResult extends SmartRecruitersOpResult {
+  postings: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersPositionsListResult extends SmartRecruitersOpResult {
+  positions: Record<string, unknown>[];
+  totalFound: number;
+}
+
+export interface SmartRecruitersPositionResult extends SmartRecruitersOpResult {
+  position: Record<string, unknown>;
+}
+
+export interface SmartRecruitersHiringTeamListResult extends SmartRecruitersOpResult {
+  members: Record<string, unknown>[];
+  totalFound: number;
+}
+
+export interface SmartRecruitersHiringTeamMemberResult extends SmartRecruitersOpResult {
+  member: Record<string, unknown>;
+}
+
 interface CachedToken {
   accessToken: string;
   expiresAt: number;
@@ -110,7 +144,11 @@ export class SmartRecruitersManager {
    * through. `path` is relative to the API base (leading slash optional). `contentType` defaults
    * to `application/json`; pass `application/merge-patch+json` for RFC 7396 partial updates
    * (e.g. patchJob). */
-  private async request<T = Record<string, unknown>>(method: string, path: string, options?: { query?: Record<string, string | number | boolean | undefined>; body?: unknown; contentType?: string }): Promise<{ success: true; data: T; status: number } | { success: false; error: string; status: number }> {
+  private async request<T = Record<string, unknown>>(
+    method: string,
+    path: string,
+    options?: { query?: Record<string, string | number | boolean | undefined>; body?: unknown; contentType?: string },
+  ): Promise<{ success: true; data: T; status: number } | { success: false; error: string; status: number }> {
     const authResult = await this.authHeader();
     if (!authResult.ok) return { success: false, error: authResult.error, status: 0 };
 
@@ -212,5 +250,102 @@ export class SmartRecruitersManager {
     const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/note`, { body: { content } });
     if (!result.success) return { success: false, note: {}, error: result.error };
     return { success: true, note: result.data, error: "" };
+  }
+
+  // --- Job Ads, Postings, Positions, Hiring Team (Phase 2) -------------------------------
+
+  async listJobAds(jobId: string): Promise<SmartRecruitersJobAdsListResult> {
+    const result = await this.request<Record<string, unknown>[] | { content?: Record<string, unknown>[] }>("GET", `/jobs/${encodeURIComponent(jobId)}/jobads`);
+    if (!result.success) return { success: false, jobAds: [], error: result.error };
+    const jobAds = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
+    return { success: true, jobAds, error: "" };
+  }
+
+  async createJobAd(jobId: string, jobAd: Record<string, unknown>): Promise<SmartRecruitersJobAdResult> {
+    const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/jobads`, { body: jobAd });
+    if (!result.success) return { success: false, jobAd: {}, error: result.error };
+    return { success: true, jobAd: result.data, error: "" };
+  }
+
+  async getJobAd(jobId: string, jobAdId: string): Promise<SmartRecruitersJobAdResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `/jobs/${encodeURIComponent(jobId)}/jobads/${encodeURIComponent(jobAdId)}`);
+    if (!result.success) return { success: false, jobAd: {}, error: result.error };
+    return { success: true, jobAd: result.data, error: "" };
+  }
+
+  async updateJobAd(jobId: string, jobAdId: string, jobAd: Record<string, unknown>): Promise<SmartRecruitersJobAdResult> {
+    const result = await this.request<Record<string, unknown>>("PUT", `/jobs/${encodeURIComponent(jobId)}/jobads/${encodeURIComponent(jobAdId)}`, { body: jobAd });
+    if (!result.success) return { success: false, jobAd: {}, error: result.error };
+    return { success: true, jobAd: result.data, error: "" };
+  }
+
+  /** POST .../postings — asynchronously publishes a job ad to its configured channels; the API
+   * returns 202 with `{postingStatus: "PENDING"}`, not the fully-published state. */
+  async publishJobAdPosting(jobId: string, jobAdId: string, options: Record<string, unknown>): Promise<SmartRecruitersPostingStatusResult> {
+    const result = await this.request<{ postingStatus?: string }>("POST", `/jobs/${encodeURIComponent(jobId)}/jobads/${encodeURIComponent(jobAdId)}/postings`, { body: options });
+    if (!result.success) return { success: false, status: "", error: result.error };
+    return { success: true, status: result.data.postingStatus ?? "", error: "" };
+  }
+
+  /** DELETE .../postings — asynchronously unpublishes; the API returns 202 with
+   * `{unpostingStatus: "PENDING"}`. */
+  async unpublishJobAdPosting(jobId: string, jobAdId: string): Promise<SmartRecruitersPostingStatusResult> {
+    const result = await this.request<{ unpostingStatus?: string }>("DELETE", `/jobs/${encodeURIComponent(jobId)}/jobads/${encodeURIComponent(jobAdId)}/postings`);
+    if (!result.success) return { success: false, status: "", error: result.error };
+    return { success: true, status: result.data.unpostingStatus ?? "", error: "" };
+  }
+
+  async listJobAdPostings(jobId: string, jobAdId: string, activeOnly: boolean): Promise<SmartRecruitersPostingsListResult> {
+    const result = await this.request<{ content?: Record<string, unknown>[] }>("GET", `/jobs/${encodeURIComponent(jobId)}/jobads/${encodeURIComponent(jobAdId)}/postings`, { query: { activeOnly } });
+    if (!result.success) return { success: false, postings: [], error: result.error };
+    return { success: true, postings: result.data.content ?? [], error: "" };
+  }
+
+  async listPositions(jobId: string): Promise<SmartRecruitersPositionsListResult> {
+    const result = await this.request<{ totalFound?: number; content?: Record<string, unknown>[] }>("GET", `/jobs/${encodeURIComponent(jobId)}/positions`);
+    if (!result.success) return { success: false, positions: [], totalFound: 0, error: result.error };
+    return { success: true, positions: result.data.content ?? [], totalFound: result.data.totalFound ?? 0, error: "" };
+  }
+
+  async createPosition(jobId: string, position: Record<string, unknown>): Promise<SmartRecruitersPositionResult> {
+    const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/positions`, { body: position });
+    if (!result.success) return { success: false, position: {}, error: result.error };
+    return { success: true, position: result.data, error: "" };
+  }
+
+  async getPosition(jobId: string, positionId: string): Promise<SmartRecruitersPositionResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `/jobs/${encodeURIComponent(jobId)}/positions/${encodeURIComponent(positionId)}`);
+    if (!result.success) return { success: false, position: {}, error: result.error };
+    return { success: true, position: result.data, error: "" };
+  }
+
+  async updatePosition(jobId: string, positionId: string, position: Record<string, unknown>): Promise<SmartRecruitersPositionResult> {
+    const result = await this.request<Record<string, unknown>>("PUT", `/jobs/${encodeURIComponent(jobId)}/positions/${encodeURIComponent(positionId)}`, { body: position });
+    if (!result.success) return { success: false, position: {}, error: result.error };
+    return { success: true, position: result.data, error: "" };
+  }
+
+  async deletePosition(jobId: string, positionId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `/jobs/${encodeURIComponent(jobId)}/positions/${encodeURIComponent(positionId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async getHiringTeam(jobId: string): Promise<SmartRecruitersHiringTeamListResult> {
+    const result = await this.request<{ totalFound?: number; content?: Record<string, unknown>[] }>("GET", `/jobs/${encodeURIComponent(jobId)}/hiring-team`);
+    if (!result.success) return { success: false, members: [], totalFound: 0, error: result.error };
+    return { success: true, members: result.data.content ?? [], totalFound: result.data.totalFound ?? 0, error: "" };
+  }
+
+  async addHiringTeamMember(jobId: string, userId: string, role: string): Promise<SmartRecruitersHiringTeamMemberResult> {
+    const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/hiring-team`, { body: { id: userId, role } });
+    if (!result.success) return { success: false, member: {}, error: result.error };
+    return { success: true, member: result.data, error: "" };
+  }
+
+  async removeHiringTeamMember(jobId: string, userId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `/jobs/${encodeURIComponent(jobId)}/hiring-team/${encodeURIComponent(userId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
   }
 }

@@ -1383,13 +1383,172 @@
         "pin_method": "Method",
         "pin_path": "Path",
         "pin_query_json": "Query Params (JSON)",
-        "pin_body_json": "Body (JSON)"
+        "pin_body_json": "Body (JSON)",
+        "pin_job_id": "Job ID",
+        "pin_job_ad_id": "Job Ad ID"
       },
       "apiCall": {
         "label": "SmartRecruiters API Call",
         "description": "Calls any documented SmartRecruiters REST endpoint directly (escape hatch for endpoints without a dedicated node yet).",
         "pin_status": "HTTP Status",
         "pin_data_json": "Data (JSON)"
+      },
+      "searchJobs": {
+        "label": "SmartRecruiters Search Jobs",
+        "description": "Searches/lists job postings, with pagination and optional query filters.",
+        "pin_offset": "Offset",
+        "pin_limit": "Limit",
+        "pin_jobs_json": "Jobs (JSON)",
+        "pin_total_found": "Total Found"
+      },
+      "createJob": {
+        "label": "SmartRecruiters Create Job",
+        "description": "Creates a new job posting.",
+        "pin_job_json": "Job (JSON)",
+        "pin_created_job_json": "Created Job (JSON)"
+      },
+      "getJob": {
+        "label": "SmartRecruiters Get Job",
+        "description": "Fetches a single job posting by id.",
+        "pin_job_json": "Job (JSON)"
+      },
+      "patchJob": {
+        "label": "SmartRecruiters Patch Job",
+        "description": "Partially updates a job posting via JSON Merge Patch (RFC 7396) — only the fields present in the patch are changed.",
+        "pin_patch_json": "Patch (JSON)",
+        "pin_job_json": "Job (JSON)"
+      },
+      "updateJobStatus": {
+        "label": "SmartRecruiters Update Job Status",
+        "description": "Updates a job posting's status (e.g. Sourcing, Interview, Filled).",
+        "pin_status": "Status",
+        "pin_job_json": "Job (JSON)"
+      },
+      "getJobStatusHistory": {
+        "label": "SmartRecruiters Get Job Status History",
+        "description": "Fetches the status change history of a job posting.",
+        "pin_history_json": "Status History (JSON)"
+      },
+      "getLatestApprovalRequest": {
+        "label": "SmartRecruiters Get Latest Approval Request",
+        "description": "Fetches the most recent approval request for a job posting.",
+        "pin_approval_json": "Approval (JSON)"
+      },
+      "updateHeadcount": {
+        "label": "SmartRecruiters Update Headcount",
+        "description": "Updates the headcount (number of open positions) for a job posting.",
+        "pin_headcount": "Headcount",
+        "pin_job_json": "Job (JSON)"
+      },
+      "getJobNote": {
+        "label": "SmartRecruiters Get Job Note",
+        "description": "Fetches the internal note attached to a job posting.",
+        "pin_note_json": "Note (JSON)"
+      },
+      "updateJobNote": {
+        "label": "SmartRecruiters Update Job Note",
+        "description": "Updates the internal note attached to a job posting.",
+        "pin_content": "Content",
+        "pin_note_json": "Note (JSON)"
+      },
+      "listJobAds": {
+        "label": "SmartRecruiters List Job Ads",
+        "description": "Lists all job ads (alternate postings/languages) for a job.",
+        "pin_job_ads_json": "Job Ads (JSON)"
+      },
+      "createJobAd": {
+        "label": "SmartRecruiters Create Job Ad",
+        "description": "Creates a new job ad (public-facing posting content) for a job.",
+        "pin_job_ad_json": "Job Ad (JSON)",
+        "pin_created_job_ad_json": "Created Job Ad (JSON)"
+      },
+      "getJobAd": {
+        "label": "SmartRecruiters Get Job Ad",
+        "description": "Fetches a single job ad by id.",
+        "pin_job_ad_json": "Job Ad (JSON)"
+      },
+      "updateJobAd": {
+        "label": "SmartRecruiters Update Job Ad",
+        "description": "Replaces a job ad's content.",
+        "pin_job_ad_json": "Job Ad (JSON)"
+      },
+      "publishJobAdPosting": {
+        "label": "SmartRecruiters Publish Job Ad",
+        "description": "Publishes a job ad to its configured channels. This is asynchronous — the response reflects a pending state, not full publication.",
+        "pin_aggregators": "Distribute to Aggregators",
+        "pin_visibility": "Visibility",
+        "pin_include_internal": "Include Internal",
+        "pin_delay_public_in_days": "Delay Public (Days)",
+        "pin_status": "Posting Status"
+      },
+      "unpublishJobAdPosting": {
+        "label": "SmartRecruiters Unpublish Job Ad",
+        "description": "Unpublishes a job ad from all channels. This is asynchronous — the response reflects a pending state.",
+        "pin_status": "Unposting Status"
+      },
+      "listJobAdPostings": {
+        "label": "SmartRecruiters List Job Ad Postings",
+        "description": "Lists the channels/sources a job ad has been published to.",
+        "pin_active_only": "Active Only",
+        "pin_postings_json": "Postings (JSON)"
+      },
+      "listPositions": {
+        "label": "SmartRecruiters List Positions",
+        "description": "Lists the headcount positions attached to a job.",
+        "pin_positions_json": "Positions (JSON)",
+        "pin_total_found": "Total Found"
+      },
+      "createPosition": {
+        "label": "SmartRecruiters Create Position",
+        "description": "Creates a new headcount position for a job.",
+        "pin_type": "Type",
+        "pin_position_open_date": "Position Open Date",
+        "pin_target_start_date": "Target Start Date",
+        "pin_external_position_id": "External Position ID",
+        "pin_incumbent_name": "Incumbent Name",
+        "pin_hiring_manager_id": "Hiring Manager ID",
+        "pin_position_json": "Position (JSON)"
+      },
+      "getPosition": {
+        "label": "SmartRecruiters Get Position",
+        "description": "Fetches a single headcount position by id.",
+        "pin_position_id": "Position ID",
+        "pin_position_json": "Position (JSON)"
+      },
+      "updatePosition": {
+        "label": "SmartRecruiters Update Position",
+        "description": "Replaces a headcount position's details.",
+        "pin_position_id": "Position ID",
+        "pin_type": "Type",
+        "pin_position_open_date": "Position Open Date",
+        "pin_target_start_date": "Target Start Date",
+        "pin_external_position_id": "External Position ID",
+        "pin_incumbent_name": "Incumbent Name",
+        "pin_hiring_manager_id": "Hiring Manager ID",
+        "pin_position_json": "Position (JSON)"
+      },
+      "deletePosition": {
+        "label": "SmartRecruiters Delete Position",
+        "description": "Removes a headcount position from a job.",
+        "pin_position_id": "Position ID"
+      },
+      "getHiringTeam": {
+        "label": "SmartRecruiters Get Hiring Team",
+        "description": "Lists the hiring team members assigned to a job.",
+        "pin_members_json": "Members (JSON)",
+        "pin_total_found": "Total Found"
+      },
+      "addHiringTeamMember": {
+        "label": "SmartRecruiters Add Hiring Team Member",
+        "description": "Adds a user to a job's hiring team with a given role.",
+        "pin_user_id": "User ID",
+        "pin_role": "Role",
+        "pin_member_json": "Member (JSON)"
+      },
+      "removeHiringTeamMember": {
+        "label": "SmartRecruiters Remove Hiring Team Member",
+        "description": "Removes a user from a job's hiring team.",
+        "pin_user_id": "User ID"
       }
     },
     "sap": {
