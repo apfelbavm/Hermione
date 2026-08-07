@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { i18n } from "@i18n";
-import type { RunLog } from "../../server/models";
+import type { RunLog } from "@hermione/core/server/models";
 import { IconManager } from "../../shared/iconManager";
 import { LogEntryView } from "./LogEntryView";
 

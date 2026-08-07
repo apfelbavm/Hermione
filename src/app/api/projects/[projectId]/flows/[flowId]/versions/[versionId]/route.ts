@@ -1,4 +1,4 @@
-import { getDatabaseManager } from "../../../../../../../../server/DatabaseManager";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
 
 export const runtime = "nodejs";
 

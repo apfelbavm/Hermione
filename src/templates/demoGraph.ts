@@ -1,7 +1,7 @@
-import { getNodeDef } from "../graph/engine/registry";
-import { addCommentBox, connectPins } from "../graph/engine/graphMutations";
-import { Graph } from "../graph/engine/graph";
-import { NodeInstance } from "../graph/engine/nodeInstance";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { addCommentBox, connectPins } from "@hermione/graph/engine/graphMutations";
+import { Graph } from "@hermione/graph/engine/graph";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
 
 function addNode(graph: Graph, type: string, position: { x: number; y: number }, id: string) {
   const def = getNodeDef(type);

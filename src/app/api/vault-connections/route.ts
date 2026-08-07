@@ -1,5 +1,5 @@
-import type { VaultProviderId } from "../../../credentials/vaultProviders";
-import { getDatabaseManager } from "../../../server/DatabaseManager";
+import type { VaultProviderId } from "@hermione/shared/vaultProviders";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
 
 export const runtime = "nodejs";
 

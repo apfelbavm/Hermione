@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import QRCode from "qrcode";
-import { getDatabaseManager } from "../../../../../server/DatabaseManager";
-import { getRequestUser } from "../../../../../server/requestAuth";
-import { generateTotpEnrollment } from "../../../../../server/totp";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { getRequestUser } from "@hermione/core/server/requestAuth";
+import { generateTotpEnrollment } from "@hermione/core/server/totp";
 
 /** Starts (or restarts) enrolling an authenticator app for the signed-in user — the secret is
  * stored but left disabled until /api/auth/totp/confirm proves the user actually scanned/entered

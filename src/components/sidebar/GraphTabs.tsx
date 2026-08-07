@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { i18n } from "@i18n";
-import { closeFunctionTab, type Store } from "../../state/store";
-import { useStoreRevision } from "../../state/useStore";
+import { closeFunctionTab, type Store } from "@hermione/graph/state/store";
+import { useStoreRevision } from "@hermione/graph/state/useStore";
 
 export function GraphTabs({ store }: { store: Store }) {
   useStoreRevision(store);

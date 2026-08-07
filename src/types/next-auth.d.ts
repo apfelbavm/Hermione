@@ -1,5 +1,5 @@
 import type { DefaultSession } from "next-auth";
-import type { UserRole } from "../server/models";
+import type { UserRole } from "@hermione/core/server/models";
 
 // Augments next-auth's built-in types with the extra fields server/auth.ts's callbacks attach —
 // keeps every `session.user.*`/`token.*` access elsewhere in the app type-checked.

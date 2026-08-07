@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { deleteUser, getCurrentUser, listUsers, setUserBlocked, setUserRole } from "../../../client/api";
-import type { UserAccount, UserRole } from "../../../server/models";
+import type { UserAccount, UserRole } from "@hermione/core/server/models";
 import { PageShell } from "../../../components/PageHeader";
 import { Breadcrumbs } from "../../../components/Breadcrumbs";
 

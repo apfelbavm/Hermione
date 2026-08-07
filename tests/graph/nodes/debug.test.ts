@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import * as functionLibrary from "../../../src/server/functionLibrary";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import * as functionLibrary from "@hermione/core/server/functionLibrary";
 
 beforeAll(() => {
   registerBuiltins();
@@ -10,10 +10,10 @@ beforeAll(() => {
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (...args: string[]) => (...args: unknown[]) => Promise<unknown>;
 
 async function print(message: string, format: string): Promise<string> {
-  const def = getNodeDef("debug.printFormatted");
+  const execute = getNodeDef("debug.printFormatted").execute!;
   const logs: string[] = [];
   const ctx = { log: (m: string) => logs.push(m) } as any;
-  await def.execute!({ node: {} as any, inputs: { message, format }, ctx });
+  await execute({ node: {} as any, inputs: { message, format }, ctx });
   return logs[0];
 }
 

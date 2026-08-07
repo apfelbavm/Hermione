@@ -1,7 +1,7 @@
 "use client";
 
 import { i18n } from "@i18n";
-import type { FlowVersionSummary } from "../../server/models";
+import type { FlowVersionSummary } from "@hermione/core/server/models";
 import { formatLogTimestamp } from "../../shared/formatLogTimestamp";
 
 /** The sole content of #toolbar-center on the "Restore old version" page — the version picker plus

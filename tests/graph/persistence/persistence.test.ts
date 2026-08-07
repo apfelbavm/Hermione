@@ -1,14 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
-import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
-import { connectPins } from "../../../src/graph/engine/graphMutations";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import { type Variable } from "../../../src/graph/engine/types";
-import { deserializeGraph } from "../../../src/graph/persistence/load";
-import { serializeGraph } from "../../../src/graph/persistence/save";
-import { CURRENT_FORMAT_VERSION } from "../../../src/graph/persistence/schema";
-import { Graph } from "../../../src/graph/engine/graph";
-import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import { createExecutionContext, runExecFrom } from "@hermione/graph/engine/executor";
+import { connectPins } from "@hermione/graph/engine/graphMutations";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { type Variable } from "@hermione/graph/engine/types";
+import { deserializeGraph } from "@hermione/graph/persistence/load";
+import { serializeGraph } from "@hermione/graph/persistence/save";
+import { CURRENT_FORMAT_VERSION } from "@hermione/graph/persistence/schema";
+import { Graph } from "@hermione/graph/engine/graph";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
 
 function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);

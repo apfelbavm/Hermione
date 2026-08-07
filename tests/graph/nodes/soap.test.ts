@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import { Graph } from "../../../src/graph/engine/graph";
-import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import { createExecutionContext, runExecFrom } from "@hermione/graph/engine/executor";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { Graph } from "@hermione/graph/engine/graph";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -75,11 +75,11 @@ describe("soap.call", () => {
 
   it("compileImports declares the functionLibrarySoap module the compiled output needs (which itself depends on the soap SDK)", () => {
     const def = getNodeDef("soap.call");
-    expect(def.compileImports).toEqual(['import * as functionLibrarySoap from "../../src/server/functionLibrarySoap.ts";']);
+    expect(def.compileImports).toEqual(['import * as functionLibrarySoap from "../../packages/core/src/server/functionLibrarySoap.ts";']);
   });
 
   it("the real soapCall function exists in its own isolated module, never imported by any interpreter-facing code", async () => {
-    const { soapCall } = await import("../../../src/server/functionLibrarySoap");
+    const { soapCall } = await import("@hermione/core/server/functionLibrarySoap");
     expect(typeof soapCall).toBe("function");
   });
 });
@@ -110,7 +110,7 @@ describe("soap.describe", () => {
   });
 
   it("the real soapDescribe function exists in its own isolated module, never imported by any interpreter-facing code", async () => {
-    const { soapDescribe } = await import("../../../src/server/functionLibrarySoap");
+    const { soapDescribe } = await import("@hermione/core/server/functionLibrarySoap");
     expect(typeof soapDescribe).toBe("function");
   });
 });

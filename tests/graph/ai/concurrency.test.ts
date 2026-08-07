@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
-import { AiGraphApi } from "../../../src/graph/ai/AiGraphApi";
+import { AiGraphApi } from "@hermione/graph/ai/AiGraphApi";
 import { buildTestGraph } from "./helpers";
 
 beforeAll(() => {

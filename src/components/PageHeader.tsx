@@ -18,15 +18,7 @@ function PageFooter() {
   return <footer className="page-bottom-footer" />;
 }
 
-export function PageShell({
-  children,
-  contentClassName,
-  aside,
-}: {
-  children: ReactNode;
-  contentClassName?: string;
-  aside?: ReactNode;
-}) {
+export function PageShell({ children, contentClassName, aside }: { children: ReactNode; contentClassName?: string; aside?: ReactNode }) {
   return (
     <div className="page-frame">
       <PageHeader />

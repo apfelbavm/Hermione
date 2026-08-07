@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
-import { rootContext } from "../../../src/graph/ai/context";
-import { applyChanges } from "../../../src/graph/ai/transactions";
+import { rootContext } from "@hermione/graph/ai/context";
+import { applyChanges } from "@hermione/graph/ai/transactions";
 import { addBuiltinNode, buildTestGraph } from "./helpers";
-import type { ChangeOp } from "../../../src/graph/ai/types";
+import type { ChangeOp } from "@hermione/graph/ai/types";
 
 beforeAll(() => {
   registerBuiltins();

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "./server/auth";
-import { verifyTabToken } from "./server/tabToken";
+import { auth } from "@hermione/core/server/auth";
+import { verifyTabToken } from "@hermione/core/server/tabToken";
 
 const PUBLIC_PATHS = ["/login", "/api/auth"];
 

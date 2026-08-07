@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { allGraphs, setPinLiteralValue, updateVariable } from "../../graph/engine/graphMutations";
+import { allGraphs, setPinLiteralValue, updateVariable } from "@hermione/graph/engine/graphMutations";
 import { i18n } from "@i18n";
-import type { NodeInstance } from "../../graph/engine/nodeInstance";
-import { getNodeDef } from "../../graph/engine/registry";
-import type { CommentBox, FunctionDef, PinDef, Variable } from "../../graph/engine/types";
+import type { NodeInstance } from "@hermione/graph/engine/nodeInstance";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import type { CommentBox, FunctionDef, PinDef, Variable } from "@hermione/graph/engine/types";
 import { setLastVariableType } from "../../client/lastVariableType";
 import { listDeployedScripts, listProjects } from "../../client/api";
-import type { ProjectSummary } from "../../server/models";
-import { createContainerSelect, createEntityPicker, createStructTypeSelect, createTypeSelect, createTypedValueInput } from "../../graph/overlay/typedValueInput";
-import { DEFAULT_COMMENT_COLOR } from "../../graph/render/commentGeometry";
-import { getEditingGraph, getVisibleVariablesForState, type Store } from "../../state/store";
-import { useStoreRevision } from "../../state/useStore";
+import type { ProjectSummary } from "@hermione/core/server/models";
+import { createContainerSelect, createEntityPicker, createStructTypeSelect, createTypeSelect, createTypedValueInput } from "@hermione/graph/overlay/typedValueInput";
+import { DEFAULT_COMMENT_COLOR } from "@hermione/graph/render/commentGeometry";
+import { getEditingGraph, getVisibleVariablesForState, type Store } from "@hermione/graph/state/store";
+import { useStoreRevision } from "@hermione/graph/state/useStore";
 import { FunctionIoPanel } from "./FunctionIoPanel";
 import { ImperativeMount } from "./ImperativeMount";
 import { NodeOutputsPanel } from "./NodeOutputsPanel";

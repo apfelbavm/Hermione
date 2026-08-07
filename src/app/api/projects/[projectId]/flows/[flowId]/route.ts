@@ -1,5 +1,5 @@
-import { getDatabaseManager } from "../../../../../../server/DatabaseManager";
-import { deleteDeployedScriptFile } from "../../../../../../server/deployedScriptFile";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { deleteDeployedScriptFile } from "@hermione/core/server/deployedScriptFile";
 
 export const runtime = "nodejs";
 

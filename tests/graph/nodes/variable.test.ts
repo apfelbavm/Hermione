@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import type { Variable } from "../../../src/graph/engine/types";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import type { Variable } from "@hermione/graph/engine/types";
 
 beforeAll(() => {
   registerBuiltins();

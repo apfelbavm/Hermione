@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Camera } from "../../../src/graph/render/camera";
+import { Camera } from "@hermione/graph/render/camera";
 
 describe("Camera", () => {
   it("defaults to a fixed starting position/zoom when constructed with no arguments", () => {

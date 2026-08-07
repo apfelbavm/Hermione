@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { i18n } from "@i18n";
 import { updateProjectDescription } from "../client/api";
-import type { ProjectSummary } from "../server/models";
+import type { ProjectSummary } from "@hermione/core/server/models";
 import { IconManager } from "../shared/iconManager";
 import { ProjectTabs, type ProjectTabKey } from "./ProjectTabs";
 

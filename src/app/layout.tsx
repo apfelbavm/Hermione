@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "../style.css";
 import { SessionProvider } from "next-auth/react";
-import { THEME_BOOTSTRAP_SCRIPT } from "../client/theme";
+import { THEME_BOOTSTRAP_SCRIPT } from "@hermione/shared/theme";
 import { SIDEBAR_BOOTSTRAP_SCRIPT } from "../client/sidebar";
 import { TAB_FETCH_BOOTSTRAP_SCRIPT } from "../client/tabFetchPatch";
 import { AuthGate } from "../components/AuthGate";

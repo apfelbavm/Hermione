@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { registerBuiltins } from "../../../graph/nodes";
-import { createExecutionContext, runExecFrom } from "../../../graph/engine/executor";
-import { deserializeGraph } from "../../../graph/persistence/load";
-import { checkpointSimulation, disposeSimulationRun, registerSimulationRun, requestSimulationResume } from "../../../graph/engine/simulationControl";
-import { allGraphs, nextId } from "../../../graph/engine/graphMutations";
-import type { Graph } from "../../../graph/engine/graph";
-import type { LogFormat } from "../../../graph/engine/types";
-import { getDatabaseManager } from "../../../server/DatabaseManager";
-import { executeDeployedFlow } from "../../../server/executeDeployedFlow";
-import { resolveAllCredentials } from "../../../server/vaultCredentials";
-import type { LogEntry, RunLog } from "../../../server/models";
+import { createExecutionContext, runExecFrom } from "@hermione/graph/engine/executor";
+import { deserializeGraph } from "@hermione/graph/persistence/load";
+import { checkpointSimulation, disposeSimulationRun, registerSimulationRun, requestSimulationResume } from "@hermione/graph/engine/simulationControl";
+import { allGraphs, nextId } from "@hermione/graph/engine/graphMutations";
+import type { Graph } from "@hermione/graph/engine/graph";
+import type { LogFormat } from "@hermione/graph/engine/types";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { executeDeployedFlow } from "@hermione/core/server/executeDeployedFlow";
+import { resolveAllCredentials } from "@hermione/core/server/vaultCredentials";
+import type { LogEntry, RunLog } from "@hermione/core/server/models";
 
 // Must run under the Node runtime (not edge) — the interpreter and node implementations
 // (node-forge/openpgp for crypto, fetch-based http/odata/oauth2 nodes, etc.) assume a Node

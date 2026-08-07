@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getDatabaseManager } from "../../../../server/DatabaseManager";
-import { getRequestUser } from "../../../../server/requestAuth";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { getRequestUser } from "@hermione/core/server/requestAuth";
 
 async function requireAdmin(req: Request) {
   const user = await getRequestUser(req);

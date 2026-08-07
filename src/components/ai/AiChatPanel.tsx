@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AiGraphApi, AI_TOOL_DEFINITIONS, categoryForTool, DEFAULT_APPROVAL_POLICY, dispatchTool } from "../../graph/ai";
+import { AiGraphApi, AI_TOOL_DEFINITIONS, categoryForTool, DEFAULT_APPROVAL_POLICY, dispatchTool } from "@hermione/graph/ai/index";
 import { IconManager } from "../../shared/iconManager";
-import type { Store } from "../../state/store";
-import { useStoreRevision } from "../../state/useStore";
+import type { Store } from "@hermione/graph/state/store";
+import { useStoreRevision } from "@hermione/graph/state/useStore";
 import { ChatHistoryStore, newSessionId, sessionTitleFromMessages, type ChatMessage, type ChatSession } from "./chatHistory";
 
 const COLLAPSED_STORAGE_KEY = "hermione:ai-chat-panel-collapsed";

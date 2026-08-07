@@ -1,4 +1,4 @@
-import { DropboxManager } from "../src/lib/dropboxManager";
+import { DropboxManager } from "@hermione/core/lib/dropboxManager";
 
 /** Wraps the real fetch to print the exact outgoing request (secret/code redacted to a length +
  * first/last few chars, not fully hidden, so truncation/whitespace/extra-character corruption is

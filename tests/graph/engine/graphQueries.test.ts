@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { connectionsFrom, connectionsTouchingPin, connectionTo } from "../../../src/graph/engine/graphQueries";
-import { type Connection } from "../../../src/graph/engine/types";
-import { Graph } from "../../../src/graph/engine/graph";
+import { connectionsFrom, connectionsTouchingPin, connectionTo } from "@hermione/graph/engine/graphQueries";
+import { type Connection } from "@hermione/graph/engine/types";
+import { Graph } from "@hermione/graph/engine/graph";
 
 function conn(id: string, fromNode: string, fromPin: string, toNode: string, toPin: string): Connection {
   return { id, fromNode, fromPin, toNode, toPin };

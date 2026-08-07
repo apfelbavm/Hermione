@@ -5,7 +5,7 @@
  * nodes (e.g. "for each") — those configure a node, not a variable. Uses sessionStorage rather than
  * localStorage since this is meant to reset per browser session, not persist indefinitely. */
 
-import type { PinContainer, PinType } from "../graph/engine/types";
+import type { PinContainer, PinType } from "@hermione/graph/engine/types";
 
 const STORAGE_KEY = "hermione:lastVariableType";
 const DEFAULT_TYPE: PinType = "number";

@@ -1,7 +1,7 @@
 import { i18n } from "@i18n";
-import type { FunctionDef } from "../graph/engine/types";
-import type { Store } from "../state/store";
-import { useStoreRevision } from "../state/useStore";
+import type { FunctionDef } from "@hermione/graph/engine/types";
+import type { Store } from "@hermione/graph/state/store";
+import { useStoreRevision } from "@hermione/graph/state/useStore";
 import { AiChatPanel } from "./ai/AiChatPanel";
 import { DetailsPanel } from "./sidebar/DetailsPanel";
 import { FunctionsPanel } from "./sidebar/FunctionsPanel";

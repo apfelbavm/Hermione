@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
-import { describeNodeType, findNodeTypes, getNodeTypeMetadata, searchNodeTypes } from "../../../src/graph/ai/metadataAdapter";
-import { getNodeDef } from "../../../src/graph/engine/registry";
+import { describeNodeType, findNodeTypes, getNodeTypeMetadata, searchNodeTypes } from "@hermione/graph/ai/metadataAdapter";
+import { getNodeDef } from "@hermione/graph/engine/registry";
 
 beforeAll(() => {
   registerBuiltins();

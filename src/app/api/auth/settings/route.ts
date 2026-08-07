@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getDatabaseManager } from "../../../../server/DatabaseManager";
-import { getRequestUser } from "../../../../server/requestAuth";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { getRequestUser } from "@hermione/core/server/requestAuth";
 
 /** GET is intentionally public (no session required) — AuthGate.tsx needs to know the session
  * scope before it knows whether the visitor is signed in at all, and the setting itself isn't

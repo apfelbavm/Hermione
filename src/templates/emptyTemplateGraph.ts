@@ -1,6 +1,6 @@
-import { Graph } from "../graph/engine/graph";
-import { nextId } from "../graph/engine/graphMutations";
-import { parseClipboardPayload, pasteNodesIntoGraph } from "../graph/engine/clipboard";
+import { Graph } from "@hermione/graph/engine/graph";
+import { nextId } from "@hermione/graph/engine/graphMutations";
+import { parseClipboardPayload, pasteNodesIntoGraph } from "@hermione/graph/engine/clipboard";
 import emptyTemplateGraph from "./emptyTemplateGraph.json";
 
 export function buildEmptyTemplateIllustrationGraph(): Graph {

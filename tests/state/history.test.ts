@@ -1,10 +1,10 @@
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../src/graph/nodes";
-import { getNodeDef } from "../../src/graph/engine/registry";
-import { Graph } from "../../src/graph/engine/graph";
-import { NodeInstance } from "../../src/graph/engine/nodeInstance";
-import type { AppState, Store } from "../../src/state/store";
-import { createHistoryManager } from "../../src/state/history";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { Graph } from "@hermione/graph/engine/graph";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
+import type { AppState, Store } from "@hermione/graph/state/store";
+import { createHistoryManager } from "@hermione/graph/state/history";
 
 // A minimal Store stand-in: notify() runs listeners synchronously instead of coalescing via
 // requestAnimationFrame (unavailable in this project's plain-node vitest environment, and

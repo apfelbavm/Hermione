@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { i18n } from "@i18n";
 import { createFlow, deleteFlow, getFlowWithGraph, getProject, listFlows, listProjectWebhooks, listRuns, renameFlow, saveFlowGraph, saveNewFlowVersion } from "../client/api";
 import { MAX_RUNS_PER_PROJECT } from "../shared/runLogConstants";
-import type { FlowSummary, ProjectSummary, RunLog, WebhookFlowSummary } from "../server/models";
+import type { FlowSummary, ProjectSummary, RunLog, WebhookFlowSummary } from "@hermione/core/server/models";
 import { PageShell } from "./PageHeader";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { CreateFlowDialog } from "./CreateFlowDialog";

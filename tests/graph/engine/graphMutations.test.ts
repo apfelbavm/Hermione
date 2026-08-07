@@ -21,13 +21,13 @@ import {
   updateScriptInput,
   updateScriptOutput,
   updateVariable,
-} from "../../../src/graph/engine/graphMutations";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import { transpileScript } from "../../../src/graph/engine/transpile";
-import { type CodeScriptDef, type ExecutionContext, type FunctionDef, type Variable } from "../../../src/graph/engine/types";
-import { Graph } from "../../../src/graph/engine/graph";
-import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
-import { TEXT_ENCODING_ENUM_TYPE } from "../../../src/graph/enum/common";
+} from "@hermione/graph/engine/graphMutations";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { transpileScript } from "@hermione/graph/engine/transpile";
+import { type CodeScriptDef, type ExecutionContext, type FunctionDef, type Variable } from "@hermione/graph/engine/types";
+import { Graph } from "@hermione/graph/engine/graph";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
+import { TEXT_ENCODING_ENUM_TYPE } from "@hermione/graph/enum/common";
 
 beforeAll(() => {
   registerBuiltins();

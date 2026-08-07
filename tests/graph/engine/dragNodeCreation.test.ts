@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import { registerStructType } from "../../../src/graph/engine/structRegistry";
-import { findDragCompatibleNodeDefs, resolveDragMatch } from "../../../src/graph/engine/dragNodeCreation";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { registerStructType } from "@hermione/graph/engine/structRegistry";
+import { findDragCompatibleNodeDefs, resolveDragMatch } from "@hermione/graph/engine/dragNodeCreation";
 
 beforeAll(() => {
   registerBuiltins();

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getDatabaseManager } from "../../../../../server/DatabaseManager";
-import { getRequestUser } from "../../../../../server/requestAuth";
-import { verifyTotpCode } from "../../../../../server/totp";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { getRequestUser } from "@hermione/core/server/requestAuth";
+import { verifyTotpCode } from "@hermione/core/server/totp";
 
 /** Second step of enrolling an authenticator app: proves the user's app actually produces valid
  * codes for the pending secret before turning totp_enabled on. */

@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
-import { connectPins } from "../../../src/graph/engine/graphMutations";
-import { rootContext } from "../../../src/graph/ai/context";
-import { getConnections, getNode, getNodes, getSummary, findNodes } from "../../../src/graph/ai/inspection";
+import { connectPins } from "@hermione/graph/engine/graphMutations";
+import { rootContext } from "@hermione/graph/ai/context";
+import { getConnections, getNode, getNodes, getSummary, findNodes } from "@hermione/graph/ai/inspection";
 import { addBuiltinNode, buildTestGraph } from "./helpers";
 
 beforeAll(() => {

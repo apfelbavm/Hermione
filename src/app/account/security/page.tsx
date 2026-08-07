@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { addAllowedDomain, confirmTotp, disableTotp, getAuthSettings, getCurrentUser, listAllowedDomains, removeAllowedDomain, setSessionScope, setupTotp } from "../../../client/api";
-import type { AuthSettings, UserAccount } from "../../../server/models";
+import type { AuthSettings, UserAccount } from "@hermione/core/server/models";
 import { PageShell } from "../../../components/PageHeader";
 import { Breadcrumbs } from "../../../components/Breadcrumbs";
 

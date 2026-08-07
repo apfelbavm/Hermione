@@ -1,10 +1,10 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import { Graph } from "../../../src/graph/engine/graph";
-import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
-import type { CredentialRecord, Oauth2SamlBearerCredentialData } from "../../../src/credentials/types";
+import { createExecutionContext, runExecFrom } from "@hermione/graph/engine/executor";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { Graph } from "@hermione/graph/engine/graph";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
+import type { CredentialRecord, Oauth2SamlBearerCredentialData } from "@hermione/shared/types";
 
 beforeAll(() => {
   registerBuiltins();

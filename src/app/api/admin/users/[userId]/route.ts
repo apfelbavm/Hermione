@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getDatabaseManager } from "../../../../../server/DatabaseManager";
-import { getRequestUser } from "../../../../../server/requestAuth";
-import type { UserRole } from "../../../../../server/models";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { getRequestUser } from "@hermione/core/server/requestAuth";
+import type { UserRole } from "@hermione/core/server/models";
 
 type Params = Promise<{ userId: string }>;
 

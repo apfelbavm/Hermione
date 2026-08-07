@@ -1,13 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import { transpileScript } from "../../../src/graph/engine/transpile";
-import type { CodeScriptDef, ExecutionContext } from "../../../src/graph/engine/types";
-import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
-import { Graph } from "../../../src/graph/engine/graph";
-import { connectPins } from "../../../src/graph/engine/graphMutations";
-import { compileGraph } from "../../../src/graph/compiler/codegen";
-import { deployedScriptPath, writeDeployedScriptFile, deleteDeployedScriptFile } from "../../../src/server/deployedScriptFile";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { transpileScript } from "@hermione/graph/engine/transpile";
+import type { CodeScriptDef, ExecutionContext } from "@hermione/graph/engine/types";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
+import { Graph } from "@hermione/graph/engine/graph";
+import { connectPins } from "@hermione/graph/engine/graphMutations";
+import { compileGraph } from "@hermione/graph/compiler/codegen";
+import { deployedScriptPath, writeDeployedScriptFile, deleteDeployedScriptFile } from "@hermione/core/server/deployedScriptFile";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 

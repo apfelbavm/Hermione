@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { i18n } from "@i18n";
-import { applyTheme, getCurrentTheme, type Theme } from "../client/theme";
+import { applyTheme, getCurrentTheme, type Theme } from "@hermione/shared/theme";
 import { IconManager } from "../shared/iconManager";
 
 export function ThemeToggle() {

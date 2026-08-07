@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { registerBuiltins } from "../src/graph/nodes";
-import { compileGraph } from "../src/compiler/codegen";
-import { deserializeGraph } from "../src/persistence/load";
+import { compileGraph } from "@hermione/graph/compiler/codegen";
+import { deserializeGraph } from "@hermione/graph/persistence/load";
 
 function main(): void {
   const [graphPath, outPath] = process.argv.slice(2);
@@ -11,11 +11,7 @@ function main(): void {
   }
 
   if (!outPath.endsWith(".mjs")) {
-    console.warn(
-      `Warning: output path "${outPath}" doesn't end in .mjs — a plain .js file is only ` +
-        `treated as ESM by Node if a "type": "module" package.json is found above it. ` +
-        `Use a .mjs extension for a file that runs correctly no matter where it's deployed.`,
-    );
+    console.warn(`Warning: output path "${outPath}" doesn't end in .mjs — a plain .js file is only ` + `treated as ESM by Node if a "type": "module" package.json is found above it. ` + `Use a .mjs extension for a file that runs correctly no matter where it's deployed.`);
   }
 
   registerBuiltins();

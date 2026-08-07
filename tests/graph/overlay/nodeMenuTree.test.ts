@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { NodeDef } from "../../../src/graph/engine/types";
-import { allGroupPaths, buildMenuTree, flattenVisible } from "../../../src/graph/overlay/nodeMenuTree";
+import type { NodeDef } from "@hermione/graph/engine/types";
+import { allGroupPaths, buildMenuTree, flattenVisible } from "@hermione/graph/overlay/nodeMenuTree";
 
 function fakeDef(type: string, label: string, group: string): NodeDef {
   return { type, label, description: "", group, pins: [] };

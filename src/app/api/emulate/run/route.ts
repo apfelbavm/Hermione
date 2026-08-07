@@ -2,11 +2,11 @@ import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 import { registerBuiltins } from "../../../../graph/nodes";
-import { nextId } from "../../../../graph/engine/graphMutations";
-import { getDatabaseManager } from "../../../../server/DatabaseManager";
-import { applyCredentialEnvVars } from "../../../../server/credentialEnv";
-import { deployedScriptPath } from "../../../../server/deployedScriptFile";
-import type { LogEntry, RunLog } from "../../../../server/models";
+import { nextId } from "@hermione/graph/engine/graphMutations";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { applyCredentialEnvVars } from "@hermione/core/server/credentialEnv";
+import { deployedScriptPath } from "@hermione/core/server/deployedScriptFile";
+import type { LogEntry, RunLog } from "@hermione/core/server/models";
 
 // Same reasoning as api/simulate/route.ts: dynamic-importing a compiled module and running real
 // node implementations (crypto/http/etc.) needs a genuine Node environment, not the edge runtime.

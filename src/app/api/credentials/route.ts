@@ -1,5 +1,5 @@
-import type { CredentialData, CredentialTypeId } from "../../../credentials/types";
-import { getDatabaseManager } from "../../../server/DatabaseManager";
+import type { CredentialData, CredentialTypeId } from "@hermione/shared/types";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
 
 export const runtime = "nodejs";
 

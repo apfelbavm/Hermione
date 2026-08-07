@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { i18n } from "@i18n";
-import type { WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "../../server/models";
+import type { WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "@hermione/core/server/models";
 import { getWebhookDetail, regenerateWebhookToken } from "../../client/api";
 import { IconManager } from "../../shared/iconManager";
 

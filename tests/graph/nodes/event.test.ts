@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { addNodeOutputEntry, nextId } from "../../../src/graph/engine/graphMutations";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import { addNodeOutputEntry, nextId } from "@hermione/graph/engine/graphMutations";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();

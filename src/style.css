@@ -1,11 +1,11 @@
 @import "./styles/theme.css";
 @import "./styles/base.css";
 @import "./styles/button.css";
-@import "./styles/toolbar.css";
-@import "./styles/editor-layout.css";
-@import "./styles/side-panels.css";
-@import "./styles/log-panel.css";
-@import "./styles/canvas-overlay.css";
+@import "../packages/graph/src/styles/toolbar.css";
+@import "../packages/graph/src/styles/editor-layout.css";
+@import "../packages/graph/src/styles/side-panels.css";
+@import "../packages/graph/src/styles/log-panel.css";
+@import "../packages/graph/src/styles/canvas-overlay.css";
 @import "./styles/app-shell.css";
 @import "./styles/pages.css";
 @import "./styles/modals.css";

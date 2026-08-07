@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
-import { connectPins } from "../../../src/graph/engine/graphMutations";
-import { registerNode } from "../../../src/graph/engine/registry";
-import { rootContext } from "../../../src/graph/ai/context";
-import { getRuntimeErrors, getRuntimeState, runGraph, traceExecution } from "../../../src/graph/ai/execution";
+import { connectPins } from "@hermione/graph/engine/graphMutations";
+import { registerNode } from "@hermione/graph/engine/registry";
+import { rootContext } from "@hermione/graph/ai/context";
+import { getRuntimeErrors, getRuntimeState, runGraph, traceExecution } from "@hermione/graph/ai/execution";
 import { addBuiltinNode, buildTestGraph } from "./helpers";
 
 beforeAll(() => {

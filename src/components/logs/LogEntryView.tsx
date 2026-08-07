@@ -1,7 +1,7 @@
 import * as Papa from "papaparse";
 import { i18n } from "@i18n";
 import { formatLogTimestamp } from "../../shared/formatLogTimestamp";
-import type { LogEntry } from "../../server/models";
+import type { LogEntry } from "@hermione/core/server/models";
 
 function formatJsonForDisplay(message: string): string {
   try {

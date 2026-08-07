@@ -1,4 +1,4 @@
-import { requestSimulationPause, requestSimulationResume } from "../../../../graph/engine/simulationControl";
+import { requestSimulationPause, requestSimulationResume } from "@hermione/graph/engine/simulationControl";
 
 // See simulate/route.ts's own comment — same reason this needs the Node runtime.
 export const runtime = "nodejs";

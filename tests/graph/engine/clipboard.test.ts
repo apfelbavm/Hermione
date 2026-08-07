@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { cloneNodesForClipboard, parseClipboardPayload, pasteNodesIntoGraph, pasteVariableIntoGraph, serializeNodesClipboardPayload, serializeVariableClipboardPayload, type NodesClipboardPayload } from "../../../src/graph/engine/clipboard";
-import { type Connection, type Variable } from "../../../src/graph/engine/types";
-import { Graph } from "../../../src/graph/engine/graph";
-import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import { cloneNodesForClipboard, parseClipboardPayload, pasteNodesIntoGraph, pasteVariableIntoGraph, serializeNodesClipboardPayload, serializeVariableClipboardPayload, type NodesClipboardPayload } from "@hermione/graph/engine/clipboard";
+import { type Connection, type Variable } from "@hermione/graph/engine/types";
+import { Graph } from "@hermione/graph/engine/graph";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
 
 describe("parseClipboardPayload", () => {
   it("rejects non-JSON text", () => {

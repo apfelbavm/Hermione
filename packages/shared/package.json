@@ -1,0 +1,12 @@
+{
+  "name": "@hermione/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./types": "./src/types.ts",
+    "./registry": "./src/registry.ts",
+    "./vaultProviders": "./src/vaultProviders.ts",
+    "./theme": "./src/theme.ts"
+  }
+}

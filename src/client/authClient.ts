@@ -1,4 +1,4 @@
-import type { AuthSettings } from "../server/models";
+import type { AuthSettings } from "@hermione/core/server/models";
 
 // Client-side half of the "per tab vs per browser" session scope (see server/models.ts's
 // AuthSettings and server/tabToken.ts). Only ever touches sessionStorage — never localStorage —

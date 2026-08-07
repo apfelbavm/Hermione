@@ -9,6 +9,9 @@ const nextConfig = {
   // better-sqlite3 (see src/server/db.ts) ships a native binary — let Node `require` it directly at
   // runtime instead of Next trying to bundle it into the server build.
   serverExternalPackages: ["better-sqlite3"],
+  // Workspace packages under packages/* ship untranspiled TS source (no build step) — tell Next to
+  // run its own bundling over them instead of treating them as pre-built node_modules.
+  transpilePackages: ["@hermione/shared", "@hermione/core", "@hermione/graph"],
   async redirects() {
     return [{ source: "/", destination: "/projects", permanent: false }];
   },
@@ -21,25 +24,25 @@ const nextConfig = {
       // Node's 'fs'/'path' for on-disk crash logs, which don't exist in the browser — swap it for
       // a stub in browser bundles instead of failing to resolve them.
       "facebook-nodejs-business-sdk": {
-        browser: "./src/lib/facebookSdkBrowserStub.ts",
+        browser: "./packages/core/src/lib/facebookSdkBrowserStub.ts",
       },
       // googleapis's entry point unconditionally requires Node built-ins ('fs', 'net', 'tls',
       // 'http2', 'child_process') across google-auth-library/gaxios/node-fetch — same problem as
       // facebook-nodejs-business-sdk above, same fix.
       googleapis: {
-        browser: "./src/lib/googleapisBrowserStub.ts",
+        browser: "./packages/core/src/lib/googleapisBrowserStub.ts",
       },
       // The official mongodb driver's entry point unconditionally requires Node built-ins ('net',
       // 'tls', 'timers/promises', 'fs/promises') for its TCP wire protocol — same problem as
       // facebook-nodejs-business-sdk/googleapis above, same fix.
       mongodb: {
-        browser: "./src/lib/mongoBrowserStub.ts",
+        browser: "./packages/core/src/lib/mongoBrowserStub.ts",
       },
       // @slack/web-api's entry point transitively pulls in a Node-only dependency that
       // unconditionally requires 'node:fs' — same problem as facebook-nodejs-business-sdk/
       // googleapis/mongodb above, same fix.
       "@slack/web-api": {
-        browser: "./src/lib/slackSdkBrowserStub.ts",
+        browser: "./packages/core/src/lib/slackSdkBrowserStub.ts",
       },
     },
   },

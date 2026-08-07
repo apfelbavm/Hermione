@@ -1,10 +1,10 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import { Graph } from "../../../src/graph/engine/graph";
-import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
-import type { CredentialRecord, FacebookCredentialData } from "../../../src/credentials/types";
+import { createExecutionContext, runExecFrom } from "@hermione/graph/engine/executor";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { Graph } from "@hermione/graph/engine/graph";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
+import type { CredentialRecord, FacebookCredentialData } from "@hermione/shared/types";
 
 /** FacebookAdsApi.call() goes through axios internally (see facebook-nodejs-business-sdk's
  * http.js), unlike Dropbox's SDK which uses global fetch — mocking the whole SDK module at this

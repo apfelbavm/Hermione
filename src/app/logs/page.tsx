@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { listAllRuns, listProjects } from "../../client/api";
-import type { ProjectSummary, RunLog } from "../../server/models";
+import type { ProjectSummary, RunLog } from "@hermione/core/server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 import { RunRow } from "../../components/logs/RunRow";

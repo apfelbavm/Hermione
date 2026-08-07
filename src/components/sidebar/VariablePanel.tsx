@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import { i18n } from "@i18n";
-import { Colors } from "../../graph/engine/color";
-import type { Graph } from "../../graph/engine/graph";
-import { addVariable, defaultValueFor, moveVariable, nextId, removeVariable, updateVariable } from "../../graph/engine/graphMutations";
-import type { PinContainer, Variable } from "../../graph/engine/types";
+import { Colors } from "@hermione/graph/engine/color";
+import type { Graph } from "@hermione/graph/engine/graph";
+import { addVariable, defaultValueFor, moveVariable, nextId, removeVariable, updateVariable } from "@hermione/graph/engine/graphMutations";
+import type { PinContainer, Variable } from "@hermione/graph/engine/types";
 import { getLastVariableType } from "../../client/lastVariableType";
-import { VARIABLE_DRAG_MIME } from "../../graph/overlay/dragTypes";
-import { openRowContextMenu } from "../../graph/overlay/rowContextMenu";
-import { nextAvailableName } from "../../graph/overlay/uniqueName";
-import type { Store } from "../../state/store";
-import { useStoreRevision } from "../../state/useStore";
+import { VARIABLE_DRAG_MIME } from "@hermione/graph/overlay/dragTypes";
+import { openRowContextMenu } from "@hermione/graph/overlay/rowContextMenu";
+import { nextAvailableName } from "@hermione/graph/overlay/uniqueName";
+import type { Store } from "@hermione/graph/state/store";
+import { useStoreRevision } from "@hermione/graph/state/useStore";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { EditableNameInput, EditableNameLabel } from "./EditableName";
 import { useRowDragReorder } from "./useRowDragReorder";

@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
-import { rootContext } from "../../../src/graph/ai/context";
-import { connect, createNode } from "../../../src/graph/ai/mutations";
-import { align, distribute, fitLayout, getLayoutSnapshot, getNodeLayout, getSpatialRelationships, insertBetween, layoutAround, layoutGraph } from "../../../src/graph/ai/layoutOperations";
-import { GraphLayoutEngine } from "../../../src/graph/ai/layoutEngine";
-import { rectsIntersect, type NodeRect } from "../../../src/graph/ai/layoutTypes";
+import { rootContext } from "@hermione/graph/ai/context";
+import { connect, createNode } from "@hermione/graph/ai/mutations";
+import { align, distribute, fitLayout, getLayoutSnapshot, getNodeLayout, getSpatialRelationships, insertBetween, layoutAround, layoutGraph } from "@hermione/graph/ai/layoutOperations";
+import { GraphLayoutEngine } from "@hermione/graph/ai/layoutEngine";
+import { rectsIntersect, type NodeRect } from "@hermione/graph/ai/layoutTypes";
 import { addBuiltinNode, buildTestGraph } from "./helpers";
 
 beforeAll(() => {

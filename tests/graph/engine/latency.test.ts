@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
-import { connectPins, createFunctionDef } from "../../../src/graph/engine/graphMutations";
-import { isFunctionLatent, isNodeLatent } from "../../../src/graph/engine/latency";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import { Graph } from "../../../src/graph/engine/graph";
-import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import { connectPins, createFunctionDef } from "@hermione/graph/engine/graphMutations";
+import { isFunctionLatent, isNodeLatent } from "@hermione/graph/engine/latency";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { Graph } from "@hermione/graph/engine/graph";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();

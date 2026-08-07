@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getDatabaseManager } from "../../../../server/DatabaseManager";
-import { getRequestUser } from "../../../../server/requestAuth";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { getRequestUser } from "@hermione/core/server/requestAuth";
 
 /** Feeds the account security page (TOTP enrollment) and the admin security page (isAdmin gate) —
  * the current signed-in user's own profile, looked up fresh from the DB (not just the token) so

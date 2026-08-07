@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getDatabaseManager } from "../../../../../server/DatabaseManager";
-import { getRequestUser } from "../../../../../server/requestAuth";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { getRequestUser } from "@hermione/core/server/requestAuth";
 
 /** Turns the authenticator-app login option back off for the signed-in user — they fall back to
  * emailed one-time codes. */

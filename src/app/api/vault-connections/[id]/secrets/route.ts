@@ -1,5 +1,5 @@
-import { getDatabaseManager } from "../../../../../server/DatabaseManager";
-import { listVaultSecrets } from "../../../../../server/vaultProviders/index.ts";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { listVaultSecrets } from "@hermione/core/server/vaultProviders/index";
 
 export const runtime = "nodejs";
 

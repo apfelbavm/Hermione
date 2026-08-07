@@ -2,14 +2,14 @@ import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes";
-import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
-import { addFunctionInput, addFunctionOutput, addNodeOutputEntry, addVariable, connectPins, createFunctionDef, nextId } from "../../../src/graph/engine/graphMutations";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import { compileGraph } from "../../../src/graph/compiler/codegen";
-import { deployedScriptPath, writeDeployedScriptFile, deleteDeployedScriptFile } from "../../../src/server/deployedScriptFile";
-import { Graph } from "../../../src/graph/engine/graph";
-import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
-import type { Variable } from "../../../src/graph/engine/types";
+import { createExecutionContext, runExecFrom } from "@hermione/graph/engine/executor";
+import { addFunctionInput, addFunctionOutput, addNodeOutputEntry, addVariable, connectPins, createFunctionDef, nextId } from "@hermione/graph/engine/graphMutations";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { compileGraph } from "@hermione/graph/compiler/codegen";
+import { deployedScriptPath, writeDeployedScriptFile, deleteDeployedScriptFile } from "@hermione/core/server/deployedScriptFile";
+import { Graph } from "@hermione/graph/engine/graph";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
+import type { Variable } from "@hermione/graph/engine/types";
 
 function addBuiltinNode(graph: Graph, type: string, position = { x: 0, y: 0 }, id?: string) {
   const def = getNodeDef(type);

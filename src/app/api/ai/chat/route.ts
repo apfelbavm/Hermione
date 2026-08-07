@@ -1,5 +1,5 @@
-import { AI_GRAPH_SYSTEM_PROMPT, AI_TOOL_DEFINITIONS } from "../../../../graph/ai";
-import { AiManager } from "../../../../server/aiManager";
+import { AI_GRAPH_SYSTEM_PROMPT, AI_TOOL_DEFINITIONS } from "@hermione/graph/ai/index";
+import { AiManager } from "@hermione/core/server/aiManager";
 
 export const runtime = "nodejs";
 

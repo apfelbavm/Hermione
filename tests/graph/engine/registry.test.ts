@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPinTypeCompatible } from "../../../src/graph/engine/registry";
+import { isPinTypeCompatible } from "@hermione/graph/engine/registry";
 
 describe("isPinTypeCompatible", () => {
   it("is true for two plain (single-container) pins of the same type", () => {

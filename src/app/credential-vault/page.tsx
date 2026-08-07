@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { i18n } from "@i18n";
 import { createCredential, createVaultConnection, deleteCredential, deleteVaultConnection, getCredential, getVaultSecret, listCredentials, listVaultConnections, listVaultSecrets, updateCredential } from "../../client/api";
-import { getCredentialTypeDef, selectableCredentialTypeDefs } from "../../credentials/registry";
-import type { CredentialData, CredentialSummary, CredentialTypeId } from "../../credentials/types";
-import { allVaultProviderDefs, getVaultProviderDef } from "../../credentials/vaultProviders";
-import type { VaultProviderId } from "../../credentials/vaultProviders";
-import type { VaultConnectionSummary } from "../../server/models";
+import { getCredentialTypeDef, selectableCredentialTypeDefs } from "@hermione/shared/registry";
+import type { CredentialData, CredentialSummary, CredentialTypeId } from "@hermione/shared/types";
+import { allVaultProviderDefs, getVaultProviderDef } from "@hermione/shared/vaultProviders";
+import type { VaultProviderId } from "@hermione/shared/vaultProviders";
+import type { VaultConnectionSummary } from "@hermione/core/server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 

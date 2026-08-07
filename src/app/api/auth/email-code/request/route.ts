@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getDatabaseManager } from "../../../../../server/DatabaseManager";
-import { sendLoginCodeEmail } from "../../../../../server/authMailer";
+import { getDatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { sendLoginCodeEmail } from "@hermione/core/server/authMailer";
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const REQUEST_COOLDOWN_MS = 30 * 1000;

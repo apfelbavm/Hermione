@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { i18n } from "@i18n";
-import { addFunctionInput, addFunctionOutput, defaultValueFor, moveFunctionEntry, nextId, removeFunctionInput, removeFunctionOutput, updateFunctionInput, updateFunctionOutput } from "../../graph/engine/graphMutations";
-import type { FunctionDef, PinSignatureEntry } from "../../graph/engine/types";
+import { addFunctionInput, addFunctionOutput, defaultValueFor, moveFunctionEntry, nextId, removeFunctionInput, removeFunctionOutput, updateFunctionInput, updateFunctionOutput } from "@hermione/graph/engine/graphMutations";
+import type { FunctionDef, PinSignatureEntry } from "@hermione/graph/engine/types";
 import { getLastVariableType, setLastVariableType } from "../../client/lastVariableType";
-import { FUNCTION_IO_ENTRY_DRAG_MIME } from "../../graph/overlay/dragTypes";
-import { openRowContextMenu } from "../../graph/overlay/rowContextMenu";
-import { createContainerSelect, createTypeSelect, createTypedValueInput } from "../../graph/overlay/typedValueInput";
-import { nextAvailableName } from "../../graph/overlay/uniqueName";
-import type { Store } from "../../state/store";
-import { useStoreRevision } from "../../state/useStore";
+import { FUNCTION_IO_ENTRY_DRAG_MIME } from "@hermione/graph/overlay/dragTypes";
+import { openRowContextMenu } from "@hermione/graph/overlay/rowContextMenu";
+import { createContainerSelect, createTypeSelect, createTypedValueInput } from "@hermione/graph/overlay/typedValueInput";
+import { nextAvailableName } from "@hermione/graph/overlay/uniqueName";
+import type { Store } from "@hermione/graph/state/store";
+import { useStoreRevision } from "@hermione/graph/state/useStore";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { EditableNameInput, EditableNameLabel } from "./EditableName";
 import { ImperativeMount } from "./ImperativeMount";

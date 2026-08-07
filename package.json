@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "run": "node scripts/checkNodeVersion.mjs && npm run run-dev",
     "--------------------------": "",
@@ -30,6 +33,9 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@hermione/core": "*",
+    "@hermione/graph": "*",
+    "@hermione/shared": "*",
     "@aws-sdk/client-dynamodb": "^3.1101.0",
     "@aws-sdk/client-kinesis": "^3.1101.0",
     "@aws-sdk/client-secrets-manager": "^3.1104.0",

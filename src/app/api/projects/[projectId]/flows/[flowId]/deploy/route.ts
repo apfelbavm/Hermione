@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 import { registerBuiltins } from "../../../../../../../graph/nodes";
-import { compileGraph } from "../../../../../../../graph/compiler/codegen";
-import { nextId } from "../../../../../../../graph/engine/graphMutations";
-import { deserializeGraph } from "../../../../../../../graph/persistence/load";
-import { getDatabaseManager, type DatabaseManager } from "../../../../../../../server/DatabaseManager";
-import { applyCredentialEnvVars } from "../../../../../../../server/credentialEnv";
-import { deployedScriptPath, writeDeployedScriptFile } from "../../../../../../../server/deployedScriptFile";
-import type { DeployedScript, LogEntry, RunLog } from "../../../../../../../server/models";
+import { compileGraph } from "@hermione/graph/compiler/codegen";
+import { nextId } from "@hermione/graph/engine/graphMutations";
+import { deserializeGraph } from "@hermione/graph/persistence/load";
+import { getDatabaseManager, type DatabaseManager } from "@hermione/core/server/DatabaseManager";
+import { applyCredentialEnvVars } from "@hermione/core/server/credentialEnv";
+import { deployedScriptPath, writeDeployedScriptFile } from "@hermione/core/server/deployedScriptFile";
+import type { DeployedScript, LogEntry, RunLog } from "@hermione/core/server/models";
 
 export const runtime = "nodejs";
 

@@ -1,6 +1,6 @@
-import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "../credentials/types";
-import type { VaultProviderId } from "../credentials/vaultProviders";
-import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, ProjectSummary, RunLog, UserAccount, UserRole, VaultConnectionRecord, VaultConnectionSummary, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "../server/models";
+import type { CredentialData, CredentialRecord, CredentialSummary, CredentialTypeId } from "@hermione/shared/types";
+import type { VaultProviderId } from "@hermione/shared/vaultProviders";
+import type { AuthSettings, DeployedScript, DeployedScriptSummary, FlowSummary, FlowVersion, FlowVersionSummary, ProjectSummary, RunLog, UserAccount, UserRole, VaultConnectionRecord, VaultConnectionSummary, WebhookConfig, WebhookDelivery, WebhookFlowSummary } from "@hermione/core/server/models";
 import { getStoredTabToken } from "./authClient";
 
 // Browser-side counterpart to src/server/DatabaseManager.ts — every function here is a thin

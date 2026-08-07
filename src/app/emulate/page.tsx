@@ -4,10 +4,10 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getDeployedScript, listDeployedScripts, listProjects, runManualFlow as runManualFlow } from "../../client/api";
-import type { DeployedScript, DeployedScriptSummary, ProjectSummary, RunLog } from "../../server/models";
+import type { DeployedScript, DeployedScriptSummary, ProjectSummary, RunLog } from "@hermione/core/server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
-import { getCurrentTheme, THEME_CHANGE_EVENT } from "../../client/theme";
+import { getCurrentTheme, THEME_CHANGE_EVENT } from "@hermione/shared/theme";
 import { formatLogTimestamp } from "../../shared/formatLogTimestamp";
 import { i18n } from "@i18n";
 

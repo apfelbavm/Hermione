@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
-import { createExecutionContext, runExecFrom } from "../../../src/graph/engine/executor";
-import { getNodeDef } from "../../../src/graph/engine/registry";
-import { Graph } from "../../../src/graph/engine/graph";
-import { NodeInstance } from "../../../src/graph/engine/nodeInstance";
+import { createExecutionContext, runExecFrom } from "@hermione/graph/engine/executor";
+import { getNodeDef } from "@hermione/graph/engine/registry";
+import { Graph } from "@hermione/graph/engine/graph";
+import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
 
 beforeAll(() => {
   registerBuiltins();
@@ -88,11 +88,11 @@ describe("sftp.upload", () => {
 
   it("compileImports declares the functionLibrarySftp module the compiled output needs (which itself depends on ssh2-sftp-client)", () => {
     const def = getNodeDef("sftp.upload");
-    expect(def.compileImports).toEqual(['import * as functionLibrarySftp from "../../src/server/functionLibrarySftp.ts";']);
+    expect(def.compileImports).toEqual(['import * as functionLibrarySftp from "../../packages/core/src/server/functionLibrarySftp.ts";']);
   });
 
   it("the real sftpUpload function exists in its own isolated module, never imported by any interpreter-facing code", async () => {
-    const { sftpUpload } = await import("../../../src/server/functionLibrarySftp");
+    const { sftpUpload } = await import("@hermione/core/server/functionLibrarySftp");
     expect(typeof sftpUpload).toBe("function");
   });
 });

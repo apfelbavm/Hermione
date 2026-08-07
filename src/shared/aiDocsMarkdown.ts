@@ -1,9 +1,9 @@
-import { allNodeDefs, topLevelGroup } from "../graph/engine/registry";
-import type { NodeDef } from "../graph/engine/types";
-import { allEnumTypeDefs } from "../graph/engine/enumRegistry";
-import { allStructTypeDefs } from "../graph/engine/structRegistry";
+import { allNodeDefs, topLevelGroup } from "@hermione/graph/engine/registry";
+import type { NodeDef } from "@hermione/graph/engine/types";
+import { allEnumTypeDefs } from "@hermione/graph/engine/enumRegistry";
+import { allStructTypeDefs } from "@hermione/graph/engine/structRegistry";
 import { registerBuiltins } from "../graph/nodes";
-import { computeNodeLayout } from "../graph/render/layout";
+import { computeNodeLayout } from "@hermione/graph/render/layout";
 
 /** Why a node's pins aren't documented pin-by-pin like an ordinary node, keyed to which
  * NodeInstance field(s) actually drive its shape — see nodeInstance.ts for all of these fields. */

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { i18n } from "@i18n";
 import { createProject, deleteProject, listProjects, renameProject } from "../../client/api";
-import type { ProjectSummary } from "../../server/models";
+import type { ProjectSummary } from "@hermione/core/server/models";
 import { PageShell } from "../../components/PageHeader";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 import { useDebounce } from "../../hooks/useDebounce";

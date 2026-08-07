@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { auth } from "../../../../server/auth";
-import { signTabToken } from "../../../../server/tabToken";
+import { auth } from "@hermione/core/server/auth";
+import { signTabToken } from "@hermione/core/server/tabToken";
 
 // Cookie names next-auth (Auth.js v5) uses for its JWT session, in both plain and secure-cookie
 // (HTTPS, __Secure- prefixed) form — see https://authjs.dev/getting-started/session-management/cookies.
