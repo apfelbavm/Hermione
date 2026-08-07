@@ -1396,7 +1396,9 @@
         "pin_session_id": "Session ID",
         "pin_self_schedule_id": "Self Schedule ID",
         "pin_application_uuid": "Application UUID",
-        "pin_application_id": "Application ID"
+        "pin_application_id": "Application ID",
+        "pin_template_id": "Template ID",
+        "pin_job_interview_template_id": "Job Interview Template ID"
       },
       "apiCall": {
         "label": "SmartRecruiters API Call",
@@ -2102,6 +2104,129 @@
         "pin_end_date": "End Date",
         "pin_slots_availability_limit_in_days": "Slots Availability Limit (Days)",
         "pin_count": "Available Slots Count"
+      },
+      "searchInterviewTemplates": {
+        "label": "SmartRecruiters Search Interview Templates",
+        "description": "Searches/lists company-level interview templates, with optional hiring-stage/step/type filters.",
+        "pin_type": "Template Type",
+        "pin_templates_json": "Templates (JSON)",
+        "pin_total_found": "Total Found"
+      },
+      "createInterviewTemplate": {
+        "label": "SmartRecruiters Create Interview Template",
+        "description": "Creates a new company-level interview template.",
+        "pin_template_json": "Template (JSON)",
+        "pin_created_template_json": "Created Template (JSON)"
+      },
+      "getInterviewTemplate": {
+        "label": "SmartRecruiters Get Interview Template",
+        "description": "Fetches a single company-level interview template by id.",
+        "pin_template_json": "Template (JSON)"
+      },
+      "updateInterviewTemplate": {
+        "label": "SmartRecruiters Update Interview Template",
+        "description": "Replaces a company-level interview template.",
+        "pin_template_json": "Template (JSON)",
+        "pin_updated_template_json": "Updated Template (JSON)"
+      },
+      "deleteInterviewTemplate": {
+        "label": "SmartRecruiters Delete Interview Template",
+        "description": "Deletes a company-level interview template."
+      },
+      "searchInterviewTemplatesDeprecated": {
+        "label": "SmartRecruiters Search Interview Templates (Deprecated)",
+        "description": "Deprecated: searches company-level interview templates via the older /interview/templates endpoint family. Prefer Search Interview Templates.",
+        "pin_page": "Page",
+        "pin_limit": "Limit",
+        "pin_search": "Search",
+        "pin_templates_json": "Templates (JSON)",
+        "pin_total_found": "Total Found"
+      },
+      "getInterviewTemplateDeprecated": {
+        "label": "SmartRecruiters Get Interview Template (Deprecated)",
+        "description": "Deprecated: fetches a company-level interview template by id via the older /interview/templates endpoint. Prefer Get Interview Template.",
+        "pin_template_json": "Template (JSON)"
+      },
+      "updateInterviewTemplateDeprecated": {
+        "label": "SmartRecruiters Update Interview Template (Deprecated)",
+        "description": "Deprecated: replaces a company-level interview template via the older /interview/templates endpoint. Prefer Update Interview Template.",
+        "pin_template_json": "Template (JSON)",
+        "pin_updated_template_json": "Updated Template (JSON)"
+      },
+      "deleteInterviewTemplateDeprecated": {
+        "label": "SmartRecruiters Delete Interview Template (Deprecated)",
+        "description": "Deprecated: deletes a company-level interview template via the older /interview/templates endpoint. Prefer Delete Interview Template."
+      },
+      "getJobManagedSteps": {
+        "label": "SmartRecruiters Get Job Managed Steps",
+        "description": "Fetches which hiring stages/steps of a job require an interview template assignment.",
+        "pin_states_json": "Managed Step States (JSON)"
+      },
+      "updateJobManagedSteps": {
+        "label": "SmartRecruiters Update Job Managed Steps",
+        "description": "Updates which hiring stages/steps of a job require an interview template assignment.",
+        "pin_states_json": "Managed Step States (JSON)",
+        "pin_updated_states_json": "Updated Managed Step States (JSON)"
+      },
+      "updateJobInterviewTemplateDeprecated": {
+        "label": "SmartRecruiters Update Job Interview Template (Deprecated)",
+        "description": "Deprecated: updates a job-level interview template assignment via the older /interview/templates/job endpoint. Prefer Update Job Template.",
+        "pin_template_json": "Template (JSON)"
+      },
+      "updateJobInterviewTemplateInterviewersDeprecated": {
+        "label": "SmartRecruiters Update Job Interview Template Interviewers (Deprecated)",
+        "description": "Deprecated: reassigns interviewers per hiring-team role on a job-level interview template via the older endpoint. Prefer Update Job Template Interviewers.",
+        "pin_hiring_team_role_to_interviewers_json": "Hiring Team Role To Interviewers (JSON)"
+      },
+      "getJobInterviewTemplatesDeprecated": {
+        "label": "SmartRecruiters Get Job Interview Templates (Deprecated)",
+        "description": "Deprecated: fetches all job-level interview templates grouped by hiring stage/step via the older endpoint. Prefer Find Job Templates By Job ID.",
+        "pin_stages_json": "Stages (JSON)"
+      },
+      "getJobApplicationInterviewTemplateDeprecated": {
+        "label": "SmartRecruiters Get Job Application Interview Template (Deprecated)",
+        "description": "Deprecated: fetches the interview template assigned to a job application's current hiring step via the older endpoint. Prefer Find Job Template By Application ID.",
+        "pin_template_json": "Template (JSON)"
+      },
+      "updateJobTemplate": {
+        "label": "SmartRecruiters Update Job Template",
+        "description": "Updates a job-level interview template assignment.",
+        "pin_template_json": "Template (JSON)"
+      },
+      "updateJobTemplateInterviewers": {
+        "label": "SmartRecruiters Update Job Template Interviewers",
+        "description": "Reassigns interviewers per hiring-team role on a job-level interview template.",
+        "pin_hiring_team_role_to_interviewers_json": "Hiring Team Role To Interviewers (JSON)"
+      },
+      "findJobTemplateByHiringStage": {
+        "label": "SmartRecruiters Find Job Template By Hiring Stage",
+        "description": "Fetches the interview template bound to a job's given hiring stage/step, if any.",
+        "pin_hiring_stage": "Hiring Stage",
+        "pin_hiring_step": "Hiring Step",
+        "pin_template_json": "Template (JSON)"
+      },
+      "upsertJobTemplate": {
+        "label": "SmartRecruiters Upsert Job Template",
+        "description": "Binds an existing company-level template to a job's hiring stage/step, replacing any template already bound there.",
+        "pin_hiring_stage": "Hiring Stage",
+        "pin_hiring_step": "Hiring Step",
+        "pin_template_json": "Template (JSON)"
+      },
+      "findJobTemplatesByJobId": {
+        "label": "SmartRecruiters Find Job Templates By Job ID",
+        "description": "Fetches all interview templates bound to a job, grouped by hiring stage/step.",
+        "pin_stages_json": "Stages (JSON)"
+      },
+      "findJobTemplateByApplicationId": {
+        "label": "SmartRecruiters Find Job Template By Application ID",
+        "description": "Fetches the interview template bound to a job application's current hiring stage/step, if any.",
+        "pin_template_json": "Template (JSON)"
+      },
+      "searchJobTemplatesByApplicationIds": {
+        "label": "SmartRecruiters Search Job Templates By Application IDs",
+        "description": "Fetches the interview template configuration for each distinct hiring state reached by a set of job applications, scoped to one job.",
+        "pin_application_ids_json": "Application IDs (JSON)",
+        "pin_blueprints_json": "Hiring State Blueprints (JSON)"
       }
     },
     "sap": {

@@ -14,6 +14,8 @@ import {
   SMARTRECRUITERS_ATTENDEE_STATUS_ENUM_TYPE,
   SMARTRECRUITERS_EVENT_STATE_ENUM_TYPE,
   SMARTRECRUITERS_SELF_SCHEDULE_TYPE_ENUM_TYPE,
+  SMARTRECRUITERS_TEMPLATE_HIRING_STAGE_ENUM_TYPE,
+  SMARTRECRUITERS_INTERVIEW_TEMPLATE_TYPE_ENUM_TYPE,
 } from "@hermione/graph/enum/smartRecruiters";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import { SmartRecruitersManager, type SmartRecruitersAuth } from "@hermione/core/lib/smartRecruitersManager";
@@ -132,6 +134,22 @@ function statusPin(label: string, defaultValue = "accepted") {
 
 function eventStatePin(label: string) {
   return { id: "state", label, type: "enum" as const, subType: SMARTRECRUITERS_EVENT_STATE_ENUM_TYPE, direction: "input" as const, defaultValue: "ACTIVE", options: enumOptionIds(SMARTRECRUITERS_EVENT_STATE_ENUM_TYPE) };
+}
+
+function templateIdPin() {
+  return { id: "templateId", label: i18n.nodes.smartRecruiters.__shared.pin_template_id, type: "string" as const, direction: "input" as const, defaultValue: "" };
+}
+
+function jobInterviewTemplateIdPin() {
+  return { id: "jobInterviewTemplateId", label: i18n.nodes.smartRecruiters.__shared.pin_job_interview_template_id, type: "string" as const, direction: "input" as const, defaultValue: "" };
+}
+
+function hiringStagePin(label: string) {
+  return { id: "hiringStage", label, type: "enum" as const, subType: SMARTRECRUITERS_TEMPLATE_HIRING_STAGE_ENUM_TYPE, direction: "input" as const, defaultValue: "INTERVIEW", options: enumOptionIds(SMARTRECRUITERS_TEMPLATE_HIRING_STAGE_ENUM_TYPE) };
+}
+
+function hiringStepPin(label: string) {
+  return { id: "hiringStep", label, type: "string" as const, direction: "input" as const, defaultValue: "" };
 }
 
 function fileFieldPins(labels: { fileBase64: string; fileName: string; fileContentType: string }) {
@@ -3718,6 +3736,635 @@ registerNode({
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, count: `${v}.count`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+// --- Interview Templates & Job Managed Steps (Phase 7) ----------------------------------
+
+registerNode({
+  type: "smartRecruiters.searchInterviewTemplates",
+  label: i18n.nodes.smartRecruiters.searchInterviewTemplates.label,
+  description: i18n.nodes.smartRecruiters.searchInterviewTemplates.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    {
+      id: "type",
+      label: i18n.nodes.smartRecruiters.searchInterviewTemplates.pin_type,
+      type: "enum",
+      subType: SMARTRECRUITERS_INTERVIEW_TEMPLATE_TYPE_ENUM_TYPE,
+      direction: "input",
+      defaultValue: "",
+      options: enumOptionIds(SMARTRECRUITERS_INTERVIEW_TEMPLATE_TYPE_ENUM_TYPE),
+    },
+    { id: "queryJson", label: i18n.nodes.smartRecruiters.__shared.pin_query_json, type: "string", direction: "input", defaultValue: "{}" },
+    execOutPin(),
+    successPin(),
+    { id: "templatesJson", label: i18n.nodes.smartRecruiters.searchInterviewTemplates.pin_templates_json, type: "string", direction: "output" },
+    { id: "totalFound", label: i18n.nodes.smartRecruiters.searchInterviewTemplates.pin_total_found, type: "number", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, templatesJson: "[]", totalFound: 0, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.searchInterviewTemplates({ ...parseJsonRecord(String(inputs.queryJson ?? "")), type: String(inputs.type ?? "") || undefined });
+    return { nextExec: "exec-out", outputs: { success: result.success, templatesJson: JSON.stringify(result.templates), totalFound: result.totalFound, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersSearchInterviewTemplates(${inputs.credentialName}, ${inputs.type}, ${inputs.queryJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, templatesJson: `JSON.stringify(${v}.templates)`, totalFound: `${v}.totalFound`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.createInterviewTemplate",
+  label: i18n.nodes.smartRecruiters.createInterviewTemplate.label,
+  description: i18n.nodes.smartRecruiters.createInterviewTemplate.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    { id: "templateJson", label: i18n.nodes.smartRecruiters.createInterviewTemplate.pin_template_json, type: "string", direction: "input", defaultValue: "{}" },
+    execOutPin(),
+    successPin(),
+    { id: "createdTemplateJson", label: i18n.nodes.smartRecruiters.createInterviewTemplate.pin_created_template_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, createdTemplateJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.createInterviewTemplate(parseJsonRecord(String(inputs.templateJson ?? "")));
+    return { nextExec: "exec-out", outputs: { success: result.success, createdTemplateJson: JSON.stringify(result.template), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersCreateInterviewTemplate(${inputs.credentialName}, ${inputs.templateJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, createdTemplateJson: `JSON.stringify(${v}.template)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.getInterviewTemplate",
+  label: i18n.nodes.smartRecruiters.getInterviewTemplate.label,
+  description: i18n.nodes.smartRecruiters.getInterviewTemplate.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), templateIdPin(), execOutPin(), successPin(), { id: "templateJson", label: i18n.nodes.smartRecruiters.getInterviewTemplate.pin_template_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, templateJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.getInterviewTemplate(String(inputs.templateId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, templateJson: JSON.stringify(result.template), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersGetInterviewTemplate(${inputs.credentialName}, ${inputs.templateId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, templateJson: `JSON.stringify(${v}.template)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.updateInterviewTemplate",
+  label: i18n.nodes.smartRecruiters.updateInterviewTemplate.label,
+  description: i18n.nodes.smartRecruiters.updateInterviewTemplate.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    templateIdPin(),
+    { id: "templateJson", label: i18n.nodes.smartRecruiters.updateInterviewTemplate.pin_template_json, type: "string", direction: "input", defaultValue: "{}" },
+    execOutPin(),
+    successPin(),
+    { id: "updatedTemplateJson", label: i18n.nodes.smartRecruiters.updateInterviewTemplate.pin_updated_template_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, updatedTemplateJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.updateInterviewTemplate(String(inputs.templateId ?? ""), parseJsonRecord(String(inputs.templateJson ?? "")));
+    return { nextExec: "exec-out", outputs: { success: result.success, updatedTemplateJson: JSON.stringify(result.template), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersUpdateInterviewTemplate(${inputs.credentialName}, ${inputs.templateId}, ${inputs.templateJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, updatedTemplateJson: `JSON.stringify(${v}.template)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.deleteInterviewTemplate",
+  label: i18n.nodes.smartRecruiters.deleteInterviewTemplate.label,
+  description: i18n.nodes.smartRecruiters.deleteInterviewTemplate.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), templateIdPin(), execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.deleteInterviewTemplate(String(inputs.templateId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersDeleteInterviewTemplate(${inputs.credentialName}, ${inputs.templateId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.searchInterviewTemplatesDeprecated",
+  label: i18n.nodes.smartRecruiters.searchInterviewTemplatesDeprecated.label,
+  description: i18n.nodes.smartRecruiters.searchInterviewTemplatesDeprecated.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    { id: "page", label: i18n.nodes.smartRecruiters.searchInterviewTemplatesDeprecated.pin_page, type: "number", direction: "input", defaultValue: 0 },
+    { id: "limit", label: i18n.nodes.smartRecruiters.searchInterviewTemplatesDeprecated.pin_limit, type: "number", direction: "input", defaultValue: 20 },
+    { id: "search", label: i18n.nodes.smartRecruiters.searchInterviewTemplatesDeprecated.pin_search, type: "string", direction: "input", defaultValue: "" },
+    execOutPin(),
+    successPin(),
+    { id: "templatesJson", label: i18n.nodes.smartRecruiters.searchInterviewTemplatesDeprecated.pin_templates_json, type: "string", direction: "output" },
+    { id: "totalFound", label: i18n.nodes.smartRecruiters.searchInterviewTemplatesDeprecated.pin_total_found, type: "number", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, templatesJson: "[]", totalFound: 0, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.searchInterviewTemplatesDeprecated(Number(inputs.page ?? 0), Number(inputs.limit ?? 20), String(inputs.search ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, templatesJson: JSON.stringify(result.templates), totalFound: result.totalFound, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersSearchInterviewTemplatesDeprecated(${inputs.credentialName}, ${inputs.page}, ${inputs.limit}, ${inputs.search});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, templatesJson: `JSON.stringify(${v}.templates)`, totalFound: `${v}.totalFound`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.getInterviewTemplateDeprecated",
+  label: i18n.nodes.smartRecruiters.getInterviewTemplateDeprecated.label,
+  description: i18n.nodes.smartRecruiters.getInterviewTemplateDeprecated.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), templateIdPin(), execOutPin(), successPin(), { id: "templateJson", label: i18n.nodes.smartRecruiters.getInterviewTemplateDeprecated.pin_template_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, templateJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.getInterviewTemplateDeprecated(String(inputs.templateId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, templateJson: JSON.stringify(result.template), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersGetInterviewTemplateDeprecated(${inputs.credentialName}, ${inputs.templateId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, templateJson: `JSON.stringify(${v}.template)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.updateInterviewTemplateDeprecated",
+  label: i18n.nodes.smartRecruiters.updateInterviewTemplateDeprecated.label,
+  description: i18n.nodes.smartRecruiters.updateInterviewTemplateDeprecated.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    templateIdPin(),
+    { id: "templateJson", label: i18n.nodes.smartRecruiters.updateInterviewTemplateDeprecated.pin_template_json, type: "string", direction: "input", defaultValue: "{}" },
+    execOutPin(),
+    successPin(),
+    { id: "updatedTemplateJson", label: i18n.nodes.smartRecruiters.updateInterviewTemplateDeprecated.pin_updated_template_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, updatedTemplateJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.updateInterviewTemplateDeprecated(String(inputs.templateId ?? ""), parseJsonRecord(String(inputs.templateJson ?? "")));
+    return { nextExec: "exec-out", outputs: { success: result.success, updatedTemplateJson: JSON.stringify(result.template), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersUpdateInterviewTemplateDeprecated(${inputs.credentialName}, ${inputs.templateId}, ${inputs.templateJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, updatedTemplateJson: `JSON.stringify(${v}.template)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.deleteInterviewTemplateDeprecated",
+  label: i18n.nodes.smartRecruiters.deleteInterviewTemplateDeprecated.label,
+  description: i18n.nodes.smartRecruiters.deleteInterviewTemplateDeprecated.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), templateIdPin(), execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.deleteInterviewTemplateDeprecated(String(inputs.templateId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersDeleteInterviewTemplateDeprecated(${inputs.credentialName}, ${inputs.templateId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.getJobManagedSteps",
+  label: i18n.nodes.smartRecruiters.getJobManagedSteps.label,
+  description: i18n.nodes.smartRecruiters.getJobManagedSteps.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), jobIdPin(), execOutPin(), successPin(), { id: "statesJson", label: i18n.nodes.smartRecruiters.getJobManagedSteps.pin_states_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, statesJson: "[]", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.getJobManagedSteps(String(inputs.jobId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, statesJson: JSON.stringify(result.states), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersGetJobManagedSteps(${inputs.credentialName}, ${inputs.jobId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, statesJson: `JSON.stringify(${v}.states)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.updateJobManagedSteps",
+  label: i18n.nodes.smartRecruiters.updateJobManagedSteps.label,
+  description: i18n.nodes.smartRecruiters.updateJobManagedSteps.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    jobIdPin(),
+    { id: "statesJson", label: i18n.nodes.smartRecruiters.updateJobManagedSteps.pin_states_json, type: "string", direction: "input", defaultValue: "[]" },
+    execOutPin(),
+    successPin(),
+    { id: "updatedStatesJson", label: i18n.nodes.smartRecruiters.updateJobManagedSteps.pin_updated_states_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, updatedStatesJson: "[]", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const parsed = parseJsonBody(String(inputs.statesJson ?? "[]"));
+    const result = await manager.updateJobManagedSteps(String(inputs.jobId ?? ""), Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : []);
+    return { nextExec: "exec-out", outputs: { success: result.success, updatedStatesJson: JSON.stringify(result.states), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersUpdateJobManagedSteps(${inputs.credentialName}, ${inputs.jobId}, ${inputs.statesJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, updatedStatesJson: `JSON.stringify(${v}.states)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.updateJobInterviewTemplateDeprecated",
+  label: i18n.nodes.smartRecruiters.updateJobInterviewTemplateDeprecated.label,
+  description: i18n.nodes.smartRecruiters.updateJobInterviewTemplateDeprecated.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), jobInterviewTemplateIdPin(), { id: "templateJson", label: i18n.nodes.smartRecruiters.updateJobInterviewTemplateDeprecated.pin_template_json, type: "string", direction: "input", defaultValue: "{}" }, execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.updateJobInterviewTemplateDeprecated(String(inputs.jobInterviewTemplateId ?? ""), parseJsonRecord(String(inputs.templateJson ?? "")));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersUpdateJobInterviewTemplateDeprecated(${inputs.credentialName}, ${inputs.jobInterviewTemplateId}, ${inputs.templateJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.updateJobInterviewTemplateInterviewersDeprecated",
+  label: i18n.nodes.smartRecruiters.updateJobInterviewTemplateInterviewersDeprecated.label,
+  description: i18n.nodes.smartRecruiters.updateJobInterviewTemplateInterviewersDeprecated.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    jobInterviewTemplateIdPin(),
+    { id: "hiringTeamRoleToInterviewersJson", label: i18n.nodes.smartRecruiters.updateJobInterviewTemplateInterviewersDeprecated.pin_hiring_team_role_to_interviewers_json, type: "string", direction: "input", defaultValue: "{}" },
+    execOutPin(),
+    successPin(),
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.updateJobInterviewTemplateInterviewersDeprecated(String(inputs.jobInterviewTemplateId ?? ""), parseJsonRecord(String(inputs.hiringTeamRoleToInterviewersJson ?? "")) as unknown as Record<string, string[]>);
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersUpdateJobInterviewTemplateInterviewersDeprecated(${inputs.credentialName}, ${inputs.jobInterviewTemplateId}, ${inputs.hiringTeamRoleToInterviewersJson});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.getJobInterviewTemplatesDeprecated",
+  label: i18n.nodes.smartRecruiters.getJobInterviewTemplatesDeprecated.label,
+  description: i18n.nodes.smartRecruiters.getJobInterviewTemplatesDeprecated.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), jobIdPin(), execOutPin(), successPin(), { id: "stagesJson", label: i18n.nodes.smartRecruiters.getJobInterviewTemplatesDeprecated.pin_stages_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, stagesJson: "[]", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.getJobInterviewTemplatesDeprecated(String(inputs.jobId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, stagesJson: JSON.stringify(result.stages), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersGetJobInterviewTemplatesDeprecated(${inputs.credentialName}, ${inputs.jobId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, stagesJson: `JSON.stringify(${v}.stages)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.getJobApplicationInterviewTemplateDeprecated",
+  label: i18n.nodes.smartRecruiters.getJobApplicationInterviewTemplateDeprecated.label,
+  description: i18n.nodes.smartRecruiters.getJobApplicationInterviewTemplateDeprecated.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), applicationIdPin(), execOutPin(), successPin(), { id: "templateJson", label: i18n.nodes.smartRecruiters.getJobApplicationInterviewTemplateDeprecated.pin_template_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, templateJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.getJobApplicationInterviewTemplateDeprecated(String(inputs.applicationId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, templateJson: JSON.stringify(result.template), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersGetJobApplicationInterviewTemplateDeprecated(${inputs.credentialName}, ${inputs.applicationId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, templateJson: `JSON.stringify(${v}.template)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.updateJobTemplate",
+  label: i18n.nodes.smartRecruiters.updateJobTemplate.label,
+  description: i18n.nodes.smartRecruiters.updateJobTemplate.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), jobInterviewTemplateIdPin(), { id: "templateJson", label: i18n.nodes.smartRecruiters.updateJobTemplate.pin_template_json, type: "string", direction: "input", defaultValue: "{}" }, execOutPin(), successPin(), errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.updateJobTemplate(String(inputs.jobInterviewTemplateId ?? ""), parseJsonRecord(String(inputs.templateJson ?? "")));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersUpdateJobTemplate(${inputs.credentialName}, ${inputs.jobInterviewTemplateId}, ${inputs.templateJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.updateJobTemplateInterviewers",
+  label: i18n.nodes.smartRecruiters.updateJobTemplateInterviewers.label,
+  description: i18n.nodes.smartRecruiters.updateJobTemplateInterviewers.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    jobInterviewTemplateIdPin(),
+    { id: "hiringTeamRoleToInterviewersJson", label: i18n.nodes.smartRecruiters.updateJobTemplateInterviewers.pin_hiring_team_role_to_interviewers_json, type: "string", direction: "input", defaultValue: "{}" },
+    execOutPin(),
+    successPin(),
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.updateJobTemplateInterviewers(String(inputs.jobInterviewTemplateId ?? ""), parseJsonRecord(String(inputs.hiringTeamRoleToInterviewersJson ?? "")) as unknown as Record<string, string[]>);
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersUpdateJobTemplateInterviewers(${inputs.credentialName}, ${inputs.jobInterviewTemplateId}, ${inputs.hiringTeamRoleToInterviewersJson});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.findJobTemplateByHiringStage",
+  label: i18n.nodes.smartRecruiters.findJobTemplateByHiringStage.label,
+  description: i18n.nodes.smartRecruiters.findJobTemplateByHiringStage.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    jobIdPin(),
+    hiringStagePin(i18n.nodes.smartRecruiters.findJobTemplateByHiringStage.pin_hiring_stage),
+    hiringStepPin(i18n.nodes.smartRecruiters.findJobTemplateByHiringStage.pin_hiring_step),
+    execOutPin(),
+    successPin(),
+    { id: "templateJson", label: i18n.nodes.smartRecruiters.findJobTemplateByHiringStage.pin_template_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, templateJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.findJobTemplateByHiringStage(String(inputs.jobId ?? ""), String(inputs.hiringStage ?? "INTERVIEW"), String(inputs.hiringStep ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, templateJson: JSON.stringify(result.template), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersFindJobTemplateByHiringStage(${inputs.credentialName}, ${inputs.jobId}, ${inputs.hiringStage}, ${inputs.hiringStep});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, templateJson: `JSON.stringify(${v}.template)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.upsertJobTemplate",
+  label: i18n.nodes.smartRecruiters.upsertJobTemplate.label,
+  description: i18n.nodes.smartRecruiters.upsertJobTemplate.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    jobIdPin(),
+    hiringStagePin(i18n.nodes.smartRecruiters.upsertJobTemplate.pin_hiring_stage),
+    hiringStepPin(i18n.nodes.smartRecruiters.upsertJobTemplate.pin_hiring_step),
+    templateIdPin(),
+    execOutPin(),
+    successPin(),
+    { id: "templateJson", label: i18n.nodes.smartRecruiters.upsertJobTemplate.pin_template_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, templateJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.upsertJobTemplate(String(inputs.jobId ?? ""), String(inputs.hiringStage ?? "INTERVIEW"), String(inputs.hiringStep ?? ""), String(inputs.templateId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, templateJson: JSON.stringify(result.template), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersUpsertJobTemplate(${inputs.credentialName}, ${inputs.jobId}, ${inputs.hiringStage}, ${inputs.hiringStep}, ${inputs.templateId});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, templateJson: `JSON.stringify(${v}.template)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.findJobTemplatesByJobId",
+  label: i18n.nodes.smartRecruiters.findJobTemplatesByJobId.label,
+  description: i18n.nodes.smartRecruiters.findJobTemplatesByJobId.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), jobIdPin(), execOutPin(), successPin(), { id: "stagesJson", label: i18n.nodes.smartRecruiters.findJobTemplatesByJobId.pin_stages_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, stagesJson: "[]", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.findJobTemplatesByJobId(String(inputs.jobId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, stagesJson: JSON.stringify(result.stages), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersFindJobTemplatesByJobId(${inputs.credentialName}, ${inputs.jobId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, stagesJson: `JSON.stringify(${v}.stages)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.findJobTemplateByApplicationId",
+  label: i18n.nodes.smartRecruiters.findJobTemplateByApplicationId.label,
+  description: i18n.nodes.smartRecruiters.findJobTemplateByApplicationId.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [execInPin(), credentialNamePin(), applicationIdPin(), execOutPin(), successPin(), { id: "templateJson", label: i18n.nodes.smartRecruiters.findJobTemplateByApplicationId.pin_template_json, type: "string", direction: "output" }, errorPin()],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, templateJson: "{}", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const result = await manager.findJobTemplateByApplicationId(String(inputs.applicationId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, templateJson: JSON.stringify(result.template), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersFindJobTemplateByApplicationId(${inputs.credentialName}, ${inputs.applicationId});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, templateJson: `JSON.stringify(${v}.template)`, error: `${v}.error` };
+  },
+  compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
+});
+
+registerNode({
+  type: "smartRecruiters.searchJobTemplatesByApplicationIds",
+  label: i18n.nodes.smartRecruiters.searchJobTemplatesByApplicationIds.label,
+  description: i18n.nodes.smartRecruiters.searchJobTemplatesByApplicationIds.description,
+  group: GROUP_NAME,
+  colorCategory: NodeColorCategory.Integration,
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    jobIdPin(),
+    { id: "applicationIdsJson", label: i18n.nodes.smartRecruiters.searchJobTemplatesByApplicationIds.pin_application_ids_json, type: "string", direction: "input", defaultValue: "[]" },
+    execOutPin(),
+    successPin(),
+    { id: "blueprintsJson", label: i18n.nodes.smartRecruiters.searchJobTemplatesByApplicationIds.pin_blueprints_json, type: "string", direction: "output" },
+    errorPin(),
+  ],
+  latent: true,
+  execute: async ({ inputs, ctx }) => {
+    const resolved = resolveSmartRecruitersCredential(ctx, String(inputs.credentialName ?? ""));
+    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, blueprintsJson: "[]", error: resolved.error } };
+    const manager = SmartRecruitersManager.forAuth(resolved.auth);
+    const parsed = parseJsonBody(String(inputs.applicationIdsJson ?? "[]"));
+    const result = await manager.searchJobTemplatesByApplicationIds(String(inputs.jobId ?? ""), Array.isArray(parsed) ? (parsed as string[]) : []);
+    return { nextExec: "exec-out", outputs: { success: result.success, blueprintsJson: JSON.stringify(result.blueprints), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySmartRecruiters.smartRecruitersSearchJobTemplatesByApplicationIds(${inputs.credentialName}, ${inputs.jobId}, ${inputs.applicationIdsJson});`, ...compileFrom("exec-out")],
+  compileExecuteOutputs: ({ node }) => {
+    const v = compileResultVar(node.id);
+    return { success: `${v}.success`, blueprintsJson: `JSON.stringify(${v}.blueprints)`, error: `${v}.error` };
   },
   compileImports: [FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT],
 });

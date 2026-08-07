@@ -210,8 +210,37 @@ clientSecret, tokenUrl}`. `static forAuth(auth)` caches instances per auth (mirr
       memory), cross-checked against an independent research subagent pass that reached the same
       endpoint list and the same interviews-api/event-management-api "two real families" conclusion.
       Verified: tsc clean, prettier clean.
-- [ ] **Phase 7 — Interview Templates**: templates CRUD (new + deprecated), job-level
-      templates, job managed steps, search by job/application ids.
+- [x] **Phase 7 — Interview Templates** (done 2026-08-07): company-level template CRUD has a
+      genuine "new" (`/templates`) and "deprecated" (`/interview/templates`) family — unlike the
+      false EEO/consent/"me" assumptions in Phases 3-5, both are still live and documented, with
+      the deprecated endpoints carrying literal "use GET/PUT/DELETE /public-api/templates/{id}
+      instead" migration notices — so both were implemented: searchInterviewTemplates/
+      createInterviewTemplate/getInterviewTemplate/updateInterviewTemplate/
+      deleteInterviewTemplate (new) and searchInterviewTemplatesDeprecated/
+      getInterviewTemplateDeprecated/updateInterviewTemplateDeprecated/
+      deleteInterviewTemplateDeprecated (deprecated; response shape differs materially —
+      durationInMinutes/format/location instead of slotSetup/templateType — and the list field is
+      `content` singular vs. the new endpoint's `contents`). Job managed steps
+      (getJobManagedSteps/updateJobManagedSteps, `managed-steps/jobs/{jobId}`) control whether a
+      hiring stage/step requires a template assignment. Job-level templates mirror the same
+      new/deprecated split: updateJobInterviewTemplateDeprecated/
+      updateJobInterviewTemplateInterviewersDeprecated/getJobInterviewTemplatesDeprecated/
+      getJobApplicationInterviewTemplateDeprecated (deprecated, `interview/templates/job...`) vs.
+      updateJobTemplate/updateJobTemplateInterviewers/findJobTemplateByHiringStage/
+      upsertJobTemplate/findJobTemplatesByJobId/findJobTemplateByApplicationId (new,
+      `job-templates/...`). **"Search by job ids" (plural, batched) does not exist** — verified via
+      live docs, same kind of scope correction as Phases 3-5's dropped assumptions; the only batch
+      endpoint in this area is searchJobTemplatesByApplicationIds
+      (`POST job-templates/jobs/{jobId}/search`), which is scoped to a single job (path param) and
+      batches by *application* ids (body), not job ids. Template/managed-step bodies stayed
+      JSON-string pins (nested slotSetup/invitations/reminders, mirrors Job/Interview); hiring
+      stage got a dedicated enum (NEW/IN_PROGRESS/INTERVIEW/OFFER) since it's a small fixed set
+      distinct from the job-status enum; template type (INDIVIDUAL/GROUP) got its own enum despite
+      sharing values with Phase 6's self-schedule-type enum, since it's conceptually a different
+      resource's field. Added 2 enums. Endpoint shapes verified against
+      developers.smartrecruiters.com live reference docs via a research subagent (WebFetch of the
+      endpoint index plus individual `/reference/*.md` pages), not from training-data memory.
+      Verified: tsc clean, prettier clean.
 - [ ] **Phase 8 — Offers & Approvals**: candidate offers (list/get/search/latest
       approvals), generic approval requests (get by id, comments get/add, get pending,
       create, approve, reject), documents list/get.

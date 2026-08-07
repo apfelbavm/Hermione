@@ -226,6 +226,27 @@ export interface SmartRecruitersAvailableSlotsCountResult extends SmartRecruiter
   count: number;
 }
 
+export interface SmartRecruitersInterviewTemplateResult extends SmartRecruitersOpResult {
+  template: Record<string, unknown>;
+}
+
+export interface SmartRecruitersInterviewTemplatesListResult extends SmartRecruitersOpResult {
+  templates: Record<string, unknown>[];
+  totalFound: number;
+}
+
+export interface SmartRecruitersJobManagedStepsResult extends SmartRecruitersOpResult {
+  states: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersJobTemplateStagesResult extends SmartRecruitersOpResult {
+  stages: Record<string, unknown>[];
+}
+
+export interface SmartRecruitersJobTemplateBlueprintsResult extends SmartRecruitersOpResult {
+  blueprints: Record<string, unknown>[];
+}
+
 interface CachedToken {
   accessToken: string;
   expiresAt: number;
@@ -1194,5 +1215,171 @@ export class SmartRecruitersManager {
     });
     if (!result.success) return { success: false, count: 0, error: result.error };
     return { success: true, count: result.data.count ?? 0, error: "" };
+  }
+
+  // --- Interview Templates & Job Managed Steps (Phase 7) -----------------------------------
+  // `interview-templates` sub-API (same host as Phase 6's getSchedulePreferences). Company-level
+  // template CRUD has a genuine "new" (`/templates`) and "deprecated" (`/interview/templates`)
+  // family — unlike the false EEO/consent/"me" assumptions in Phases 3-5, both are still live and
+  // documented, with the deprecated endpoints carrying literal "use GET/PUT/DELETE
+  // /public-api/templates/{id} instead" migration notices. Job-level templates mirror the same
+  // split: `/job-templates` (new) vs. `/interview/templates/job...` (deprecated). Managed steps
+  // (`/managed-steps/jobs/{jobId}`) control whether a hiring stage/step requires a template
+  // assignment. The only batch/"search" endpoint in this area
+  // (POST /job-templates/jobs/{jobId}/search) is scoped to one job and batches by application ids
+  // — there is no job-ids-batched search, confirmed via live docs (same kind of scope correction
+  // as prior phases' dropped assumptions).
+
+  async searchInterviewTemplates(query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersInterviewTemplatesListResult> {
+    const result = await this.request<{ totalElements?: number; contents?: Record<string, unknown>[] }>("GET", "interview-templates/templates", { query });
+    if (!result.success) return { success: false, templates: [], totalFound: 0, error: result.error };
+    return { success: true, templates: result.data.contents ?? [], totalFound: result.data.totalElements ?? 0, error: "" };
+  }
+
+  async createInterviewTemplate(template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
+    const result = await this.request<Record<string, unknown>>("POST", "interview-templates/templates", { body: template });
+    if (!result.success) return { success: false, template: {}, error: result.error };
+    return { success: true, template: result.data, error: "" };
+  }
+
+  async getInterviewTemplate(templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `interview-templates/templates/${encodeURIComponent(templateId)}`);
+    if (!result.success) return { success: false, template: {}, error: result.error };
+    return { success: true, template: result.data, error: "" };
+  }
+
+  async updateInterviewTemplate(templateId: string, template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
+    const result = await this.request<Record<string, unknown>>("PUT", `interview-templates/templates/${encodeURIComponent(templateId)}`, { body: template });
+    if (!result.success) return { success: false, template: {}, error: result.error };
+    return { success: true, template: result.data, error: "" };
+  }
+
+  async deleteInterviewTemplate(templateId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `interview-templates/templates/${encodeURIComponent(templateId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** Deprecated company-level family — kept for exhaustive coverage alongside the new /templates
+   * endpoints above, same as prior phases' deprecated variants. Response shape differs
+   * materially (durationInMinutes/format/location instead of slotSetup/templateType), and the
+   * list field is `content` (singular) here vs. `contents` on the new endpoint. */
+  async searchInterviewTemplatesDeprecated(page: number, limit: number, search: string): Promise<SmartRecruitersInterviewTemplatesListResult> {
+    const result = await this.request<{ totalElements?: number; content?: Record<string, unknown>[] }>("GET", "interview-templates/interview/templates", { query: { page, limit, search: search || undefined } });
+    if (!result.success) return { success: false, templates: [], totalFound: 0, error: result.error };
+    return { success: true, templates: result.data.content ?? [], totalFound: result.data.totalElements ?? 0, error: "" };
+  }
+
+  async getInterviewTemplateDeprecated(templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `interview-templates/interview/templates/${encodeURIComponent(templateId)}`);
+    if (!result.success) return { success: false, template: {}, error: result.error };
+    return { success: true, template: result.data, error: "" };
+  }
+
+  async updateInterviewTemplateDeprecated(templateId: string, template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
+    const result = await this.request<Record<string, unknown>>("PUT", `interview-templates/interview/templates/${encodeURIComponent(templateId)}`, { body: template });
+    if (!result.success) return { success: false, template: {}, error: result.error };
+    return { success: true, template: result.data, error: "" };
+  }
+
+  async deleteInterviewTemplateDeprecated(templateId: string): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("DELETE", `interview-templates/interview/templates/${encodeURIComponent(templateId)}`);
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** Controls whether a hiring stage/step requires an interview template assignment. */
+  async getJobManagedSteps(jobId: string): Promise<SmartRecruitersJobManagedStepsResult> {
+    const result = await this.request<{ states?: Record<string, unknown>[] }>("GET", `interview-templates/managed-steps/jobs/${encodeURIComponent(jobId)}`);
+    if (!result.success) return { success: false, states: [], error: result.error };
+    return { success: true, states: result.data.states ?? [], error: "" };
+  }
+
+  async updateJobManagedSteps(jobId: string, states: Record<string, unknown>[]): Promise<SmartRecruitersJobManagedStepsResult> {
+    const result = await this.request<{ states?: Record<string, unknown>[] }>("PUT", `interview-templates/managed-steps/jobs/${encodeURIComponent(jobId)}`, { body: { states } });
+    if (!result.success) return { success: false, states: [], error: result.error };
+    return { success: true, states: result.data.states ?? [], error: "" };
+  }
+
+  // Job-level templates: deprecated family (`/interview/templates/job...`).
+
+  /** 204 on success — the deprecated job-level template body is the older shape
+   * (durationInMinutes/format/location instead of slotSetup/templateType). */
+  async updateJobInterviewTemplateDeprecated(jobInterviewTemplateId: string, template: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("PUT", `interview-templates/interview/templates/job/${encodeURIComponent(jobInterviewTemplateId)}`, { body: template });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** 204 on success — reassigns interviewers per hiring-team role without touching the rest of the template. */
+  async updateJobInterviewTemplateInterviewersDeprecated(jobInterviewTemplateId: string, hiringTeamRoleToInterviewers: Record<string, string[]>): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("PATCH", `interview-templates/interview/templates/job/${encodeURIComponent(jobInterviewTemplateId)}`, { body: { hiringTeamRoleToInterviewers } });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  async getJobInterviewTemplatesDeprecated(jobId: string): Promise<SmartRecruitersJobTemplateStagesResult> {
+    const result = await this.request<{ stages?: Record<string, unknown>[] }>("GET", `interview-templates/interview/templates/jobs/${encodeURIComponent(jobId)}`);
+    if (!result.success) return { success: false, stages: [], error: result.error };
+    return { success: true, stages: result.data.stages ?? [], error: "" };
+  }
+
+  /** 200 if a template is assigned to the application's current hiring step, 204 if none is. */
+  async getJobApplicationInterviewTemplateDeprecated(applicationId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `interview-templates/interview/templates/job-applications/${encodeURIComponent(applicationId)}`);
+    if (!result.success) return { success: false, template: {}, error: result.error };
+    return { success: true, template: result.data, error: "" };
+  }
+
+  // Job-level templates: new family (`/job-templates`).
+
+  /** 204 on success. */
+  async updateJobTemplate(jobInterviewTemplateId: string, template: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("PUT", `interview-templates/job-templates/${encodeURIComponent(jobInterviewTemplateId)}`, { body: template });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** 204 on success — reassigns interviewers per hiring-team role, same body shape as the deprecated variant. */
+  async updateJobTemplateInterviewers(jobInterviewTemplateId: string, hiringTeamRoleToInterviewers: Record<string, string[]>): Promise<SmartRecruitersOpResult> {
+    const result = await this.request("PATCH", `interview-templates/job-templates/${encodeURIComponent(jobInterviewTemplateId)}`, { body: { hiringTeamRoleToInterviewers } });
+    if (!result.success) return { success: false, error: result.error };
+    return { success: true, error: "" };
+  }
+
+  /** 200 if found, 204 if no template is bound to this hiring stage/step yet. */
+  async findJobTemplateByHiringStage(jobId: string, hiringStage: string, hiringStep: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `interview-templates/job-templates/jobs/${encodeURIComponent(jobId)}/hiringStages/${encodeURIComponent(hiringStage)}`, { query: { hiringStep } });
+    if (!result.success) return { success: false, template: {}, error: result.error };
+    return { success: true, template: result.data, error: "" };
+  }
+
+  /** Save-or-replace — binds an existing company-level template (`templateId`) to a job's hiring stage/step. */
+  async upsertJobTemplate(jobId: string, hiringStage: string, hiringStep: string, templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const result = await this.request<Record<string, unknown>>("PUT", `interview-templates/job-templates/jobs/${encodeURIComponent(jobId)}/hiringStages/${encodeURIComponent(hiringStage)}`, { query: { hiringStep }, body: { templateId } });
+    if (!result.success) return { success: false, template: {}, error: result.error };
+    return { success: true, template: result.data, error: "" };
+  }
+
+  async findJobTemplatesByJobId(jobId: string): Promise<SmartRecruitersJobTemplateStagesResult> {
+    const result = await this.request<{ stages?: Record<string, unknown>[] }>("GET", `interview-templates/job-templates/jobs/${encodeURIComponent(jobId)}`);
+    if (!result.success) return { success: false, stages: [], error: result.error };
+    return { success: true, stages: result.data.stages ?? [], error: "" };
+  }
+
+  /** 200 if found, 204 if none is bound yet. */
+  async findJobTemplateByApplicationId(applicationId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const result = await this.request<Record<string, unknown>>("GET", `interview-templates/job-templates/job-applications/${encodeURIComponent(applicationId)}`);
+    if (!result.success) return { success: false, template: {}, error: result.error };
+    return { success: true, template: result.data, error: "" };
+  }
+
+  /** The one batch endpoint in this area — scoped to a single job (`jobId` in the path), batched
+   * by application ids (not job ids) in the body. Returns one blueprint per distinct hiring
+   * state reached by the given applications. */
+  async searchJobTemplatesByApplicationIds(jobId: string, applicationIds: string[]): Promise<SmartRecruitersJobTemplateBlueprintsResult> {
+    const result = await this.request<{ hiringStateBlueprints?: Record<string, unknown>[] }>("POST", `interview-templates/job-templates/jobs/${encodeURIComponent(jobId)}/search`, { body: { applicationIds } });
+    if (!result.success) return { success: false, blueprints: [], error: result.error };
+    return { success: true, blueprints: result.data.hiringStateBlueprints ?? [], error: "" };
   }
 }

@@ -148,3 +148,29 @@ registerEnumType({
     { id: "GROUP", label: "Group" },
   ],
 });
+
+export const SMARTRECRUITERS_TEMPLATE_HIRING_STAGE_ENUM_TYPE = "smartRecruitersTemplateHiringStage";
+
+registerEnumType({
+  id: SMARTRECRUITERS_TEMPLATE_HIRING_STAGE_ENUM_TYPE,
+  label: "SmartRecruiters Template Hiring Stage",
+  category: "SmartRecruiters",
+  values: [
+    { id: "NEW", label: "New" },
+    { id: "IN_PROGRESS", label: "In Progress" },
+    { id: "INTERVIEW", label: "Interview" },
+    { id: "OFFER", label: "Offer" },
+  ],
+});
+
+export const SMARTRECRUITERS_INTERVIEW_TEMPLATE_TYPE_ENUM_TYPE = "smartRecruitersInterviewTemplateType";
+
+registerEnumType({
+  id: SMARTRECRUITERS_INTERVIEW_TEMPLATE_TYPE_ENUM_TYPE,
+  label: "SmartRecruiters Interview Template Type",
+  category: "SmartRecruiters",
+  values: [
+    { id: "INDIVIDUAL", label: "Individual" },
+    { id: "GROUP", label: "Group" },
+  ],
+});

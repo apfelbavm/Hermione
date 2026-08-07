@@ -861,3 +861,157 @@ export async function smartRecruitersGetAutomatedScheduleAvailableSlotsCount(cre
   if (!parsed.ok) return { success: false, count: 0, error: parsed.error };
   return SmartRecruitersManager.forAuth(cred.auth).getAutomatedScheduleAvailableSlotsCount(scheduleType, applicationUuid, parsed.value as unknown as Record<string, string[]>, startDate, endDate, slotsAvailabilityLimitInDays);
 }
+
+// --- Interview Templates & Job Managed Steps (Phase 7) ---------------------------------------
+
+export async function smartRecruitersSearchInterviewTemplates(credentialName: string, type: string, queryJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, templates: [], totalFound: 0, error: cred.error };
+  const parsed = parseJsonRecord(queryJson, "queryJson");
+  if (!parsed.ok) return { success: false, templates: [], totalFound: 0, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).searchInterviewTemplates({ ...parsed.value, type: type || undefined });
+}
+
+export async function smartRecruitersCreateInterviewTemplate(credentialName: string, templateJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, template: {}, error: cred.error };
+  const parsed = parseJsonRecord(templateJson, "templateJson");
+  if (!parsed.ok) return { success: false, template: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).createInterviewTemplate(parsed.value);
+}
+
+export async function smartRecruitersGetInterviewTemplate(credentialName: string, templateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, template: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getInterviewTemplate(templateId);
+}
+
+export async function smartRecruitersUpdateInterviewTemplate(credentialName: string, templateId: string, templateJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, template: {}, error: cred.error };
+  const parsed = parseJsonRecord(templateJson, "templateJson");
+  if (!parsed.ok) return { success: false, template: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateInterviewTemplate(templateId, parsed.value);
+}
+
+export async function smartRecruitersDeleteInterviewTemplate(credentialName: string, templateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deleteInterviewTemplate(templateId);
+}
+
+export async function smartRecruitersSearchInterviewTemplatesDeprecated(credentialName: string, page: number, limit: number, search: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, templates: [], totalFound: 0, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).searchInterviewTemplatesDeprecated(page, limit, search);
+}
+
+export async function smartRecruitersGetInterviewTemplateDeprecated(credentialName: string, templateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, template: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getInterviewTemplateDeprecated(templateId);
+}
+
+export async function smartRecruitersUpdateInterviewTemplateDeprecated(credentialName: string, templateId: string, templateJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, template: {}, error: cred.error };
+  const parsed = parseJsonRecord(templateJson, "templateJson");
+  if (!parsed.ok) return { success: false, template: {}, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateInterviewTemplateDeprecated(templateId, parsed.value);
+}
+
+export async function smartRecruitersDeleteInterviewTemplateDeprecated(credentialName: string, templateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).deleteInterviewTemplateDeprecated(templateId);
+}
+
+export async function smartRecruitersGetJobManagedSteps(credentialName: string, jobId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, states: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getJobManagedSteps(jobId);
+}
+
+export async function smartRecruitersUpdateJobManagedSteps(credentialName: string, jobId: string, statesJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, states: [], error: cred.error };
+  const parsed = parseJsonArray(statesJson, "statesJson");
+  if (!parsed.ok) return { success: false, states: [], error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateJobManagedSteps(jobId, parsed.value);
+}
+
+export async function smartRecruitersUpdateJobInterviewTemplateDeprecated(credentialName: string, jobInterviewTemplateId: string, templateJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  const parsed = parseJsonRecord(templateJson, "templateJson");
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateJobInterviewTemplateDeprecated(jobInterviewTemplateId, parsed.value);
+}
+
+export async function smartRecruitersUpdateJobInterviewTemplateInterviewersDeprecated(credentialName: string, jobInterviewTemplateId: string, hiringTeamRoleToInterviewersJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  const parsed = parseJsonRecord(hiringTeamRoleToInterviewersJson, "hiringTeamRoleToInterviewersJson");
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateJobInterviewTemplateInterviewersDeprecated(jobInterviewTemplateId, parsed.value as unknown as Record<string, string[]>);
+}
+
+export async function smartRecruitersGetJobInterviewTemplatesDeprecated(credentialName: string, jobId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, stages: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getJobInterviewTemplatesDeprecated(jobId);
+}
+
+export async function smartRecruitersGetJobApplicationInterviewTemplateDeprecated(credentialName: string, applicationId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, template: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).getJobApplicationInterviewTemplateDeprecated(applicationId);
+}
+
+export async function smartRecruitersUpdateJobTemplate(credentialName: string, jobInterviewTemplateId: string, templateJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  const parsed = parseJsonRecord(templateJson, "templateJson");
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateJobTemplate(jobInterviewTemplateId, parsed.value);
+}
+
+export async function smartRecruitersUpdateJobTemplateInterviewers(credentialName: string, jobInterviewTemplateId: string, hiringTeamRoleToInterviewersJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, error: cred.error };
+  const parsed = parseJsonRecord(hiringTeamRoleToInterviewersJson, "hiringTeamRoleToInterviewersJson");
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).updateJobTemplateInterviewers(jobInterviewTemplateId, parsed.value as unknown as Record<string, string[]>);
+}
+
+export async function smartRecruitersFindJobTemplateByHiringStage(credentialName: string, jobId: string, hiringStage: string, hiringStep: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, template: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).findJobTemplateByHiringStage(jobId, hiringStage, hiringStep);
+}
+
+export async function smartRecruitersUpsertJobTemplate(credentialName: string, jobId: string, hiringStage: string, hiringStep: string, templateId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, template: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).upsertJobTemplate(jobId, hiringStage, hiringStep, templateId);
+}
+
+export async function smartRecruitersFindJobTemplatesByJobId(credentialName: string, jobId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, stages: [], error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).findJobTemplatesByJobId(jobId);
+}
+
+export async function smartRecruitersFindJobTemplateByApplicationId(credentialName: string, applicationId: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, template: {}, error: cred.error };
+  return SmartRecruitersManager.forAuth(cred.auth).findJobTemplateByApplicationId(applicationId);
+}
+
+export async function smartRecruitersSearchJobTemplatesByApplicationIds(credentialName: string, jobId: string, applicationIdsJson: string) {
+  const cred = smartRecruitersCredentialFromEnv(credentialName);
+  if (!cred.ok) return { success: false, blueprints: [], error: cred.error };
+  const parsed = parseJsonArray(applicationIdsJson, "applicationIdsJson");
+  if (!parsed.ok) return { success: false, blueprints: [], error: parsed.error };
+  return SmartRecruitersManager.forAuth(cred.auth).searchJobTemplatesByApplicationIds(jobId, parsed.value as unknown as string[]);
+}
