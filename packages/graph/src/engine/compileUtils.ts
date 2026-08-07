@@ -67,9 +67,11 @@ export const FUNCTION_LIBRARY_GITHUB_IMPORT = 'import * as functionLibraryGithub
  * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/google.ts). */
 export const FUNCTION_LIBRARY_GOOGLE_IMPORT = 'import * as functionLibraryGoogle from "../../packages/core/src/server/functionLibraryGoogle.ts";';
 
-/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryFacebook.ts — kept in its own
- * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/facebook.ts). */
-export const FUNCTION_LIBRARY_FACEBOOK_IMPORT = 'import * as functionLibraryFacebook from "../../packages/core/src/server/functionLibraryFacebook.ts";';
+/** Unlike every other provider, Facebook has no functionLibrary<Provider>.ts of its own — FacebookManager
+ * (packages/core/src/lib/facebookManager.ts) resolves its own credentials straight from the database
+ * (see its findCredential), so both the interpreter and the compiled/deployed script call the
+ * exact same manager methods directly instead of going through a separate env-var-reading layer. */
+export const FACEBOOK_MANAGER_IMPORT = 'import { FacebookManager } from "../../packages/core/src/lib/facebookManager.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryAzureStorage.ts — kept in its
  * own file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see

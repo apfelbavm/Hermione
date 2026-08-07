@@ -22,6 +22,17 @@ vi.mock("facebook-nodejs-business-sdk", () => ({
   },
 }));
 
+/** FacebookManager (like TwilioManager) resolves its named credential straight from the database
+ * via resolveAllCredentials(getDatabaseManager()) instead of ctx.getCredential — mock that
+ * resolution layer directly rather than standing up a real DatabaseManager. */
+let credentials: Map<string, CredentialRecord> = new Map();
+vi.mock("@hermione/core/server/DatabaseManager", () => ({
+  getDatabaseManager: () => ({}),
+}));
+vi.mock("@hermione/core/server/vaultCredentials", () => ({
+  resolveAllCredentials: async () => credentials,
+}));
+
 beforeAll(() => {
   registerBuiltins();
 });
@@ -29,6 +40,7 @@ beforeAll(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+  credentials = new Map();
 });
 
 function buildGraph(type: string, id: string, pinValues: Record<string, unknown> = {}) {
@@ -43,10 +55,7 @@ function buildGraph(type: string, id: string, pinValues: Record<string, unknown>
 }
 
 let credentialCounter = 0;
-function freshCredential(overrides: Partial<FacebookCredentialData> = {}): {
-  name: string;
-  getCredential: (name: string) => CredentialRecord | undefined;
-} {
+function freshCredential(overrides: Partial<FacebookCredentialData> = {}): { name: string } {
   credentialCounter += 1;
   const credential: CredentialRecord = {
     id: `cred-${credentialCounter}`,
@@ -63,15 +72,13 @@ function freshCredential(overrides: Partial<FacebookCredentialData> = {}): {
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
-  return {
-    name: credential.name,
-    getCredential: (name) => (name === credential.name ? credential : undefined),
-  };
+  credentials.set(credential.name, credential);
+  return { name: credential.name };
 }
 
 describe("facebook.authorize", () => {
   it("exchanges the vault credential's authorization code for a long-lived access token", async () => {
-    const { name, getCredential } = freshCredential({ authCode: "one-time-code" });
+    const { name } = freshCredential({ authCode: "one-time-code" });
     const fetchMock = vi.fn(async (url: string) => {
       const isExchange = url.includes("fb_exchange_token");
       return new Response(JSON.stringify(isExchange ? { access_token: "long-lived-token", expires_in: 5184000 } : { access_token: "short-lived-token", expires_in: 3600 }), {
@@ -82,7 +89,7 @@ describe("facebook.authorize", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph("facebook.authorize", "az", { credentialName: name });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("az", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("az:success")).toBe(true);
@@ -95,10 +102,10 @@ describe("facebook.authorize", () => {
       "fetch",
       vi.fn(async () => new Response(JSON.stringify({ error: { message: "Invalid verification code format." } }), { status: 400 })),
     );
-    const { name, getCredential } = freshCredential({ authCode: "bad-code" });
+    const { name } = freshCredential({ authCode: "bad-code" });
 
     const { graph } = buildGraph("facebook.authorize", "az", { credentialName: name });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("az", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("az:success")).toBe(false);
@@ -111,7 +118,7 @@ describe("facebook.authorize", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { graph } = buildGraph("facebook.authorize", "az", { credentialName: "Nonexistent" });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential: () => undefined });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("az", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("az:success")).toBe(false);
@@ -127,10 +134,10 @@ describe("facebook.getPageInfo", () => {
       expect(path).toEqual(["123"]);
       return { id: "123", name: "My Page", category: "Business", fan_count: 42, link: "https://facebook.com/mypage" };
     });
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
 
     const { graph } = buildGraph("facebook.getPageInfo", "gp", { credentialName: name, pageId: "123" });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("gp", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("gp:success")).toBe(true);
@@ -142,10 +149,10 @@ describe("facebook.getPageInfo", () => {
     mockCall = vi.fn(async () => {
       throw new Error("Invalid OAuth access token.");
     });
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
 
     const { graph } = buildGraph("facebook.getPageInfo", "gp", { credentialName: name, pageId: "123" });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("gp", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("gp:success")).toBe(false);
@@ -161,7 +168,7 @@ describe("facebook.createPost", () => {
       expect(params.message).toBe("Hello world");
       return { id: "123_456" };
     });
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
 
     const { graph } = buildGraph("facebook.createPost", "cp", {
       credentialName: name,
@@ -169,7 +176,7 @@ describe("facebook.createPost", () => {
       message: "Hello world",
       link: "",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("cp", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("cp:success")).toBe(true);
@@ -184,7 +191,7 @@ describe("facebook.createPost", () => {
       pageId: "123",
       message: "x",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential: () => undefined });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("cp", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("cp:success")).toBe(false);
@@ -201,10 +208,10 @@ describe("facebook.getPosts", () => {
         { id: "2", message: "Second", created_time: "2024-01-02T00:00:00+0000" },
       ],
     }));
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
 
     const { graph } = buildGraph("facebook.getPosts", "gp", { credentialName: name, pageId: "123", limit: 25 });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("gp", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("gp:success")).toBe(true);
@@ -223,7 +230,7 @@ describe("facebook.apiCall", () => {
       expect(params).toEqual({ fields: "name" });
       return { data: [{ id: "1", name: "A Page" }] };
     });
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
 
     const { graph } = buildGraph("facebook.apiCall", "ac", {
       credentialName: name,
@@ -231,7 +238,7 @@ describe("facebook.apiCall", () => {
       path: "me/accounts",
       paramsJson: JSON.stringify({ fields: "name" }),
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("ac", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("ac:success")).toBe(true);

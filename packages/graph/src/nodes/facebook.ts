@@ -1,45 +1,33 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_FACEBOOK_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, FACEBOOK_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { AUTH_TOKENS_STRUCT_TYPE, DEBUG_TOKEN_STRUCT_TYPE, PAGE_STRUCT_TYPE, POST_STRUCT_TYPE, COMMENT_STRUCT_TYPE, USER_STRUCT_TYPE, AD_ACCOUNT_STRUCT_TYPE, CAMPAIGN_STRUCT_TYPE } from "@hermione/graph/structs/facebook";
 import { FACEBOOK_CAMPAIGN_OBJECTIVE_ENUM_TYPE, FACEBOOK_CAMPAIGN_STATUS_ENUM_TYPE, FACEBOOK_INSIGHTS_PERIOD_ENUM_TYPE } from "@hermione/graph/enum/facebook";
 import { HTTP_METHOD_ENUM_TYPE } from "@hermione/graph/enum/common";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
-import { FacebookManager } from "@hermione/core/lib/facebookManager";
-import type { FacebookCredentialData } from "@hermione/shared/types";
 import { i18n } from "@i18n";
 
-// Every node here also has a compileExecute: the compiled path calls a same-named
-// `functionLibraryFacebook.facebook*` wrapper (see server/functionLibraryFacebook.ts), which reads
-// the credential back from environment variables instead of the vault — same split as
-// github.ts's execute()/compileExecute().
+// Every operation below calls the exact same FacebookManager static method (packages/core/src/lib/
+// facebookManager.ts) from both execute() (interpreter path) and compileExecute() (compiled/deployed
+// path) — FacebookManager resolves the named credential straight from the database itself (see its
+// findCredential), so unlike most other providers there is no separate functionLibraryFacebook.ts
+// env-var-reading layer and no ctx.getCredential vault lookup here: both paths are already identical.
+//
+// FacebookManager now reaches the database directly, which pulls in better-sqlite3 and Node
+// builtins — fine for execute(), which only ever runs server-side, but this file is still statically
+// imported client-side too (for the node-creation menu), so a plain top-level import here would drag
+// that whole chain into the browser bundle. Loaded with a runtime `import()` instead, ignored by both
+// bundlers, so it's never even resolved for the client build; only ever actually called server-side,
+// where it resolves normally.
+async function loadFacebookManager(): Promise<typeof import("@hermione/core/lib/facebookManager").FacebookManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/facebookManager");
+  return mod.FacebookManager;
+}
 
 const GROUP_NAME = "Request.Facebook";
 
 function credentialNamePin() {
-  return {
-    id: "credentialName",
-    label: i18n.nodes.facebook.__shared.pin_credential_name,
-    type: "string" as const,
-    direction: "input" as const,
-    defaultValue: "",
-  };
-}
-
-function resolveFacebookCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: FacebookCredentialData } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential)
-    return {
-      ok: false,
-      error: `Credential "${credentialName}" not found in the vault`,
-    };
-  if (credential.type !== "facebookGraphAPI")
-    return {
-      ok: false,
-      error: `Credential "${credentialName}" is not a Facebook Graph API credential`,
-    };
-  return { ok: true, data: credential.data as FacebookCredentialData };
+  return { id: "credentialName", label: i18n.nodes.facebook.__shared.pin_credential_name, type: "string" as const, direction: "input" as const, defaultValue: "" };
 }
 
 registerNode({
@@ -50,41 +38,23 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
-    { id: "credentialName", label: i18n.nodes.facebook.authorize.pin_credential_name, type: "string", direction: "input", defaultValue: "" },
+    credentialNamePin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "tokens", label: i18n.nodes.facebook.authTokens.label, type: "struct", subType: AUTH_TOKENS_STRUCT_TYPE, direction: "output" },
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          tokens: { accessToken: "", expiresIn: 0 },
-          error: resolved.error,
-        },
-      };
-    }
-    const result = await FacebookManager.exchangeAuthCode(resolved.data.authCode, resolved.data.appId, resolved.data.appSecret, resolved.data.redirectUri);
-    return {
-      nextExec: "exec-out",
-      outputs: {
-        success: result.success,
-        tokens: { accessToken: result.accessToken, expiresIn: result.expiresIn },
-        error: result.error,
-      },
-    };
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).authorize(String(inputs.credentialName ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, tokens: { accessToken: result.accessToken, expiresIn: result.expiresIn }, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookAuthorize(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.authorize(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, tokens: `{ accessToken: ${v}.accessToken, expiresIn: ${v}.expiresIn }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -103,38 +73,23 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          result: { appId: "", isValid: false, expiresAt: 0, scopes: [] },
-          error: resolved.error,
-        },
-      };
-    const result = await FacebookManager.debugToken(String(inputs.inputToken ?? ""), resolved.data.appId, resolved.data.appSecret);
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).debugToken(String(inputs.credentialName ?? ""), String(inputs.inputToken ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
-        result: {
-          appId: result.appId,
-          isValid: result.isValid,
-          expiresAt: result.expiresAt,
-          scopes: result.scopes,
-        },
+        result: { appId: result.appId, isValid: result.isValid, expiresAt: result.expiresAt, scopes: result.scopes },
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookDebugToken(${inputs.credentialName}, ${inputs.inputToken});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.debugToken(${inputs.credentialName}, ${inputs.inputToken});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, result: `{ appId: ${v}.appId, isValid: ${v}.isValid, expiresAt: ${v}.expiresAt, scopes: ${v}.scopes }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -153,19 +108,8 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          page: { id: "", name: "", category: "", fanCount: 0, link: "" },
-          error: resolved.error,
-        },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.getPageInfo(String(inputs.pageId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).getPageInfo(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -175,12 +119,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetPageInfo(${inputs.credentialName}, ${inputs.pageId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getPageInfo(${inputs.credentialName}, ${inputs.pageId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, page: `{ id: ${v}.id, name: ${v}.name, category: ${v}.category, fanCount: ${v}.fanCount, link: ${v}.link }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -201,23 +145,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, postId: "", error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.createPost(String(inputs.pageId ?? ""), String(inputs.message ?? ""), String(inputs.link ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).createPost(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), String(inputs.message ?? ""), String(inputs.link ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookCreatePost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.message}, ${inputs.link});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.createPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.message}, ${inputs.link});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, postId: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -238,23 +175,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, postId: "", error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.createPhotoPost(String(inputs.pageId ?? ""), String(inputs.url ?? ""), String(inputs.caption ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).createPhotoPost(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), String(inputs.url ?? ""), String(inputs.caption ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookCreatePhotoPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.url}, ${inputs.caption});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.createPhotoPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.url}, ${inputs.caption});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, postId: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -275,23 +205,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, postId: "", error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.createVideoPost(String(inputs.pageId ?? ""), String(inputs.videoUrl ?? ""), String(inputs.description ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).createVideoPost(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), String(inputs.videoUrl ?? ""), String(inputs.description ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookCreateVideoPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.videoUrl}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.createVideoPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.videoUrl}, ${inputs.description});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, postId: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -309,23 +232,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.deletePost(String(inputs.postId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).deletePost(String(inputs.credentialName ?? ""), String(inputs.postId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookDeletePost(${inputs.credentialName}, ${inputs.postId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.deletePost(${inputs.credentialName}, ${inputs.postId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -345,23 +261,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, posts: [], error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.getPosts(String(inputs.pageId ?? ""), Number(inputs.limit ?? 25));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).getPosts(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), Number(inputs.limit ?? 25));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetPosts(${inputs.credentialName}, ${inputs.pageId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getPosts(${inputs.credentialName}, ${inputs.pageId}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, posts: `${v}.posts`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -382,23 +291,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, json: "", error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.getPageInsights(String(inputs.pageId ?? ""), (inputs.metrics as string[]) ?? [], String(inputs.period ?? "day"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).getPageInsights(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), (inputs.metrics as string[]) ?? [], String(inputs.period ?? "day"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetPageInsights(${inputs.credentialName}, ${inputs.pageId}, ${inputs.metrics}, ${inputs.period});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getPageInsights(${inputs.credentialName}, ${inputs.pageId}, ${inputs.metrics}, ${inputs.period});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, json: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -418,23 +320,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.createComment(String(inputs.objectId ?? ""), String(inputs.message ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).createComment(String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""), String(inputs.message ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookCreateComment(${inputs.credentialName}, ${inputs.objectId}, ${inputs.message});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.createComment(${inputs.credentialName}, ${inputs.objectId}, ${inputs.message});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -454,23 +349,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, comments: [], error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.getComments(String(inputs.objectId ?? ""), Number(inputs.limit ?? 25));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).getComments(String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""), Number(inputs.limit ?? 25));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetComments(${inputs.credentialName}, ${inputs.objectId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getComments(${inputs.credentialName}, ${inputs.objectId}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, comments: `${v}.comments`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -488,23 +376,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.deleteComment(String(inputs.commentId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).deleteComment(String(inputs.credentialName ?? ""), String(inputs.commentId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookDeleteComment(${inputs.credentialName}, ${inputs.commentId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.deleteComment(${inputs.credentialName}, ${inputs.commentId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 function registerLikeNode(type: "likeObject" | "unlikeObject") {
@@ -523,23 +404,17 @@ function registerLikeNode(type: "likeObject" | "unlikeObject") {
       { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
     ],
     latent: true,
-    execute: async ({ inputs, ctx }) => {
-      const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-      if (!resolved.ok)
-        return {
-          nextExec: "exec-out",
-          outputs: { success: false, error: resolved.error },
-        };
-      const manager = FacebookManager.forCredential(resolved.data.accessToken);
-      const result = await manager[type](String(inputs.objectId ?? ""));
+    execute: async ({ inputs }) => {
+      const manager = await loadFacebookManager();
+      const result = await manager[type](String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""));
       return { nextExec: "exec-out", outputs: result };
     },
-    compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebook${type[0].toUpperCase()}${type.slice(1)}(${inputs.credentialName}, ${inputs.objectId});`, ...compileFrom("exec-out")],
+    compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.${type}(${inputs.credentialName}, ${inputs.objectId});`, ...compileFrom("exec-out")],
     compileExecuteOutputs: ({ node }) => {
       const v = compileResultVar(node.id);
       return { success: `${v}.success`, error: `${v}.error` };
     },
-    compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+    compileImports: [FACEBOOK_MANAGER_IMPORT],
   });
 }
 
@@ -562,23 +437,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, count: 0, error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.getLikesCount(String(inputs.objectId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).getLikesCount(String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetLikesCount(${inputs.credentialName}, ${inputs.objectId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getLikesCount(${inputs.credentialName}, ${inputs.objectId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, count: `${v}.count`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -597,34 +465,19 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          user: { id: "", name: "", email: "" },
-          error: resolved.error,
-        },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.getUserProfile(String(inputs.userId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).getUserProfile(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
     return {
       nextExec: "exec-out",
-      outputs: {
-        success: result.success,
-        user: { id: result.id, name: result.name, email: result.email },
-        error: result.error,
-      },
+      outputs: { success: result.success, user: { id: result.id, name: result.name, email: result.email }, error: result.error },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetUserProfile(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getUserProfile(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, user: `{ id: ${v}.id, name: ${v}.name, email: ${v}.email }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -643,23 +496,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, accounts: [], error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.getAdAccounts(String(inputs.userId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).getAdAccounts(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetAdAccounts(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getAdAccounts(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, accounts: `${v}.accounts`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -681,23 +527,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.createCampaign(String(inputs.adAccountId ?? ""), String(inputs.name ?? ""), String(inputs.objective ?? "OUTCOME_TRAFFIC"), String(inputs.status ?? "PAUSED"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).createCampaign(String(inputs.credentialName ?? ""), String(inputs.adAccountId ?? ""), String(inputs.name ?? ""), String(inputs.objective ?? "OUTCOME_TRAFFIC"), String(inputs.status ?? "PAUSED"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookCreateCampaign(${inputs.credentialName}, ${inputs.adAccountId}, ${inputs.name}, ${inputs.objective}, ${inputs.status});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.createCampaign(${inputs.credentialName}, ${inputs.adAccountId}, ${inputs.name}, ${inputs.objective}, ${inputs.status});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -717,23 +556,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, campaigns: [], error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.getCampaigns(String(inputs.adAccountId ?? ""), Number(inputs.limit ?? 25));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).getCampaigns(String(inputs.credentialName ?? ""), String(inputs.adAccountId ?? ""), Number(inputs.limit ?? 25));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetCampaigns(${inputs.credentialName}, ${inputs.adAccountId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getCampaigns(${inputs.credentialName}, ${inputs.adAccountId}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, campaigns: `${v}.campaigns`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -751,23 +583,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.deleteCampaign(String(inputs.campaignId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).deleteCampaign(String(inputs.credentialName ?? ""), String(inputs.campaignId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookDeleteCampaign(${inputs.credentialName}, ${inputs.campaignId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.deleteCampaign(${inputs.credentialName}, ${inputs.campaignId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -787,23 +612,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, json: "", error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.getInsights(String(inputs.objectId ?? ""), (inputs.fields as string[]) ?? []);
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).getInsights(String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""), (inputs.fields as string[]) ?? []);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookGetInsights(${inputs.credentialName}, ${inputs.objectId}, ${inputs.fields});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getInsights(${inputs.credentialName}, ${inputs.objectId}, ${inputs.fields});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, json: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -824,21 +642,14 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveFacebookCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, json: "", error: resolved.error },
-      };
-    const manager = FacebookManager.forCredential(resolved.data.accessToken);
-    const result = await manager.apiCall(String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.paramsJson ?? "{}"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadFacebookManager()).apiCall(String(inputs.credentialName ?? ""), String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.paramsJson ?? "{}"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryFacebook.facebookApiCall(${inputs.credentialName}, ${inputs.method}, ${inputs.path}, ${inputs.paramsJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.apiCall(${inputs.credentialName}, ${inputs.method}, ${inputs.path}, ${inputs.paramsJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, json: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_FACEBOOK_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT],
 });
