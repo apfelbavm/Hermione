@@ -5,7 +5,7 @@ import { SendGridManager } from "../lib/sendGridManager.ts";
  * reads the same credential's apiKey back from environment variables instead, the same
  * "HERMIONE_CRED_<NAME>_<FIELD>" naming credentialEnv.ts's applyCredentialEnvVars writes. Never
  * called by the interpreter — genuinely different credential-sourcing behavior, not duplicated logic
- * (see functionLibraryTwilio.ts for the same pattern). */
+ * (see functionLibraryJira.ts for the same pattern). */
 function sendGridManagerFromEnv(credentialName: string): { ok: true; manager: SendGridManager } | { ok: false; error: string } {
   const prefix = `HERMIONE_CRED_${String(credentialName)
     .toUpperCase()

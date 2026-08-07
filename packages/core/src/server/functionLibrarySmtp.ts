@@ -4,9 +4,9 @@ import { SmtpManager } from "../lib/smtpManager.ts";
  * access to the Credential Vault database, only the interpreter would, so this reads the same
  * credential's host/port/secure/username/password back from environment variables instead, the
  * same "HERMIONE_CRED_<NAME>_<FIELD>" naming credentialEnv.ts's applyCredentialEnvVars writes (see
- * functionLibraryTwilio.ts for the same pattern). `port` and `secure` arrive from env vars as plain
+ * functionLibraryJira.ts for the same pattern). `port` and `secure` arrive from env vars as plain
  * strings (every credential field does), so they're parsed here with Number(...) and === "true".
- * Unlike functionLibraryTwilio.ts, this file's own manager (lib/smtpManager.ts) wraps nodemailer —
+ * Unlike functionLibraryJira.ts, this file's own manager (lib/smtpManager.ts) wraps nodemailer —
  * a real TCP-socket dependency the browser bundle must never see — so nodes/smtp.ts's own execute()
  * never resolves a credential or calls into this file at all; it's a permanent honest stub (see that
  * file's header comment). This file is reachable only via compileImports, resolved at compiled-script

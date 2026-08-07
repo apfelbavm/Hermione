@@ -1,24 +1,31 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_TWILIO_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, TWILIO_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { MESSAGE_STRUCT_TYPE, CALL_STRUCT_TYPE } from "@hermione/graph/structs/twilio";
 import { i18n } from "@i18n";
 
+// Every operation below calls the exact same TwilioManager static method (packages/core/src/lib/
+// twilioManager.ts) from both execute() (interpreter path) and compileExecute() (compiled/deployed
+// path) — TwilioManager resolves the named credential straight from the database itself (see its
+// resolveCredential), so unlike most other providers there is no separate functionLibraryTwilio.ts
+// env-var-reading layer and no ctx.getCredential vault lookup here: both paths are already identical.
+//
+// TwilioManager now reaches the database directly (see its own header comment), which pulls in
+// better-sqlite3 and Node builtins — fine for execute(), which only ever runs server-side, but this
+// file is still statically imported client-side too (for the node-creation menu), so a plain
+// top-level import here would drag that whole chain into the browser bundle. Loaded with a runtime
+// `import()` instead, ignored by both bundlers, so it's never even resolved for the client build;
+// only ever actually called server-side, where it resolves normally.
+async function loadTwilioManager(): Promise<typeof import("@hermione/core/lib/twilioManager").TwilioManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/twilioManager");
+  return mod.TwilioManager;
+}
+
 const GROUP_NAME = "Request.Twilio";
 
-// Calls Twilio via the official "twilio" Node SDK — a real REST client that transitively pulls in
-// Node-only packages (https-proxy-agent, jsonwebtoken, etc.), which Twilio itself documents as
-// server-side only (embedding an Auth Token in browser-shipped code is a real credential-leak risk,
-// not just a bundler technicality). Same structural situation as sftp.ts's SFTP Upload node and
-// smtp.ts's Send Mail node (see those files' own header comments): every node below therefore has a
-// permanent, honest stub execute() reporting that only the compiled output can actually reach
-// Twilio; the REAL implementation lives in src/server/functionLibraryTwilio.ts (backed by
-// src/lib/twilioManager.ts), reached only via compileImports, never statically imported here.
 function credentialNamePin() {
   return { id: "credentialName", label: i18n.nodes.twilio.__shared.pin_credential_name, type: "string" as const, direction: "input" as const, defaultValue: "" };
 }
-
-const STUB_ERROR = 'This Twilio node only runs in the compiled output (under Node.js) — the in-browser "Run" button cannot use the official Twilio SDK client-side (it is server-only and would expose your Auth Token). Compile this graph and run the generated script to actually call Twilio.';
 
 const emptyMessage = { sid: "", status: "", body: "", to: "", from: "", dateSent: "" };
 
@@ -41,13 +48,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, sid: "", status: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryTwilio.twilioSendSms(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.body});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadTwilioManager()).sendSms(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), String(inputs.body ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.sendSms(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.body});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, sid: `${v}.sid`, status: `${v}.status`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_TWILIO_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -66,8 +76,18 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, message: emptyMessage, error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryTwilio.twilioGetMessage(${inputs.credentialName}, ${inputs.messageSid});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadTwilioManager()).getMessage(String(inputs.credentialName ?? ""), String(inputs.messageSid ?? ""));
+    return {
+      nextExec: "exec-out",
+      outputs: {
+        success: result.success,
+        message: result.success ? { sid: result.sid, status: result.status, body: result.body, to: result.to, from: result.from, dateSent: result.dateSent } : emptyMessage,
+        error: result.error,
+      },
+    };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.getMessage(${inputs.credentialName}, ${inputs.messageSid});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -76,7 +96,7 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_TWILIO_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -97,13 +117,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, messages: [], error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryTwilio.twilioListMessages(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadTwilioManager()).listMessages(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), Number(inputs.limit) || 20);
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.listMessages(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, messages: `${v}.messages`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_TWILIO_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -122,13 +145,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, deleted: false, error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryTwilio.twilioDeleteMessage(${inputs.credentialName}, ${inputs.messageSid});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadTwilioManager()).deleteMessage(String(inputs.credentialName ?? ""), String(inputs.messageSid ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.deleteMessage(${inputs.credentialName}, ${inputs.messageSid});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, deleted: `${v}.deleted`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_TWILIO_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -150,13 +176,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, sid: "", status: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryTwilio.twilioMakeCall(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.twimlUrl});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadTwilioManager()).makeCall(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), String(inputs.twimlUrl ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.makeCall(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.twimlUrl});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, sid: `${v}.sid`, status: `${v}.status`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_TWILIO_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -178,13 +207,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, status: "", duration: 0, to: "", from: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryTwilio.twilioGetCall(${inputs.credentialName}, ${inputs.callSid});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadTwilioManager()).getCall(String(inputs.credentialName ?? ""), String(inputs.callSid ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, status: result.status, duration: Number(result.duration) || 0, to: result.to, from: result.from, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.getCall(${inputs.credentialName}, ${inputs.callSid});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, status: `${v}.status`, duration: `(Number(${v}.duration) || 0)`, to: `${v}.to`, from: `${v}.from`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_TWILIO_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -206,13 +238,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, sid: "", status: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryTwilio.twilioSendWhatsApp(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.body});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadTwilioManager()).sendWhatsApp(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), String(inputs.body ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.sendWhatsApp(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.body});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, sid: `${v}.sid`, status: `${v}.status`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_TWILIO_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -233,13 +268,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, calls: [], error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryTwilio.twilioListCalls(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadTwilioManager()).listCalls(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), Number(inputs.limit) || 20);
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.listCalls(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, calls: `${v}.calls`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_TWILIO_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -258,13 +296,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, status: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryTwilio.twilioHangupCall(${inputs.credentialName}, ${inputs.callSid});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadTwilioManager()).hangupCall(String(inputs.credentialName ?? ""), String(inputs.callSid ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, status: result.status, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.hangupCall(${inputs.credentialName}, ${inputs.callSid});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, status: `${v}.status`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_TWILIO_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -287,11 +328,14 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, valid: false, countryCode: "", nationalFormat: "", callerName: "", lineType: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryTwilio.twilioLookupPhoneNumber(${inputs.credentialName}, ${inputs.phoneNumber});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadTwilioManager()).lookupPhoneNumber(String(inputs.credentialName ?? ""), String(inputs.phoneNumber ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.lookupPhoneNumber(${inputs.credentialName}, ${inputs.phoneNumber});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, valid: `${v}.valid`, countryCode: `${v}.countryCode`, nationalFormat: `${v}.nationalFormat`, callerName: `${v}.callerName`, lineType: `${v}.lineType`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_TWILIO_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT],
 });

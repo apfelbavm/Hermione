@@ -49,7 +49,11 @@ export const FUNCTION_LIBRARY_SLACK_IMPORT = 'import * as functionLibrarySlack f
 export const FUNCTION_LIBRARY_STRIPE_IMPORT = 'import * as functionLibraryStripe from "../../packages/core/src/server/functionLibraryStripe.ts";';
 export const FUNCTION_LIBRARY_SALESFORCE_IMPORT = 'import * as functionLibrarySalesforce from "../../packages/core/src/server/functionLibrarySalesforce.ts";';
 export const FUNCTION_LIBRARY_WORKDAY_IMPORT = 'import * as functionLibraryWorkday from "../../packages/core/src/server/functionLibraryWorkday.ts";';
-export const FUNCTION_LIBRARY_TWILIO_IMPORT = 'import * as functionLibraryTwilio from "../../packages/core/src/server/functionLibraryTwilio.ts";';
+/** Unlike every other provider, Twilio has no functionLibrary<Provider>.ts of its own — TwilioManager
+ * (packages/core/src/lib/twilioManager.ts) resolves its own credentials straight from the database
+ * (see its resolveCredential), so both the interpreter and the compiled/deployed script call the
+ * exact same manager methods directly instead of going through a separate env-var-reading layer. */
+export const TWILIO_MANAGER_IMPORT = 'import { TwilioManager } from "../../packages/core/src/lib/twilioManager.ts";';
 export const FUNCTION_LIBRARY_SMTP_IMPORT = 'import * as functionLibrarySmtp from "../../packages/core/src/server/functionLibrarySmtp.ts";';
 export const FUNCTION_LIBRARY_SAP_IMPORT = 'import * as functionLibrarySap from "../../packages/core/src/server/functionLibrarySap.ts";';
 export const FUNCTION_LIBRARY_LINKEDIN_IMPORT = 'import * as functionLibraryLinkedIn from "../../packages/core/src/server/functionLibraryLinkedIn.ts";';
