@@ -1,87 +1,59 @@
-import { NodeColorCategory, type ExecutionContext } from "@hermione/graph/engine/types";
+import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_GOOGLE_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, GOOGLE_ADMIN_MANAGER_IMPORT, GOOGLE_CALENDAR_MANAGER_IMPORT, GOOGLE_DOCS_MANAGER_IMPORT, GOOGLE_DRIVE_MANAGER_IMPORT, GOOGLE_GMAIL_MANAGER_IMPORT, GOOGLE_SHEETS_MANAGER_IMPORT, GOOGLE_AUTH_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { AUTH_TOKENS_STRUCT_TYPE, DRIVE_FILE_STRUCT_TYPE, DRIVE_PERMISSION_STRUCT_TYPE, GMAIL_MESSAGE_STRUCT_TYPE, GMAIL_LABEL_STRUCT_TYPE, CALENDAR_EVENT_STRUCT_TYPE, CALENDAR_ENTRY_STRUCT_TYPE, ADMIN_USER_STRUCT_TYPE, ADMIN_GROUP_STRUCT_TYPE } from "@hermione/graph/structs/google";
 import { GOOGLE_DRIVE_ROLE_ENUM_TYPE, GOOGLE_DRIVE_PERMISSION_TYPE_ENUM_TYPE } from "@hermione/graph/enum/google";
 import { TEXT_ENCODING_ENUM_TYPE } from "@hermione/graph/enum/common";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import { i18n } from "@i18n";
-import { GoogleDriveManager } from "@hermione/core/lib/googleDriveManager";
-import { GoogleSheetsManager } from "@hermione/core/lib/googleSheetsManager";
-import { GoogleDocsManager } from "@hermione/core/lib/googleDocsManager";
-import { GoogleGmailManager } from "@hermione/core/lib/googleGmailManager";
-import { GoogleCalendarManager } from "@hermione/core/lib/googleCalendarManager";
-import { GoogleAdminManager } from "@hermione/core/lib/googleAdminManager";
-import { exchangeAuthCode } from "@hermione/core/lib/googleAuthManager";
-import type { GoogleServiceAccountCredentialData, GoogleOAuth2CredentialData } from "@hermione/shared/types";
 
-// Every operation below is a thin pin-wiring shim over the lib/google*Manager.ts classes, which
-// own the actual googleapis SDK calls, auth client construction, and error normalization — this
-// file only ever translates pins to method arguments and method results back to pins.
+// Every operation below calls the exact same lib/google*Manager.ts static method from both
+// execute() (interpreter path) and compileExecute() (compiled/deployed path) — every manager now
+// resolves its own named credential straight from the database (see each manager's own
+// findCredential), accepting either a Google Service Account or a Google OAuth2 credential (Drive/
+// Sheets/Docs/Gmail/Calendar) or a Service Account only (Admin SDK, domain-wide delegation only —
+// see googleAdminManager.ts's own doc comment). No ctx.getCredential vault lookup or
+// functionLibraryGoogle env-reading layer is needed here anymore — mirrors nodes/twilio.ts/
+// nodes/dropbox.ts.
 //
-// Every node here also has a compileExecute: the compiled path calls a same-named
-// `functionLibraryGoogle.google*` wrapper (see server/functionLibraryGoogle.ts), which reads the
-// credential back from environment variables via `googleCredentialFromEnv` instead of the vault —
-// same split as github.ts's execute()/compileExecute().
-//
-// Every operation node (other than google.authorize) takes a Credential Name directly: each
-// resolves the named vault entry, accepting either a Google Service Account or Google OAuth2
-// credential (see resolveGoogleCredential below) — mirrors github.ts's dual githubToken/githubApp
-// resolution. Admin SDK nodes are the one exception (service account with domain-wide delegation
-// only, see resolveGoogleServiceAccountCredential's own doc comment).
+// Every manager pulls in better-sqlite3/Node builtins via that DB access, which is fine
+// server-side (where execute() always runs) but not for this file's client-side (node-menu)
+// bundle, so each is loaded with a runtime `import()` that both bundlers are told to ignore, same
+// as loadTwilioManager/loadDropboxManager.
 
-type ResolvedGoogleCredential = { kind: "serviceAccount"; data: GoogleServiceAccountCredentialData } | { kind: "oauth2"; data: GoogleOAuth2CredentialData };
-
-/** Shared by every Google node except the Admin SDK group — looks up a named Credential Vault
- * entry and accepts either a Google Service Account or a Google OAuth2 credential, since every
- * non-Admin API here (Drive, Sheets, Docs, Gmail, Calendar) works fine under either auth flow. */
-function resolveGoogleCredential(ctx: ExecutionContext, credentialName: string): { ok: true; resolved: ResolvedGoogleCredential } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
-  if (credential.type === "googleServiceAccount") return { ok: true, resolved: { kind: "serviceAccount", data: credential.data as GoogleServiceAccountCredentialData } };
-  if (credential.type === "googleOAuth2") return { ok: true, resolved: { kind: "oauth2", data: credential.data as GoogleOAuth2CredentialData } };
-  return { ok: false, error: `Credential "${credentialName}" is not a Google Service Account or Google OAuth2 credential` };
+async function loadDriveManager(): Promise<typeof import("@hermione/core/lib/googleDriveManager").GoogleDriveManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/googleDriveManager");
+  return mod.GoogleDriveManager;
 }
 
-/** Admin SDK Directory API only accepts a service account impersonating a super admin (Google
- * rejects domain-wide-delegation-less calls entirely) — see lib/googleAdminManager.ts's own doc
- * comment — so this narrows resolveGoogleCredential's result instead of duplicating the vault
- * lookup. */
-function resolveGoogleServiceAccountCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: GoogleServiceAccountCredentialData } | { ok: false; error: string } {
-  const resolved = resolveGoogleCredential(ctx, credentialName);
-  if (!resolved.ok) return resolved;
-  if (resolved.resolved.kind !== "serviceAccount") return { ok: false, error: `Credential "${credentialName}" must be a Google Service Account credential (Admin SDK requires domain-wide delegation)` };
-  return { ok: true, data: resolved.resolved.data };
+async function loadSheetsManager(): Promise<typeof import("@hermione/core/lib/googleSheetsManager").GoogleSheetsManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/googleSheetsManager");
+  return mod.GoogleSheetsManager;
 }
 
-/** Only accepts a Google OAuth2 credential — used solely by google.authorize, which exchanges that
- * credential's staging authCode field for a refresh token (see nodes/dropbox.ts's authorize node
- * for the identical pattern). */
-function resolveGoogleOAuth2Credential(ctx: ExecutionContext, credentialName: string): { ok: true; data: GoogleOAuth2CredentialData } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
-  if (credential.type !== "googleOAuth2") return { ok: false, error: `Credential "${credentialName}" is not a Google OAuth2 credential` };
-  return { ok: true, data: credential.data as GoogleOAuth2CredentialData };
+async function loadDocsManager(): Promise<typeof import("@hermione/core/lib/googleDocsManager").GoogleDocsManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/googleDocsManager");
+  return mod.GoogleDocsManager;
 }
 
-function driveManagerFor(resolved: ResolvedGoogleCredential): GoogleDriveManager {
-  return resolved.kind === "serviceAccount" ? GoogleDriveManager.forServiceAccount(resolved.data) : GoogleDriveManager.forOAuth2(resolved.data);
+async function loadGmailManager(): Promise<typeof import("@hermione/core/lib/googleGmailManager").GoogleGmailManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/googleGmailManager");
+  return mod.GoogleGmailManager;
 }
 
-function sheetsManagerFor(resolved: ResolvedGoogleCredential): GoogleSheetsManager {
-  return resolved.kind === "serviceAccount" ? GoogleSheetsManager.forServiceAccount(resolved.data) : GoogleSheetsManager.forOAuth2(resolved.data);
+async function loadCalendarManager(): Promise<typeof import("@hermione/core/lib/googleCalendarManager").GoogleCalendarManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/googleCalendarManager");
+  return mod.GoogleCalendarManager;
 }
 
-function docsManagerFor(resolved: ResolvedGoogleCredential): GoogleDocsManager {
-  return resolved.kind === "serviceAccount" ? GoogleDocsManager.forServiceAccount(resolved.data) : GoogleDocsManager.forOAuth2(resolved.data);
+async function loadAdminManager(): Promise<typeof import("@hermione/core/lib/googleAdminManager").GoogleAdminManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/googleAdminManager");
+  return mod.GoogleAdminManager;
 }
 
-function gmailManagerFor(resolved: ResolvedGoogleCredential): GoogleGmailManager {
-  return resolved.kind === "serviceAccount" ? GoogleGmailManager.forServiceAccount(resolved.data) : GoogleGmailManager.forOAuth2(resolved.data);
-}
-
-function calendarManagerFor(resolved: ResolvedGoogleCredential): GoogleCalendarManager {
-  return resolved.kind === "serviceAccount" ? GoogleCalendarManager.forServiceAccount(resolved.data) : GoogleCalendarManager.forOAuth2(resolved.data);
+async function loadAuthManager(): Promise<typeof import("@hermione/core/lib/googleAuthManager").authorize> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/googleAuthManager");
+  return mod.authorize;
 }
 
 const emptyEvent = { id: "", summary: "", start: "", end: "", htmlLink: "" };
@@ -134,15 +106,9 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleOAuth2Credential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, tokens: { accessToken: "", refreshToken: "", expiresIn: 0 }, error: resolved.error },
-      };
-    }
-    const result = await exchangeAuthCode(resolved.data.authCode, resolved.data.clientId, resolved.data.clientSecret, resolved.data.redirectUri);
+  execute: async ({ inputs }) => {
+    const authorize = await loadAuthManager();
+    const result = await authorize(String(inputs.credentialName ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -152,12 +118,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAuthorize(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await googleAuthorize(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, tokens: `${v}.tokens`, error: `${v}.error` };
+    return { success: `${v}.success`, tokens: `{ accessToken: ${v}.accessToken, refreshToken: ${v}.refreshToken, expiresIn: ${v}.expiresIn }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_AUTH_MANAGER_IMPORT],
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -181,18 +147,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, files: [], error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).listFiles(String(inputs.query ?? ""), Number(inputs.pageSize ?? 100));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDriveManager()).listFiles(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), Number(inputs.pageSize ?? 100));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveListFiles(${inputs.credentialName}, ${inputs.query}, ${inputs.pageSize});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.listFiles(${inputs.credentialName}, ${inputs.query}, ${inputs.pageSize});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, files: `${v}.files`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -211,26 +175,28 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
+  execute: async ({ inputs }) => {
     const emptyFile = { id: "", name: "", mimeType: "", isFolder: false, size: 0, webViewLink: "" };
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, file: emptyFile, error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).getFile(String(inputs.fileId ?? ""));
+    const result = await (await loadDriveManager()).getFile(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
-        file: { id: result.id ?? "", name: result.name ?? "", mimeType: result.mimeType ?? "", isFolder: result.isFolder ?? false, size: result.size ?? 0, webViewLink: result.webViewLink ?? "" },
+        file: result.success ? { id: result.id ?? "", name: result.name ?? "", mimeType: result.mimeType ?? "", isFolder: result.isFolder ?? false, size: result.size ?? 0, webViewLink: result.webViewLink ?? "" } : emptyFile,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveGetFile(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.getFile(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, file: `${v}.file`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      file: `(${v}.success ? { id: ${v}.id ?? "", name: ${v}.name ?? "", mimeType: ${v}.mimeType ?? "", isFolder: ${v}.isFolder ?? false, size: ${v}.size ?? 0, webViewLink: ${v}.webViewLink ?? "" } : { id: "", name: "", mimeType: "", isFolder: false, size: 0, webViewLink: "" })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -253,26 +219,28 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
+  execute: async ({ inputs }) => {
     const emptyFile = { id: "", name: "", mimeType: "", isFolder: false, size: 0, webViewLink: "" };
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, file: emptyFile, error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).uploadFile(String(inputs.name ?? ""), String(inputs.parentFolderId ?? ""), String(inputs.mimeType ?? ""), String(inputs.content ?? ""), (inputs.encoding as "utf8" | "base64") ?? "utf8");
+    const result = await (await loadDriveManager()).uploadFile(String(inputs.credentialName ?? ""), String(inputs.name ?? ""), String(inputs.parentFolderId ?? ""), String(inputs.mimeType ?? ""), String(inputs.content ?? ""), (inputs.encoding as "utf8" | "base64") ?? "utf8");
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
-        file: { id: result.id ?? "", name: result.name ?? "", mimeType: result.mimeType ?? "", isFolder: result.isFolder ?? false, size: result.size ?? 0, webViewLink: result.webViewLink ?? "" },
+        file: result.success ? { id: result.id ?? "", name: result.name ?? "", mimeType: result.mimeType ?? "", isFolder: result.isFolder ?? false, size: result.size ?? 0, webViewLink: result.webViewLink ?? "" } : emptyFile,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveUploadFile(${inputs.credentialName}, ${inputs.name}, ${inputs.parentFolderId}, ${inputs.mimeType}, ${inputs.content}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.uploadFile(${inputs.credentialName}, ${inputs.name}, ${inputs.parentFolderId}, ${inputs.mimeType}, ${inputs.content}, ${inputs.encoding});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, file: `${v}.file`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      file: `(${v}.success ? { id: ${v}.id ?? "", name: ${v}.name ?? "", mimeType: ${v}.mimeType ?? "", isFolder: ${v}.isFolder ?? false, size: ${v}.size ?? 0, webViewLink: ${v}.webViewLink ?? "" } : { id: "", name: "", mimeType: "", isFolder: false, size: 0, webViewLink: "" })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -293,18 +261,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).updateFileContent(String(inputs.fileId ?? ""), String(inputs.mimeType ?? ""), String(inputs.content ?? ""), (inputs.encoding as "utf8" | "base64") ?? "utf8");
+  execute: async ({ inputs }) => {
+    const result = await (await loadDriveManager()).updateFileContent(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""), String(inputs.mimeType ?? ""), String(inputs.content ?? ""), (inputs.encoding as "utf8" | "base64") ?? "utf8");
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveUpdateFileContent(${inputs.credentialName}, ${inputs.fileId}, ${inputs.mimeType}, ${inputs.content}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.updateFileContent(${inputs.credentialName}, ${inputs.fileId}, ${inputs.mimeType}, ${inputs.content}, ${inputs.encoding});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -324,18 +290,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, content: "", error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).downloadFile(String(inputs.fileId ?? ""), (inputs.encoding as "utf8" | "base64") ?? "utf8");
+  execute: async ({ inputs }) => {
+    const result = await (await loadDriveManager()).downloadFile(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""), (inputs.encoding as "utf8" | "base64") ?? "utf8");
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveDownloadFile(${inputs.credentialName}, ${inputs.fileId}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.downloadFile(${inputs.credentialName}, ${inputs.fileId}, ${inputs.encoding});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, content: `${v}.content`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -355,26 +319,28 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
+  execute: async ({ inputs }) => {
     const emptyFile = { id: "", name: "", mimeType: "", isFolder: false, size: 0, webViewLink: "" };
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, file: emptyFile, error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).createFolder(String(inputs.name ?? ""), String(inputs.parentFolderId ?? ""));
+    const result = await (await loadDriveManager()).createFolder(String(inputs.credentialName ?? ""), String(inputs.name ?? ""), String(inputs.parentFolderId ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
-        file: { id: result.id ?? "", name: result.name ?? "", mimeType: result.mimeType ?? "", isFolder: result.isFolder ?? false, size: result.size ?? 0, webViewLink: result.webViewLink ?? "" },
+        file: result.success ? { id: result.id ?? "", name: result.name ?? "", mimeType: result.mimeType ?? "", isFolder: result.isFolder ?? false, size: result.size ?? 0, webViewLink: result.webViewLink ?? "" } : emptyFile,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveCreateFolder(${inputs.credentialName}, ${inputs.name}, ${inputs.parentFolderId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.createFolder(${inputs.credentialName}, ${inputs.name}, ${inputs.parentFolderId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, file: `${v}.file`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      file: `(${v}.success ? { id: ${v}.id ?? "", name: ${v}.name ?? "", mimeType: ${v}.mimeType ?? "", isFolder: ${v}.isFolder ?? false, size: ${v}.size ?? 0, webViewLink: ${v}.webViewLink ?? "" } : { id: "", name: "", mimeType: "", isFolder: false, size: 0, webViewLink: "" })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -395,26 +361,28 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
+  execute: async ({ inputs }) => {
     const emptyFile = { id: "", name: "", mimeType: "", isFolder: false, size: 0, webViewLink: "" };
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, file: emptyFile, error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).copyFile(String(inputs.fileId ?? ""), String(inputs.newName ?? ""), String(inputs.destinationFolderId ?? ""));
+    const result = await (await loadDriveManager()).copyFile(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""), String(inputs.newName ?? ""), String(inputs.destinationFolderId ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
-        file: { id: result.id ?? "", name: result.name ?? "", mimeType: result.mimeType ?? "", isFolder: result.isFolder ?? false, size: result.size ?? 0, webViewLink: result.webViewLink ?? "" },
+        file: result.success ? { id: result.id ?? "", name: result.name ?? "", mimeType: result.mimeType ?? "", isFolder: result.isFolder ?? false, size: result.size ?? 0, webViewLink: result.webViewLink ?? "" } : emptyFile,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveCopyFile(${inputs.credentialName}, ${inputs.fileId}, ${inputs.newName}, ${inputs.destinationFolderId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.copyFile(${inputs.credentialName}, ${inputs.fileId}, ${inputs.newName}, ${inputs.destinationFolderId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, file: `${v}.file`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      file: `(${v}.success ? { id: ${v}.id ?? "", name: ${v}.name ?? "", mimeType: ${v}.mimeType ?? "", isFolder: ${v}.isFolder ?? false, size: ${v}.size ?? 0, webViewLink: ${v}.webViewLink ?? "" } : { id: "", name: "", mimeType: "", isFolder: false, size: 0, webViewLink: "" })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -433,18 +401,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).moveFile(String(inputs.fileId ?? ""), String(inputs.destinationFolderId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDriveManager()).moveFile(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""), String(inputs.destinationFolderId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveMoveFile(${inputs.credentialName}, ${inputs.fileId}, ${inputs.destinationFolderId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.moveFile(${inputs.credentialName}, ${inputs.fileId}, ${inputs.destinationFolderId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -463,18 +429,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).renameFile(String(inputs.fileId ?? ""), String(inputs.newName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDriveManager()).renameFile(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""), String(inputs.newName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveRenameFile(${inputs.credentialName}, ${inputs.fileId}, ${inputs.newName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.renameFile(${inputs.credentialName}, ${inputs.fileId}, ${inputs.newName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -485,18 +449,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), { id: "fileId", label: i18n.nodes.google.__shared.pin_file_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).deleteFile(String(inputs.fileId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDriveManager()).deleteFile(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveDeleteFile(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.deleteFile(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -518,18 +480,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).shareFile(String(inputs.fileId ?? ""), String(inputs.role ?? "reader"), String(inputs.type ?? "user"), String(inputs.emailAddress ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDriveManager()).shareFile(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""), String(inputs.role ?? "reader"), String(inputs.type ?? "user"), String(inputs.emailAddress ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveShareFile(${inputs.credentialName}, ${inputs.fileId}, ${inputs.role}, ${inputs.type}, ${inputs.emailAddress});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.shareFile(${inputs.credentialName}, ${inputs.fileId}, ${inputs.role}, ${inputs.type}, ${inputs.emailAddress});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -548,18 +508,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, permissions: [], error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).listPermissions(String(inputs.fileId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDriveManager()).listPermissions(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveListPermissions(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.listPermissions(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, permissions: `${v}.permissions`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -578,18 +536,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await driveManagerFor(resolved.resolved).deletePermission(String(inputs.fileId ?? ""), String(inputs.permissionId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDriveManager()).deletePermission(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""), String(inputs.permissionId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDriveDeletePermission(${inputs.credentialName}, ${inputs.fileId}, ${inputs.permissionId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDriveManager.deletePermission(${inputs.credentialName}, ${inputs.fileId}, ${inputs.permissionId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DRIVE_MANAGER_IMPORT],
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -613,18 +569,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, valuesJson: "[]", error: resolved.error } };
-    const result = await sheetsManagerFor(resolved.resolved).getValues(String(inputs.spreadsheetId ?? ""), String(inputs.range ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSheetsManager()).getValues(String(inputs.credentialName ?? ""), String(inputs.spreadsheetId ?? ""), String(inputs.range ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleSheetsGetValues(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.range});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleSheetsManager.getValues(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.range});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, valuesJson: `${v}.valuesJson`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_SHEETS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -645,18 +599,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, updatedCells: 0, error: resolved.error } };
-    const result = await sheetsManagerFor(resolved.resolved).updateValues(String(inputs.spreadsheetId ?? ""), String(inputs.range ?? ""), String(inputs.valuesJson ?? "[]"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSheetsManager()).updateValues(String(inputs.credentialName ?? ""), String(inputs.spreadsheetId ?? ""), String(inputs.range ?? ""), String(inputs.valuesJson ?? "[]"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleSheetsUpdateValues(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.range}, ${inputs.valuesJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleSheetsManager.updateValues(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.range}, ${inputs.valuesJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, updatedCells: `${v}.updatedCells`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_SHEETS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -677,18 +629,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, updatedCells: 0, error: resolved.error } };
-    const result = await sheetsManagerFor(resolved.resolved).appendValues(String(inputs.spreadsheetId ?? ""), String(inputs.range ?? ""), String(inputs.valuesJson ?? "[]"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSheetsManager()).appendValues(String(inputs.credentialName ?? ""), String(inputs.spreadsheetId ?? ""), String(inputs.range ?? ""), String(inputs.valuesJson ?? "[]"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleSheetsAppendValues(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.range}, ${inputs.valuesJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleSheetsManager.appendValues(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.range}, ${inputs.valuesJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, updatedCells: `${v}.updatedCells`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_SHEETS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -707,18 +657,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await sheetsManagerFor(resolved.resolved).clearValues(String(inputs.spreadsheetId ?? ""), String(inputs.range ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSheetsManager()).clearValues(String(inputs.credentialName ?? ""), String(inputs.spreadsheetId ?? ""), String(inputs.range ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleSheetsClearValues(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.range});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleSheetsManager.clearValues(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.range});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_SHEETS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -738,18 +686,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, spreadsheetId: "", spreadsheetUrl: "", error: resolved.error } };
-    const result = await sheetsManagerFor(resolved.resolved).createSpreadsheet(String(inputs.title ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSheetsManager()).createSpreadsheet(String(inputs.credentialName ?? ""), String(inputs.title ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleSheetsCreateSpreadsheet(${inputs.credentialName}, ${inputs.title});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleSheetsManager.createSpreadsheet(${inputs.credentialName}, ${inputs.title});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, spreadsheetId: `${v}.spreadsheetId`, spreadsheetUrl: `${v}.spreadsheetUrl`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_SHEETS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -769,18 +715,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, sheetId: 0, error: resolved.error } };
-    const result = await sheetsManagerFor(resolved.resolved).addSheet(String(inputs.spreadsheetId ?? ""), String(inputs.title ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSheetsManager()).addSheet(String(inputs.credentialName ?? ""), String(inputs.spreadsheetId ?? ""), String(inputs.title ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleSheetsAddSheet(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.title});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleSheetsManager.addSheet(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.title});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, sheetId: `${v}.sheetId`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_SHEETS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -799,18 +743,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await sheetsManagerFor(resolved.resolved).deleteSheet(String(inputs.spreadsheetId ?? ""), Number(inputs.sheetId ?? 0));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSheetsManager()).deleteSheet(String(inputs.credentialName ?? ""), String(inputs.spreadsheetId ?? ""), Number(inputs.sheetId ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleSheetsDeleteSheet(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.sheetId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleSheetsManager.deleteSheet(${inputs.credentialName}, ${inputs.spreadsheetId}, ${inputs.sheetId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_SHEETS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -830,18 +772,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, title: "", sheetTitlesJson: "[]", error: resolved.error } };
-    const result = await sheetsManagerFor(resolved.resolved).getMetadata(String(inputs.spreadsheetId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSheetsManager()).getMetadata(String(inputs.credentialName ?? ""), String(inputs.spreadsheetId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleSheetsGetMetadata(${inputs.credentialName}, ${inputs.spreadsheetId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleSheetsManager.getMetadata(${inputs.credentialName}, ${inputs.spreadsheetId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, title: `${v}.title`, sheetTitlesJson: `${v}.sheetTitlesJson`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_SHEETS_MANAGER_IMPORT],
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -864,18 +804,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, documentId: "", error: resolved.error } };
-    const result = await docsManagerFor(resolved.resolved).createDocument(String(inputs.title ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDocsManager()).createDocument(String(inputs.credentialName ?? ""), String(inputs.title ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDocsCreateDocument(${inputs.credentialName}, ${inputs.title});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDocsManager.createDocument(${inputs.credentialName}, ${inputs.title});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, documentId: `${v}.documentId`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DOCS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -894,18 +832,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, text: "", error: resolved.error } };
-    const result = await docsManagerFor(resolved.resolved).getText(String(inputs.documentId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDocsManager()).getText(String(inputs.credentialName ?? ""), String(inputs.documentId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDocsGetText(${inputs.credentialName}, ${inputs.documentId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDocsManager.getText(${inputs.credentialName}, ${inputs.documentId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, text: `${v}.text`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DOCS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -924,18 +860,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await docsManagerFor(resolved.resolved).appendText(String(inputs.documentId ?? ""), String(inputs.text ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDocsManager()).appendText(String(inputs.credentialName ?? ""), String(inputs.documentId ?? ""), String(inputs.text ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDocsAppendText(${inputs.credentialName}, ${inputs.documentId}, ${inputs.text});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDocsManager.appendText(${inputs.credentialName}, ${inputs.documentId}, ${inputs.text});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DOCS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -955,18 +889,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await docsManagerFor(resolved.resolved).insertText(String(inputs.documentId ?? ""), String(inputs.text ?? ""), Number(inputs.index ?? 1));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDocsManager()).insertText(String(inputs.credentialName ?? ""), String(inputs.documentId ?? ""), String(inputs.text ?? ""), Number(inputs.index ?? 1));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDocsInsertText(${inputs.credentialName}, ${inputs.documentId}, ${inputs.text}, ${inputs.index});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDocsManager.insertText(${inputs.credentialName}, ${inputs.documentId}, ${inputs.text}, ${inputs.index});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DOCS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -987,18 +919,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await docsManagerFor(resolved.resolved).replaceAllText(String(inputs.documentId ?? ""), String(inputs.find ?? ""), String(inputs.replacement ?? ""), Boolean(inputs.matchCase));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDocsManager()).replaceAllText(String(inputs.credentialName ?? ""), String(inputs.documentId ?? ""), String(inputs.find ?? ""), String(inputs.replacement ?? ""), Boolean(inputs.matchCase));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleDocsReplaceAllText(${inputs.credentialName}, ${inputs.documentId}, ${inputs.find}, ${inputs.replacement}, ${inputs.matchCase});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleDocsManager.replaceAllText(${inputs.credentialName}, ${inputs.documentId}, ${inputs.find}, ${inputs.replacement}, ${inputs.matchCase});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_DOCS_MANAGER_IMPORT],
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -1022,18 +952,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, messages: [], error: resolved.error } };
-    const result = await gmailManagerFor(resolved.resolved).listMessages(String(inputs.query ?? ""), Number(inputs.maxResults ?? 20));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGmailManager()).listMessages(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), Number(inputs.maxResults ?? 20));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleGmailListMessages(${inputs.credentialName}, ${inputs.query}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleGmailManager.listMessages(${inputs.credentialName}, ${inputs.query}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, messages: `${v}.messages`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_GMAIL_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1055,21 +983,19 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, subject: "", from: "", snippet: "", body: "", error: resolved.error } };
-    const result = await gmailManagerFor(resolved.resolved).getMessage(String(inputs.messageId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGmailManager()).getMessage(String(inputs.credentialName ?? ""), String(inputs.messageId ?? ""));
     return {
       nextExec: "exec-out",
       outputs: { success: result.success, subject: result.subject ?? "", from: result.from ?? "", snippet: result.snippet ?? "", body: result.body, error: result.error },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleGmailGetMessage(${inputs.credentialName}, ${inputs.messageId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleGmailManager.getMessage(${inputs.credentialName}, ${inputs.messageId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, subject: `${v}.subject`, from: `${v}.from`, snippet: `${v}.snippet`, body: `${v}.body`, error: `${v}.error` };
+    return { success: `${v}.success`, subject: `(${v}.subject ?? "")`, from: `(${v}.from ?? "")`, snippet: `(${v}.snippet ?? "")`, body: `${v}.body`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_GMAIL_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1090,18 +1016,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", error: resolved.error } };
-    const result = await gmailManagerFor(resolved.resolved).sendMessage(String(inputs.to ?? ""), String(inputs.subject ?? ""), String(inputs.body ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGmailManager()).sendMessage(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.subject ?? ""), String(inputs.body ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleGmailSendMessage(${inputs.credentialName}, ${inputs.to}, ${inputs.subject}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleGmailManager.sendMessage(${inputs.credentialName}, ${inputs.to}, ${inputs.subject}, ${inputs.body});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_GMAIL_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1112,18 +1036,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), { id: "messageId", label: i18n.nodes.google.__shared.pin_message_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await gmailManagerFor(resolved.resolved).trashMessage(String(inputs.messageId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGmailManager()).trashMessage(String(inputs.credentialName ?? ""), String(inputs.messageId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleGmailTrashMessage(${inputs.credentialName}, ${inputs.messageId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleGmailManager.trashMessage(${inputs.credentialName}, ${inputs.messageId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_GMAIL_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1134,18 +1056,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), execInOutPins().execOut, execInOutPins().success, { id: "labels", label: i18n.nodes.google.gmailListLabels.pin_labels, type: "struct", subType: GMAIL_LABEL_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, labels: [], error: resolved.error } };
-    const result = await gmailManagerFor(resolved.resolved).listLabels();
+  execute: async ({ inputs }) => {
+    const result = await (await loadGmailManager()).listLabels(String(inputs.credentialName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleGmailListLabels(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleGmailManager.listLabels(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, labels: `${v}.labels`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_GMAIL_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1164,18 +1084,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", error: resolved.error } };
-    const result = await gmailManagerFor(resolved.resolved).createLabel(String(inputs.name ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGmailManager()).createLabel(String(inputs.credentialName ?? ""), String(inputs.name ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleGmailCreateLabel(${inputs.credentialName}, ${inputs.name});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleGmailManager.createLabel(${inputs.credentialName}, ${inputs.name});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_GMAIL_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1195,23 +1113,21 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+  execute: async ({ inputs }) => {
     const parseIds = (value: unknown) =>
       String(value ?? "")
         .split(",")
         .map((id) => id.trim())
         .filter((id) => id !== "");
-    const result = await gmailManagerFor(resolved.resolved).modifyMessageLabels(String(inputs.messageId ?? ""), parseIds(inputs.addLabelIds), parseIds(inputs.removeLabelIds));
+    const result = await (await loadGmailManager()).modifyMessageLabels(String(inputs.credentialName ?? ""), String(inputs.messageId ?? ""), parseIds(inputs.addLabelIds), parseIds(inputs.removeLabelIds));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleGmailModifyMessageLabels(${inputs.credentialName}, ${inputs.messageId}, ${inputs.addLabelIds}, ${inputs.removeLabelIds});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleGmailManager.modifyMessageLabels(${inputs.credentialName}, ${inputs.messageId}, ${inputs.addLabelIds}, ${inputs.removeLabelIds});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_GMAIL_MANAGER_IMPORT],
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -1241,18 +1157,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, events: [], error: resolved.error } };
-    const result = await calendarManagerFor(resolved.resolved).listEvents(String(inputs.calendarId ?? "primary"), String(inputs.timeMin ?? ""), String(inputs.timeMax ?? ""), Number(inputs.maxResults ?? 20));
+  execute: async ({ inputs }) => {
+    const result = await (await loadCalendarManager()).listEvents(String(inputs.credentialName ?? ""), String(inputs.calendarId ?? "primary"), String(inputs.timeMin ?? ""), String(inputs.timeMax ?? ""), Number(inputs.maxResults ?? 20));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleCalendarListEvents(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.timeMin}, ${inputs.timeMax}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleCalendarManager.listEvents(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.timeMin}, ${inputs.timeMax}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, events: `${v}.events`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_CALENDAR_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1272,25 +1186,27 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, event: emptyEvent, error: resolved.error } };
-    const result = await calendarManagerFor(resolved.resolved).getEvent(String(inputs.calendarId ?? "primary"), String(inputs.eventId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadCalendarManager()).getEvent(String(inputs.credentialName ?? ""), String(inputs.calendarId ?? "primary"), String(inputs.eventId ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
-        event: { id: result.id ?? "", summary: result.summary ?? "", start: result.start ?? "", end: result.end ?? "", htmlLink: result.htmlLink ?? "" },
+        event: result.success ? { id: result.id ?? "", summary: result.summary ?? "", start: result.start ?? "", end: result.end ?? "", htmlLink: result.htmlLink ?? "" } : emptyEvent,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleCalendarGetEvent(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.eventId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleCalendarManager.getEvent(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.eventId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, event: `${v}.event`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      event: `(${v}.success ? { id: ${v}.id ?? "", summary: ${v}.summary ?? "", start: ${v}.start ?? "", end: ${v}.end ?? "", htmlLink: ${v}.htmlLink ?? "" } : { id: "", summary: "", start: "", end: "", htmlLink: "" })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_CALENDAR_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1313,25 +1229,27 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, event: emptyEvent, error: resolved.error } };
-    const result = await calendarManagerFor(resolved.resolved).createEvent(String(inputs.calendarId ?? "primary"), String(inputs.summary ?? ""), String(inputs.start ?? ""), String(inputs.end ?? ""), String(inputs.description ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadCalendarManager()).createEvent(String(inputs.credentialName ?? ""), String(inputs.calendarId ?? "primary"), String(inputs.summary ?? ""), String(inputs.start ?? ""), String(inputs.end ?? ""), String(inputs.description ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
-        event: { id: result.id ?? "", summary: result.summary ?? "", start: result.start ?? "", end: result.end ?? "", htmlLink: result.htmlLink ?? "" },
+        event: result.success ? { id: result.id ?? "", summary: result.summary ?? "", start: result.start ?? "", end: result.end ?? "", htmlLink: result.htmlLink ?? "" } : emptyEvent,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleCalendarCreateEvent(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.summary}, ${inputs.start}, ${inputs.end}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleCalendarManager.createEvent(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.summary}, ${inputs.start}, ${inputs.end}, ${inputs.description});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, event: `${v}.event`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      event: `(${v}.success ? { id: ${v}.id ?? "", summary: ${v}.summary ?? "", start: ${v}.start ?? "", end: ${v}.end ?? "", htmlLink: ${v}.htmlLink ?? "" } : { id: "", summary: "", start: "", end: "", htmlLink: "" })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_CALENDAR_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1355,28 +1273,30 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, event: emptyEvent, error: resolved.error } };
-    const result = await calendarManagerFor(resolved.resolved).updateEvent(String(inputs.calendarId ?? "primary"), String(inputs.eventId ?? ""), String(inputs.summary ?? ""), String(inputs.start ?? ""), String(inputs.end ?? ""), String(inputs.description ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadCalendarManager()).updateEvent(String(inputs.credentialName ?? ""), String(inputs.calendarId ?? "primary"), String(inputs.eventId ?? ""), String(inputs.summary ?? ""), String(inputs.start ?? ""), String(inputs.end ?? ""), String(inputs.description ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
-        event: { id: result.id ?? "", summary: result.summary ?? "", start: result.start ?? "", end: result.end ?? "", htmlLink: result.htmlLink ?? "" },
+        event: result.success ? { id: result.id ?? "", summary: result.summary ?? "", start: result.start ?? "", end: result.end ?? "", htmlLink: result.htmlLink ?? "" } : emptyEvent,
         error: result.error,
       },
     };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleCalendarUpdateEvent(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.eventId}, ${inputs.summary}, ${inputs.start}, ${inputs.end}, ${inputs.description});`,
+    `const ${compileResultVar(node.id)} = await GoogleCalendarManager.updateEvent(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.eventId}, ${inputs.summary}, ${inputs.start}, ${inputs.end}, ${inputs.description});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, event: `${v}.event`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      event: `(${v}.success ? { id: ${v}.id ?? "", summary: ${v}.summary ?? "", start: ${v}.start ?? "", end: ${v}.end ?? "", htmlLink: ${v}.htmlLink ?? "" } : { id: "", summary: "", start: "", end: "", htmlLink: "" })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_CALENDAR_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1387,18 +1307,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), calendarIdPin(), { id: "eventId", label: i18n.nodes.google.__shared.pin_event_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await calendarManagerFor(resolved.resolved).deleteEvent(String(inputs.calendarId ?? "primary"), String(inputs.eventId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadCalendarManager()).deleteEvent(String(inputs.credentialName ?? ""), String(inputs.calendarId ?? "primary"), String(inputs.eventId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleCalendarDeleteEvent(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.eventId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleCalendarManager.deleteEvent(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.eventId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_CALENDAR_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1418,25 +1336,27 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, event: emptyEvent, error: resolved.error } };
-    const result = await calendarManagerFor(resolved.resolved).quickAddEvent(String(inputs.calendarId ?? "primary"), String(inputs.text ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadCalendarManager()).quickAddEvent(String(inputs.credentialName ?? ""), String(inputs.calendarId ?? "primary"), String(inputs.text ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
-        event: { id: result.id ?? "", summary: result.summary ?? "", start: result.start ?? "", end: result.end ?? "", htmlLink: result.htmlLink ?? "" },
+        event: result.success ? { id: result.id ?? "", summary: result.summary ?? "", start: result.start ?? "", end: result.end ?? "", htmlLink: result.htmlLink ?? "" } : emptyEvent,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleCalendarQuickAddEvent(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.text});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleCalendarManager.quickAddEvent(${inputs.credentialName}, ${inputs.calendarId}, ${inputs.text});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, event: `${v}.event`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      event: `(${v}.success ? { id: ${v}.id ?? "", summary: ${v}.summary ?? "", start: ${v}.start ?? "", end: ${v}.end ?? "", htmlLink: ${v}.htmlLink ?? "" } : { id: "", summary: "", start: "", end: "", htmlLink: "" })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_CALENDAR_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1454,18 +1374,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, calendars: [], error: resolved.error } };
-    const result = await calendarManagerFor(resolved.resolved).listCalendars();
+  execute: async ({ inputs }) => {
+    const result = await (await loadCalendarManager()).listCalendars(String(inputs.credentialName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleCalendarListCalendars(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleCalendarManager.listCalendars(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, calendars: `${v}.calendars`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_CALENDAR_MANAGER_IMPORT],
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -1490,18 +1408,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleServiceAccountCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, users: [], error: resolved.error } };
-    const result = await GoogleAdminManager.forServiceAccount(resolved.data).listUsers(String(inputs.domain ?? ""), String(inputs.query ?? ""), Number(inputs.maxResults ?? 100));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAdminManager()).listUsers(String(inputs.credentialName ?? ""), String(inputs.domain ?? ""), String(inputs.query ?? ""), Number(inputs.maxResults ?? 100));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAdminListUsers(${inputs.credentialName}, ${inputs.domain}, ${inputs.query}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleAdminManager.listUsers(${inputs.credentialName}, ${inputs.domain}, ${inputs.query}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, users: `${v}.users`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_ADMIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1520,25 +1436,27 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleServiceAccountCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, user: emptyAdminUser, error: resolved.error } };
-    const result = await GoogleAdminManager.forServiceAccount(resolved.data).getUser(String(inputs.userKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAdminManager()).getUser(String(inputs.credentialName ?? ""), String(inputs.userKey ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
-        user: { id: result.id ?? "", primaryEmail: result.primaryEmail ?? "", fullName: result.fullName ?? "", suspended: result.suspended ?? false },
+        user: result.success ? { id: result.id ?? "", primaryEmail: result.primaryEmail ?? "", fullName: result.fullName ?? "", suspended: result.suspended ?? false } : emptyAdminUser,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAdminGetUser(${inputs.credentialName}, ${inputs.userKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleAdminManager.getUser(${inputs.credentialName}, ${inputs.userKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, user: `${v}.user`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      user: `(${v}.success ? { id: ${v}.id ?? "", primaryEmail: ${v}.primaryEmail ?? "", fullName: ${v}.fullName ?? "", suspended: ${v}.suspended ?? false } : { id: "", primaryEmail: "", fullName: "", suspended: false })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_ADMIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1560,25 +1478,27 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleServiceAccountCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, user: emptyAdminUser, error: resolved.error } };
-    const result = await GoogleAdminManager.forServiceAccount(resolved.data).createUser(String(inputs.primaryEmail ?? ""), String(inputs.givenName ?? ""), String(inputs.familyName ?? ""), String(inputs.password ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAdminManager()).createUser(String(inputs.credentialName ?? ""), String(inputs.primaryEmail ?? ""), String(inputs.givenName ?? ""), String(inputs.familyName ?? ""), String(inputs.password ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
-        user: { id: result.id ?? "", primaryEmail: result.primaryEmail ?? "", fullName: result.fullName ?? "", suspended: result.suspended ?? false },
+        user: result.success ? { id: result.id ?? "", primaryEmail: result.primaryEmail ?? "", fullName: result.fullName ?? "", suspended: result.suspended ?? false } : emptyAdminUser,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAdminCreateUser(${inputs.credentialName}, ${inputs.primaryEmail}, ${inputs.givenName}, ${inputs.familyName}, ${inputs.password});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleAdminManager.createUser(${inputs.credentialName}, ${inputs.primaryEmail}, ${inputs.givenName}, ${inputs.familyName}, ${inputs.password});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, user: `${v}.user`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      user: `(${v}.success ? { id: ${v}.id ?? "", primaryEmail: ${v}.primaryEmail ?? "", fullName: ${v}.fullName ?? "", suspended: ${v}.suspended ?? false } : { id: "", primaryEmail: "", fullName: "", suspended: false })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_ADMIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1597,18 +1517,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleServiceAccountCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await GoogleAdminManager.forServiceAccount(resolved.data).updateUser(String(inputs.userKey ?? ""), String(inputs.propertiesJson ?? "{}"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAdminManager()).updateUser(String(inputs.credentialName ?? ""), String(inputs.userKey ?? ""), String(inputs.propertiesJson ?? "{}"));
     return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAdminUpdateUser(${inputs.credentialName}, ${inputs.userKey}, ${inputs.propertiesJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleAdminManager.updateUser(${inputs.credentialName}, ${inputs.userKey}, ${inputs.propertiesJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_ADMIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1619,18 +1537,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), { id: "userKey", label: i18n.nodes.google.__shared.pin_user_key, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleServiceAccountCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await GoogleAdminManager.forServiceAccount(resolved.data).deleteUser(String(inputs.userKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAdminManager()).deleteUser(String(inputs.credentialName ?? ""), String(inputs.userKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAdminDeleteUser(${inputs.credentialName}, ${inputs.userKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleAdminManager.deleteUser(${inputs.credentialName}, ${inputs.userKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_ADMIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1650,18 +1566,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleServiceAccountCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, groups: [], error: resolved.error } };
-    const result = await GoogleAdminManager.forServiceAccount(resolved.data).listGroups(String(inputs.domain ?? ""), Number(inputs.maxResults ?? 100));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAdminManager()).listGroups(String(inputs.credentialName ?? ""), String(inputs.domain ?? ""), Number(inputs.maxResults ?? 100));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAdminListGroups(${inputs.credentialName}, ${inputs.domain}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleAdminManager.listGroups(${inputs.credentialName}, ${inputs.domain}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, groups: `${v}.groups`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_ADMIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1680,21 +1594,23 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleServiceAccountCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, group: emptyAdminGroup, error: resolved.error } };
-    const result = await GoogleAdminManager.forServiceAccount(resolved.data).getGroup(String(inputs.groupKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAdminManager()).getGroup(String(inputs.credentialName ?? ""), String(inputs.groupKey ?? ""));
     return {
       nextExec: "exec-out",
-      outputs: { success: result.success, group: { id: result.id ?? "", email: result.email ?? "", name: result.name ?? "" }, error: result.error },
+      outputs: { success: result.success, group: result.success ? { id: result.id ?? "", email: result.email ?? "", name: result.name ?? "" } : emptyAdminGroup, error: result.error },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAdminGetGroup(${inputs.credentialName}, ${inputs.groupKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleAdminManager.getGroup(${inputs.credentialName}, ${inputs.groupKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, group: `${v}.group`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      group: `(${v}.success ? { id: ${v}.id ?? "", email: ${v}.email ?? "", name: ${v}.name ?? "" } : { id: "", email: "", name: "" })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_ADMIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1715,21 +1631,23 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleServiceAccountCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, group: emptyAdminGroup, error: resolved.error } };
-    const result = await GoogleAdminManager.forServiceAccount(resolved.data).createGroup(String(inputs.email ?? ""), String(inputs.name ?? ""), String(inputs.description ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAdminManager()).createGroup(String(inputs.credentialName ?? ""), String(inputs.email ?? ""), String(inputs.name ?? ""), String(inputs.description ?? ""));
     return {
       nextExec: "exec-out",
-      outputs: { success: result.success, group: { id: result.id ?? "", email: result.email ?? "", name: result.name ?? "" }, error: result.error },
+      outputs: { success: result.success, group: result.success ? { id: result.id ?? "", email: result.email ?? "", name: result.name ?? "" } : emptyAdminGroup, error: result.error },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAdminCreateGroup(${inputs.credentialName}, ${inputs.email}, ${inputs.name}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleAdminManager.createGroup(${inputs.credentialName}, ${inputs.email}, ${inputs.name}, ${inputs.description});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, group: `${v}.group`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      group: `(${v}.success ? { id: ${v}.id ?? "", email: ${v}.email ?? "", name: ${v}.name ?? "" } : { id: "", email: "", name: "" })`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_ADMIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1740,18 +1658,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), { id: "groupKey", label: i18n.nodes.google.__shared.pin_group_key, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleServiceAccountCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await GoogleAdminManager.forServiceAccount(resolved.data).deleteGroup(String(inputs.groupKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAdminManager()).deleteGroup(String(inputs.credentialName ?? ""), String(inputs.groupKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAdminDeleteGroup(${inputs.credentialName}, ${inputs.groupKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleAdminManager.deleteGroup(${inputs.credentialName}, ${inputs.groupKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_ADMIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1771,18 +1687,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleServiceAccountCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await GoogleAdminManager.forServiceAccount(resolved.data).addGroupMember(String(inputs.groupKey ?? ""), String(inputs.email ?? ""), String(inputs.role ?? "MEMBER"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAdminManager()).addGroupMember(String(inputs.credentialName ?? ""), String(inputs.groupKey ?? ""), String(inputs.email ?? ""), String(inputs.role ?? "MEMBER"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAdminAddGroupMember(${inputs.credentialName}, ${inputs.groupKey}, ${inputs.email}, ${inputs.role});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleAdminManager.addGroupMember(${inputs.credentialName}, ${inputs.groupKey}, ${inputs.email}, ${inputs.role});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_ADMIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1801,16 +1715,14 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGoogleServiceAccountCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await GoogleAdminManager.forServiceAccount(resolved.data).removeGroupMember(String(inputs.groupKey ?? ""), String(inputs.memberKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAdminManager()).removeGroupMember(String(inputs.credentialName ?? ""), String(inputs.groupKey ?? ""), String(inputs.memberKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGoogle.googleAdminRemoveGroupMember(${inputs.credentialName}, ${inputs.groupKey}, ${inputs.memberKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GoogleAdminManager.removeGroupMember(${inputs.credentialName}, ${inputs.groupKey}, ${inputs.memberKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GOOGLE_IMPORT],
+  compileImports: [GOOGLE_ADMIN_MANAGER_IMPORT],
 });

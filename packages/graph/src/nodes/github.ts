@@ -1,54 +1,29 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_GITHUB_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, GITHUB_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { ISSUE_STRUCT_TYPE, PULL_REQUEST_STRUCT_TYPE, CREATE_RESULT_STRUCT_TYPE, MERGE_RESULT_STRUCT_TYPE, FILE_CONTENT_STRUCT_TYPE, FILE_WRITE_RESULT_STRUCT_TYPE } from "@hermione/graph/structs/github";
 import { GITHUB_STATE_ENUM_TYPE, GITHUB_MERGE_METHOD_ENUM_TYPE } from "@hermione/graph/enum/github";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
-import { GithubManager, type GithubAuth } from "@hermione/core/lib/githubManager";
-import type { GithubTokenCredentialData, GithubAppCredentialData } from "@hermione/shared/types";
 import { i18n } from "@i18n";
 
-// Every operation below is a thin pin-wiring shim over GithubManager (server/functionLibraryGithub
-// on the compiled path, GithubManager directly on the interpreter path) — this file only ever
-// translates pins to method arguments and method results back to pins.
+// Every operation below calls the exact same GithubManager static method (packages/core/src/lib/
+// githubManager.ts) from both execute() (interpreter path) and compileExecute() (compiled/deployed
+// path) — GithubManager resolves the named credential straight from the database itself (see its
+// findCredential), so unlike the old two-layer split there is no separate functionLibraryGithub.ts
+// env-var-reading layer and no ctx.getCredential vault lookup here: both paths are already identical.
 //
-// Every node here also has a compileExecute: the compiled path calls a same-named
-// `functionLibraryGithub.github*` wrapper (see server/functionLibraryGithub.ts), which reads the
-// credential back from environment variables via `githubCredentialFromEnv` instead of the vault —
-// same split as jira.ts's execute()/compileExecute().
+// GithubManager now reaches the database directly (see its own header comment), which pulls in
+// better-sqlite3 and Node builtins — fine for execute(), which only ever runs server-side, but this
+// file is still statically imported client-side too (for the node-creation menu), so a plain
+// top-level import here would drag that whole chain into the browser bundle. Loaded with a runtime
+// `import()` instead, ignored by both bundlers, so it's never even resolved for the client build;
+// only ever actually called server-side, where it resolves normally.
+async function loadGithubManager(): Promise<typeof import("@hermione/core/lib/githubManager").GithubManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/githubManager");
+  return mod.GithubManager;
+}
 
 const GROUP_NAME = "Request.GitHub";
-
-/** Shared by every GitHub node — looks up a named Credential Vault entry and turns either its
- * githubToken or githubApp fields into the GithubAuth shape GithubManager's constructor expects. */
-function resolveGithubCredential(ctx: ExecutionContext, credentialName: string): { ok: true; auth: GithubAuth } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential)
-    return {
-      ok: false,
-      error: `Credential "${credentialName}" not found in the vault`,
-    };
-  if (credential.type === "githubToken") {
-    const data = credential.data as GithubTokenCredentialData;
-    return { ok: true, auth: { token: data.token } };
-  }
-  if (credential.type === "githubApp") {
-    const data = credential.data as GithubAppCredentialData;
-    return {
-      ok: true,
-      auth: {
-        appId: data.appId,
-        privateKey: data.privateKey,
-        installationId: data.installationId,
-      },
-    };
-  }
-  return {
-    ok: false,
-    error: `Credential "${credentialName}" is not a GitHub Token or GitHub App credential`,
-  };
-}
 
 function credentialNamePin() {
   return {
@@ -125,23 +100,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, issues: [], error: resolved.error },
-      };
-    const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.listIssues(String(inputs.owner ?? ""), String(inputs.repo ?? ""), (inputs.state as "open" | "closed" | "all") ?? "open");
+  execute: async ({ inputs }) => {
+    const result = await (await loadGithubManager()).listIssues(String(inputs.credentialName ?? ""), String(inputs.owner ?? ""), String(inputs.repo ?? ""), (inputs.state as "open" | "closed" | "all") ?? "open");
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubListIssues(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.state});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GithubManager.listIssues(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.state});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, issues: `${v}.issues`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
+  compileImports: [GITHUB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -162,19 +130,8 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          result: { number: 0, url: "" },
-          error: resolved.error,
-        },
-      };
-    const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.createIssue(String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.title ?? ""), String(inputs.body ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGithubManager()).createIssue(String(inputs.credentialName ?? ""), String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.title ?? ""), String(inputs.body ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -184,12 +141,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubCreateIssue(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.title}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GithubManager.createIssue(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.title}, ${inputs.body});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, result: `{ number: ${v}.number, url: ${v}.url }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
+  compileImports: [GITHUB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -209,23 +166,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.commentOnIssue(String(inputs.owner ?? ""), String(inputs.repo ?? ""), Number(inputs.issueNumber ?? 0), String(inputs.body ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGithubManager()).commentOnIssue(String(inputs.credentialName ?? ""), String(inputs.owner ?? ""), String(inputs.repo ?? ""), Number(inputs.issueNumber ?? 0), String(inputs.body ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubCommentOnIssue(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.issueNumber}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GithubManager.commentOnIssue(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.issueNumber}, ${inputs.body});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
+  compileImports: [GITHUB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -245,23 +195,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, pullRequests: [], error: resolved.error },
-      };
-    const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.listPullRequests(String(inputs.owner ?? ""), String(inputs.repo ?? ""), (inputs.state as "open" | "closed" | "all") ?? "open");
+  execute: async ({ inputs }) => {
+    const result = await (await loadGithubManager()).listPullRequests(String(inputs.credentialName ?? ""), String(inputs.owner ?? ""), String(inputs.repo ?? ""), (inputs.state as "open" | "closed" | "all") ?? "open");
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubListPullRequests(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.state});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GithubManager.listPullRequests(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.state});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, pullRequests: `${v}.pullRequests`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
+  compileImports: [GITHUB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -284,19 +227,8 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          result: { number: 0, url: "" },
-          error: resolved.error,
-        },
-      };
-    const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.createPullRequest(String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.title ?? ""), String(inputs.head ?? ""), String(inputs.base ?? ""), String(inputs.body ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGithubManager()).createPullRequest(String(inputs.credentialName ?? ""), String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.title ?? ""), String(inputs.head ?? ""), String(inputs.base ?? ""), String(inputs.body ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -306,12 +238,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubCreatePullRequest(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.title}, ${inputs.head}, ${inputs.base}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GithubManager.createPullRequest(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.title}, ${inputs.head}, ${inputs.base}, ${inputs.body});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, result: `{ number: ${v}.number, url: ${v}.url }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
+  compileImports: [GITHUB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -332,19 +264,8 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          result: { merged: false, sha: "" },
-          error: resolved.error,
-        },
-      };
-    const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.mergePullRequest(String(inputs.owner ?? ""), String(inputs.repo ?? ""), Number(inputs.pullNumber ?? 0), (inputs.mergeMethod as "merge" | "squash" | "rebase") ?? "merge");
+  execute: async ({ inputs }) => {
+    const result = await (await loadGithubManager()).mergePullRequest(String(inputs.credentialName ?? ""), String(inputs.owner ?? ""), String(inputs.repo ?? ""), Number(inputs.pullNumber ?? 0), (inputs.mergeMethod as "merge" | "squash" | "rebase") ?? "merge");
     return {
       nextExec: "exec-out",
       outputs: {
@@ -354,12 +275,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubMergePullRequest(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.pullNumber}, ${inputs.mergeMethod});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GithubManager.mergePullRequest(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.pullNumber}, ${inputs.mergeMethod});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, result: `{ merged: ${v}.merged, sha: ${v}.sha }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
+  compileImports: [GITHUB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -380,20 +301,9 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          result: { content: "", sha: "" },
-          error: resolved.error,
-        },
-      };
-    const manager = GithubManager.forAuth(resolved.auth);
+  execute: async ({ inputs }) => {
     const ref = String(inputs.ref ?? "");
-    const result = await manager.getFileContent(String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.path ?? ""), ref || undefined);
+    const result = await (await loadGithubManager()).getFileContent(String(inputs.credentialName ?? ""), String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.path ?? ""), ref || undefined);
     return {
       nextExec: "exec-out",
       outputs: {
@@ -403,12 +313,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubGetFileContent(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.path}, ${inputs.ref});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GithubManager.getFileContent(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.path}, ${inputs.ref});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, result: `{ content: ${v}.content, sha: ${v}.sha }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
+  compileImports: [GITHUB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -432,21 +342,10 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          result: { sha: "", commitSha: "" },
-          error: resolved.error,
-        },
-      };
-    const manager = GithubManager.forAuth(resolved.auth);
+  execute: async ({ inputs }) => {
     const branch = String(inputs.branch ?? "");
     const sha = String(inputs.sha ?? "");
-    const result = await manager.createOrUpdateFile(String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.path ?? ""), String(inputs.content ?? ""), String(inputs.message ?? ""), branch || undefined, sha || undefined);
+    const result = await (await loadGithubManager()).createOrUpdateFile(String(inputs.credentialName ?? ""), String(inputs.owner ?? ""), String(inputs.repo ?? ""), String(inputs.path ?? ""), String(inputs.content ?? ""), String(inputs.message ?? ""), branch || undefined, sha || undefined);
     return {
       nextExec: "exec-out",
       outputs: {
@@ -457,14 +356,14 @@ registerNode({
     };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryGithub.githubCreateOrUpdateFile(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.path}, ${inputs.content}, ${inputs.message}, ${inputs.branch}, ${inputs.sha});`,
+    `const ${compileResultVar(node.id)} = await GithubManager.createOrUpdateFile(${inputs.credentialName}, ${inputs.owner}, ${inputs.repo}, ${inputs.path}, ${inputs.content}, ${inputs.message}, ${inputs.branch}, ${inputs.sha});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, result: `{ sha: ${v}.sha, commitSha: ${v}.commitSha }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
+  compileImports: [GITHUB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -484,35 +383,14 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGithubCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, data: null, error: resolved.error },
-      };
-    const rawParams = String(inputs.paramsJson ?? "").trim();
-    let params: Record<string, unknown> | undefined;
-    try {
-      params = rawParams ? JSON.parse(rawParams) : undefined;
-    } catch (err) {
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          data: null,
-          error: err instanceof Error ? err.message : String(err),
-        },
-      };
-    }
-    const manager = GithubManager.forAuth(resolved.auth);
-    const result = await manager.request(String(inputs.route ?? ""), params);
+  execute: async ({ inputs }) => {
+    const result = await (await loadGithubManager()).request(String(inputs.credentialName ?? ""), String(inputs.route ?? ""), String(inputs.paramsJson ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryGithub.githubRequest(${inputs.credentialName}, ${inputs.route}, ${inputs.paramsJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GithubManager.request(${inputs.credentialName}, ${inputs.route}, ${inputs.paramsJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, data: `${v}.data`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_GITHUB_IMPORT],
+  compileImports: [GITHUB_MANAGER_IMPORT],
 });

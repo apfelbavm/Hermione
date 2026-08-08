@@ -1,25 +1,31 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_SENDGRID_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, SENDGRID_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { CONTACT_STRUCT_TYPE, API_KEY_STRUCT_TYPE, CONTACT_LIST_STRUCT_TYPE, BOUNCE_STRUCT_TYPE, SPAM_REPORT_STRUCT_TYPE, GLOBAL_UNSUBSCRIBE_STRUCT_TYPE, EMAIL_STAT_STRUCT_TYPE, VERIFIED_SENDER_STRUCT_TYPE } from "@hermione/graph/structs/sendgrid";
 import { i18n } from "@i18n";
 
+// Every operation below calls the exact same SendGridManager static method (packages/core/src/lib/
+// sendGridManager.ts) from both execute() (interpreter path) and compileExecute() (compiled/deployed
+// path) — SendGridManager resolves the named credential straight from the database itself (see its
+// findCredential), so like twilio.ts's nodes there is no separate functionLibrarySendGrid.ts
+// env-var-reading layer and no ctx.getCredential vault lookup here: both paths are already identical.
+//
+// SendGridManager reaches the database directly, which pulls in better-sqlite3 and Node builtins —
+// fine for execute(), which only ever runs server-side, but this file is still statically imported
+// client-side too (for the node-creation menu), so a plain top-level import here would drag that
+// whole chain into the browser bundle. Loaded with a runtime `import()` instead, ignored by both
+// bundlers, so it's never even resolved for the client build; only ever actually called
+// server-side, where it resolves normally.
+async function loadSendGridManager(): Promise<typeof import("@hermione/core/lib/sendGridManager").SendGridManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/sendGridManager");
+  return mod.SendGridManager;
+}
+
 const GROUP_NAME = "Request.SendGrid";
 
-// Calls SendGrid via the official "@sendgrid/mail" and "@sendgrid/client" Node SDKs — real REST
-// clients that talk to the SendGrid Web API over Node's own https module, which SendGrid itself
-// documents as server-side only (embedding an API Key in browser-shipped code is a real
-// credential-leak risk, not just a bundler technicality). Same structural situation as twilio.ts's
-// nodes and smtp.ts's Send Mail node (see those files' own header comments): every node below
-// therefore has a permanent, honest stub execute() reporting that only the compiled output can
-// actually reach SendGrid; the REAL implementation lives in src/server/functionLibrarySendGrid.ts
-// (backed by src/lib/sendGridManager.ts), reached only via compileImports, never statically
-// imported here.
 function credentialNamePin() {
   return { id: "credentialName", label: i18n.nodes.sendgrid.__shared.pin_credential_name, type: "string" as const, direction: "input" as const, defaultValue: "" };
 }
-
-const STUB_ERROR = 'This SendGrid node only runs in the compiled output (under Node.js) — the in-browser "Run" button cannot use the official SendGrid SDKs client-side (they are server-only and would expose your API Key). Compile this graph and run the generated script to actually call SendGrid.';
 
 const emptyContact = { id: "", email: "", firstName: "", lastName: "" };
 
@@ -46,16 +52,21 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, messageId: "", error: STUB_ERROR } }),
+  execute: async ({ inputs }) => {
+    const result = await (
+      await loadSendGridManager()
+    ).sendEmail(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), String(inputs.subject ?? ""), String(inputs.text ?? ""), String(inputs.html ?? ""), String(inputs.cc ?? ""), String(inputs.bcc ?? ""), String(inputs.replyTo ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridSendEmail(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.subject}, ${inputs.text}, ${inputs.html}, ${inputs.cc}, ${inputs.bcc}, ${inputs.replyTo});`,
+    `const ${compileResultVar(node.id)} = await SendGridManager.sendEmail(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.subject}, ${inputs.text}, ${inputs.html}, ${inputs.cc}, ${inputs.bcc}, ${inputs.replyTo});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, messageId: `${v}.messageId`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -77,13 +88,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, messageId: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridSendTemplateEmail(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.templateId}, ${inputs.dynamicTemplateDataJson});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).sendTemplateEmail(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), String(inputs.templateId ?? ""), String(inputs.dynamicTemplateDataJson ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.sendTemplateEmail(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.templateId}, ${inputs.dynamicTemplateDataJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, messageId: `${v}.messageId`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -106,13 +120,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, messageId: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridSendMultiple(${inputs.credentialName}, ${inputs.toEmailsJson}, ${inputs.from}, ${inputs.subject}, ${inputs.text}, ${inputs.html});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).sendMultiple(String(inputs.credentialName ?? ""), String(inputs.toEmailsJson ?? ""), String(inputs.from ?? ""), String(inputs.subject ?? ""), String(inputs.text ?? ""), String(inputs.html ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.sendMultiple(${inputs.credentialName}, ${inputs.toEmailsJson}, ${inputs.from}, ${inputs.subject}, ${inputs.text}, ${inputs.html});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, messageId: `${v}.messageId`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -133,13 +150,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, apiKeyId: "", apiKeyValue: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridCreateApiKey(${inputs.credentialName}, ${inputs.name}, ${inputs.scopesJson});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).createApiKey(String(inputs.credentialName ?? ""), String(inputs.name ?? ""), String(inputs.scopesJson ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.createApiKey(${inputs.credentialName}, ${inputs.name}, ${inputs.scopesJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, apiKeyId: `${v}.apiKeyId`, apiKeyValue: `${v}.apiKeyValue`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -157,13 +177,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, apiKeys: [], error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridListApiKeys(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).listApiKeys(String(inputs.credentialName ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.listApiKeys(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, apiKeys: `${v}.apiKeys`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -181,13 +204,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridDeleteApiKey(${inputs.credentialName}, ${inputs.apiKeyId});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).deleteApiKey(String(inputs.credentialName ?? ""), String(inputs.apiKeyId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.deleteApiKey(${inputs.credentialName}, ${inputs.apiKeyId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -207,13 +233,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, jobId: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridUpsertContacts(${inputs.credentialName}, ${inputs.contactsJson}, ${inputs.listIdsJson});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).upsertContacts(String(inputs.credentialName ?? ""), String(inputs.contactsJson ?? ""), String(inputs.listIdsJson ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.upsertContacts(${inputs.credentialName}, ${inputs.contactsJson}, ${inputs.listIdsJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, jobId: `${v}.jobId`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -232,13 +261,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, contact: emptyContact, error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridGetContactByEmail(${inputs.credentialName}, ${inputs.email});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).getContactByEmail(String(inputs.credentialName ?? ""), String(inputs.email ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, contact: result.success ? result.contact : emptyContact, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.getContactByEmail(${inputs.credentialName}, ${inputs.email});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, contact: `${v}.contact`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -258,13 +290,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, jobId: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridDeleteContacts(${inputs.credentialName}, ${inputs.contactIdsJson}, ${inputs.deleteAll});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).deleteContacts(String(inputs.credentialName ?? ""), String(inputs.contactIdsJson ?? ""), Boolean(inputs.deleteAll));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.deleteContacts(${inputs.credentialName}, ${inputs.contactIdsJson}, ${inputs.deleteAll});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, jobId: `${v}.jobId`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -284,13 +319,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, listId: "", listName: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridCreateList(${inputs.credentialName}, ${inputs.name});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).createList(String(inputs.credentialName ?? ""), String(inputs.name ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, listId: result.listId, listName: result.name, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.createList(${inputs.credentialName}, ${inputs.name});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, listId: `${v}.listId`, listName: `${v}.name`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -308,13 +346,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, lists: [], error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridListContactLists(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).listContactLists(String(inputs.credentialName ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.listContactLists(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, lists: `${v}.lists`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -332,13 +373,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridDeleteList(${inputs.credentialName}, ${inputs.listId});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).deleteList(String(inputs.credentialName ?? ""), String(inputs.listId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.deleteList(${inputs.credentialName}, ${inputs.listId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -358,13 +402,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, bounces: [], error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridGetBounces(${inputs.credentialName}, ${inputs.startTime}, ${inputs.endTime});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).getBounces(String(inputs.credentialName ?? ""), Number(inputs.startTime) || 0, Number(inputs.endTime) || 0);
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.getBounces(${inputs.credentialName}, ${inputs.startTime}, ${inputs.endTime});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, bounces: `${v}.bounces`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -383,13 +430,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridDeleteBounce(${inputs.credentialName}, ${inputs.email}, ${inputs.deleteAll});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).deleteBounce(String(inputs.credentialName ?? ""), String(inputs.email ?? ""), Boolean(inputs.deleteAll));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.deleteBounce(${inputs.credentialName}, ${inputs.email}, ${inputs.deleteAll});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -407,13 +457,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, spamReports: [], error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridGetSpamReports(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).getSpamReports(String(inputs.credentialName ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.getSpamReports(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, spamReports: `${v}.spamReports`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -431,13 +484,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, unsubscribes: [], error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridGetGlobalUnsubscribes(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).getGlobalUnsubscribes(String(inputs.credentialName ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.getGlobalUnsubscribes(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, unsubscribes: `${v}.unsubscribes`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -457,13 +513,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, stats: [], error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridGetEmailStats(${inputs.credentialName}, ${inputs.startDate}, ${inputs.endDate});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).getEmailStats(String(inputs.credentialName ?? ""), String(inputs.startDate ?? ""), String(inputs.endDate ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.getEmailStats(${inputs.credentialName}, ${inputs.startDate}, ${inputs.endDate});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, stats: `${v}.stats`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -481,11 +540,14 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, senders: [], error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySendGrid.sendGridGetVerifiedSenders(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSendGridManager()).getVerifiedSenders(String(inputs.credentialName ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SendGridManager.getVerifiedSenders(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, senders: `${v}.senders`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SENDGRID_IMPORT],
+  compileImports: [SENDGRID_MANAGER_IMPORT],
 });

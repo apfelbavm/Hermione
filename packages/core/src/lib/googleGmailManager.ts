@@ -1,5 +1,7 @@
 import { google, type gmail_v1 } from "googleapis";
 import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager.ts";
+import { getDatabaseManager } from "../server/DatabaseManager.ts";
+import { resolveAllCredentials } from "../server/vaultCredentials.ts";
 import type { GoogleServiceAccountCredentialData, GoogleOAuth2CredentialData } from "@hermione/shared/types";
 
 /** Every Gmail node (list/get/send/trash messages, list/create labels, modify labels) needs the
@@ -48,6 +50,8 @@ export interface GoogleGmailLabelResult extends GoogleGmailOpResult {
   id: string;
 }
 
+type ResolvedGoogleCredential = { kind: "serviceAccount"; data: GoogleServiceAccountCredentialData } | { kind: "oauth2"; data: GoogleOAuth2CredentialData };
+
 function headerValue(headers: gmail_v1.Schema$MessagePartHeader[] | undefined, name: string): string {
   return headers?.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
 }
@@ -81,7 +85,7 @@ export class GoogleGmailManager {
     this.client = google.gmail({ version: "v1", auth });
   }
 
-  static forServiceAccount(data: GoogleServiceAccountCredentialData): GoogleGmailManager {
+  private static forServiceAccount(data: GoogleServiceAccountCredentialData): GoogleGmailManager {
     const key = `sa:${data.serviceAccountKeyJson}:${data.impersonateUser}`;
     let manager = managerCache.get(key);
     if (!manager) {
@@ -91,7 +95,7 @@ export class GoogleGmailManager {
     return manager;
   }
 
-  static forOAuth2(data: GoogleOAuth2CredentialData): GoogleGmailManager {
+  private static forOAuth2(data: GoogleOAuth2CredentialData): GoogleGmailManager {
     const key = `oauth2:${data.clientId}:${data.refreshToken}`;
     let manager = managerCache.get(key);
     if (!manager) {
@@ -101,7 +105,63 @@ export class GoogleGmailManager {
     return manager;
   }
 
-  async listMessages(query: string, maxResults: number): Promise<GoogleGmailListMessagesResult> {
+  private static getInstance(resolved: ResolvedGoogleCredential): GoogleGmailManager {
+    return resolved.kind === "serviceAccount" ? GoogleGmailManager.forServiceAccount(resolved.data) : GoogleGmailManager.forOAuth2(resolved.data);
+  }
+
+  /** Looks up a named Credential Vault entry and accepts either a Google Service Account or a
+   * Google OAuth2 credential — Gmail works fine under either auth flow. */
+  private static async findCredential(credentialName: string): Promise<{ ok: true; resolved: ResolvedGoogleCredential } | { ok: false; error: string }> {
+    const credRecord = (await resolveAllCredentials(getDatabaseManager())).get(credentialName);
+    if (!credRecord) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
+    if (credRecord.type === "googleServiceAccount") return { ok: true, resolved: { kind: "serviceAccount", data: credRecord.data as GoogleServiceAccountCredentialData } };
+    if (credRecord.type === "googleOAuth2") return { ok: true, resolved: { kind: "oauth2", data: credRecord.data as GoogleOAuth2CredentialData } };
+    return { ok: false, error: `Credential "${credentialName}" is not a Google Service Account or Google OAuth2 credential` };
+  }
+
+  static async listMessages(credentialName: string, query: string, maxResults: number): Promise<GoogleGmailListMessagesResult> {
+    const cred = await GoogleGmailManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, messages: [], error: cred.error };
+    return GoogleGmailManager.getInstance(cred.resolved).listMessages(query, maxResults);
+  }
+
+  static async getMessage(credentialName: string, messageId: string): Promise<GoogleGmailMessageResult> {
+    const cred = await GoogleGmailManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, body: "", error: cred.error };
+    return GoogleGmailManager.getInstance(cred.resolved).getMessage(messageId);
+  }
+
+  static async sendMessage(credentialName: string, to: string, subject: string, body: string): Promise<GoogleGmailSendResult> {
+    const cred = await GoogleGmailManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, id: "", error: cred.error };
+    return GoogleGmailManager.getInstance(cred.resolved).sendMessage(to, subject, body);
+  }
+
+  static async trashMessage(credentialName: string, messageId: string): Promise<GoogleGmailOpResult> {
+    const cred = await GoogleGmailManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleGmailManager.getInstance(cred.resolved).trashMessage(messageId);
+  }
+
+  static async listLabels(credentialName: string): Promise<GoogleGmailListLabelsResult> {
+    const cred = await GoogleGmailManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, labels: [], error: cred.error };
+    return GoogleGmailManager.getInstance(cred.resolved).listLabels();
+  }
+
+  static async createLabel(credentialName: string, name: string): Promise<GoogleGmailLabelResult> {
+    const cred = await GoogleGmailManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, id: "", error: cred.error };
+    return GoogleGmailManager.getInstance(cred.resolved).createLabel(name);
+  }
+
+  static async modifyMessageLabels(credentialName: string, messageId: string, addLabelIds: string[], removeLabelIds: string[]): Promise<GoogleGmailOpResult> {
+    const cred = await GoogleGmailManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleGmailManager.getInstance(cred.resolved).modifyMessageLabels(messageId, addLabelIds, removeLabelIds);
+  }
+
+  private async listMessages(query: string, maxResults: number): Promise<GoogleGmailListMessagesResult> {
     try {
       const list = await this.client.users.messages.list({ userId: "me", q: query || undefined, maxResults });
       const messages: GoogleGmailMessage[] = [];
@@ -121,7 +181,7 @@ export class GoogleGmailManager {
     }
   }
 
-  async getMessage(messageId: string): Promise<GoogleGmailMessageResult> {
+  private async getMessage(messageId: string): Promise<GoogleGmailMessageResult> {
     try {
       const res = await this.client.users.messages.get({ userId: "me", id: messageId, format: "full" });
       return {
@@ -139,7 +199,7 @@ export class GoogleGmailManager {
     }
   }
 
-  async sendMessage(to: string, subject: string, body: string): Promise<GoogleGmailSendResult> {
+  private async sendMessage(to: string, subject: string, body: string): Promise<GoogleGmailSendResult> {
     try {
       const res = await this.client.users.messages.send({
         userId: "me",
@@ -151,7 +211,7 @@ export class GoogleGmailManager {
     }
   }
 
-  async trashMessage(messageId: string): Promise<GoogleGmailOpResult> {
+  private async trashMessage(messageId: string): Promise<GoogleGmailOpResult> {
     try {
       await this.client.users.messages.trash({ userId: "me", id: messageId });
       return { success: true, error: "" };
@@ -160,7 +220,7 @@ export class GoogleGmailManager {
     }
   }
 
-  async listLabels(): Promise<GoogleGmailListLabelsResult> {
+  private async listLabels(): Promise<GoogleGmailListLabelsResult> {
     try {
       const res = await this.client.users.labels.list({ userId: "me" });
       const labels = (res.data.labels ?? []).map((l) => ({ id: l.id ?? "", name: l.name ?? "" }));
@@ -170,7 +230,7 @@ export class GoogleGmailManager {
     }
   }
 
-  async createLabel(name: string): Promise<GoogleGmailLabelResult> {
+  private async createLabel(name: string): Promise<GoogleGmailLabelResult> {
     try {
       const res = await this.client.users.labels.create({ userId: "me", requestBody: { name } });
       return { success: true, id: res.data.id ?? "", error: "" };
@@ -179,7 +239,7 @@ export class GoogleGmailManager {
     }
   }
 
-  async modifyMessageLabels(messageId: string, addLabelIds: string[], removeLabelIds: string[]): Promise<GoogleGmailOpResult> {
+  private async modifyMessageLabels(messageId: string, addLabelIds: string[], removeLabelIds: string[]): Promise<GoogleGmailOpResult> {
     try {
       await this.client.users.messages.modify({
         userId: "me",

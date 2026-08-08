@@ -1,60 +1,33 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_JIRA_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, JIRA_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { JIRA_ISSUE_STRUCT_TYPE, JIRA_COMMENT_STRUCT_TYPE, JIRA_TRANSITION_STRUCT_TYPE, JIRA_PROJECT_STRUCT_TYPE, JIRA_USER_STRUCT_TYPE } from "@hermione/graph/structs/jira";
 import { JIRA_VALIDATE_QUERY_ENUM_TYPE } from "@hermione/graph/enum/jira";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
-import { JiraManager, type JiraAuth } from "@hermione/core/lib/jiraManager";
-import type { JiraCloudApiTokenCredentialData, JiraServerPersonalAccessTokenCredentialData, JiraServerBasicAuthCredentialData } from "@hermione/shared/types";
 import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over JiraManager (src/lib/jiraManager.ts), which
-// owns the actual jira.js SDK calls and error normalization — this file only ever translates pins
-// to method arguments and method results back to pins.
+// owns the actual jira.js SDK calls, credential resolution, and error normalization — this file
+// only ever translates pins to method arguments and method results back to pins.
 //
 // Jira Cloud and Jira Server/Data Center share this single node group rather than being split into
 // two: every operation here (issues, comments, transitions, worklogs, projects, users) behaves
 // identically on both REST APIs once JiraManager has picked the right client/auth for the
 // credential — see the comment atop jiraManager.ts for the full reasoning.
 //
-// Every node here also has a compileExecute: the compiled path calls a same-named
-// `functionLibraryJira.jira*` wrapper (see server/functionLibraryJira.ts), which reads the
-// credential back from environment variables via `jiraCredentialFromEnv` instead of the vault —
-// same split as oauth2Saml.ts's execute()/compileExecute().
+// Both execute() and compileExecute() call the exact same JiraManager static method — JiraManager
+// resolves the named credential straight from the database itself, so there is no separate
+// functionLibraryJira.ts env-var-reading layer and no ctx.getCredential vault lookup here.
 const GROUP_NAME = "Request.Jira";
 
-/** Shared by every Jira node — looks up a named Credential Vault entry and turns whichever Jira
- * credential type it is (Cloud API token, Server PAT, Server Basic) into the JiraAuth shape
- * JiraManager's constructor expects. */
-function resolveJiraCredential(ctx: ExecutionContext, credentialName: string): { ok: true; auth: JiraAuth } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential)
-    return {
-      ok: false,
-      error: `Credential "${credentialName}" not found in the vault`,
-    };
-  if (credential.type === "jiraCloudApiToken") {
-    const data = credential.data as JiraCloudApiTokenCredentialData;
-    return { ok: true, auth: { kind: "cloud", url: data.url, email: data.email, apiToken: data.apiToken } };
-  }
-  if (credential.type === "jiraServerPersonalAccessToken") {
-    const data = credential.data as JiraServerPersonalAccessTokenCredentialData;
-    return { ok: true, auth: { kind: "serverPat", url: data.url, personalAccessToken: data.personalAccessToken } };
-  }
-  if (credential.type === "jiraServerBasicAuth") {
-    const data = credential.data as JiraServerBasicAuthCredentialData;
-    return { ok: true, auth: { kind: "serverBasic", url: data.url, username: data.username, password: data.password } };
-  }
-  return {
-    ok: false,
-    error: `Credential "${credentialName}" is not a Jira Cloud or Jira Server/Data Center credential`,
-  };
+// JiraManager pulls in better-sqlite3/Node builtins for its DB-backed credential resolution — fine
+// server-side, but this file is also statically imported client-side (node-creation menu), so a
+// plain top-level import would drag that chain into the browser bundle. Loaded with a runtime
+// `import()` instead, ignored by both bundlers, same as nodes/twilio.ts's loadTwilioManager.
+async function loadJiraManager(): Promise<typeof import("@hermione/core/lib/jiraManager").JiraManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/jiraManager");
+  return mod.JiraManager;
 }
-
-const emptyIssue = { id: "", key: "", summary: "", status: "", issueType: "", url: "" };
-const emptyProject = { id: "", key: "", name: "" };
-const emptyUser = { accountId: "", username: "", displayName: "", emailAddress: "" };
 
 function credentialNamePin() {
   return {
@@ -106,19 +79,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", key: "", url: "", error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.createIssue(String(inputs.projectKey ?? ""), String(inputs.issueType ?? ""), String(inputs.summary ?? ""), String(inputs.description ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).createIssue(String(inputs.credentialName ?? ""), String(inputs.projectKey ?? ""), String(inputs.issueType ?? ""), String(inputs.summary ?? ""), String(inputs.description ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraCreateIssue(${inputs.credentialName}, ${inputs.projectKey}, ${inputs.issueType}, ${inputs.summary}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.createIssue(${inputs.credentialName}, ${inputs.projectKey}, ${inputs.issueType}, ${inputs.summary}, ${inputs.description});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, key: `${v}.key`, url: `${v}.url`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -129,19 +99,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), issueKeyPin(), execInOutPins().execOut, execInOutPins().success, { id: "issue", label: i18n.nodes.jira.getIssue.pin_issue, type: "struct", subType: JIRA_ISSUE_STRUCT_TYPE, direction: "output" }, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, issue: emptyIssue, error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.getIssue(String(inputs.issueKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).getIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraGetIssue(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.getIssue(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, issue: `${v}.issue`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -161,19 +128,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.updateIssue(String(inputs.issueKey ?? ""), String(inputs.summary ?? ""), String(inputs.description ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).updateIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.summary ?? ""), String(inputs.description ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraUpdateIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.summary}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.updateIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.summary}, ${inputs.description});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -184,19 +148,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), issueKeyPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.deleteIssue(String(inputs.issueKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).deleteIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraDeleteIssue(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.deleteIssue(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -218,19 +179,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, issues: [], total: 0, error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.searchIssues(String(inputs.jql ?? ""), Number(inputs.maxResults ?? 50), (inputs.validateQuery as "strict" | "warn" | "none") ?? "warn");
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).searchIssues(String(inputs.credentialName ?? ""), String(inputs.jql ?? ""), Number(inputs.maxResults ?? 50), (inputs.validateQuery as "strict" | "warn" | "none") ?? "warn");
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraSearchIssues(${inputs.credentialName}, ${inputs.jql}, ${inputs.maxResults}, ${inputs.validateQuery});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.searchIssues(${inputs.credentialName}, ${inputs.jql}, ${inputs.maxResults}, ${inputs.validateQuery});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, issues: `${v}.issues`, total: `${v}.total`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -250,19 +208,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.addComment(String(inputs.issueKey ?? ""), String(inputs.body ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).addComment(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.body ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraAddComment(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.addComment(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.body});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -281,19 +236,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, comments: [], error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.listComments(String(inputs.issueKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).listComments(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraListComments(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.listComments(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, comments: `${v}.comments`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -312,19 +264,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, transitions: [], error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.listTransitions(String(inputs.issueKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).listTransitions(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraListTransitions(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.listTransitions(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, transitions: `${v}.transitions`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -335,19 +284,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), issueKeyPin(), { id: "transitionId", label: i18n.nodes.jira.transitionIssue.pin_transition_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.transitionIssue(String(inputs.issueKey ?? ""), String(inputs.transitionId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).transitionIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.transitionId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraTransitionIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.transitionId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.transitionIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.transitionId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -358,19 +304,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), issueKeyPin(), { id: "assignee", label: i18n.nodes.jira.assignIssue.pin_assignee, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.assignIssue(String(inputs.issueKey ?? ""), String(inputs.assignee ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).assignIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.assignee ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraAssignIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.assignee});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.assignIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.assignee});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -381,19 +324,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), execInOutPins().execOut, execInOutPins().success, { id: "projects", label: i18n.nodes.jira.listProjects.pin_projects, type: "struct", subType: JIRA_PROJECT_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, projects: [], error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.listProjects();
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).listProjects(String(inputs.credentialName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraListProjects(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.listProjects(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, projects: `${v}.projects`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -412,19 +352,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, project: emptyProject, error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.getProject(String(inputs.projectKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).getProject(String(inputs.credentialName ?? ""), String(inputs.projectKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraGetProject(${inputs.credentialName}, ${inputs.projectKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.getProject(${inputs.credentialName}, ${inputs.projectKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, project: `${v}.project`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -445,19 +382,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.addWorklog(String(inputs.issueKey ?? ""), String(inputs.timeSpent ?? ""), String(inputs.comment ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).addWorklog(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.timeSpent ?? ""), String(inputs.comment ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraAddWorklog(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.timeSpent}, ${inputs.comment});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.addWorklog(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.timeSpent}, ${inputs.comment});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -477,19 +411,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.linkIssues(String(inputs.inwardIssueKey ?? ""), String(inputs.outwardIssueKey ?? ""), String(inputs.linkType ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).linkIssues(String(inputs.credentialName ?? ""), String(inputs.inwardIssueKey ?? ""), String(inputs.outwardIssueKey ?? ""), String(inputs.linkType ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraLinkIssues(${inputs.credentialName}, ${inputs.inwardIssueKey}, ${inputs.outwardIssueKey}, ${inputs.linkType});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.linkIssues(${inputs.credentialName}, ${inputs.inwardIssueKey}, ${inputs.outwardIssueKey}, ${inputs.linkType});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -509,19 +440,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, user: emptyUser, error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.getUser(String(inputs.accountId ?? ""), String(inputs.username ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).getUser(String(inputs.credentialName ?? ""), String(inputs.accountId ?? ""), String(inputs.username ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraGetUser(${inputs.credentialName}, ${inputs.accountId}, ${inputs.username});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.getUser(${inputs.credentialName}, ${inputs.accountId}, ${inputs.username});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, user: `${v}.user`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -541,17 +469,14 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveJiraCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, users: [], error: resolved.error } };
-    const manager = JiraManager.forAuth(resolved.auth);
-    const result = await manager.findUsers(String(inputs.query ?? ""), Number(inputs.maxResults ?? 50));
+  execute: async ({ inputs }) => {
+    const result = await (await loadJiraManager()).findUsers(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), Number(inputs.maxResults ?? 50));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryJira.jiraFindUsers(${inputs.credentialName}, ${inputs.query}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.findUsers(${inputs.credentialName}, ${inputs.query}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, users: `${v}.users`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_JIRA_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT],
 });

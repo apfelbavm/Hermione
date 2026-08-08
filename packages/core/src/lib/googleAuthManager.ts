@@ -1,4 +1,6 @@
 import { google, type Auth } from "googleapis";
+import { getDatabaseManager } from "../server/DatabaseManager.ts";
+import { resolveAllCredentials } from "../server/vaultCredentials.ts";
 import type { GoogleServiceAccountCredentialData, GoogleOAuth2CredentialData } from "@hermione/shared/types";
 
 /** Every Google node (Drive, Sheets, Docs, Gmail, Calendar, Admin SDK) needs the same boilerplate:
@@ -91,4 +93,16 @@ export async function exchangeAuthCode(authCode: string, clientId: string, clien
   } catch (err) {
     return { success: false, accessToken: "", refreshToken: "", expiresIn: 0, error: googleErrorMessage(err) };
   }
+}
+
+/** One-time setup step's credentialName-taking entry point: looks up the named vault entry itself
+ * (only accepting a Google OAuth2 credential), then exchanges its staging authCode field for a
+ * refresh token via exchangeAuthCode above. Mirrors dropboxManager.ts's authorize/
+ * DropboxManager.authorize exactly. */
+export async function authorize(credentialName: string): Promise<GoogleTokenResult> {
+  const credRecord = (await resolveAllCredentials(getDatabaseManager())).get(credentialName);
+  if (!credRecord) return { success: false, accessToken: "", refreshToken: "", expiresIn: 0, error: `Credential "${credentialName}" not found in the vault` };
+  if (credRecord.type !== "googleOAuth2") return { success: false, accessToken: "", refreshToken: "", expiresIn: 0, error: `Credential "${credentialName}" is not a Google OAuth2 credential` };
+  const data = credRecord.data as GoogleOAuth2CredentialData;
+  return exchangeAuthCode(data.authCode, data.clientId, data.clientSecret, data.redirectUri);
 }

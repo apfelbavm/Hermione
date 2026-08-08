@@ -18,16 +18,17 @@ export interface SmtpAuth {
   password: string;
 }
 
-export interface SmtpSendMailResult {
+export interface SmtpOpResult {
   success: boolean;
   error: string;
+  [key: string]: unknown;
+}
+
+export interface SmtpSendMailResult extends SmtpOpResult {
   messageId: string;
 }
 
-export interface SmtpVerifyResult {
-  success: boolean;
-  error: string;
-}
+export type SmtpVerifyResult = SmtpOpResult;
 
 const managerCache = new Map<string, SmtpManager>();
 

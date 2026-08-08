@@ -1,16 +1,25 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_DROPBOX_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, DROPBOX_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { AUTH_TOKENS_STRUCT_TYPE, METADATA_STRUCT_TYPE, REVISION_STRUCT_TYPE, ACCOUNT_STRUCT_TYPE, SPACE_USAGE_STRUCT_TYPE } from "@hermione/graph/structs/dropbox";
 import { DROPBOX_WRITE_MODE_ENUM_TYPE, DROPBOX_ACCESS_LEVEL_ENUM_TYPE } from "@hermione/graph/enum/dropbox";
 import { TEXT_ENCODING_ENUM_TYPE } from "@hermione/graph/enum/common";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
-import { DropboxManager } from "@hermione/core/lib/dropboxManager";
-import type { DropboxOAuth2CredentialData } from "@hermione/shared/types";
 import { i18n } from "@i18n";
 
 const GROUP_NAME = "Request.Dropbox";
+
+// Every op below, including dropbox.authorize, delegates straight to the matching DropboxManager
+// static method (packages/core/src/lib/dropboxManager.ts), which resolves the named credential
+// from the vault database itself — no ctx.getCredential lookup or functionLibraryDropbox
+// env-reading layer needed here (see DropboxManager's own findCredential/authorize). DropboxManager
+// pulls in better-sqlite3/Node builtins via that DB access, which is fine server-side but not for
+// this file's client-side (node-menu) bundle, so it's loaded with a runtime `import()` that both
+// bundlers are told to ignore, same as loadTwilioManager/loadFacebookManager.
+async function loadDropboxManager(): Promise<typeof import("@hermione/core/lib/dropboxManager").DropboxManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/dropboxManager");
+  return mod.DropboxManager;
+}
 
 function credentialNamePin() {
   return {
@@ -20,21 +29,6 @@ function credentialNamePin() {
     direction: "input" as const,
     defaultValue: "",
   };
-}
-
-function resolveDropboxCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: DropboxOAuth2CredentialData } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential)
-    return {
-      ok: false,
-      error: `Credential "${credentialName}" not found in the vault`,
-    };
-  if (credential.type !== "dropboxOAuth2")
-    return {
-      ok: false,
-      error: `Credential "${credentialName}" is not a Dropbox OAuth2 credential`,
-    };
-  return { ok: true, data: credential.data as DropboxOAuth2CredentialData };
 }
 
 registerNode({
@@ -52,19 +46,8 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          tokens: { accessToken: "", refreshToken: "", expiresIn: 0 },
-          error: resolved.error,
-        },
-      };
-    }
-    const result = await DropboxManager.exchangeAuthCode(resolved.data.authCode, resolved.data.appKey, resolved.data.appSecret);
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).authorize(String(inputs.credentialName ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -78,12 +61,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxAuthorize(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.authorize(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, tokens: `{ accessToken: ${v}.accessToken, refreshToken: ${v}.refreshToken, expiresIn: ${v}.expiresIn }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -105,23 +88,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.upload(String(inputs.path ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", inputs.mode === "overwrite" ? "overwrite" : "add", Boolean(inputs.autorename));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).upload(String(inputs.credentialName ?? ""), String(inputs.path ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", inputs.mode === "overwrite" ? "overwrite" : "add", Boolean(inputs.autorename));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxUpload(${inputs.credentialName}, ${inputs.path}, ${inputs.content}, ${inputs.encoding}, ${inputs.mode}, ${inputs.autorename});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.upload(${inputs.credentialName}, ${inputs.path}, ${inputs.content}, ${inputs.encoding}, ${inputs.mode}, ${inputs.autorename});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -141,23 +117,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.download(String(inputs.path ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).download(String(inputs.credentialName ?? ""), String(inputs.path ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxDownload(${inputs.credentialName}, ${inputs.path}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.download(${inputs.credentialName}, ${inputs.path}, ${inputs.encoding});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, content: `${v}.content`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -177,23 +146,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.listFolders(String(inputs.path ?? ""), Boolean(inputs.recursive));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).listFolders(String(inputs.credentialName ?? ""), String(inputs.path ?? ""), Boolean(inputs.recursive));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxListFolders(${inputs.credentialName}, ${inputs.path}, ${inputs.recursive});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.listFolders(${inputs.credentialName}, ${inputs.path}, ${inputs.recursive});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, folders: `${v}.folders`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 function registerRelocationNode(type: "move" | "copy" | "rename") {
@@ -214,26 +176,20 @@ function registerRelocationNode(type: "move" | "copy" | "rename") {
       { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
     ],
     latent: true,
-    execute: async ({ inputs, ctx }) => {
-      const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-      if (!resolved.ok)
-        return {
-          nextExec: "exec-out",
-          outputs: { success: false, error: resolved.error },
-        };
-      const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-      const result = await manager[type](String(inputs.fromPath ?? ""), String(inputs.toPath ?? ""), Boolean(inputs.autorename));
+    execute: async ({ inputs }) => {
+      const manager = await loadDropboxManager();
+      const result = await manager[type](String(inputs.credentialName ?? ""), String(inputs.fromPath ?? ""), String(inputs.toPath ?? ""), Boolean(inputs.autorename));
       return { nextExec: "exec-out", outputs: result };
     },
     compileExecute: ({ node, inputs, compileFrom }) => {
-      const fn = type === "move" ? "dropboxMove" : type === "copy" ? "dropboxCopy" : "dropboxRename";
-      return [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.${fn}(${inputs.credentialName}, ${inputs.fromPath}, ${inputs.toPath}, ${inputs.autorename});`, ...compileFrom("exec-out")];
+      const fn = type === "move" ? "move" : type === "copy" ? "copy" : "rename";
+      return [`const ${compileResultVar(node.id)} = await DropboxManager.${fn}(${inputs.credentialName}, ${inputs.fromPath}, ${inputs.toPath}, ${inputs.autorename});`, ...compileFrom("exec-out")];
     },
     compileExecuteOutputs: ({ node }) => {
       const v = compileResultVar(node.id);
       return { success: `${v}.success`, error: `${v}.error` };
     },
-    compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+    compileImports: [DROPBOX_MANAGER_IMPORT],
   });
 }
 
@@ -256,23 +212,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.delete(String(inputs.path ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).delete(String(inputs.credentialName ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxDelete(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.delete(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -291,23 +240,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.createFolder(String(inputs.path ?? ""), Boolean(inputs.autorename));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).createFolder(String(inputs.credentialName ?? ""), String(inputs.path ?? ""), Boolean(inputs.autorename));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxCreateFolder(${inputs.credentialName}, ${inputs.path}, ${inputs.autorename});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.createFolder(${inputs.credentialName}, ${inputs.path}, ${inputs.autorename});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -326,24 +268,8 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          metadata: {
-            isFolder: false,
-            size: 0,
-            contentHash: "",
-            serverModified: "",
-          },
-          error: resolved.error,
-        },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.getMetadata(String(inputs.path ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).getMetadata(String(inputs.credentialName ?? ""), String(inputs.path ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -358,12 +284,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxGetMetadata(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.getMetadata(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, metadata: `{ isFolder: ${v}.isFolder, size: ${v}.size, contentHash: ${v}.contentHash, serverModified: ${v}.serverModified }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -384,23 +310,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.search(String(inputs.query ?? ""), String(inputs.path ?? ""), Number(inputs.maxResults ?? 100));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).search(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), String(inputs.path ?? ""), Number(inputs.maxResults ?? 100));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxSearch(${inputs.credentialName}, ${inputs.query}, ${inputs.path}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.search(${inputs.credentialName}, ${inputs.query}, ${inputs.path}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, paths: `${v}.paths`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -420,23 +339,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.listRevisions(String(inputs.path ?? ""), Number(inputs.limit ?? 10));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).listRevisions(String(inputs.credentialName ?? ""), String(inputs.path ?? ""), Number(inputs.limit ?? 10));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxListRevisions(${inputs.credentialName}, ${inputs.path}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.listRevisions(${inputs.credentialName}, ${inputs.path}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, revisions: `${v}.revisions`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -455,23 +367,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.restore(String(inputs.path ?? ""), String(inputs.rev ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).restore(String(inputs.credentialName ?? ""), String(inputs.path ?? ""), String(inputs.rev ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxRestore(${inputs.credentialName}, ${inputs.path}, ${inputs.rev});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.restore(${inputs.credentialName}, ${inputs.path}, ${inputs.rev});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -489,23 +394,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.permanentlyDelete(String(inputs.path ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).permanentlyDelete(String(inputs.credentialName ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxPermanentlyDelete(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.permanentlyDelete(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -524,23 +422,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.getTemporaryLink(String(inputs.path ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).getTemporaryLink(String(inputs.credentialName ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxGetTemporaryLink(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.getTemporaryLink(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, link: `${v}.link`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -560,23 +451,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.getTemporaryUploadLink(String(inputs.path ?? ""), Number(inputs.durationSeconds ?? 14400));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).getTemporaryUploadLink(String(inputs.credentialName ?? ""), String(inputs.path ?? ""), Number(inputs.durationSeconds ?? 14400));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxGetTemporaryUploadLink(${inputs.credentialName}, ${inputs.path}, ${inputs.durationSeconds});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.getTemporaryUploadLink(${inputs.credentialName}, ${inputs.path}, ${inputs.durationSeconds});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, link: `${v}.link`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 function registerRelocationBatchNode(type: "moveBatch" | "copyBatch") {
@@ -597,26 +481,17 @@ function registerRelocationBatchNode(type: "moveBatch" | "copyBatch") {
       { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
     ],
     latent: true,
-    execute: async ({ inputs, ctx }) => {
-      const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-      if (!resolved.ok)
-        return {
-          nextExec: "exec-out",
-          outputs: { success: false, error: resolved.error },
-        };
-      const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-      const result = await manager[type]((inputs.fromPaths as string[]) ?? [], (inputs.toPaths as string[]) ?? [], Boolean(inputs.autorename));
+    execute: async ({ inputs }) => {
+      const manager = await loadDropboxManager();
+      const result = await manager[type](String(inputs.credentialName ?? ""), (inputs.fromPaths as string[]) ?? [], (inputs.toPaths as string[]) ?? [], Boolean(inputs.autorename));
       return { nextExec: "exec-out", outputs: result };
     },
-    compileExecute: ({ node, inputs, compileFrom }) => {
-      const fn = type === "moveBatch" ? "dropboxMoveBatch" : "dropboxCopyBatch";
-      return [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.${fn}(${inputs.credentialName}, ${inputs.fromPaths}, ${inputs.toPaths}, ${inputs.autorename});`, ...compileFrom("exec-out")];
-    },
+    compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.${type}(${inputs.credentialName}, ${inputs.fromPaths}, ${inputs.toPaths}, ${inputs.autorename});`, ...compileFrom("exec-out")],
     compileExecuteOutputs: ({ node }) => {
       const v = compileResultVar(node.id);
       return { success: `${v}.success`, error: `${v}.error` };
     },
-    compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+    compileImports: [DROPBOX_MANAGER_IMPORT],
   });
 }
 
@@ -638,23 +513,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.deleteBatch((inputs.paths as string[]) ?? []);
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).deleteBatch(String(inputs.credentialName ?? ""), (inputs.paths as string[]) ?? []);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxDeleteBatch(${inputs.credentialName}, ${inputs.paths});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.deleteBatch(${inputs.credentialName}, ${inputs.paths});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -673,23 +541,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.createSharedLink(String(inputs.path ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).createSharedLink(String(inputs.credentialName ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxCreateSharedLink(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.createSharedLink(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, link: `${v}.link`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -708,23 +569,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.listSharedLinks(String(inputs.path ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).listSharedLinks(String(inputs.credentialName ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxListSharedLinks(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.listSharedLinks(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, urls: `${v}.urls`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -743,23 +597,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.shareFolder(String(inputs.path ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).shareFolder(String(inputs.credentialName ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxShareFolder(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.shareFolder(${inputs.credentialName}, ${inputs.path});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, sharedFolderId: `${v}.sharedFolderId`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -779,23 +626,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.addFolderMember(String(inputs.sharedFolderId ?? ""), String(inputs.email ?? ""), String(inputs.accessLevel ?? "editor"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).addFolderMember(String(inputs.credentialName ?? ""), String(inputs.sharedFolderId ?? ""), String(inputs.email ?? ""), String(inputs.accessLevel ?? "editor"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxAddFolderMember(${inputs.credentialName}, ${inputs.sharedFolderId}, ${inputs.email}, ${inputs.accessLevel});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.addFolderMember(${inputs.credentialName}, ${inputs.sharedFolderId}, ${inputs.email}, ${inputs.accessLevel});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -813,19 +653,8 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          account: { accountId: "", name: "", email: "" },
-          error: resolved.error,
-        },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.getCurrentAccount();
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).getCurrentAccount(String(inputs.credentialName ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -839,12 +668,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxGetCurrentAccount(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.getCurrentAccount(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, account: `{ accountId: ${v}.accountId, name: ${v}.name, email: ${v}.email }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -862,19 +691,8 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveDropboxCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          spaceUsage: { used: 0, allocated: 0 },
-          error: resolved.error,
-        },
-      };
-    const manager = DropboxManager.forCredential(resolved.data.appKey, resolved.data.appSecret, resolved.data.refreshToken);
-    const result = await manager.getSpaceUsage();
+  execute: async ({ inputs }) => {
+    const result = await (await loadDropboxManager()).getSpaceUsage(String(inputs.credentialName ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -884,10 +702,10 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDropbox.dropboxGetSpaceUsage(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DropboxManager.getSpaceUsage(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, spaceUsage: `{ used: ${v}.used, allocated: ${v}.allocated }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DROPBOX_IMPORT],
+  compileImports: [DROPBOX_MANAGER_IMPORT],
 });

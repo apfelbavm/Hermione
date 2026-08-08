@@ -1,4 +1,7 @@
 import { Version2, Version3 } from "jira.js";
+import { getDatabaseManager } from "../server/DatabaseManager.ts";
+import { resolveAllCredentials } from "../server/vaultCredentials.ts";
+import type { JiraCloudApiTokenCredentialData, JiraServerPersonalAccessTokenCredentialData, JiraServerBasicAuthCredentialData } from "@hermione/shared/types";
 
 type Version2Client = Version2.Version2Client;
 type Version3Client = Version3.Version3Client;
@@ -16,21 +19,6 @@ const { Version3Client } = Version3;
  * both REST APIs — only the auth mechanism and the user identifier (accountId vs username) differ,
  * and both of those are already abstracted away here. Splitting nodes per flavor would just
  * duplicate every node definition for no behavioral difference. */
-
-function jiraErrorMessage(err: unknown): string {
-  if (err && typeof err === "object" && "response" in err) {
-    const response = (err as { response?: { status?: number; data?: unknown } }).response;
-    const data = response?.data as { errorMessages?: string[]; errors?: Record<string, string>; message?: string } | undefined;
-    if (data?.errorMessages?.length) return data.errorMessages.join("; ");
-    if (data?.errors && Object.keys(data.errors).length > 0)
-      return Object.entries(data.errors)
-        .map(([field, message]) => `${field}: ${message}`)
-        .join("; ");
-    if (data?.message) return data.message;
-    if (response?.status) return `Jira API error (status ${response.status})`;
-  }
-  return err instanceof Error ? err.message : String(err);
-}
 
 export type JiraCloudAuth = { kind: "cloud"; url: string; email: string; apiToken: string };
 export type JiraServerPatAuth = { kind: "serverPat"; url: string; personalAccessToken: string };
@@ -139,8 +127,8 @@ export class JiraManager {
   private readonly serverClient?: Version2Client;
 
   /** Reuses one JiraManager (and its underlying jira.js client) per distinct auth instead of
-   * building a fresh one per node execution — same rationale as GithubManager.forAuth. */
-  static forAuth(auth: JiraAuth): JiraManager {
+   * building a fresh one per node execution — same rationale as TwilioManager.getInstance. */
+  static getInstance(auth: JiraAuth): JiraManager {
     const key = cacheKey(auth);
     let manager = managerCache.get(key);
     if (!manager) {
@@ -148,6 +136,138 @@ export class JiraManager {
       managerCache.set(key, manager);
     }
     return manager;
+  }
+
+  static errorMessage(err: unknown): string {
+    if (err && typeof err === "object" && "response" in err) {
+      const response = (err as { response?: { status?: number; data?: unknown } }).response;
+      const data = response?.data as { errorMessages?: string[]; errors?: Record<string, string>; message?: string } | undefined;
+      if (data?.errorMessages?.length) return data.errorMessages.join("; ");
+      if (data?.errors && Object.keys(data.errors).length > 0)
+        return Object.entries(data.errors)
+          .map(([field, message]) => `${field}: ${message}`)
+          .join("; ");
+      if (data?.message) return data.message;
+      if (response?.status) return `Jira API error (status ${response.status})`;
+    }
+    return err instanceof Error ? err.message : String(err);
+  }
+
+  /** Mirrors nodes/jira.ts's former ctx-based resolveJiraCredential and functionLibraryJira.ts's
+   * former env-based jiraCredentialFromEnv — same three credential-type ids, same field mapping,
+   * now resolved straight from the vault instead of duplicated per call site. */
+  private static async findCredential(credentialName: string): Promise<{ ok: true; auth: JiraAuth } | { ok: false; error: string }> {
+    const credRecord = (await resolveAllCredentials(getDatabaseManager())).get(credentialName);
+    if (!credRecord) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
+    if (credRecord.type === "jiraCloudApiToken") {
+      const data = credRecord.data as JiraCloudApiTokenCredentialData;
+      return { ok: true, auth: { kind: "cloud", url: data.url, email: data.email, apiToken: data.apiToken } };
+    }
+    if (credRecord.type === "jiraServerPersonalAccessToken") {
+      const data = credRecord.data as JiraServerPersonalAccessTokenCredentialData;
+      return { ok: true, auth: { kind: "serverPat", url: data.url, personalAccessToken: data.personalAccessToken } };
+    }
+    if (credRecord.type === "jiraServerBasicAuth") {
+      const data = credRecord.data as JiraServerBasicAuthCredentialData;
+      return { ok: true, auth: { kind: "serverBasic", url: data.url, username: data.username, password: data.password } };
+    }
+    return { ok: false, error: `Credential "${credentialName}" is not a Jira Cloud or Jira Server/Data Center credential` };
+  }
+
+  static async createIssue(credentialName: string, projectKey: string, issueTypeName: string, summary: string, description: string): Promise<JiraCreateResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, id: "", key: "", url: "", error: cred.error };
+    return JiraManager.getInstance(cred.auth).createIssue(projectKey, issueTypeName, summary, description);
+  }
+
+  static async getIssue(credentialName: string, issueIdOrKey: string): Promise<JiraGetIssueResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, issue: { id: "", key: "", summary: "", status: "", issueType: "", url: "" }, error: cred.error };
+    return JiraManager.getInstance(cred.auth).getIssue(issueIdOrKey);
+  }
+
+  static async updateIssue(credentialName: string, issueIdOrKey: string, summary: string, description: string): Promise<JiraOpResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return JiraManager.getInstance(cred.auth).updateIssue(issueIdOrKey, summary, description);
+  }
+
+  static async deleteIssue(credentialName: string, issueIdOrKey: string): Promise<JiraOpResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return JiraManager.getInstance(cred.auth).deleteIssue(issueIdOrKey);
+  }
+
+  static async searchIssues(credentialName: string, jql: string, maxResults: number, validateQuery: "strict" | "warn" | "none"): Promise<JiraSearchIssuesResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, issues: [], total: 0, error: cred.error };
+    return JiraManager.getInstance(cred.auth).searchIssues(jql, maxResults, validateQuery);
+  }
+
+  static async addComment(credentialName: string, issueIdOrKey: string, body: string): Promise<JiraAddCommentResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, id: "", error: cred.error };
+    return JiraManager.getInstance(cred.auth).addComment(issueIdOrKey, body);
+  }
+
+  static async listComments(credentialName: string, issueIdOrKey: string): Promise<JiraListCommentsResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, comments: [], error: cred.error };
+    return JiraManager.getInstance(cred.auth).listComments(issueIdOrKey);
+  }
+
+  static async listTransitions(credentialName: string, issueIdOrKey: string): Promise<JiraListTransitionsResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, transitions: [], error: cred.error };
+    return JiraManager.getInstance(cred.auth).listTransitions(issueIdOrKey);
+  }
+
+  static async transitionIssue(credentialName: string, issueIdOrKey: string, transitionId: string): Promise<JiraOpResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return JiraManager.getInstance(cred.auth).transitionIssue(issueIdOrKey, transitionId);
+  }
+
+  static async assignIssue(credentialName: string, issueIdOrKey: string, assignee: string): Promise<JiraOpResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return JiraManager.getInstance(cred.auth).assignIssue(issueIdOrKey, assignee);
+  }
+
+  static async listProjects(credentialName: string): Promise<JiraListProjectsResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, projects: [], error: cred.error };
+    return JiraManager.getInstance(cred.auth).listProjects();
+  }
+
+  static async getProject(credentialName: string, projectIdOrKey: string): Promise<JiraGetProjectResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, project: { id: "", key: "", name: "" }, error: cred.error };
+    return JiraManager.getInstance(cred.auth).getProject(projectIdOrKey);
+  }
+
+  static async addWorklog(credentialName: string, issueIdOrKey: string, timeSpent: string, comment: string): Promise<JiraAddWorklogResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, id: "", error: cred.error };
+    return JiraManager.getInstance(cred.auth).addWorklog(issueIdOrKey, timeSpent, comment);
+  }
+
+  static async linkIssues(credentialName: string, inwardIssueKey: string, outwardIssueKey: string, linkTypeName: string): Promise<JiraOpResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return JiraManager.getInstance(cred.auth).linkIssues(inwardIssueKey, outwardIssueKey, linkTypeName);
+  }
+
+  static async getUser(credentialName: string, accountId: string, username: string): Promise<JiraGetUserResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, user: { accountId: "", username: "", displayName: "", emailAddress: "" }, error: cred.error };
+    return JiraManager.getInstance(cred.auth).getUser(accountId, username);
+  }
+
+  static async findUsers(credentialName: string, query: string, maxResults: number): Promise<JiraFindUsersResult> {
+    const cred = await JiraManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, users: [], error: cred.error };
+    return JiraManager.getInstance(cred.auth).findUsers(query, maxResults);
   }
 
   constructor(auth: JiraAuth) {
@@ -205,7 +325,7 @@ export class JiraManager {
     };
   }
 
-  async createIssue(projectKey: string, issueTypeName: string, summary: string, description: string): Promise<JiraCreateResult> {
+  private async createIssue(projectKey: string, issueTypeName: string, summary: string, description: string): Promise<JiraCreateResult> {
     try {
       const res = await this.run(
         (client) => client.issues.createIssue({ fields: { project: { key: projectKey }, issuetype: { name: issueTypeName }, summary, description: this.richText(description) as never } }),
@@ -213,11 +333,11 @@ export class JiraManager {
       );
       return { success: true, id: res.id, key: res.key, url: `${this.baseUrl}/browse/${res.key}`, error: "" };
     } catch (err) {
-      return { success: false, id: "", key: "", url: "", error: jiraErrorMessage(err) };
+      return { success: false, id: "", key: "", url: "", error: JiraManager.errorMessage(err) };
     }
   }
 
-  async getIssue(issueIdOrKey: string): Promise<JiraGetIssueResult> {
+  private async getIssue(issueIdOrKey: string): Promise<JiraGetIssueResult> {
     try {
       const res = await this.run(
         (client) => client.issues.getIssue({ issueIdOrKey }),
@@ -225,11 +345,11 @@ export class JiraManager {
       );
       return { success: true, issue: this.toIssue(res), error: "" };
     } catch (err) {
-      return { success: false, issue: { id: "", key: "", summary: "", status: "", issueType: "", url: "" }, error: jiraErrorMessage(err) };
+      return { success: false, issue: { id: "", key: "", summary: "", status: "", issueType: "", url: "" }, error: JiraManager.errorMessage(err) };
     }
   }
 
-  async updateIssue(issueIdOrKey: string, summary: string, description: string): Promise<JiraOpResult> {
+  private async updateIssue(issueIdOrKey: string, summary: string, description: string): Promise<JiraOpResult> {
     try {
       const fields: Record<string, unknown> = {};
       if (summary) fields.summary = summary;
@@ -240,11 +360,11 @@ export class JiraManager {
       );
       return { success: true, error: "" };
     } catch (err) {
-      return { success: false, error: jiraErrorMessage(err) };
+      return { success: false, error: JiraManager.errorMessage(err) };
     }
   }
 
-  async deleteIssue(issueIdOrKey: string): Promise<JiraOpResult> {
+  private async deleteIssue(issueIdOrKey: string): Promise<JiraOpResult> {
     try {
       await this.run(
         (client) => client.issues.deleteIssue({ issueIdOrKey }),
@@ -252,11 +372,11 @@ export class JiraManager {
       );
       return { success: true, error: "" };
     } catch (err) {
-      return { success: false, error: jiraErrorMessage(err) };
+      return { success: false, error: JiraManager.errorMessage(err) };
     }
   }
 
-  async searchIssues(jql: string, maxResults: number, validateQuery: "strict" | "warn" | "none"): Promise<JiraSearchIssuesResult> {
+  private async searchIssues(jql: string, maxResults: number, validateQuery: "strict" | "warn" | "none"): Promise<JiraSearchIssuesResult> {
     try {
       const res = await this.run(
         (client) => client.issueSearch.searchForIssuesUsingJql({ jql, maxResults, validateQuery }),
@@ -265,11 +385,11 @@ export class JiraManager {
       const issues = (res.issues ?? []).map((issue) => this.toIssue(issue));
       return { success: true, issues, total: res.total ?? issues.length, error: "" };
     } catch (err) {
-      return { success: false, issues: [], total: 0, error: jiraErrorMessage(err) };
+      return { success: false, issues: [], total: 0, error: JiraManager.errorMessage(err) };
     }
   }
 
-  async addComment(issueIdOrKey: string, body: string): Promise<JiraAddCommentResult> {
+  private async addComment(issueIdOrKey: string, body: string): Promise<JiraAddCommentResult> {
     try {
       const res = await this.run(
         (client) => client.issueComments.addComment({ issueIdOrKey, comment: this.richText(body) as never }),
@@ -277,11 +397,11 @@ export class JiraManager {
       );
       return { success: true, id: res.id ?? "", error: "" };
     } catch (err) {
-      return { success: false, id: "", error: jiraErrorMessage(err) };
+      return { success: false, id: "", error: JiraManager.errorMessage(err) };
     }
   }
 
-  async listComments(issueIdOrKey: string): Promise<JiraListCommentsResult> {
+  private async listComments(issueIdOrKey: string): Promise<JiraListCommentsResult> {
     try {
       const res = await this.run(
         (client) => client.issueComments.getComments({ issueIdOrKey }),
@@ -295,11 +415,11 @@ export class JiraManager {
       }));
       return { success: true, comments, error: "" };
     } catch (err) {
-      return { success: false, comments: [], error: jiraErrorMessage(err) };
+      return { success: false, comments: [], error: JiraManager.errorMessage(err) };
     }
   }
 
-  async listTransitions(issueIdOrKey: string): Promise<JiraListTransitionsResult> {
+  private async listTransitions(issueIdOrKey: string): Promise<JiraListTransitionsResult> {
     try {
       const res = await this.run(
         (client) => client.issues.getTransitions({ issueIdOrKey }),
@@ -308,11 +428,11 @@ export class JiraManager {
       const transitions = (res.transitions ?? []).map((transition) => ({ id: transition.id ?? "", name: transition.name ?? "" }));
       return { success: true, transitions, error: "" };
     } catch (err) {
-      return { success: false, transitions: [], error: jiraErrorMessage(err) };
+      return { success: false, transitions: [], error: JiraManager.errorMessage(err) };
     }
   }
 
-  async transitionIssue(issueIdOrKey: string, transitionId: string): Promise<JiraOpResult> {
+  private async transitionIssue(issueIdOrKey: string, transitionId: string): Promise<JiraOpResult> {
     try {
       await this.run(
         (client) => client.issues.doTransition({ issueIdOrKey, transition: { id: transitionId } }),
@@ -320,13 +440,13 @@ export class JiraManager {
       );
       return { success: true, error: "" };
     } catch (err) {
-      return { success: false, error: jiraErrorMessage(err) };
+      return { success: false, error: JiraManager.errorMessage(err) };
     }
   }
 
   /** `assignee` is an accountId on Jira Cloud, a username on Jira Server/Data Center — pass
    * whichever identifier matches the credential's flavor. */
-  async assignIssue(issueIdOrKey: string, assignee: string): Promise<JiraOpResult> {
+  private async assignIssue(issueIdOrKey: string, assignee: string): Promise<JiraOpResult> {
     try {
       await this.run(
         (client) => client.issues.assignIssue({ issueIdOrKey, accountId: assignee }),
@@ -334,11 +454,11 @@ export class JiraManager {
       );
       return { success: true, error: "" };
     } catch (err) {
-      return { success: false, error: jiraErrorMessage(err) };
+      return { success: false, error: JiraManager.errorMessage(err) };
     }
   }
 
-  async listProjects(): Promise<JiraListProjectsResult> {
+  private async listProjects(): Promise<JiraListProjectsResult> {
     try {
       const res = await this.run(
         (client) => client.projects.searchProjects(),
@@ -347,11 +467,11 @@ export class JiraManager {
       const projects = (res.values ?? []).map((project) => ({ id: project.id ?? "", key: project.key ?? "", name: project.name ?? "" }));
       return { success: true, projects, error: "" };
     } catch (err) {
-      return { success: false, projects: [], error: jiraErrorMessage(err) };
+      return { success: false, projects: [], error: JiraManager.errorMessage(err) };
     }
   }
 
-  async getProject(projectIdOrKey: string): Promise<JiraGetProjectResult> {
+  private async getProject(projectIdOrKey: string): Promise<JiraGetProjectResult> {
     try {
       const res = await this.run(
         (client) => client.projects.getProject({ projectIdOrKey }),
@@ -359,11 +479,11 @@ export class JiraManager {
       );
       return { success: true, project: { id: res.id ?? "", key: res.key ?? "", name: res.name ?? "" }, error: "" };
     } catch (err) {
-      return { success: false, project: { id: "", key: "", name: "" }, error: jiraErrorMessage(err) };
+      return { success: false, project: { id: "", key: "", name: "" }, error: JiraManager.errorMessage(err) };
     }
   }
 
-  async addWorklog(issueIdOrKey: string, timeSpent: string, comment: string): Promise<JiraAddWorklogResult> {
+  private async addWorklog(issueIdOrKey: string, timeSpent: string, comment: string): Promise<JiraAddWorklogResult> {
     try {
       const res = await this.run(
         (client) => client.issueWorklogs.addWorklog({ issueIdOrKey, timeSpent, comment: comment ? (this.richText(comment) as never) : undefined }),
@@ -371,11 +491,11 @@ export class JiraManager {
       );
       return { success: true, id: res.id ?? "", error: "" };
     } catch (err) {
-      return { success: false, id: "", error: jiraErrorMessage(err) };
+      return { success: false, id: "", error: JiraManager.errorMessage(err) };
     }
   }
 
-  async linkIssues(inwardIssueKey: string, outwardIssueKey: string, linkTypeName: string): Promise<JiraOpResult> {
+  private async linkIssues(inwardIssueKey: string, outwardIssueKey: string, linkTypeName: string): Promise<JiraOpResult> {
     try {
       await this.run(
         (client) => client.issueLinks.linkIssues({ type: { name: linkTypeName }, inwardIssue: { key: inwardIssueKey }, outwardIssue: { key: outwardIssueKey } }),
@@ -383,13 +503,13 @@ export class JiraManager {
       );
       return { success: true, error: "" };
     } catch (err) {
-      return { success: false, error: jiraErrorMessage(err) };
+      return { success: false, error: JiraManager.errorMessage(err) };
     }
   }
 
   /** `accountId` resolves a user on Jira Cloud, `username` (or `key`) on Jira Server/Data Center —
    * only the identifier matching the credential's flavor needs to be provided. */
-  async getUser(accountId: string, username: string): Promise<JiraGetUserResult> {
+  private async getUser(accountId: string, username: string): Promise<JiraGetUserResult> {
     try {
       const res = await this.run(
         (client) => client.users.getUser({ accountId: accountId || undefined }),
@@ -403,11 +523,11 @@ export class JiraManager {
         error: "",
       };
     } catch (err) {
-      return { success: false, user: { accountId: "", username: "", displayName: "", emailAddress: "" }, error: jiraErrorMessage(err) };
+      return { success: false, user: { accountId: "", username: "", displayName: "", emailAddress: "" }, error: JiraManager.errorMessage(err) };
     }
   }
 
-  async findUsers(query: string, maxResults: number): Promise<JiraFindUsersResult> {
+  private async findUsers(query: string, maxResults: number): Promise<JiraFindUsersResult> {
     try {
       const res = await this.run(
         (client) => client.userSearch.findUsers({ query, maxResults }),
@@ -421,7 +541,7 @@ export class JiraManager {
       }));
       return { success: true, users, error: "" };
     } catch (err) {
-      return { success: false, users: [], error: jiraErrorMessage(err) };
+      return { success: false, users: [], error: JiraManager.errorMessage(err) };
     }
   }
 }

@@ -1,9 +1,6 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_MICROSOFT365_IMPORT } from "@hermione/graph/engine/compileUtils";
-import { GraphManager } from "@hermione/core/lib/graphManager";
-import type { MicrosoftGraphClientCredentialsData } from "@hermione/shared/types";
+import { compileResultVar, MICROSOFT365_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import {
   USER_STRUCT_TYPE,
   GROUP_STRUCT_TYPE,
@@ -34,18 +31,22 @@ import { TEXT_ENCODING_ENUM_TYPE } from "@hermione/graph/enum/common";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import { i18n } from "@i18n";
 
-// Every operation below is a thin pin-wiring shim over GraphManager (src/lib/graphManager.ts),
-// which owns the actual Graph REST calls, token acquisition/refresh, and error normalization —
-// this file only ever translates pins to method arguments and method results back to pins.
+// Every operation below calls the exact same GraphManager static method (packages/core/src/lib/
+// graphManager.ts) from both execute() (interpreter path) and compileExecute() (compiled/deployed
+// path) — GraphManager resolves the named credential straight from the database itself (see its
+// findCredential), so unlike the old split there is no separate functionLibraryMicrosoft365.ts
+// env-var-reading layer and no ctx.getCredential vault lookup here: both paths are already identical.
 //
-// Every node here also has a compileExecute: the compiled path calls a same-named
-// `functionLibraryMicrosoft365.microsoft365*` wrapper (see server/functionLibraryMicrosoft365.ts),
-// which reads the credential back from environment variables via `microsoft365ManagerFromEnv`
-// instead of the vault — same split as jira.ts's execute()/compileExecute().
-//
-// Every operation node takes a Credential Name directly: each resolves the named vault entry and
-// hands it to GraphManager.forCredential, which caches the client and mints/refreshes the app-only
-// access token on demand — see graphManager.ts.
+// GraphManager reaches the database directly, which pulls in better-sqlite3 and Node builtins — fine
+// for execute(), which only ever runs server-side, but this file is still statically imported
+// client-side too (for the node-creation menu), so a plain top-level import here would drag that
+// whole chain into the browser bundle. Loaded with a runtime import() instead, ignored by both
+// bundlers, so it is never even resolved for the client build; only ever actually called
+// server-side, where it resolves normally.
+async function loadGraphManager(): Promise<typeof import("@hermione/core/lib/graphManager").GraphManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/graphManager");
+  return mod.GraphManager;
+}
 
 const GROUP_NAME = "Request.Microsoft365";
 const GROUP_NAME_ONEDRIVE = "Request.Microsoft365 OneDrive";
@@ -105,30 +106,6 @@ function execInOutPins() {
   };
 }
 
-/** Shared by every Microsoft 365 node — looks up a named Credential Vault entry and returns its
- * tenant/client fields, or a clear error if the name is wrong/missing. */
-function resolveGraphCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: MicrosoftGraphClientCredentialsData } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential)
-    return {
-      ok: false,
-      error: `Credential "${credentialName}" not found in the vault`,
-    };
-  if (credential.type !== "microsoftGraphClientCredentials")
-    return {
-      ok: false,
-      error: `Credential "${credentialName}" is not a Microsoft Graph credential`,
-    };
-  return {
-    ok: true,
-    data: credential.data as MicrosoftGraphClientCredentialsData,
-  };
-}
-
-function managerFor(data: MicrosoftGraphClientCredentialsData): GraphManager {
-  return GraphManager.forCredential(data.tenantId, data.clientId, data.clientSecret);
-}
-
 registerNode({
   type: "microsoft365.listUsers",
   label: i18n.nodes.microsoft365.listUsers.label,
@@ -146,23 +123,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, users: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listUsers(String(inputs.filter ?? ""), Number(inputs.top ?? 100));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listUsers(String(inputs.credentialName ?? ""), String(inputs.filter ?? ""), Number(inputs.top ?? 100));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListUsers(${inputs.credentialName}, ${inputs.filter}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listUsers(${inputs.credentialName}, ${inputs.filter}, ${inputs.top});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, users: `${v}.users`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -173,19 +143,8 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "user", label: i18n.nodes.microsoft365.graphUser.label, type: "struct", subType: USER_STRUCT_TYPE, direction: "output" }, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          user: { id: "", displayName: "", userPrincipalName: "", mail: "" },
-          error: resolved.error,
-        },
-      };
-    }
-    const result = await managerFor(resolved.data).getUser(String(inputs.userId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).getUser(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -200,12 +159,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365GetUser(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.getUser(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, user: `{ id: ${v}.id, displayName: ${v}.displayName, userPrincipalName: ${v}.userPrincipalName, mail: ${v}.mail }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -228,26 +187,19 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).createUser(String(inputs.displayName ?? ""), String(inputs.userPrincipalName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.password ?? ""), Boolean(inputs.forceChangePasswordNextSignIn));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).createUser(String(inputs.credentialName ?? ""), String(inputs.displayName ?? ""), String(inputs.userPrincipalName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.password ?? ""), Boolean(inputs.forceChangePasswordNextSignIn));
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateUser(${inputs.credentialName}, ${inputs.displayName}, ${inputs.userPrincipalName}, ${inputs.mailNickname}, ${inputs.password}, ${inputs.forceChangePasswordNextSignIn});`,
+    `const ${compileResultVar(node.id)} = await GraphManager.createUser(${inputs.credentialName}, ${inputs.displayName}, ${inputs.userPrincipalName}, ${inputs.mailNickname}, ${inputs.password}, ${inputs.forceChangePasswordNextSignIn});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -258,23 +210,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "propertiesJson", label: i18n.nodes.microsoft365.updateUser.pin_properties_json, type: "string", direction: "input", defaultValue: "{}" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).updateUser(String(inputs.userId ?? ""), String(inputs.propertiesJson ?? "{}"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).updateUser(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.propertiesJson ?? "{}"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365UpdateUser(${inputs.credentialName}, ${inputs.userId}, ${inputs.propertiesJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.updateUser(${inputs.credentialName}, ${inputs.userId}, ${inputs.propertiesJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -285,23 +230,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).deleteUser(String(inputs.userId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).deleteUser(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteUser(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteUser(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -321,23 +259,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, groups: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listGroups(String(inputs.filter ?? ""), Number(inputs.top ?? 100));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listGroups(String(inputs.credentialName ?? ""), String(inputs.filter ?? ""), Number(inputs.top ?? 100));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListGroups(${inputs.credentialName}, ${inputs.filter}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listGroups(${inputs.credentialName}, ${inputs.filter}, ${inputs.top});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, groups: `${v}.groups`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -360,26 +291,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).createGroup(String(inputs.displayName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.description ?? ""), Boolean(inputs.securityEnabled), Boolean(inputs.mailEnabled));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).createGroup(String(inputs.credentialName ?? ""), String(inputs.displayName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.description ?? ""), Boolean(inputs.securityEnabled), Boolean(inputs.mailEnabled));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateGroup(${inputs.credentialName}, ${inputs.displayName}, ${inputs.mailNickname}, ${inputs.description}, ${inputs.securityEnabled}, ${inputs.mailEnabled});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createGroup(${inputs.credentialName}, ${inputs.displayName}, ${inputs.mailNickname}, ${inputs.description}, ${inputs.securityEnabled}, ${inputs.mailEnabled});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -390,23 +311,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), { id: "groupId", label: i18n.nodes.microsoft365.__shared.pin_group_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).deleteGroup(String(inputs.groupId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).deleteGroup(String(inputs.credentialName ?? ""), String(inputs.groupId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteGroup(${inputs.credentialName}, ${inputs.groupId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteGroup(${inputs.credentialName}, ${inputs.groupId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -417,23 +331,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), { id: "groupId", label: i18n.nodes.microsoft365.__shared.pin_group_id, type: "string", direction: "input", defaultValue: "" }, userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).addGroupMember(String(inputs.groupId ?? ""), String(inputs.userId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).addGroupMember(String(inputs.credentialName ?? ""), String(inputs.groupId ?? ""), String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365AddGroupMember(${inputs.credentialName}, ${inputs.groupId}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.addGroupMember(${inputs.credentialName}, ${inputs.groupId}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -456,26 +363,18 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).sendMail(String(inputs.userId ?? ""), (Array.isArray(inputs.to) ? inputs.to : []).map(String), String(inputs.subject ?? ""), String(inputs.body ?? ""), inputs.bodyType === "html" ? "html" : "text", Boolean(inputs.saveToSentItems));
+  execute: async ({ inputs }) => {
+    const result = await (
+      await loadGraphManager()
+    ).sendMail(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), (Array.isArray(inputs.to) ? inputs.to : []).map(String), String(inputs.subject ?? ""), String(inputs.body ?? ""), inputs.bodyType === "html" ? "html" : "text", Boolean(inputs.saveToSentItems));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365SendMail(${inputs.credentialName}, ${inputs.userId}, ${inputs.to}, ${inputs.subject}, ${inputs.body}, ${inputs.bodyType}, ${inputs.saveToSentItems});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.sendMail(${inputs.credentialName}, ${inputs.userId}, ${inputs.to}, ${inputs.subject}, ${inputs.body}, ${inputs.bodyType}, ${inputs.saveToSentItems});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -496,23 +395,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, messages: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listMessages(String(inputs.userId ?? ""), Number(inputs.top ?? 25), String(inputs.filter ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listMessages(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), Number(inputs.top ?? 25), String(inputs.filter ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListMessages(${inputs.credentialName}, ${inputs.userId}, ${inputs.top}, ${inputs.filter});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listMessages(${inputs.credentialName}, ${inputs.userId}, ${inputs.top}, ${inputs.filter});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, messages: `${v}.messages`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -532,24 +424,8 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          message: {
-            subject: "",
-            from: "",
-            bodyContent: "",
-            receivedDateTime: "",
-          },
-          error: resolved.error,
-        },
-      };
-    }
-    const result = await managerFor(resolved.data).getMessage(String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).getMessage(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -564,12 +440,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365GetMessage(${inputs.credentialName}, ${inputs.userId}, ${inputs.messageId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.getMessage(${inputs.credentialName}, ${inputs.userId}, ${inputs.messageId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, message: `{ subject: ${v}.subject, from: ${v}.from, bodyContent: ${v}.bodyContent, receivedDateTime: ${v}.receivedDateTime }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -580,23 +456,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "messageId", label: i18n.nodes.microsoft365.__shared.pin_message_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).deleteMessage(String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).deleteMessage(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteMessage(${inputs.credentialName}, ${inputs.userId}, ${inputs.messageId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteMessage(${inputs.credentialName}, ${inputs.userId}, ${inputs.messageId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -616,23 +485,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, events: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listEvents(String(inputs.userId ?? ""), Number(inputs.top ?? 25));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listEvents(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), Number(inputs.top ?? 25));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListEvents(${inputs.credentialName}, ${inputs.userId}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listEvents(${inputs.credentialName}, ${inputs.userId}, ${inputs.top});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, events: `${v}.events`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -657,34 +519,21 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).createEvent(
-      String(inputs.userId ?? ""),
-      String(inputs.subject ?? ""),
-      String(inputs.start ?? ""),
-      String(inputs.end ?? ""),
-      String(inputs.timeZone ?? "UTC"),
-      String(inputs.body ?? ""),
-      (Array.isArray(inputs.attendees) ? inputs.attendees : []).map(String),
-    );
+  execute: async ({ inputs }) => {
+    const result = await (
+      await loadGraphManager()
+    ).createEvent(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.subject ?? ""), String(inputs.start ?? ""), String(inputs.end ?? ""), String(inputs.timeZone ?? "UTC"), String(inputs.body ?? ""), (Array.isArray(inputs.attendees) ? inputs.attendees : []).map(String));
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateEvent(${inputs.credentialName}, ${inputs.userId}, ${inputs.subject}, ${inputs.start}, ${inputs.end}, ${inputs.timeZone}, ${inputs.body}, ${inputs.attendees});`,
+    `const ${compileResultVar(node.id)} = await GraphManager.createEvent(${inputs.credentialName}, ${inputs.userId}, ${inputs.subject}, ${inputs.start}, ${inputs.end}, ${inputs.timeZone}, ${inputs.body}, ${inputs.attendees});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -695,23 +544,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "eventId", label: i18n.nodes.microsoft365.__shared.pin_event_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).deleteEvent(String(inputs.userId ?? ""), String(inputs.eventId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).deleteEvent(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.eventId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteEvent(${inputs.credentialName}, ${inputs.userId}, ${inputs.eventId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteEvent(${inputs.credentialName}, ${inputs.userId}, ${inputs.eventId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -731,23 +573,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, items: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listDriveItems(String(inputs.userId ?? ""), String(inputs.folderPath ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listDriveItems(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.folderPath ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListDriveItems(${inputs.credentialName}, ${inputs.userId}, ${inputs.folderPath});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listDriveItems(${inputs.credentialName}, ${inputs.userId}, ${inputs.folderPath});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, items: `${v}.items`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -768,23 +603,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, content: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).downloadFile(String(inputs.userId ?? ""), String(inputs.filePath ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).downloadFile(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.filePath ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DownloadFile(${inputs.credentialName}, ${inputs.userId}, ${inputs.filePath}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.downloadFile(${inputs.credentialName}, ${inputs.userId}, ${inputs.filePath}, ${inputs.encoding});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, content: `${v}.content`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -805,23 +633,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).uploadFile(String(inputs.userId ?? ""), String(inputs.filePath ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).uploadFile(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.filePath ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365UploadFile(${inputs.credentialName}, ${inputs.userId}, ${inputs.filePath}, ${inputs.content}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.uploadFile(${inputs.credentialName}, ${inputs.userId}, ${inputs.filePath}, ${inputs.content}, ${inputs.encoding});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -832,23 +653,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).deleteDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).deleteDriveItem(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -859,23 +673,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "teams", label: i18n.nodes.microsoft365.listJoinedTeams.pin_teams, type: "struct", subType: TEAM_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, teams: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listJoinedTeams(String(inputs.userId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listJoinedTeams(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListJoinedTeams(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listJoinedTeams(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, teams: `${v}.teams`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -895,23 +702,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).sendChannelMessage(String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), String(inputs.message ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).sendChannelMessage(String(inputs.credentialName ?? ""), String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), String(inputs.message ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365SendChannelMessage(${inputs.credentialName}, ${inputs.teamId}, ${inputs.channelId}, ${inputs.message});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.sendChannelMessage(${inputs.credentialName}, ${inputs.teamId}, ${inputs.channelId}, ${inputs.message});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -933,28 +733,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          status: 0,
-          data: undefined,
-          error: resolved.error,
-        },
-      };
-    }
-    const result = await managerFor(resolved.data).rawRequest(String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.bodyJson ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).rawRequest(String(inputs.credentialName ?? ""), String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.bodyJson ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365Request(${inputs.credentialName}, ${inputs.method}, ${inputs.path}, ${inputs.bodyJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.rawRequest(${inputs.credentialName}, ${inputs.method}, ${inputs.path}, ${inputs.bodyJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, status: `${v}.status`, data: `${v}.data`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -973,23 +761,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, channels: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listChannels(String(inputs.teamId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listChannels(String(inputs.credentialName ?? ""), String(inputs.teamId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListChannels(${inputs.credentialName}, ${inputs.teamId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listChannels(${inputs.credentialName}, ${inputs.teamId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, channels: `${v}.channels`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1015,23 +796,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).createChannel(String(inputs.teamId ?? ""), String(inputs.displayName ?? ""), String(inputs.description ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).createChannel(String(inputs.credentialName ?? ""), String(inputs.teamId ?? ""), String(inputs.displayName ?? ""), String(inputs.description ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateChannel(${inputs.credentialName}, ${inputs.teamId}, ${inputs.displayName}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createChannel(${inputs.credentialName}, ${inputs.teamId}, ${inputs.displayName}, ${inputs.description});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1052,23 +826,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, messages: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listChannelMessages(String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), Number(inputs.top ?? 25));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listChannelMessages(String(inputs.credentialName ?? ""), String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), Number(inputs.top ?? 25));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListChannelMessages(${inputs.credentialName}, ${inputs.teamId}, ${inputs.channelId}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listChannelMessages(${inputs.credentialName}, ${inputs.teamId}, ${inputs.channelId}, ${inputs.top});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, messages: `${v}.messages`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1079,23 +846,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "chats", label: i18n.nodes.microsoft365.listChats.pin_chats, type: "struct", subType: CHAT_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, chats: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listChats(String(inputs.userId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listChats(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListChats(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listChats(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, chats: `${v}.chats`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1114,23 +874,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).sendChatMessage(String(inputs.chatId ?? ""), String(inputs.message ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).sendChatMessage(String(inputs.credentialName ?? ""), String(inputs.chatId ?? ""), String(inputs.message ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365SendChatMessage(${inputs.credentialName}, ${inputs.chatId}, ${inputs.message});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.sendChatMessage(${inputs.credentialName}, ${inputs.chatId}, ${inputs.message});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1149,23 +902,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, sites: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listSites(String(inputs.search ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listSites(String(inputs.credentialName ?? ""), String(inputs.search ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListSites(${inputs.credentialName}, ${inputs.search});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listSites(${inputs.credentialName}, ${inputs.search});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, sites: `${v}.sites`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1184,23 +930,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, lists: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listSiteLists(String(inputs.siteId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listSiteLists(String(inputs.credentialName ?? ""), String(inputs.siteId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListSiteLists(${inputs.credentialName}, ${inputs.siteId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listSiteLists(${inputs.credentialName}, ${inputs.siteId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, lists: `${v}.lists`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1220,23 +959,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, items: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listListItems(String(inputs.siteId ?? ""), String(inputs.listId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listListItems(String(inputs.credentialName ?? ""), String(inputs.siteId ?? ""), String(inputs.listId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListListItems(${inputs.credentialName}, ${inputs.siteId}, ${inputs.listId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listListItems(${inputs.credentialName}, ${inputs.siteId}, ${inputs.listId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, items: `${v}.items`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1257,23 +989,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).createListItem(String(inputs.siteId ?? ""), String(inputs.listId ?? ""), String(inputs.fieldsJson ?? "{}"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).createListItem(String(inputs.credentialName ?? ""), String(inputs.siteId ?? ""), String(inputs.listId ?? ""), String(inputs.fieldsJson ?? "{}"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateListItem(${inputs.credentialName}, ${inputs.siteId}, ${inputs.listId}, ${inputs.fieldsJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createListItem(${inputs.credentialName}, ${inputs.siteId}, ${inputs.listId}, ${inputs.fieldsJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1294,23 +1019,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).createFolder(String(inputs.userId ?? ""), String(inputs.parentPath ?? ""), String(inputs.name ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).createFolder(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.parentPath ?? ""), String(inputs.name ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateFolder(${inputs.credentialName}, ${inputs.userId}, ${inputs.parentPath}, ${inputs.name});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createFolder(${inputs.credentialName}, ${inputs.userId}, ${inputs.parentPath}, ${inputs.name});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1330,23 +1048,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).moveDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).moveDriveItem(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365MoveDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.destinationFolderPath});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.moveDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.destinationFolderPath});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1367,23 +1078,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).copyDriveItem(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""), String(inputs.newName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).copyDriveItem(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""), String(inputs.newName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CopyDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.destinationFolderPath}, ${inputs.newName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.copyDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.destinationFolderPath}, ${inputs.newName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1405,23 +1109,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, link: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).createSharingLink(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.type ?? "view"), String(inputs.scope ?? "organization"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).createSharingLink(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.type ?? "view"), String(inputs.scope ?? "organization"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateSharingLink(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.type}, ${inputs.scope});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createSharingLink(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.type}, ${inputs.scope});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, link: `${v}.link`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1441,23 +1138,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, items: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).searchDriveItems(String(inputs.userId ?? ""), String(inputs.query ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).searchDriveItems(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.query ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365SearchDriveItems(${inputs.credentialName}, ${inputs.userId}, ${inputs.query});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.searchDriveItems(${inputs.credentialName}, ${inputs.userId}, ${inputs.query});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, items: `${v}.items`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1477,23 +1167,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, worksheets: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listWorksheets(String(inputs.userId ?? ""), String(inputs.path ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listWorksheets(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListWorksheets(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listWorksheets(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, worksheets: `${v}.worksheets`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1515,23 +1198,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, valuesJson: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).getWorksheetRange(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).getWorksheetRange(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365GetWorksheetRange(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.worksheetName}, ${inputs.address});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.getWorksheetRange(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.worksheetName}, ${inputs.address});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, valuesJson: `${v}.valuesJson`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1553,26 +1229,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).setWorksheetRange(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""), String(inputs.valuesJson ?? "[]"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).setWorksheetRange(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""), String(inputs.valuesJson ?? "[]"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365SetWorksheetRange(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.worksheetName}, ${inputs.address}, ${inputs.valuesJson});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.setWorksheetRange(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.worksheetName}, ${inputs.address}, ${inputs.valuesJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1592,23 +1258,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, tables: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listTables(String(inputs.userId ?? ""), String(inputs.path ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listTables(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListTables(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listTables(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, tables: `${v}.tables`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1629,23 +1288,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).addTableRow(String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.tableName ?? ""), String(inputs.valuesJson ?? "[]"));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).addTableRow(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.tableName ?? ""), String(inputs.valuesJson ?? "[]"));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365AddTableRow(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.tableName}, ${inputs.valuesJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.addTableRow(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.tableName}, ${inputs.valuesJson});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1664,23 +1316,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, plans: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listPlannerPlans(String(inputs.groupId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listPlannerPlans(String(inputs.credentialName ?? ""), String(inputs.groupId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListPlannerPlans(${inputs.credentialName}, ${inputs.groupId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listPlannerPlans(${inputs.credentialName}, ${inputs.groupId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, plans: `${v}.plans`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1701,23 +1346,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).createPlannerTask(String(inputs.planId ?? ""), String(inputs.bucketId ?? ""), String(inputs.title ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).createPlannerTask(String(inputs.credentialName ?? ""), String(inputs.planId ?? ""), String(inputs.bucketId ?? ""), String(inputs.title ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreatePlannerTask(${inputs.credentialName}, ${inputs.planId}, ${inputs.bucketId}, ${inputs.title});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createPlannerTask(${inputs.credentialName}, ${inputs.planId}, ${inputs.bucketId}, ${inputs.title});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1736,23 +1374,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, tasks: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listPlannerTasks(String(inputs.planId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listPlannerTasks(String(inputs.credentialName ?? ""), String(inputs.planId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListPlannerTasks(${inputs.credentialName}, ${inputs.planId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listPlannerTasks(${inputs.credentialName}, ${inputs.planId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, tasks: `${v}.tasks`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1771,23 +1402,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, lists: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listTodoLists(String(inputs.userId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listTodoLists(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListTodoLists(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listTodoLists(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, lists: `${v}.lists`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1808,23 +1432,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).createTodoTask(String(inputs.userId ?? ""), String(inputs.listId ?? ""), String(inputs.title ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).createTodoTask(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.listId ?? ""), String(inputs.title ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateTodoTask(${inputs.credentialName}, ${inputs.userId}, ${inputs.listId}, ${inputs.title});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createTodoTask(${inputs.credentialName}, ${inputs.userId}, ${inputs.listId}, ${inputs.title});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1844,23 +1461,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, tasks: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listTodoTasks(String(inputs.userId ?? ""), String(inputs.listId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listTodoTasks(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.listId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListTodoTasks(${inputs.credentialName}, ${inputs.userId}, ${inputs.listId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listTodoTasks(${inputs.credentialName}, ${inputs.userId}, ${inputs.listId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, tasks: `${v}.tasks`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1879,23 +1489,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, contacts: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listContacts(String(inputs.userId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listContacts(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListContacts(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listContacts(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, contacts: `${v}.contacts`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1916,23 +1519,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).createContact(String(inputs.userId ?? ""), String(inputs.displayName ?? ""), String(inputs.email ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).createContact(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.displayName ?? ""), String(inputs.email ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateContact(${inputs.credentialName}, ${inputs.userId}, ${inputs.displayName}, ${inputs.email});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createContact(${inputs.credentialName}, ${inputs.userId}, ${inputs.displayName}, ${inputs.email});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1943,23 +1539,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "contactId", label: i18n.nodes.microsoft365.deleteContact.pin_contact_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).deleteContact(String(inputs.userId ?? ""), String(inputs.contactId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).deleteContact(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.contactId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteContact(${inputs.credentialName}, ${inputs.userId}, ${inputs.contactId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteContact(${inputs.credentialName}, ${inputs.userId}, ${inputs.contactId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1978,23 +1567,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, applications: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listApplications(String(inputs.filter ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listApplications(String(inputs.credentialName ?? ""), String(inputs.filter ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListApplications(${inputs.credentialName}, ${inputs.filter});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listApplications(${inputs.credentialName}, ${inputs.filter});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, applications: `${v}.applications`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -2005,23 +1587,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), execInOutPins().execOut, execInOutPins().success, { id: "roles", label: i18n.nodes.microsoft365.listDirectoryRoles.pin_roles, type: "struct", subType: DIRECTORY_ROLE_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, roles: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listDirectoryRoles();
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listDirectoryRoles(String(inputs.credentialName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListDirectoryRoles(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listDirectoryRoles(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, roles: `${v}.roles`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -2032,23 +1607,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "skuIds", label: i18n.nodes.microsoft365.listUserLicenses.pin_sku_ids, type: "string", container: "array", direction: "output" }, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, skuIds: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listUserLicenses(String(inputs.userId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listUserLicenses(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListUserLicenses(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listUserLicenses(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, skuIds: `${v}.skuIds`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -2070,26 +1638,16 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, id: "", error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).createSubscription(String(inputs.resource ?? ""), String(inputs.changeType ?? "updated"), String(inputs.notificationUrl ?? ""), String(inputs.expirationDateTime ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).createSubscription(String(inputs.credentialName ?? ""), String(inputs.resource ?? ""), String(inputs.changeType ?? "updated"), String(inputs.notificationUrl ?? ""), String(inputs.expirationDateTime ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365CreateSubscription(${inputs.credentialName}, ${inputs.resource}, ${inputs.changeType}, ${inputs.notificationUrl}, ${inputs.expirationDateTime});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createSubscription(${inputs.credentialName}, ${inputs.resource}, ${inputs.changeType}, ${inputs.notificationUrl}, ${inputs.expirationDateTime});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -2100,23 +1658,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInOutPins().execIn, credentialNamePin(), { id: "subscriptionId", label: i18n.nodes.microsoft365.deleteSubscription.pin_subscription_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).deleteSubscription(String(inputs.subscriptionId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).deleteSubscription(String(inputs.credentialName ?? ""), String(inputs.subscriptionId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365DeleteSubscription(${inputs.credentialName}, ${inputs.subscriptionId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteSubscription(${inputs.credentialName}, ${inputs.subscriptionId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -2135,21 +1686,14 @@ registerNode({
     execInOutPins().error,
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveGraphCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) {
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, documents: [], error: resolved.error },
-      };
-    }
-    const result = await managerFor(resolved.data).listTrendingDocuments(String(inputs.userId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadGraphManager()).listTrendingDocuments(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryMicrosoft365.microsoft365ListTrendingDocuments(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listTrendingDocuments(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, documents: `${v}.documents`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_MICROSOFT365_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT],
 });

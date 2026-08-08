@@ -1,6 +1,8 @@
 import { google, type drive_v3 } from "googleapis";
 import { Readable } from "node:stream";
 import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager.ts";
+import { getDatabaseManager } from "../server/DatabaseManager.ts";
+import { resolveAllCredentials } from "../server/vaultCredentials.ts";
 import type { GoogleServiceAccountCredentialData, GoogleOAuth2CredentialData } from "@hermione/shared/types";
 
 /** Every Google Drive node (list, get, upload, download, copy, move, delete, share, create folder)
@@ -50,6 +52,8 @@ export interface GoogleDrivePermissionResult extends GoogleDriveOpResult {
   id: string;
 }
 
+type ResolvedGoogleCredential = { kind: "serviceAccount"; data: GoogleServiceAccountCredentialData } | { kind: "oauth2"; data: GoogleOAuth2CredentialData };
+
 function toFile(file: drive_v3.Schema$File): GoogleDriveFile {
   return {
     id: file.id ?? "",
@@ -70,7 +74,7 @@ export class GoogleDriveManager {
     this.client = google.drive({ version: "v3", auth });
   }
 
-  static forServiceAccount(data: GoogleServiceAccountCredentialData): GoogleDriveManager {
+  private static forServiceAccount(data: GoogleServiceAccountCredentialData): GoogleDriveManager {
     const key = `sa:${data.serviceAccountKeyJson}:${data.impersonateUser}`;
     let manager = managerCache.get(key);
     if (!manager) {
@@ -80,7 +84,7 @@ export class GoogleDriveManager {
     return manager;
   }
 
-  static forOAuth2(data: GoogleOAuth2CredentialData): GoogleDriveManager {
+  private static forOAuth2(data: GoogleOAuth2CredentialData): GoogleDriveManager {
     const key = `oauth2:${data.clientId}:${data.refreshToken}`;
     let manager = managerCache.get(key);
     if (!manager) {
@@ -90,7 +94,100 @@ export class GoogleDriveManager {
     return manager;
   }
 
-  async listFiles(query: string, pageSize: number): Promise<GoogleDriveListFilesResult> {
+  private static getInstance(resolved: ResolvedGoogleCredential): GoogleDriveManager {
+    return resolved.kind === "serviceAccount" ? GoogleDriveManager.forServiceAccount(resolved.data) : GoogleDriveManager.forOAuth2(resolved.data);
+  }
+
+  /** Looks up a named Credential Vault entry and accepts either a Google Service Account or a
+   * Google OAuth2 credential — Drive works fine under either auth flow (see nodes/google.ts's
+   * former resolveGoogleCredential, now owned here). */
+  private static async findCredential(credentialName: string): Promise<{ ok: true; resolved: ResolvedGoogleCredential } | { ok: false; error: string }> {
+    const credRecord = (await resolveAllCredentials(getDatabaseManager())).get(credentialName);
+    if (!credRecord) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
+    if (credRecord.type === "googleServiceAccount") return { ok: true, resolved: { kind: "serviceAccount", data: credRecord.data as GoogleServiceAccountCredentialData } };
+    if (credRecord.type === "googleOAuth2") return { ok: true, resolved: { kind: "oauth2", data: credRecord.data as GoogleOAuth2CredentialData } };
+    return { ok: false, error: `Credential "${credentialName}" is not a Google Service Account or Google OAuth2 credential` };
+  }
+
+  static async listFiles(credentialName: string, query: string, pageSize: number): Promise<GoogleDriveListFilesResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, files: [], error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).listFiles(query, pageSize);
+  }
+
+  static async getFile(credentialName: string, fileId: string): Promise<GoogleDriveFileResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).getFile(fileId);
+  }
+
+  static async uploadFile(credentialName: string, name: string, parentFolderId: string, mimeType: string, content: string, encoding: "utf8" | "base64"): Promise<GoogleDriveFileResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).uploadFile(name, parentFolderId, mimeType, content, encoding);
+  }
+
+  static async updateFileContent(credentialName: string, fileId: string, mimeType: string, content: string, encoding: "utf8" | "base64"): Promise<GoogleDriveOpResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).updateFileContent(fileId, mimeType, content, encoding);
+  }
+
+  static async downloadFile(credentialName: string, fileId: string, encoding: "utf8" | "base64"): Promise<GoogleDriveDownloadResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, content: "", error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).downloadFile(fileId, encoding);
+  }
+
+  static async createFolder(credentialName: string, name: string, parentFolderId: string): Promise<GoogleDriveFileResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).createFolder(name, parentFolderId);
+  }
+
+  static async copyFile(credentialName: string, fileId: string, newName: string, destinationFolderId: string): Promise<GoogleDriveFileResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).copyFile(fileId, newName, destinationFolderId);
+  }
+
+  static async moveFile(credentialName: string, fileId: string, destinationFolderId: string): Promise<GoogleDriveOpResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).moveFile(fileId, destinationFolderId);
+  }
+
+  static async renameFile(credentialName: string, fileId: string, newName: string): Promise<GoogleDriveOpResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).renameFile(fileId, newName);
+  }
+
+  static async deleteFile(credentialName: string, fileId: string): Promise<GoogleDriveOpResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).deleteFile(fileId);
+  }
+
+  static async shareFile(credentialName: string, fileId: string, role: string, type: string, emailAddress: string): Promise<GoogleDrivePermissionResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, id: "", error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).shareFile(fileId, role, type, emailAddress);
+  }
+
+  static async listPermissions(credentialName: string, fileId: string): Promise<GoogleDriveListPermissionsResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, permissions: [], error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).listPermissions(fileId);
+  }
+
+  static async deletePermission(credentialName: string, fileId: string, permissionId: string): Promise<GoogleDriveOpResult> {
+    const cred = await GoogleDriveManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDriveManager.getInstance(cred.resolved).deletePermission(fileId, permissionId);
+  }
+
+  private async listFiles(query: string, pageSize: number): Promise<GoogleDriveListFilesResult> {
     try {
       const res = await this.client.files.list({
         q: query || undefined,
@@ -103,7 +200,7 @@ export class GoogleDriveManager {
     }
   }
 
-  async getFile(fileId: string): Promise<GoogleDriveFileResult> {
+  private async getFile(fileId: string): Promise<GoogleDriveFileResult> {
     try {
       const res = await this.client.files.get({
         fileId,
@@ -115,7 +212,7 @@ export class GoogleDriveManager {
     }
   }
 
-  async uploadFile(name: string, parentFolderId: string, mimeType: string, content: string, encoding: "utf8" | "base64"): Promise<GoogleDriveFileResult> {
+  private async uploadFile(name: string, parentFolderId: string, mimeType: string, content: string, encoding: "utf8" | "base64"): Promise<GoogleDriveFileResult> {
     try {
       const body = Readable.from([encoding === "base64" ? Buffer.from(content, "base64") : Buffer.from(content, "utf8")]);
       const res = await this.client.files.create({
@@ -129,7 +226,7 @@ export class GoogleDriveManager {
     }
   }
 
-  async updateFileContent(fileId: string, mimeType: string, content: string, encoding: "utf8" | "base64"): Promise<GoogleDriveOpResult> {
+  private async updateFileContent(fileId: string, mimeType: string, content: string, encoding: "utf8" | "base64"): Promise<GoogleDriveOpResult> {
     try {
       const body = Readable.from([encoding === "base64" ? Buffer.from(content, "base64") : Buffer.from(content, "utf8")]);
       await this.client.files.update({
@@ -142,7 +239,7 @@ export class GoogleDriveManager {
     }
   }
 
-  async downloadFile(fileId: string, encoding: "utf8" | "base64"): Promise<GoogleDriveDownloadResult> {
+  private async downloadFile(fileId: string, encoding: "utf8" | "base64"): Promise<GoogleDriveDownloadResult> {
     try {
       const res = await this.client.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
       const bytes = Buffer.from(res.data as ArrayBuffer);
@@ -152,7 +249,7 @@ export class GoogleDriveManager {
     }
   }
 
-  async createFolder(name: string, parentFolderId: string): Promise<GoogleDriveFileResult> {
+  private async createFolder(name: string, parentFolderId: string): Promise<GoogleDriveFileResult> {
     try {
       const res = await this.client.files.create({
         requestBody: {
@@ -168,7 +265,7 @@ export class GoogleDriveManager {
     }
   }
 
-  async copyFile(fileId: string, newName: string, destinationFolderId: string): Promise<GoogleDriveFileResult> {
+  private async copyFile(fileId: string, newName: string, destinationFolderId: string): Promise<GoogleDriveFileResult> {
     try {
       const res = await this.client.files.copy({
         fileId,
@@ -183,7 +280,7 @@ export class GoogleDriveManager {
 
   /** Drive has no dedicated move route — a file's "parents" IS its location, so moving means
    * adding the destination folder and removing every current parent in one files.update call. */
-  async moveFile(fileId: string, destinationFolderId: string): Promise<GoogleDriveOpResult> {
+  private async moveFile(fileId: string, destinationFolderId: string): Promise<GoogleDriveOpResult> {
     try {
       const current = await this.client.files.get({ fileId, fields: "parents" });
       const previousParents = (current.data.parents ?? []).join(",");
@@ -198,7 +295,7 @@ export class GoogleDriveManager {
     }
   }
 
-  async renameFile(fileId: string, newName: string): Promise<GoogleDriveOpResult> {
+  private async renameFile(fileId: string, newName: string): Promise<GoogleDriveOpResult> {
     try {
       await this.client.files.update({ fileId, requestBody: { name: newName } });
       return { success: true, error: "" };
@@ -207,7 +304,7 @@ export class GoogleDriveManager {
     }
   }
 
-  async deleteFile(fileId: string): Promise<GoogleDriveOpResult> {
+  private async deleteFile(fileId: string): Promise<GoogleDriveOpResult> {
     try {
       await this.client.files.delete({ fileId });
       return { success: true, error: "" };
@@ -216,7 +313,7 @@ export class GoogleDriveManager {
     }
   }
 
-  async shareFile(fileId: string, role: string, type: string, emailAddress: string): Promise<GoogleDrivePermissionResult> {
+  private async shareFile(fileId: string, role: string, type: string, emailAddress: string): Promise<GoogleDrivePermissionResult> {
     try {
       const res = await this.client.permissions.create({
         fileId,
@@ -230,7 +327,7 @@ export class GoogleDriveManager {
     }
   }
 
-  async listPermissions(fileId: string): Promise<GoogleDriveListPermissionsResult> {
+  private async listPermissions(fileId: string): Promise<GoogleDriveListPermissionsResult> {
     try {
       const res = await this.client.permissions.list({
         fileId,
@@ -248,7 +345,7 @@ export class GoogleDriveManager {
     }
   }
 
-  async deletePermission(fileId: string, permissionId: string): Promise<GoogleDriveOpResult> {
+  private async deletePermission(fileId: string, permissionId: string): Promise<GoogleDriveOpResult> {
     try {
       await this.client.permissions.delete({ fileId, permissionId });
       return { success: true, error: "" };

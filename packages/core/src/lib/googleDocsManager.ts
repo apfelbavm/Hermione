@@ -1,5 +1,7 @@
 import { google, type docs_v1 } from "googleapis";
 import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager.ts";
+import { getDatabaseManager } from "../server/DatabaseManager.ts";
+import { resolveAllCredentials } from "../server/vaultCredentials.ts";
 import type { GoogleServiceAccountCredentialData, GoogleOAuth2CredentialData } from "@hermione/shared/types";
 
 /** Every Google Docs node (create, get text, insert/append/replace text) needs the same
@@ -22,6 +24,8 @@ export interface GoogleDocsCreateResult extends GoogleDocsOpResult {
 export interface GoogleDocsTextResult extends GoogleDocsOpResult {
   text: string;
 }
+
+type ResolvedGoogleCredential = { kind: "serviceAccount"; data: GoogleServiceAccountCredentialData } | { kind: "oauth2"; data: GoogleOAuth2CredentialData };
 
 /** Docs represents body text as a tree of structural elements — flattens it to the plain text a
  * node's output pin can show, same simplification jiraManager.ts does for Atlassian Document
@@ -54,7 +58,7 @@ export class GoogleDocsManager {
     this.client = google.docs({ version: "v1", auth });
   }
 
-  static forServiceAccount(data: GoogleServiceAccountCredentialData): GoogleDocsManager {
+  private static forServiceAccount(data: GoogleServiceAccountCredentialData): GoogleDocsManager {
     const key = `sa:${data.serviceAccountKeyJson}:${data.impersonateUser}`;
     let manager = managerCache.get(key);
     if (!manager) {
@@ -64,7 +68,7 @@ export class GoogleDocsManager {
     return manager;
   }
 
-  static forOAuth2(data: GoogleOAuth2CredentialData): GoogleDocsManager {
+  private static forOAuth2(data: GoogleOAuth2CredentialData): GoogleDocsManager {
     const key = `oauth2:${data.clientId}:${data.refreshToken}`;
     let manager = managerCache.get(key);
     if (!manager) {
@@ -74,7 +78,51 @@ export class GoogleDocsManager {
     return manager;
   }
 
-  async createDocument(title: string): Promise<GoogleDocsCreateResult> {
+  private static getInstance(resolved: ResolvedGoogleCredential): GoogleDocsManager {
+    return resolved.kind === "serviceAccount" ? GoogleDocsManager.forServiceAccount(resolved.data) : GoogleDocsManager.forOAuth2(resolved.data);
+  }
+
+  /** Looks up a named Credential Vault entry and accepts either a Google Service Account or a
+   * Google OAuth2 credential — Docs works fine under either auth flow. */
+  private static async findCredential(credentialName: string): Promise<{ ok: true; resolved: ResolvedGoogleCredential } | { ok: false; error: string }> {
+    const credRecord = (await resolveAllCredentials(getDatabaseManager())).get(credentialName);
+    if (!credRecord) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
+    if (credRecord.type === "googleServiceAccount") return { ok: true, resolved: { kind: "serviceAccount", data: credRecord.data as GoogleServiceAccountCredentialData } };
+    if (credRecord.type === "googleOAuth2") return { ok: true, resolved: { kind: "oauth2", data: credRecord.data as GoogleOAuth2CredentialData } };
+    return { ok: false, error: `Credential "${credentialName}" is not a Google Service Account or Google OAuth2 credential` };
+  }
+
+  static async createDocument(credentialName: string, title: string): Promise<GoogleDocsCreateResult> {
+    const cred = await GoogleDocsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, documentId: "", error: cred.error };
+    return GoogleDocsManager.getInstance(cred.resolved).createDocument(title);
+  }
+
+  static async getText(credentialName: string, documentId: string): Promise<GoogleDocsTextResult> {
+    const cred = await GoogleDocsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, text: "", error: cred.error };
+    return GoogleDocsManager.getInstance(cred.resolved).getText(documentId);
+  }
+
+  static async appendText(credentialName: string, documentId: string, text: string): Promise<GoogleDocsOpResult> {
+    const cred = await GoogleDocsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDocsManager.getInstance(cred.resolved).appendText(documentId, text);
+  }
+
+  static async insertText(credentialName: string, documentId: string, text: string, index: number): Promise<GoogleDocsOpResult> {
+    const cred = await GoogleDocsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDocsManager.getInstance(cred.resolved).insertText(documentId, text, index);
+  }
+
+  static async replaceAllText(credentialName: string, documentId: string, find: string, replacement: string, matchCase: boolean): Promise<GoogleDocsOpResult> {
+    const cred = await GoogleDocsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleDocsManager.getInstance(cred.resolved).replaceAllText(documentId, find, replacement, matchCase);
+  }
+
+  private async createDocument(title: string): Promise<GoogleDocsCreateResult> {
     try {
       const res = await this.client.documents.create({ requestBody: { title } });
       return { success: true, documentId: res.data.documentId ?? "", error: "" };
@@ -83,7 +131,7 @@ export class GoogleDocsManager {
     }
   }
 
-  async getText(documentId: string): Promise<GoogleDocsTextResult> {
+  private async getText(documentId: string): Promise<GoogleDocsTextResult> {
     try {
       const res = await this.client.documents.get({ documentId });
       return { success: true, text: extractText(res.data), error: "" };
@@ -92,7 +140,7 @@ export class GoogleDocsManager {
     }
   }
 
-  async appendText(documentId: string, text: string): Promise<GoogleDocsOpResult> {
+  private async appendText(documentId: string, text: string): Promise<GoogleDocsOpResult> {
     try {
       const doc = await this.client.documents.get({ documentId });
       await this.client.documents.batchUpdate({
@@ -105,7 +153,7 @@ export class GoogleDocsManager {
     }
   }
 
-  async insertText(documentId: string, text: string, index: number): Promise<GoogleDocsOpResult> {
+  private async insertText(documentId: string, text: string, index: number): Promise<GoogleDocsOpResult> {
     try {
       await this.client.documents.batchUpdate({
         documentId,
@@ -117,7 +165,7 @@ export class GoogleDocsManager {
     }
   }
 
-  async replaceAllText(documentId: string, find: string, replacement: string, matchCase: boolean): Promise<GoogleDocsOpResult> {
+  private async replaceAllText(documentId: string, find: string, replacement: string, matchCase: boolean): Promise<GoogleDocsOpResult> {
     try {
       await this.client.documents.batchUpdate({
         documentId,

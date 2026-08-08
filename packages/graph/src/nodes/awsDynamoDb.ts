@@ -1,31 +1,33 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
-import { compileResultVar, FUNCTION_LIBRARY_DYNAMODB_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, DYNAMODB_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { DYNAMODB_TABLE_DESCRIPTION_STRUCT_TYPE } from "@hermione/graph/structs/dynamoDb";
 import { DYNAMODB_ATTRIBUTE_TYPE_ENUM_TYPE, DYNAMODB_BILLING_MODE_ENUM_TYPE, DYNAMODB_RETURN_VALUES_PUT_ENUM_TYPE, DYNAMODB_RETURN_VALUES_UPDATE_ENUM_TYPE } from "@hermione/graph/enum/dynamoDb";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
-import { DynamoDbManager } from "@hermione/core/lib/dynamoDbManager";
-import type { AwsAccessKeyCredentialData } from "@hermione/shared/types";
 import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over DynamoDbManager (src/lib/dynamoDbManager.ts),
 // which owns the actual SDK calls and error normalization — this file only ever translates pins to
-// method arguments and method results back to pins.
-//
-// Every operation node takes a Credential Name directly (no separate auth/refresh node): each
-// resolves the named vault entry and hands its access key pair to DynamoDbManager.forCredential,
-// which caches the underlying DynamoDBClient/DynamoDBDocumentClient — see dynamoDbManager.ts.
+// method arguments and method results back to pins. DynamoDbManager resolves its own named
+// credential straight from the database (mirrors twilioManager.ts), so there is no separate
+// functionLibraryAwsDynamoDb.ts env-var-reading layer — both execute() and compileExecute() call the
+// exact same static manager methods.
 //
 // Items/keys/expressions with dynamic shapes (items, keys, expression attribute names/values,
 // batch/transact specs) are carried as JSON string pins rather than "map"/"struct" pins, since
 // DynamoDB attribute values can be arbitrarily nested (lists, maps, numbers, sets) unlike e.g. Azure
 // Storage's flat string/string metadata maps — same convention as soap.ts's Args/Headers pins.
+// DynamoDbManager's public static methods take/return those same JSON strings directly.
 //
-// Every node here also has a compileExecute: the compiled path calls a same-named
-// `functionLibraryDynamoDb.dynamoDb*` wrapper (see server/functionLibraryAwsDynamoDb.ts), which reads
-// the credential's access key back from environment variables instead of the vault — same split as
-// azureStorage.ts's execute()/compileExecute().
+// DynamoDbManager now reaches the database directly, which pulls in better-sqlite3 and Node
+// builtins — fine for execute(), which only ever runs server-side, but this file is still
+// statically imported client-side too (for the node-creation menu), so it's loaded with a runtime
+// `import()` instead of a top-level import (ignored by both bundlers) — see nodes/twilio.ts's
+// loadTwilioManager for the same pattern.
+async function loadDynamoDbManager(): Promise<typeof import("@hermione/core/lib/dynamoDbManager").DynamoDbManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/dynamoDbManager");
+  return mod.DynamoDbManager;
+}
 
 const GROUP_NAME = "Request.AWS DynamoDB";
 
@@ -73,44 +75,6 @@ function errorPin() {
   return { id: "error", label: i18n.nodes.__shared.pin_error, type: "string" as const, direction: "output" as const };
 }
 
-function parseJsonObject(json: unknown): Record<string, unknown> {
-  const str = String(json ?? "");
-  if (!str) return {};
-  try {
-    const parsed: unknown = JSON.parse(str);
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function parseJsonArray(json: unknown): unknown[] {
-  const str = String(json ?? "");
-  if (!str) return [];
-  try {
-    const parsed: unknown = JSON.parse(str);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Shared by every DynamoDB node — looks up a named Credential Vault entry and returns its access
- * key data, or a clear error if the name is wrong/missing. */
-function resolveDynamoDbCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: AwsAccessKeyCredentialData } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
-  if (credential.type !== "awsAccessKey") return { ok: false, error: `Credential "${credentialName}" is not an AWS Access Key credential` };
-  return { ok: true, data: credential.data as AwsAccessKeyCredentialData };
-}
-
-function managerFor(ctx: ExecutionContext, credentialName: string): { ok: true; manager: DynamoDbManager } | { ok: false; error: string } {
-  const resolved = resolveDynamoDbCredential(ctx, credentialName);
-  if (!resolved.ok) return resolved;
-  const data = resolved.data;
-  return { ok: true, manager: DynamoDbManager.forCredential(data.accessKeyId, data.secretAccessKey, data.region, data.sessionToken, data.endpoint) };
-}
-
 registerNode({
   type: "dynamoDb.listTables",
   label: i18n.nodes.dynamoDb.listTables.label,
@@ -129,18 +93,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, tableNames: [], lastEvaluatedTableName: "", error: resolved.error } };
-    const result = await resolved.manager.listTables(String(inputs.exclusiveStartTableName ?? ""), Number(inputs.limit) || 0);
+  execute: async ({ inputs }) => {
+    const result = await (await loadDynamoDbManager()).listTables(String(inputs.credentialName ?? ""), String(inputs.exclusiveStartTableName ?? ""), Number(inputs.limit) || 0);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbListTables(${inputs.credentialName}, ${inputs.exclusiveStartTableName}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.listTables(${inputs.credentialName}, ${inputs.exclusiveStartTableName}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, tableNames: `${v}.tableNames`, lastEvaluatedTableName: `${v}.lastEvaluatedTableName`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -165,24 +127,24 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+  execute: async ({ inputs }) => {
     const partitionKeyType = inputs.partitionKeyType === "N" || inputs.partitionKeyType === "B" ? inputs.partitionKeyType : "S";
     const sortKeyType = inputs.sortKeyType === "N" || inputs.sortKeyType === "B" ? inputs.sortKeyType : "S";
     const billingMode = inputs.billingMode === "PROVISIONED" ? "PROVISIONED" : "PAY_PER_REQUEST";
-    const result = await resolved.manager.createTable(String(inputs.tableName ?? ""), String(inputs.partitionKeyName ?? ""), partitionKeyType, String(inputs.sortKeyName ?? ""), sortKeyType, billingMode, Number(inputs.readCapacityUnits) || 0, Number(inputs.writeCapacityUnits) || 0);
+    const result = await (
+      await loadDynamoDbManager()
+    ).createTable(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.partitionKeyName ?? ""), partitionKeyType, String(inputs.sortKeyName ?? ""), sortKeyType, billingMode, Number(inputs.readCapacityUnits) || 0, Number(inputs.writeCapacityUnits) || 0);
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbCreateTable(${inputs.credentialName}, ${inputs.tableName}, ${inputs.partitionKeyName}, ${inputs.partitionKeyType}, ${inputs.sortKeyName}, ${inputs.sortKeyType}, ${inputs.billingMode}, ${inputs.readCapacityUnits}, ${inputs.writeCapacityUnits});`,
+    `const ${compileResultVar(node.id)} = await DynamoDbManager.createTable(${inputs.credentialName}, ${inputs.tableName}, ${inputs.partitionKeyName}, ${inputs.partitionKeyType}, ${inputs.sortKeyName}, ${inputs.sortKeyType}, ${inputs.billingMode}, ${inputs.readCapacityUnits}, ${inputs.writeCapacityUnits});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -193,18 +155,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), tableNamePin(), execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await resolved.manager.deleteTable(String(inputs.tableName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDynamoDbManager()).deleteTable(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbDeleteTable(${inputs.credentialName}, ${inputs.tableName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.deleteTable(${inputs.credentialName}, ${inputs.tableName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -215,18 +175,12 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), tableNamePin(), execOutPin(), successPin(), { id: "table", label: i18n.nodes.dynamoDb.tableDescription.label, type: "struct", subType: DYNAMODB_TABLE_DESCRIPTION_STRUCT_TYPE, direction: "output" }, errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, table: { status: "", itemCount: 0, sizeBytes: 0, partitionKeyName: "", partitionKeyType: "", sortKeyName: "", sortKeyType: "", billingMode: "", readCapacityUnits: 0, writeCapacityUnits: 0 }, error: resolved.error },
-      };
-    const result = await resolved.manager.describeTable(String(inputs.tableName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadDynamoDbManager()).describeTable(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""));
     const { success, error, ...table } = result;
     return { nextExec: "exec-out", outputs: { success, table, error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbDescribeTable(${inputs.credentialName}, ${inputs.tableName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.describeTable(${inputs.credentialName}, ${inputs.tableName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -235,7 +189,7 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -256,22 +210,17 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+  execute: async ({ inputs }) => {
     const billingMode = inputs.billingMode === "PROVISIONED" ? "PROVISIONED" : "PAY_PER_REQUEST";
-    const result = await resolved.manager.updateTableCapacity(String(inputs.tableName ?? ""), billingMode, Number(inputs.readCapacityUnits) || 0, Number(inputs.writeCapacityUnits) || 0);
+    const result = await (await loadDynamoDbManager()).updateTableCapacity(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), billingMode, Number(inputs.readCapacityUnits) || 0, Number(inputs.writeCapacityUnits) || 0);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbUpdateTableCapacity(${inputs.credentialName}, ${inputs.tableName}, ${inputs.billingMode}, ${inputs.readCapacityUnits}, ${inputs.writeCapacityUnits});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.updateTableCapacity(${inputs.credentialName}, ${inputs.tableName}, ${inputs.billingMode}, ${inputs.readCapacityUnits}, ${inputs.writeCapacityUnits});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -295,22 +244,22 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, attributes: "null", error: resolved.error } };
+  execute: async ({ inputs }) => {
     const returnValues = inputs.returnValues === "ALL_OLD" ? "ALL_OLD" : "NONE";
-    const result = await resolved.manager.putItem(String(inputs.tableName ?? ""), parseJsonObject(inputs.item), String(inputs.conditionExpression ?? ""), parseJsonObject(inputs.expressionAttributeNames) as Record<string, string>, parseJsonObject(inputs.expressionAttributeValues), returnValues);
-    return { nextExec: "exec-out", outputs: { success: result.success, attributes: JSON.stringify(result.attributes), error: result.error } };
+    const result = await (
+      await loadDynamoDbManager()
+    ).putItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.item ?? ""), String(inputs.conditionExpression ?? ""), String(inputs.expressionAttributeNames ?? ""), String(inputs.expressionAttributeValues ?? ""), returnValues);
+    return { nextExec: "exec-out", outputs: { success: result.success, attributes: result.attributesJson, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbPutItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.item}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues});`,
+    `const ${compileResultVar(node.id)} = await DynamoDbManager.putItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.item}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, attributes: `${v}.attributesJson`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -332,18 +281,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, item: "null", error: resolved.error } };
-    const result = await resolved.manager.getItem(String(inputs.tableName ?? ""), parseJsonObject(inputs.key), Boolean(inputs.consistentRead), String(inputs.projectionExpression ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, item: JSON.stringify(result.item), error: result.error } };
+  execute: async ({ inputs }) => {
+    const result = await (await loadDynamoDbManager()).getItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.key ?? ""), Boolean(inputs.consistentRead), String(inputs.projectionExpression ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, item: result.itemJson, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbGetItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.consistentRead}, ${inputs.projectionExpression});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.getItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.consistentRead}, ${inputs.projectionExpression});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, item: `${v}.itemJson`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -368,30 +315,31 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, attributes: "null", error: resolved.error } };
+  execute: async ({ inputs }) => {
     const returnValues = ["ALL_OLD", "UPDATED_OLD", "ALL_NEW", "UPDATED_NEW"].includes(String(inputs.returnValues)) ? (inputs.returnValues as "ALL_OLD" | "UPDATED_OLD" | "ALL_NEW" | "UPDATED_NEW") : "NONE";
-    const result = await resolved.manager.updateItem(
+    const result = await (
+      await loadDynamoDbManager()
+    ).updateItem(
+      String(inputs.credentialName ?? ""),
       String(inputs.tableName ?? ""),
-      parseJsonObject(inputs.key),
+      String(inputs.key ?? ""),
       String(inputs.updateExpression ?? ""),
       String(inputs.conditionExpression ?? ""),
-      parseJsonObject(inputs.expressionAttributeNames) as Record<string, string>,
-      parseJsonObject(inputs.expressionAttributeValues),
+      String(inputs.expressionAttributeNames ?? ""),
+      String(inputs.expressionAttributeValues ?? ""),
       returnValues,
     );
-    return { nextExec: "exec-out", outputs: { success: result.success, attributes: JSON.stringify(result.attributes), error: result.error } };
+    return { nextExec: "exec-out", outputs: { success: result.success, attributes: result.attributesJson, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbUpdateItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.updateExpression}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues});`,
+    `const ${compileResultVar(node.id)} = await DynamoDbManager.updateItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.updateExpression}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, attributes: `${v}.attributesJson`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -415,22 +363,22 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, attributes: "null", error: resolved.error } };
+  execute: async ({ inputs }) => {
     const returnValues = inputs.returnValues === "ALL_OLD" ? "ALL_OLD" : "NONE";
-    const result = await resolved.manager.deleteItem(String(inputs.tableName ?? ""), parseJsonObject(inputs.key), String(inputs.conditionExpression ?? ""), parseJsonObject(inputs.expressionAttributeNames) as Record<string, string>, parseJsonObject(inputs.expressionAttributeValues), returnValues);
-    return { nextExec: "exec-out", outputs: { success: result.success, attributes: JSON.stringify(result.attributes), error: result.error } };
+    const result = await (
+      await loadDynamoDbManager()
+    ).deleteItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.key ?? ""), String(inputs.conditionExpression ?? ""), String(inputs.expressionAttributeNames ?? ""), String(inputs.expressionAttributeValues ?? ""), returnValues);
+    return { nextExec: "exec-out", outputs: { success: result.success, attributes: result.attributesJson, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbDeleteItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues});`,
+    `const ${compileResultVar(node.id)} = await DynamoDbManager.deleteItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, attributes: `${v}.attributesJson`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -461,33 +409,33 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, items: "[]", lastEvaluatedKey: "null", count: 0, scannedCount: 0, error: resolved.error } };
-    const exclusiveStartKeyStr = String(inputs.exclusiveStartKey ?? "");
-    const result = await resolved.manager.query(
+  execute: async ({ inputs }) => {
+    const result = await (
+      await loadDynamoDbManager()
+    ).query(
+      String(inputs.credentialName ?? ""),
       String(inputs.tableName ?? ""),
       String(inputs.keyConditionExpression ?? ""),
       String(inputs.filterExpression ?? ""),
-      parseJsonObject(inputs.expressionAttributeNames) as Record<string, string>,
-      parseJsonObject(inputs.expressionAttributeValues),
+      String(inputs.expressionAttributeNames ?? ""),
+      String(inputs.expressionAttributeValues ?? ""),
       String(inputs.indexName ?? ""),
       Boolean(inputs.scanIndexForward),
       Number(inputs.limit) || 0,
-      exclusiveStartKeyStr ? parseJsonObject(exclusiveStartKeyStr) : null,
+      String(inputs.exclusiveStartKey ?? ""),
       Boolean(inputs.consistentRead),
     );
-    return { nextExec: "exec-out", outputs: { success: result.success, items: JSON.stringify(result.items), lastEvaluatedKey: JSON.stringify(result.lastEvaluatedKey), count: result.count, scannedCount: result.scannedCount, error: result.error } };
+    return { nextExec: "exec-out", outputs: { success: result.success, items: result.itemsJson, lastEvaluatedKey: result.lastEvaluatedKeyJson, count: result.count, scannedCount: result.scannedCount, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbQuery(${inputs.credentialName}, ${inputs.tableName}, ${inputs.keyConditionExpression}, ${inputs.filterExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.indexName}, ${inputs.scanIndexForward}, ${inputs.limit}, ${inputs.exclusiveStartKey}, ${inputs.consistentRead});`,
+    `const ${compileResultVar(node.id)} = await DynamoDbManager.query(${inputs.credentialName}, ${inputs.tableName}, ${inputs.keyConditionExpression}, ${inputs.filterExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.indexName}, ${inputs.scanIndexForward}, ${inputs.limit}, ${inputs.exclusiveStartKey}, ${inputs.consistentRead});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, items: `${v}.itemsJson`, lastEvaluatedKey: `${v}.lastEvaluatedKeyJson`, count: `${v}.count`, scannedCount: `${v}.scannedCount`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -516,31 +464,31 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, items: "[]", lastEvaluatedKey: "null", count: 0, scannedCount: 0, error: resolved.error } };
-    const exclusiveStartKeyStr = String(inputs.exclusiveStartKey ?? "");
-    const result = await resolved.manager.scan(
+  execute: async ({ inputs }) => {
+    const result = await (
+      await loadDynamoDbManager()
+    ).scan(
+      String(inputs.credentialName ?? ""),
       String(inputs.tableName ?? ""),
       String(inputs.filterExpression ?? ""),
-      parseJsonObject(inputs.expressionAttributeNames) as Record<string, string>,
-      parseJsonObject(inputs.expressionAttributeValues),
+      String(inputs.expressionAttributeNames ?? ""),
+      String(inputs.expressionAttributeValues ?? ""),
       String(inputs.indexName ?? ""),
       Number(inputs.limit) || 0,
-      exclusiveStartKeyStr ? parseJsonObject(exclusiveStartKeyStr) : null,
+      String(inputs.exclusiveStartKey ?? ""),
       Boolean(inputs.consistentRead),
     );
-    return { nextExec: "exec-out", outputs: { success: result.success, items: JSON.stringify(result.items), lastEvaluatedKey: JSON.stringify(result.lastEvaluatedKey), count: result.count, scannedCount: result.scannedCount, error: result.error } };
+    return { nextExec: "exec-out", outputs: { success: result.success, items: result.itemsJson, lastEvaluatedKey: result.lastEvaluatedKeyJson, count: result.count, scannedCount: result.scannedCount, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbScan(${inputs.credentialName}, ${inputs.tableName}, ${inputs.filterExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.indexName}, ${inputs.limit}, ${inputs.exclusiveStartKey}, ${inputs.consistentRead});`,
+    `const ${compileResultVar(node.id)} = await DynamoDbManager.scan(${inputs.credentialName}, ${inputs.tableName}, ${inputs.filterExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.indexName}, ${inputs.limit}, ${inputs.exclusiveStartKey}, ${inputs.consistentRead});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, items: `${v}.itemsJson`, lastEvaluatedKey: `${v}.lastEvaluatedKeyJson`, count: `${v}.count`, scannedCount: `${v}.scannedCount`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -562,18 +510,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, items: "[]", unprocessedKeys: "[]", error: resolved.error } };
-    const result = await resolved.manager.batchGetItem(String(inputs.tableName ?? ""), parseJsonArray(inputs.keys) as Record<string, unknown>[], Boolean(inputs.consistentRead));
-    return { nextExec: "exec-out", outputs: { success: result.success, items: JSON.stringify(result.items), unprocessedKeys: JSON.stringify(result.unprocessedKeys), error: result.error } };
+  execute: async ({ inputs }) => {
+    const result = await (await loadDynamoDbManager()).batchGetItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.keys ?? ""), Boolean(inputs.consistentRead));
+    return { nextExec: "exec-out", outputs: { success: result.success, items: result.itemsJson, unprocessedKeys: result.unprocessedKeysJson, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbBatchGetItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.keys}, ${inputs.consistentRead});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.batchGetItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.keys}, ${inputs.consistentRead});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, items: `${v}.itemsJson`, unprocessedKeys: `${v}.unprocessedKeysJson`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -594,18 +540,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, unprocessedCount: 0, error: resolved.error } };
-    const result = await resolved.manager.batchWriteItem(String(inputs.tableName ?? ""), parseJsonArray(inputs.putItems) as Record<string, unknown>[], parseJsonArray(inputs.deleteKeys) as Record<string, unknown>[]);
+  execute: async ({ inputs }) => {
+    const result = await (await loadDynamoDbManager()).batchWriteItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.putItems ?? ""), String(inputs.deleteKeys ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbBatchWriteItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.putItems}, ${inputs.deleteKeys});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.batchWriteItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.putItems}, ${inputs.deleteKeys});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, unprocessedCount: `${v}.unprocessedCount`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -624,19 +568,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, "items-out": "[]", error: resolved.error } };
-    const items = parseJsonArray(inputs.items) as { tableName: string; key: Record<string, unknown> }[];
-    const result = await resolved.manager.transactGetItems(items);
-    return { nextExec: "exec-out", outputs: { success: result.success, "items-out": JSON.stringify(result.items), error: result.error } };
+  execute: async ({ inputs }) => {
+    const result = await (await loadDynamoDbManager()).transactGetItems(String(inputs.credentialName ?? ""), String(inputs.items ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, "items-out": result.itemsJson, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbTransactGetItems(${inputs.credentialName}, ${inputs.items});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.transactGetItems(${inputs.credentialName}, ${inputs.items});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, "items-out": `${v}.itemsJson`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -647,17 +588,14 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), { id: "operations", label: i18n.nodes.dynamoDb.transactWriteItems.pin_operations, type: "string", direction: "input", defaultValue: "[]" }, execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const operations = parseJsonArray(inputs.operations) as Parameters<DynamoDbManager["transactWriteItems"]>[0];
-    const result = await resolved.manager.transactWriteItems(operations);
+  execute: async ({ inputs }) => {
+    const result = await (await loadDynamoDbManager()).transactWriteItems(String(inputs.credentialName ?? ""), String(inputs.operations ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryDynamoDb.dynamoDbTransactWriteItems(${inputs.credentialName}, ${inputs.operations});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.transactWriteItems(${inputs.credentialName}, ${inputs.operations});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_DYNAMODB_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT],
 });

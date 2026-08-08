@@ -1,20 +1,27 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_SALESFORCE_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, SALESFORCE_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { SALESFORCE_DESCRIBE_FIELD_STRUCT_TYPE } from "@hermione/graph/structs/salesforce";
-import { SalesforceManager } from "@hermione/core/lib/salesforceManager";
-import type { SalesforceOAuth2PasswordFlowCredentialData } from "@hermione/shared/types";
 import { i18n } from "@i18n";
 
-const GROUP_NAME = "Request.Salesforce";
-
-function resolveSalesforceCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: SalesforceOAuth2PasswordFlowCredentialData } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
-  if (credential.type !== "salesforceOAuth2PasswordFlow") return { ok: false, error: `Credential "${credentialName}" is not a Salesforce OAuth2 (Password Flow) credential` };
-  return { ok: true, data: credential.data as SalesforceOAuth2PasswordFlowCredentialData };
+// Every operation below calls the exact same SalesforceManager static method (packages/core/src/lib/
+// salesforceManager.ts) from both execute() (interpreter path) and compileExecute() (compiled/deployed
+// path) — SalesforceManager resolves the named credential straight from the database itself (see its
+// findCredential), so unlike most other providers there is no separate functionLibrarySalesforce.ts
+// env-var-reading layer and no ctx.getCredential vault lookup here: both paths are already identical.
+//
+// SalesforceManager reaches the database directly, which pulls in better-sqlite3 and Node builtins —
+// fine for execute(), which only ever runs server-side, but this file is still statically imported
+// client-side too (for the node-creation menu), so a plain top-level import here would drag that
+// whole chain into the browser bundle. Loaded with a runtime `import()` instead, ignored by both
+// bundlers, so it's never even resolved for the client build; only ever actually called server-side,
+// where it resolves normally.
+async function loadSalesforceManager(): Promise<typeof import("@hermione/core/lib/salesforceManager").SalesforceManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/salesforceManager");
+  return mod.SalesforceManager;
 }
+
+const GROUP_NAME = "Request.Salesforce";
 
 function credentialNamePin() {
   return { id: "credentialName", label: i18n.nodes.salesforce.__shared.pin_credential_name, type: "string" as const, direction: "input" as const, defaultValue: "" };
@@ -54,20 +61,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSalesforceCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, recordsJson: "[]", totalSize: 0, done: true, error: resolved.error } };
-    const auth = await SalesforceManager.forCredential(resolved.data);
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, recordsJson: "[]", totalSize: 0, done: true, error: auth.error } };
-    const result = await auth.manager.query(String(inputs.soql ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSalesforceManager()).query(String(inputs.credentialName ?? ""), String(inputs.soql ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, recordsJson: JSON.stringify(result.records), totalSize: result.totalSize, done: result.done, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySalesforce.salesforceQuery(${inputs.credentialName}, ${inputs.soql});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SalesforceManager.query(${inputs.credentialName}, ${inputs.soql});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, recordsJson: `JSON.stringify(${v}.records)`, totalSize: `${v}.totalSize`, done: `${v}.done`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SALESFORCE_IMPORT],
+  compileImports: [SALESFORCE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -87,26 +90,22 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSalesforceCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", error: resolved.error } };
+  execute: async ({ inputs }) => {
     let fields: Record<string, unknown>;
     try {
       fields = JSON.parse(String(inputs.fieldsJson ?? "{}"));
     } catch {
       return { nextExec: "exec-out", outputs: { success: false, id: "", error: "Fields JSON is not valid JSON" } };
     }
-    const auth = await SalesforceManager.forCredential(resolved.data);
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", error: auth.error } };
-    const result = await auth.manager.createRecord(String(inputs.sobjectType ?? ""), fields);
+    const result = await (await loadSalesforceManager()).createRecord(String(inputs.credentialName ?? ""), String(inputs.sobjectType ?? ""), fields);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySalesforce.salesforceCreateRecord(${inputs.credentialName}, ${inputs.sobjectType}, JSON.parse(${inputs.fieldsJson}));`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SalesforceManager.createRecord(${inputs.credentialName}, ${inputs.sobjectType}, JSON.parse(${inputs.fieldsJson}));`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SALESFORCE_IMPORT],
+  compileImports: [SALESFORCE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -127,20 +126,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSalesforceCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, recordJson: "{}", error: resolved.error } };
-    const auth = await SalesforceManager.forCredential(resolved.data);
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, recordJson: "{}", error: auth.error } };
-    const result = await auth.manager.getRecord(String(inputs.sobjectType ?? ""), String(inputs.id ?? ""), String(inputs.fields ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSalesforceManager()).getRecord(String(inputs.credentialName ?? ""), String(inputs.sobjectType ?? ""), String(inputs.id ?? ""), String(inputs.fields ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, recordJson: JSON.stringify(result.record), error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySalesforce.salesforceGetRecord(${inputs.credentialName}, ${inputs.sobjectType}, ${inputs.id}, ${inputs.fields});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SalesforceManager.getRecord(${inputs.credentialName}, ${inputs.sobjectType}, ${inputs.id}, ${inputs.fields});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, recordJson: `JSON.stringify(${v}.record)`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SALESFORCE_IMPORT],
+  compileImports: [SALESFORCE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -160,26 +155,22 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSalesforceCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+  execute: async ({ inputs }) => {
     let fields: Record<string, unknown>;
     try {
       fields = JSON.parse(String(inputs.fieldsJson ?? "{}"));
     } catch {
       return { nextExec: "exec-out", outputs: { success: false, error: "Fields JSON is not valid JSON" } };
     }
-    const auth = await SalesforceManager.forCredential(resolved.data);
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, error: auth.error } };
-    const result = await auth.manager.updateRecord(String(inputs.sobjectType ?? ""), String(inputs.id ?? ""), fields);
+    const result = await (await loadSalesforceManager()).updateRecord(String(inputs.credentialName ?? ""), String(inputs.sobjectType ?? ""), String(inputs.id ?? ""), fields);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySalesforce.salesforceUpdateRecord(${inputs.credentialName}, ${inputs.sobjectType}, ${inputs.id}, JSON.parse(${inputs.fieldsJson}));`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SalesforceManager.updateRecord(${inputs.credentialName}, ${inputs.sobjectType}, ${inputs.id}, JSON.parse(${inputs.fieldsJson}));`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SALESFORCE_IMPORT],
+  compileImports: [SALESFORCE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -198,20 +189,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSalesforceCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const auth = await SalesforceManager.forCredential(resolved.data);
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, error: auth.error } };
-    const result = await auth.manager.deleteRecord(String(inputs.sobjectType ?? ""), String(inputs.id ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSalesforceManager()).deleteRecord(String(inputs.credentialName ?? ""), String(inputs.sobjectType ?? ""), String(inputs.id ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySalesforce.salesforceDeleteRecord(${inputs.credentialName}, ${inputs.sobjectType}, ${inputs.id});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SalesforceManager.deleteRecord(${inputs.credentialName}, ${inputs.sobjectType}, ${inputs.id});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SALESFORCE_IMPORT],
+  compileImports: [SALESFORCE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -233,29 +220,22 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSalesforceCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", error: resolved.error } };
+  execute: async ({ inputs }) => {
     let fields: Record<string, unknown>;
     try {
       fields = JSON.parse(String(inputs.fieldsJson ?? "{}"));
     } catch {
       return { nextExec: "exec-out", outputs: { success: false, id: "", error: "Fields JSON is not valid JSON" } };
     }
-    const auth = await SalesforceManager.forCredential(resolved.data);
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", error: auth.error } };
-    const result = await auth.manager.upsertRecord(String(inputs.sobjectType ?? ""), String(inputs.externalIdField ?? ""), String(inputs.externalIdValue ?? ""), fields);
+    const result = await (await loadSalesforceManager()).upsertRecord(String(inputs.credentialName ?? ""), String(inputs.sobjectType ?? ""), String(inputs.externalIdField ?? ""), String(inputs.externalIdValue ?? ""), fields);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibrarySalesforce.salesforceUpsertRecord(${inputs.credentialName}, ${inputs.sobjectType}, ${inputs.externalIdField}, ${inputs.externalIdValue}, JSON.parse(${inputs.fieldsJson}));`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SalesforceManager.upsertRecord(${inputs.credentialName}, ${inputs.sobjectType}, ${inputs.externalIdField}, ${inputs.externalIdValue}, JSON.parse(${inputs.fieldsJson}));`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SALESFORCE_IMPORT],
+  compileImports: [SALESFORCE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -274,18 +254,14 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSalesforceCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, fields: [], error: resolved.error } };
-    const auth = await SalesforceManager.forCredential(resolved.data);
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, fields: [], error: auth.error } };
-    const result = await auth.manager.describeSobject(String(inputs.sobjectType ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSalesforceManager()).describeSobject(String(inputs.credentialName ?? ""), String(inputs.sobjectType ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySalesforce.salesforceDescribeSobject(${inputs.credentialName}, ${inputs.sobjectType});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SalesforceManager.describeSobject(${inputs.credentialName}, ${inputs.sobjectType});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, fields: `${v}.fields`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SALESFORCE_IMPORT],
+  compileImports: [SALESFORCE_MANAGER_IMPORT],
 });

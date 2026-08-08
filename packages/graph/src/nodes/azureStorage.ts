@@ -1,27 +1,29 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
-import { compileResultVar, FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, AZURE_STORAGE_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { UPLOAD_OPTIONS_STRUCT_TYPE, CONTAINER_PROPERTIES_STRUCT_TYPE, BLOB_PROPERTIES_STRUCT_TYPE, ACCOUNT_INFO_STRUCT_TYPE } from "@hermione/graph/structs/azureStorage";
 import { AZURE_STORAGE_CONTAINER_ACCESS_ENUM_TYPE } from "@hermione/graph/enum/azureStorage";
 import { TEXT_ENCODING_ENUM_TYPE } from "@hermione/graph/enum/common";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
-import { AzureStorageManager } from "@hermione/core/lib/azureStorageManager";
 import type { AzureStorageBlobUploadOptions } from "@hermione/core/lib/azureStorageManager";
-import type { AzureStorageConnectionStringCredentialData } from "@hermione/shared/types";
 import { i18n } from "@i18n";
 
-// Every operation below is a thin pin-wiring shim over AzureStorageManager (src/lib/azureStorageManager.ts)
-// — this file only ever translates pins to method arguments and method results back to pins.
+// Every operation below calls the exact same AzureStorageManager static method (packages/core/src/
+// lib/azureStorageManager.ts) from both execute() (interpreter path) and compileExecute()
+// (compiled/deployed path) -- AzureStorageManager resolves the named credential straight from the
+// database itself (see its findCredential), so unlike the old two-layer split there is no separate
+// functionLibraryAzureStorage.ts env-var-reading layer and no ctx.getCredential vault lookup here:
+// both paths are already identical. Same structure as nodes/twilio.ts.
 //
-// Every operation node takes a Credential Name directly (no separate auth/refresh node): each
-// resolves the named vault entry and hands its connection string to AzureStorageManager.forCredential,
-// which caches the underlying BlobServiceClient — see azureStorageManager.ts.
-//
-// Every node here also has a compileExecute: the compiled path calls a same-named
-// `functionLibraryAzureStorage.azureStorage*` wrapper (see server/functionLibraryAzureStorage.ts),
-// which reads the credential's connection string back from environment variables instead of the
-// vault — same split as jira.ts's execute()/compileExecute().
+// AzureStorageManager now reaches the database directly, which pulls in better-sqlite3 and Node
+// builtins -- fine for execute(), which only ever runs server-side, but this file is still
+// statically imported client-side too (for the node-creation menu), so it's loaded with a runtime
+// `import()` instead of a top-level import (ignored by both bundlers) -- see nodes/twilio.ts's
+// loadTwilioManager for the same pattern.
+async function loadAzureStorageManager(): Promise<typeof import("@hermione/core/lib/azureStorageManager").AzureStorageManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/azureStorageManager");
+  return mod.AzureStorageManager;
+}
 
 const GROUP_NAME = "Request.AzureStorage";
 
@@ -109,8 +111,9 @@ interface MapEntry {
 }
 
 /** The engine's "map" container pin carries its value as an array of {key, value} entries (see
- * nodes/map.ts) rather than a plain object — these convert to/from the Record<string, string>
- * AzureStorageManager actually expects/returns. */
+ * nodes/map.ts) rather than a plain object -- these convert to/from the Record<string, string>
+ * AzureStorageManager actually expects/returns. compileExecute below inlines the equivalent
+ * conversion as generated JS, since the compiled path has no access to these helpers at runtime. */
 function mapEntriesToRecord(value: unknown): Record<string, string> {
   const entries = Array.isArray(value) ? (value as MapEntry[]) : [];
   const record: Record<string, string> = {};
@@ -122,33 +125,16 @@ function recordToMapEntries(record: Record<string, string>): MapEntry[] {
   return Object.entries(record).map(([key, value]) => ({ key, value }));
 }
 
-/** Shared by every Azure Storage node — looks up a named Credential Vault entry and returns its
- * connection string, or a clear error if the name is wrong/missing. */
-function resolveAzureStorageCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: AzureStorageConnectionStringCredentialData } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential)
-    return {
-      ok: false,
-      error: `Credential "${credentialName}" not found in the vault`,
-    };
-  if (credential.type !== "azureStorageConnectionString")
-    return {
-      ok: false,
-      error: `Credential "${credentialName}" is not an Azure Storage credential`,
-    };
-  return {
-    ok: true,
-    data: credential.data as AzureStorageConnectionStringCredentialData,
-  };
+/** Inline JS (for compileExecute-generated source) that turns a compiled "map" pin's {key,value}[]
+ * literal into the Record<string,string> AzureStorageManager's static methods expect. */
+function inlineRecordFromEntries(entriesExpr: string): string {
+  return `Object.fromEntries((${entriesExpr} || []).map((e) => [e.key, e.value]))`;
 }
 
-function managerFor(ctx: ExecutionContext, credentialName: string): { ok: true; manager: AzureStorageManager } | { ok: false; error: string } {
-  const resolved = resolveAzureStorageCredential(ctx, credentialName);
-  if (!resolved.ok) return resolved;
-  return {
-    ok: true,
-    manager: AzureStorageManager.forCredential(resolved.data.connectionString),
-  };
+/** Inline JS that turns a Record<string,string> result field back into the {key,value}[] shape a
+ * "map" output pin expects. */
+function inlineEntriesFromRecord(recordExpr: string): string {
+  return `Object.entries(${recordExpr}).map(([key, value]) => ({ key, value }))`;
 }
 
 registerNode({
@@ -167,22 +153,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, containers: [], error: resolved.error },
-      };
-    const result = await resolved.manager.listContainers(String(inputs.prefix ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).listContainers(String(inputs.credentialName ?? ""), String(inputs.prefix ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageListContainers(${inputs.credentialName}, ${inputs.prefix});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.listContainers(${inputs.credentialName}, ${inputs.prefix});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, containers: `${v}.containers`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -201,23 +181,17 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
+  execute: async ({ inputs }) => {
     const access = inputs.access === "blob" || inputs.access === "container" ? inputs.access : "private";
-    const result = await resolved.manager.createContainer(String(inputs.containerName ?? ""), access);
+    const result = await (await loadAzureStorageManager()).createContainer(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), access);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageCreateContainer(${inputs.credentialName}, ${inputs.containerName}, ${inputs.access});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.createContainer(${inputs.credentialName}, ${inputs.containerName}, ${inputs.access});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -228,22 +202,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), containerNamePin(), execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const result = await resolved.manager.deleteContainer(String(inputs.containerName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).deleteContainer(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageDeleteContainer(${inputs.credentialName}, ${inputs.containerName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.deleteContainer(${inputs.credentialName}, ${inputs.containerName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -254,23 +222,8 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), containerNamePin(), execOutPin(), successPin(), { id: "properties", label: i18n.nodes.azureStorage.containerProperties.label, type: "struct", subType: CONTAINER_PROPERTIES_STRUCT_TYPE, direction: "output" }, errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          properties: {
-            etag: "",
-            lastModified: "",
-            publicAccess: "",
-            metadata: [],
-          },
-          error: resolved.error,
-        },
-      };
-    const result = await resolved.manager.getContainerProperties(String(inputs.containerName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).getContainerProperties(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -285,12 +238,12 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageGetContainerProperties(${inputs.credentialName}, ${inputs.containerName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.getContainerProperties(${inputs.credentialName}, ${inputs.containerName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, properties: `${v}.properties`, error: `${v}.error` };
+    return { success: `${v}.success`, properties: `{ etag: ${v}.etag, lastModified: ${v}.lastModified, publicAccess: ${v}.publicAccess, metadata: ${inlineEntriesFromRecord(`${v}.metadata`)} }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -301,22 +254,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), containerNamePin(), metadataInPin(), execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const result = await resolved.manager.setContainerMetadata(String(inputs.containerName ?? ""), mapEntriesToRecord(inputs.metadata));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).setContainerMetadata(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), mapEntriesToRecord(inputs.metadata));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageSetContainerMetadata(${inputs.credentialName}, ${inputs.containerName}, ${inputs.metadata});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.setContainerMetadata(${inputs.credentialName}, ${inputs.containerName}, ${inlineRecordFromEntries(inputs.metadata)});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -337,22 +284,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, blobs: [], error: resolved.error },
-      };
-    const result = await resolved.manager.listBlobs(String(inputs.containerName ?? ""), String(inputs.prefix ?? ""), Boolean(inputs.recursive));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).listBlobs(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.prefix ?? ""), Boolean(inputs.recursive));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageListBlobs(${inputs.credentialName}, ${inputs.containerName}, ${inputs.prefix}, ${inputs.recursive});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.listBlobs(${inputs.credentialName}, ${inputs.containerName}, ${inputs.prefix}, ${inputs.recursive});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, blobs: `${v}.blobs`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -390,13 +331,7 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
+  execute: async ({ inputs }) => {
     const options = (inputs.options ?? {}) as Partial<AzureStorageBlobUploadOptions>;
     const uploadOptions: AzureStorageBlobUploadOptions = {
       contentType: String(options.contentType ?? ""),
@@ -407,18 +342,18 @@ registerNode({
       tier: String(options.tier ?? ""),
       metadata: mapEntriesToRecord(options.metadata),
     };
-    const result = await resolved.manager.uploadBlob(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", uploadOptions, Boolean(inputs.overwrite));
+    const result = await (await loadAzureStorageManager()).uploadBlob(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", uploadOptions, Boolean(inputs.overwrite));
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageUploadBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.content}, ${inputs.encoding}, ${inputs.options}, ${inputs.overwrite});`,
+    `const ${compileResultVar(node.id)} = await AzureStorageManager.uploadBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.content}, ${inputs.encoding}, { ...${inputs.options}, metadata: ${inlineRecordFromEntries(`${inputs.options}.metadata`)} }, ${inputs.overwrite});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -439,22 +374,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, content: "", error: resolved.error },
-      };
-    const result = await resolved.manager.downloadBlob(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).downloadBlob(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageDownloadBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.downloadBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.encoding});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, content: `${v}.content`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -465,25 +394,20 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const result = await resolved.manager.deleteBlob(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).deleteBlob(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageDeleteBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.deleteBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 function registerRelocationNode(type: "copyBlob" | "moveBlob") {
+  const fn = type === "copyBlob" ? "copyBlob" : "moveBlob";
   registerNode({
     type: `azureStorage.${type}`,
     label: i18n.nodes.azureStorage[type].label,
@@ -502,25 +426,17 @@ function registerRelocationNode(type: "copyBlob" | "moveBlob") {
       errorPin(),
     ],
     latent: true,
-    execute: async ({ inputs, ctx }) => {
-      const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-      if (!resolved.ok)
-        return {
-          nextExec: "exec-out",
-          outputs: { success: false, error: resolved.error },
-        };
-      const result = await resolved.manager[type](String(inputs.sourceContainer ?? ""), String(inputs.sourceBlob ?? ""), String(inputs.destContainer ?? ""), String(inputs.destBlob ?? ""));
+    execute: async ({ inputs }) => {
+      const manager = await loadAzureStorageManager();
+      const result = await manager[fn](String(inputs.credentialName ?? ""), String(inputs.sourceContainer ?? ""), String(inputs.sourceBlob ?? ""), String(inputs.destContainer ?? ""), String(inputs.destBlob ?? ""));
       return { nextExec: "exec-out", outputs: result };
     },
-    compileExecute: ({ node, inputs, compileFrom }) => {
-      const fn = type === "copyBlob" ? "azureStorageCopyBlob" : "azureStorageMoveBlob";
-      return [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.${fn}(${inputs.credentialName}, ${inputs.sourceContainer}, ${inputs.sourceBlob}, ${inputs.destContainer}, ${inputs.destBlob});`, ...compileFrom("exec-out")];
-    },
+    compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.${fn}(${inputs.credentialName}, ${inputs.sourceContainer}, ${inputs.sourceBlob}, ${inputs.destContainer}, ${inputs.destBlob});`, ...compileFrom("exec-out")],
     compileExecuteOutputs: ({ node }) => {
       const v = compileResultVar(node.id);
       return { success: `${v}.success`, error: `${v}.error` };
     },
-    compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+    compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
   });
 }
 
@@ -535,24 +451,8 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), execOutPin(), successPin(), { id: "properties", label: i18n.nodes.azureStorage.blobProperties.label, type: "struct", subType: BLOB_PROPERTIES_STRUCT_TYPE, direction: "output" }, errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          properties: {
-            size: 0,
-            contentType: "",
-            etag: "",
-            lastModified: "",
-            metadata: [],
-          },
-          error: resolved.error,
-        },
-      };
-    const result = await resolved.manager.getBlobProperties(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).getBlobProperties(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -568,12 +468,16 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageGetBlobProperties(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.getBlobProperties(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, properties: `${v}.properties`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      properties: `{ size: ${v}.size, contentType: ${v}.contentType, etag: ${v}.etag, lastModified: ${v}.lastModified, metadata: ${inlineEntriesFromRecord(`${v}.metadata`)} }`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -584,22 +488,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), metadataInPin(), execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, error: resolved.error },
-      };
-    const result = await resolved.manager.setBlobMetadata(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), mapEntriesToRecord(inputs.metadata));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).setBlobMetadata(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), mapEntriesToRecord(inputs.metadata));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageSetBlobMetadata(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.metadata});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.setBlobMetadata(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inlineRecordFromEntries(inputs.metadata)});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -610,22 +508,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), execOutPin(), successPin(), { id: "exists", label: i18n.nodes.azureStorage.blobExists.pin_exists, type: "boolean", direction: "output" }, errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, exists: false, error: resolved.error },
-      };
-    const result = await resolved.manager.blobExists(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).blobExists(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageBlobExists(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.blobExists(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, exists: `${v}.exists`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -647,25 +539,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, url: "", error: resolved.error },
-      };
-    const result = await resolved.manager.generateBlobSasUrl(String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).generateBlobSasUrl(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageGenerateBlobSasUrl(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.permissions}, ${inputs.expiresInMinutes});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.generateBlobSasUrl(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.permissions}, ${inputs.expiresInMinutes});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, url: `${v}.url`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -686,22 +569,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: { success: false, url: "", error: resolved.error },
-      };
-    const result = await resolved.manager.generateContainerSasUrl(String(inputs.containerName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60));
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).generateContainerSasUrl(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageGenerateContainerSasUrl(${inputs.credentialName}, ${inputs.containerName}, ${inputs.permissions}, ${inputs.expiresInMinutes});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.generateContainerSasUrl(${inputs.credentialName}, ${inputs.containerName}, ${inputs.permissions}, ${inputs.expiresInMinutes});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, url: `${v}.url`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -712,18 +589,8 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "accountInfo", label: i18n.nodes.azureStorage.accountInfo.label, type: "struct", subType: ACCOUNT_INFO_STRUCT_TYPE, direction: "output" }, errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok)
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          accountInfo: { accountKind: "", skuName: "" },
-          error: resolved.error,
-        },
-      };
-    const result = await resolved.manager.getAccountInfo();
+  execute: async ({ inputs }) => {
+    const result = await (await loadAzureStorageManager()).getAccountInfo(String(inputs.credentialName ?? ""));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -736,10 +603,10 @@ registerNode({
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryAzureStorage.azureStorageGetAccountInfo(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.getAccountInfo(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, accountInfo: `${v}.accountInfo`, error: `${v}.error` };
+    return { success: `${v}.success`, accountInfo: `{ accountKind: ${v}.accountKind, skuName: ${v}.skuName }`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
 });

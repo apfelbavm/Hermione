@@ -2,24 +2,31 @@
  * see lib/sapManager.ts for the request logic. SAP's proprietary IDoc/BAPI/RFC protocols require the
  * NetWeaver RFC SDK (not available via npm) and are out of scope here; this connector only covers
  * OData/Gateway services. RFC-enabled function modules exposed as a SOAP web service can still be
- * reached via the existing generic soap.call node (src/graph/nodes/soap.ts).
- *
- * lib/sapManager.ts wraps the official `@sap-cloud-sdk/http-client` + `@sap-cloud-sdk/connectivity`
- * packages, which transitively depend on Node-only packages (jsonwebtoken, @sap/xssec, jks-js, etc.)
- * — a browser tab has no way to run them at all, same situation as twilio.ts/stripe.ts/smtp.ts (see
- * those files' own header comments for the fuller explanation). Every node's own execute() below is
- * therefore a permanent, honest stub — it always reports failure with a clear explanation instead of
- * pretending to try, and the REAL implementation exists only for the compiled path, reached purely
- * via compileImports below (never a static import here). */
+ * reached via the existing generic soap.call node (src/graph/nodes/soap.ts). */
 
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_SAP_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, SAP_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { i18n } from "@i18n";
 
-const GROUP_NAME = "Request.SAP";
+// Every operation below calls the exact same SapManager static method (packages/core/src/lib/
+// sapManager.ts) from both execute() (interpreter path) and compileExecute() (compiled/deployed
+// path) — SapManager resolves the named credential straight from the database itself (see its
+// findCredential), so unlike most other providers there is no separate functionLibrarySap.ts
+// env-var-reading layer here: both paths are already identical.
+//
+// SapManager reaches the database directly (see its own header comment), which pulls in
+// better-sqlite3, the SAP Cloud SDK, and Node builtins — fine for execute(), which only ever runs
+// server-side, but this file is still statically imported client-side too (for the node-creation
+// menu), so a plain top-level import here would drag that whole chain into the browser bundle.
+// Loaded with a runtime `import()` instead, ignored by both bundlers, so it's never even resolved
+// for the client build; only ever actually called server-side, where it resolves normally.
+async function loadSapManager(): Promise<typeof import("@hermione/core/lib/sapManager").SapManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/sapManager");
+  return mod.SapManager;
+}
 
-const STUB_ERROR = 'SAP OData nodes only run in the compiled output (under Node.js) — the in-browser "Run" button cannot load the SAP Cloud SDK. Compile this graph and run the generated script to actually reach SAP.';
+const GROUP_NAME = "Request.SAP";
 
 function credentialNamePin() {
   return { id: "credentialName", label: i18n.nodes.sap.__shared.pin_credential_name, type: "string" as const, direction: "input" as const, defaultValue: "" };
@@ -71,13 +78,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, resultsJson: "[]", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySap.sapGetEntitySet(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.queryOptions});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSapManager()).getEntitySet(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.queryOptions ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, resultsJson: JSON.stringify(result.results), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SapManager.getEntitySet(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.queryOptions});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, resultsJson: `JSON.stringify(${v}.results)`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SAP_IMPORT],
+  compileImports: [SAP_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -98,13 +108,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, entityJson: "{}", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySap.sapGetEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSapManager()).getEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.keyPredicate ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, entityJson: JSON.stringify(result.entity), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SapManager.getEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, entityJson: `JSON.stringify(${v}.entity)`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SAP_IMPORT],
+  compileImports: [SAP_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -125,13 +138,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, entityJson: "{}", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySap.sapCreateEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, JSON.parse(${inputs.bodyJson}));`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSapManager()).createEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), JSON.parse(String(inputs.bodyJson ?? "{}")));
+    return { nextExec: "exec-out", outputs: { success: result.success, entityJson: JSON.stringify(result.entity), error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SapManager.createEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, JSON.parse(${inputs.bodyJson}));`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, entityJson: `JSON.stringify(${v}.entity)`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SAP_IMPORT],
+  compileImports: [SAP_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -152,13 +168,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySap.sapUpdateEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate}, JSON.parse(${inputs.bodyJson}));`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSapManager()).updateEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.keyPredicate ?? ""), JSON.parse(String(inputs.bodyJson ?? "{}")));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SapManager.updateEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate}, JSON.parse(${inputs.bodyJson}));`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SAP_IMPORT],
+  compileImports: [SAP_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -169,11 +188,14 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), servicePathPin(i18n.nodes.sap.deleteEntity.pin_service_path), entitySetPin(i18n.nodes.sap.deleteEntity.pin_entity_set), keyPredicatePin(i18n.nodes.sap.deleteEntity.pin_key_predicate), execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySap.sapDeleteEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSapManager()).deleteEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.keyPredicate ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SapManager.deleteEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SAP_IMPORT],
+  compileImports: [SAP_MANAGER_IMPORT],
 });

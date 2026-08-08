@@ -1,23 +1,31 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_STRIPE_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, STRIPE_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { CHARGE_STRUCT_TYPE, CUSTOMER_STRUCT_TYPE } from "@hermione/graph/structs/stripe";
 import { i18n } from "@i18n";
 
+// Every operation below calls the exact same StripeManager static method (packages/core/src/lib/
+// stripeManager.ts) from both execute() (interpreter path) and compileExecute() (compiled/deployed
+// path) — StripeManager resolves the named credential straight from the database itself (see its
+// findCredential), so unlike most other providers there is no separate functionLibraryStripe.ts
+// env-var-reading layer and no ctx.getCredential vault lookup here: both paths are already identical.
+//
+// StripeManager reaches the database directly (see its own header comment), which pulls in
+// better-sqlite3 and Node builtins — fine for execute(), which only ever runs server-side, but this
+// file is still statically imported client-side too (for the node-creation menu), so a plain
+// top-level import here would drag that whole chain into the browser bundle. Loaded with a runtime
+// `import()` instead, ignored by both bundlers, so it's never even resolved for the client build;
+// only ever actually called server-side, where it resolves normally.
+async function loadStripeManager(): Promise<typeof import("@hermione/core/lib/stripeManager").StripeManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/stripeManager");
+  return mod.StripeManager;
+}
+
 const GROUP_NAME = "Request.Stripe";
 
-// Calls Stripe via the official "stripe" Node SDK, which talks to Stripe over Node's own
-// http/https/crypto modules and is documented by Stripe as server-side only (a secret key shipped
-// to a browser is a live credential leak). Same structural situation as sftp.ts/smtp.ts/twilio.ts:
-// every node below has a permanent, honest stub execute() reporting that only the compiled output
-// can actually reach Stripe; the REAL implementation lives in
-// src/server/functionLibraryStripe.ts (backed by src/lib/stripeManager.ts), reached only via
-// compileImports, never statically imported here.
 function credentialNamePin() {
   return { id: "credentialName", label: i18n.nodes.stripe.__shared.pin_credential_name, type: "string" as const, direction: "input" as const, defaultValue: "" };
 }
-
-const STUB_ERROR = 'This Stripe node only runs in the compiled output (under Node.js) — the in-browser "Run" button cannot use the official Stripe SDK client-side (it is server-only and would expose your secret key). Compile this graph and run the generated script to actually call Stripe.';
 
 registerNode({
   type: "stripe.createCustomer",
@@ -38,13 +46,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, customerId: "", customerEmail: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryStripe.stripeCreateCustomer(${inputs.credentialName}, ${inputs.email}, ${inputs.name}, ${inputs.description});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadStripeManager()).createCustomer(String(inputs.credentialName ?? ""), String(inputs.email ?? ""), String(inputs.name ?? ""), String(inputs.description ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, customerId: result.customerId, customerEmail: result.email, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.createCustomer(${inputs.credentialName}, ${inputs.email}, ${inputs.name}, ${inputs.description});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, customerId: `${v}.customerId`, customerEmail: `${v}.email`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_STRIPE_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -65,13 +76,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, id: "", email: "", name: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryStripe.stripeGetCustomer(${inputs.credentialName}, ${inputs.customerId});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadStripeManager()).getCustomer(String(inputs.credentialName ?? ""), String(inputs.customerId ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, id: result.customerId, email: result.email, name: result.name, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.getCustomer(${inputs.credentialName}, ${inputs.customerId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.customerId`, email: `${v}.email`, name: `${v}.name`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_STRIPE_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -90,13 +104,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, deleted: false, error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryStripe.stripeDeleteCustomer(${inputs.credentialName}, ${inputs.customerId});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadStripeManager()).deleteCustomer(String(inputs.credentialName ?? ""), String(inputs.customerId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.deleteCustomer(${inputs.credentialName}, ${inputs.customerId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, deleted: `${v}.deleted`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_STRIPE_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -116,13 +133,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, customers: [], error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryStripe.stripeListCustomers(${inputs.credentialName}, ${inputs.email}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadStripeManager()).listCustomers(String(inputs.credentialName ?? ""), String(inputs.email ?? ""), Number(inputs.limit) || 20);
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.listCustomers(${inputs.credentialName}, ${inputs.email}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, customers: `${v}.customers`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_STRIPE_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -146,13 +166,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, paymentIntentId: "", clientSecret: "", status: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryStripe.stripeCreatePaymentIntent(${inputs.credentialName}, ${inputs.amount}, ${inputs.currency}, ${inputs.customerId}, ${inputs.description});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadStripeManager()).createPaymentIntent(String(inputs.credentialName ?? ""), Number(inputs.amount) || 0, String(inputs.currency ?? ""), String(inputs.customerId ?? ""), String(inputs.description ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.createPaymentIntent(${inputs.credentialName}, ${inputs.amount}, ${inputs.currency}, ${inputs.customerId}, ${inputs.description});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, paymentIntentId: `${v}.paymentIntentId`, clientSecret: `${v}.clientSecret`, status: `${v}.status`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_STRIPE_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -173,13 +196,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, status: "", amount: 0, currency: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryStripe.stripeGetPaymentIntent(${inputs.credentialName}, ${inputs.paymentIntentId});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadStripeManager()).getPaymentIntent(String(inputs.credentialName ?? ""), String(inputs.paymentIntentId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.getPaymentIntent(${inputs.credentialName}, ${inputs.paymentIntentId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, status: `${v}.status`, amount: `${v}.amount`, currency: `${v}.currency`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_STRIPE_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -198,13 +224,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, status: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryStripe.stripeCancelPaymentIntent(${inputs.credentialName}, ${inputs.paymentIntentId});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadStripeManager()).cancelPaymentIntent(String(inputs.credentialName ?? ""), String(inputs.paymentIntentId ?? ""));
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.cancelPaymentIntent(${inputs.credentialName}, ${inputs.paymentIntentId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, status: `${v}.status`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_STRIPE_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -225,13 +254,16 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, refundId: "", status: "", error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryStripe.stripeCreateRefund(${inputs.credentialName}, ${inputs.paymentIntentId}, ${inputs.amount});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadStripeManager()).createRefund(String(inputs.credentialName ?? ""), String(inputs.paymentIntentId ?? ""), Number(inputs.amount) || 0);
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.createRefund(${inputs.credentialName}, ${inputs.paymentIntentId}, ${inputs.amount});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, refundId: `${v}.refundId`, status: `${v}.status`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_STRIPE_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -251,11 +283,14 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({ nextExec: "exec-out", outputs: { success: false, charges: [], error: STUB_ERROR } }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryStripe.stripeListCharges(${inputs.credentialName}, ${inputs.customerId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadStripeManager()).listCharges(String(inputs.credentialName ?? ""), String(inputs.customerId ?? ""), Number(inputs.limit) || 20);
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.listCharges(${inputs.credentialName}, ${inputs.customerId}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, charges: `${v}.charges`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_STRIPE_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT],
 });

@@ -1,13 +1,21 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_SLACK_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, SLACK_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { CHANNEL_STRUCT_TYPE, USER_STRUCT_TYPE, MESSAGE_STRUCT_TYPE, PIN_ITEM_STRUCT_TYPE, SEARCH_MATCH_STRUCT_TYPE, USER_GROUP_STRUCT_TYPE, REMINDER_STRUCT_TYPE } from "@hermione/graph/structs/slack";
 import { TEXT_ENCODING_ENUM_TYPE } from "@hermione/graph/enum/common";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
-import { SlackManager } from "@hermione/core/lib/slackManager";
-import type { SlackBotTokenCredentialData } from "@hermione/shared/types";
 import { i18n } from "@i18n";
+
+// SlackManager (packages/core/src/lib/slackManager.ts) reaches the database directly to resolve the
+// named credential, which pulls in better-sqlite3 and Node builtins — fine for execute(), which only
+// ever runs server-side, but this file is still statically imported client-side too (for the
+// node-creation menu), so a plain top-level import here would drag that whole chain into the browser
+// bundle. Loaded with a runtime `import()` instead, ignored by both bundlers, so it's never even
+// resolved for the client build; only ever actually called server-side, where it resolves normally.
+async function loadSlackManager(): Promise<typeof import("@hermione/core/lib/slackManager").SlackManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/slackManager");
+  return mod.SlackManager;
+}
 
 const GROUP_NAME = "Request.Slack";
 
@@ -31,13 +39,6 @@ function errorPin() {
   return { id: "error", label: i18n.nodes.__shared.pin_error, type: "string" as const, direction: "output" as const };
 }
 
-function resolveSlackCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: SlackBotTokenCredentialData } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
-  if (credential.type !== "slackBotToken") return { ok: false, error: `Credential "${credentialName}" is not a Slack Bot Token credential` };
-  return { ok: true, data: credential.data as SlackBotTokenCredentialData };
-}
-
 registerNode({
   type: "slack.postMessage",
   label: i18n.nodes.slack.postMessage.label,
@@ -56,19 +57,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, channel: "", ts: "", error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.postMessage(String(inputs.channel ?? ""), String(inputs.text ?? ""), String(inputs.threadTs ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).postMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.text ?? ""), String(inputs.threadTs ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackPostMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.text}, ${inputs.threadTs});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.postMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.text}, ${inputs.threadTs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, ts: `${v}.ts`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -90,19 +88,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, channelOut: "", tsOut: "", error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.updateMessage(String(inputs.channel ?? ""), String(inputs.ts ?? ""), String(inputs.text ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).updateMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.ts ?? ""), String(inputs.text ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, channelOut: result.channel, tsOut: result.ts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackUpdateMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.ts}, ${inputs.text});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.updateMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.ts}, ${inputs.text});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, channelOut: `${v}.channel`, tsOut: `${v}.ts`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -121,19 +116,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.deleteMessage(String(inputs.channel ?? ""), String(inputs.ts ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).deleteMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.ts ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackDeleteMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.ts});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.deleteMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.ts});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -154,19 +146,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, messageTs: "", error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.postEphemeral(String(inputs.channel ?? ""), String(inputs.user ?? ""), String(inputs.text ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).postEphemeral(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.user ?? ""), String(inputs.text ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackPostEphemeral(${inputs.credentialName}, ${inputs.channel}, ${inputs.user}, ${inputs.text});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.postEphemeral(${inputs.credentialName}, ${inputs.channel}, ${inputs.user}, ${inputs.text});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, messageTs: `${v}.messageTs`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -188,19 +177,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, scheduledMessageId: "", postAtOut: 0, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.scheduleMessage(String(inputs.channel ?? ""), String(inputs.text ?? ""), Number(inputs.postAt ?? 0));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).scheduleMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.text ?? ""), Number(inputs.postAt ?? 0));
     return { nextExec: "exec-out", outputs: { success: result.success, scheduledMessageId: result.scheduledMessageId, postAtOut: result.postAt, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackScheduleMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.text}, ${inputs.postAt});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.scheduleMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.text}, ${inputs.postAt});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, scheduledMessageId: `${v}.scheduledMessageId`, postAtOut: `${v}.postAt`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -220,19 +206,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, channels: [], error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.listConversations(Number(inputs.limit ?? 200), String(inputs.types ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).listConversations(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 200), String(inputs.types ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackListConversations(${inputs.credentialName}, ${inputs.limit}, ${inputs.types});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.listConversations(${inputs.credentialName}, ${inputs.limit}, ${inputs.types});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, channels: `${v}.channels`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -253,19 +236,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, channelId: "", nameOut: "", error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.createConversation(String(inputs.name ?? ""), Boolean(inputs.isPrivate));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).createConversation(String(inputs.credentialName ?? ""), String(inputs.name ?? ""), Boolean(inputs.isPrivate));
     return { nextExec: "exec-out", outputs: { success: result.success, channelId: result.channelId, nameOut: result.name, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackCreateConversation(${inputs.credentialName}, ${inputs.name}, ${inputs.isPrivate});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.createConversation(${inputs.credentialName}, ${inputs.name}, ${inputs.isPrivate});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, channelId: `${v}.channelId`, nameOut: `${v}.name`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -276,19 +256,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), { id: "channel", label: i18n.nodes.slack.archiveConversation.pin_channel, type: "string", direction: "input", defaultValue: "" }, execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.archiveConversation(String(inputs.channel ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).archiveConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackArchiveConversation(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.archiveConversation(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -307,19 +284,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.inviteToConversation(String(inputs.channel ?? ""), String(inputs.userIds ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).inviteToConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.userIds ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackInviteToConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.userIds});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.inviteToConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.userIds});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -338,19 +312,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.kickFromConversation(String(inputs.channel ?? ""), String(inputs.user ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).kickFromConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.user ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackKickFromConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.user});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.kickFromConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.user});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -361,19 +332,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), { id: "channel", label: i18n.nodes.slack.joinConversation.pin_channel, type: "string", direction: "input", defaultValue: "" }, execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.joinConversation(String(inputs.channel ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).joinConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackJoinConversation(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.joinConversation(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -393,19 +361,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, messages: [], error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.getConversationHistory(String(inputs.channel ?? ""), Number(inputs.limit ?? 100));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).getConversationHistory(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), Number(inputs.limit ?? 100));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackGetConversationHistory(${inputs.credentialName}, ${inputs.channel}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getConversationHistory(${inputs.credentialName}, ${inputs.channel}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, messages: `${v}.messages`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -430,14 +395,11 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", name: "", isPrivate: false, isArchived: false, topic: "", purpose: "", memberCount: 0, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.getConversationInfo(String(inputs.channel ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).getConversationInfo(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackGetConversationInfo(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getConversationInfo(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -452,7 +414,7 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -472,19 +434,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, memberIds: [], error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.getConversationMembers(String(inputs.channel ?? ""), Number(inputs.limit ?? 200));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).getConversationMembers(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), Number(inputs.limit ?? 200));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackGetConversationMembers(${inputs.credentialName}, ${inputs.channel}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getConversationMembers(${inputs.credentialName}, ${inputs.channel}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, memberIds: `${v}.memberIds`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -503,19 +462,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.setConversationTopic(String(inputs.channel ?? ""), String(inputs.topic ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).setConversationTopic(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.topic ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackSetConversationTopic(${inputs.credentialName}, ${inputs.channel}, ${inputs.topic});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.setConversationTopic(${inputs.credentialName}, ${inputs.channel}, ${inputs.topic});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -534,19 +490,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.setConversationPurpose(String(inputs.channel ?? ""), String(inputs.purpose ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).setConversationPurpose(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.purpose ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackSetConversationPurpose(${inputs.credentialName}, ${inputs.channel}, ${inputs.purpose});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.setConversationPurpose(${inputs.credentialName}, ${inputs.channel}, ${inputs.purpose});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -565,19 +518,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.renameConversation(String(inputs.channel ?? ""), String(inputs.name ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).renameConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.name ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackRenameConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.name});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.renameConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.name});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -596,19 +546,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, users: [], error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.listUsers(Number(inputs.limit ?? 200));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).listUsers(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 200));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackListUsers(${inputs.credentialName}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.listUsers(${inputs.credentialName}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, users: `${v}.users`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -631,19 +578,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", name: "", realName: "", email: "", isBot: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.getUserInfo(String(inputs.user ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).getUserInfo(String(inputs.credentialName ?? ""), String(inputs.user ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackGetUserInfo(${inputs.credentialName}, ${inputs.user});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getUserInfo(${inputs.credentialName}, ${inputs.user});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, realName: `${v}.realName`, email: `${v}.email`, isBot: `${v}.isBot`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -664,19 +608,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", name: "", realName: "", error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.lookupUserByEmail(String(inputs.email ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).lookupUserByEmail(String(inputs.credentialName ?? ""), String(inputs.email ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackLookupUserByEmail(${inputs.credentialName}, ${inputs.email});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.lookupUserByEmail(${inputs.credentialName}, ${inputs.email});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, realName: `${v}.realName`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -700,19 +641,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, fileId: "", permalink: "", error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.uploadFile(String(inputs.channel ?? ""), String(inputs.filename ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", String(inputs.initialComment ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).uploadFile(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.filename ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", String(inputs.initialComment ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackUploadFile(${inputs.credentialName}, ${inputs.channel}, ${inputs.filename}, ${inputs.content}, ${inputs.encoding}, ${inputs.initialComment});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.uploadFile(${inputs.credentialName}, ${inputs.channel}, ${inputs.filename}, ${inputs.content}, ${inputs.encoding}, ${inputs.initialComment});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, fileId: `${v}.fileId`, permalink: `${v}.permalink`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -723,19 +661,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), { id: "fileId", label: i18n.nodes.slack.deleteFile.pin_file_id, type: "string", direction: "input", defaultValue: "" }, execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.deleteFile(String(inputs.fileId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).deleteFile(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackDeleteFile(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.deleteFile(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -758,19 +693,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", name: "", title: "", permalink: "", size: 0, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.getFileInfo(String(inputs.fileId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).getFileInfo(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackGetFileInfo(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getFileInfo(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, title: `${v}.title`, permalink: `${v}.permalink`, size: `${v}.size`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -790,19 +722,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.addReaction(String(inputs.channel ?? ""), String(inputs.timestamp ?? ""), String(inputs.emojiName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).addReaction(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? ""), String(inputs.emojiName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackAddReaction(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp}, ${inputs.emojiName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.addReaction(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp}, ${inputs.emojiName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -822,19 +751,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.removeReaction(String(inputs.channel ?? ""), String(inputs.timestamp ?? ""), String(inputs.emojiName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).removeReaction(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? ""), String(inputs.emojiName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackRemoveReaction(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp}, ${inputs.emojiName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.removeReaction(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp}, ${inputs.emojiName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -853,19 +779,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.addPin(String(inputs.channel ?? ""), String(inputs.timestamp ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).addPin(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackAddPin(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.addPin(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -884,19 +807,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.removePin(String(inputs.channel ?? ""), String(inputs.timestamp ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).removePin(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackRemovePin(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.removePin(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -915,19 +835,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, items: [], error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.listPins(String(inputs.channel ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).listPins(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackListPins(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.listPins(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, items: `${v}.items`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -947,19 +864,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, matches: [], error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.searchMessages(String(inputs.query ?? ""), Number(inputs.count ?? 20));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).searchMessages(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), Number(inputs.count ?? 20));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackSearchMessages(${inputs.credentialName}, ${inputs.query}, ${inputs.count});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.searchMessages(${inputs.credentialName}, ${inputs.query}, ${inputs.count});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, matches: `${v}.matches`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -979,19 +893,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", name: "", domain: "", error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.getTeamInfo();
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).getTeamInfo(String(inputs.credentialName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackGetTeamInfo(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getTeamInfo(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, domain: `${v}.domain`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1002,19 +913,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "groups", label: i18n.nodes.slack.listUserGroups.pin_groups, type: "struct", subType: USER_GROUP_STRUCT_TYPE, container: "array", direction: "output" }, errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, groups: [], error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.listUserGroups();
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).listUserGroups(String(inputs.credentialName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackListUserGroups(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.listUserGroups(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, groups: `${v}.groups`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1034,19 +942,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, id: "", error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.createUserGroup(String(inputs.name ?? ""), String(inputs.handle ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).createUserGroup(String(inputs.credentialName ?? ""), String(inputs.name ?? ""), String(inputs.handle ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackCreateUserGroup(${inputs.credentialName}, ${inputs.name}, ${inputs.handle});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.createUserGroup(${inputs.credentialName}, ${inputs.name}, ${inputs.handle});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1066,19 +971,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.updateUserGroup(String(inputs.usergroup ?? ""), String(inputs.name ?? ""), String(inputs.handle ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).updateUserGroup(String(inputs.credentialName ?? ""), String(inputs.usergroup ?? ""), String(inputs.name ?? ""), String(inputs.handle ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackUpdateUserGroup(${inputs.credentialName}, ${inputs.usergroup}, ${inputs.name}, ${inputs.handle});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.updateUserGroup(${inputs.credentialName}, ${inputs.usergroup}, ${inputs.name}, ${inputs.handle});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1097,19 +999,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.updateUserGroupUsers(String(inputs.usergroup ?? ""), String(inputs.userIds ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).updateUserGroupUsers(String(inputs.credentialName ?? ""), String(inputs.usergroup ?? ""), String(inputs.userIds ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackUpdateUserGroupUsers(${inputs.credentialName}, ${inputs.usergroup}, ${inputs.userIds});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.updateUserGroupUsers(${inputs.credentialName}, ${inputs.usergroup}, ${inputs.userIds});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1130,19 +1029,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, reminderId: "", error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.addReminder(String(inputs.text ?? ""), String(inputs.time ?? ""), String(inputs.user ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).addReminder(String(inputs.credentialName ?? ""), String(inputs.text ?? ""), String(inputs.time ?? ""), String(inputs.user ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, reminderId: result.reminderId, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackAddReminder(${inputs.credentialName}, ${inputs.text}, ${inputs.time}, ${inputs.user});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.addReminder(${inputs.credentialName}, ${inputs.text}, ${inputs.time}, ${inputs.user});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, reminderId: `${v}.reminderId`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1153,19 +1049,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "reminders", label: i18n.nodes.slack.listReminders.pin_reminders, type: "struct", subType: REMINDER_STRUCT_TYPE, container: "array", direction: "output" }, errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, reminders: [], error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.listReminders();
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).listReminders(String(inputs.credentialName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackListReminders(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.listReminders(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, reminders: `${v}.reminders`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -1176,17 +1069,14 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), { id: "reminderId", label: i18n.nodes.slack.deleteReminder.pin_reminder_id, type: "string", direction: "input", defaultValue: "" }, execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveSlackCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const manager = new SlackManager(resolved.data.botToken);
-    const result = await manager.deleteReminder(String(inputs.reminderId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadSlackManager()).deleteReminder(String(inputs.credentialName ?? ""), String(inputs.reminderId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySlack.slackDeleteReminder(${inputs.credentialName}, ${inputs.reminderId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.deleteReminder(${inputs.credentialName}, ${inputs.reminderId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_SLACK_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT],
 });

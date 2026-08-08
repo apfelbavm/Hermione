@@ -1,5 +1,7 @@
 import { google, type calendar_v3 } from "googleapis";
 import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager.ts";
+import { getDatabaseManager } from "../server/DatabaseManager.ts";
+import { resolveAllCredentials } from "../server/vaultCredentials.ts";
 import type { GoogleServiceAccountCredentialData, GoogleOAuth2CredentialData } from "@hermione/shared/types";
 
 /** Every Google Calendar node (list/get/create/update/delete events, list calendars, quick-add)
@@ -38,6 +40,8 @@ export interface GoogleCalendarListCalendarsResult extends GoogleCalendarOpResul
   calendars: GoogleCalendarEntry[];
 }
 
+type ResolvedGoogleCredential = { kind: "serviceAccount"; data: GoogleServiceAccountCredentialData } | { kind: "oauth2"; data: GoogleOAuth2CredentialData };
+
 function toEvent(event: calendar_v3.Schema$Event): GoogleCalendarEvent {
   return {
     id: event.id ?? "",
@@ -57,7 +61,7 @@ export class GoogleCalendarManager {
     this.client = google.calendar({ version: "v3", auth });
   }
 
-  static forServiceAccount(data: GoogleServiceAccountCredentialData): GoogleCalendarManager {
+  private static forServiceAccount(data: GoogleServiceAccountCredentialData): GoogleCalendarManager {
     const key = `sa:${data.serviceAccountKeyJson}:${data.impersonateUser}`;
     let manager = managerCache.get(key);
     if (!manager) {
@@ -67,7 +71,7 @@ export class GoogleCalendarManager {
     return manager;
   }
 
-  static forOAuth2(data: GoogleOAuth2CredentialData): GoogleCalendarManager {
+  private static forOAuth2(data: GoogleOAuth2CredentialData): GoogleCalendarManager {
     const key = `oauth2:${data.clientId}:${data.refreshToken}`;
     let manager = managerCache.get(key);
     if (!manager) {
@@ -77,7 +81,63 @@ export class GoogleCalendarManager {
     return manager;
   }
 
-  async listEvents(calendarId: string, timeMin: string, timeMax: string, maxResults: number): Promise<GoogleCalendarListEventsResult> {
+  private static getInstance(resolved: ResolvedGoogleCredential): GoogleCalendarManager {
+    return resolved.kind === "serviceAccount" ? GoogleCalendarManager.forServiceAccount(resolved.data) : GoogleCalendarManager.forOAuth2(resolved.data);
+  }
+
+  /** Looks up a named Credential Vault entry and accepts either a Google Service Account or a
+   * Google OAuth2 credential — Calendar works fine under either auth flow. */
+  private static async findCredential(credentialName: string): Promise<{ ok: true; resolved: ResolvedGoogleCredential } | { ok: false; error: string }> {
+    const credRecord = (await resolveAllCredentials(getDatabaseManager())).get(credentialName);
+    if (!credRecord) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
+    if (credRecord.type === "googleServiceAccount") return { ok: true, resolved: { kind: "serviceAccount", data: credRecord.data as GoogleServiceAccountCredentialData } };
+    if (credRecord.type === "googleOAuth2") return { ok: true, resolved: { kind: "oauth2", data: credRecord.data as GoogleOAuth2CredentialData } };
+    return { ok: false, error: `Credential "${credentialName}" is not a Google Service Account or Google OAuth2 credential` };
+  }
+
+  static async listEvents(credentialName: string, calendarId: string, timeMin: string, timeMax: string, maxResults: number): Promise<GoogleCalendarListEventsResult> {
+    const cred = await GoogleCalendarManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, events: [], error: cred.error };
+    return GoogleCalendarManager.getInstance(cred.resolved).listEvents(calendarId, timeMin, timeMax, maxResults);
+  }
+
+  static async getEvent(credentialName: string, calendarId: string, eventId: string): Promise<GoogleCalendarEventResult> {
+    const cred = await GoogleCalendarManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleCalendarManager.getInstance(cred.resolved).getEvent(calendarId, eventId);
+  }
+
+  static async createEvent(credentialName: string, calendarId: string, summary: string, start: string, end: string, description: string): Promise<GoogleCalendarEventResult> {
+    const cred = await GoogleCalendarManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleCalendarManager.getInstance(cred.resolved).createEvent(calendarId, summary, start, end, description);
+  }
+
+  static async updateEvent(credentialName: string, calendarId: string, eventId: string, summary: string, start: string, end: string, description: string): Promise<GoogleCalendarEventResult> {
+    const cred = await GoogleCalendarManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleCalendarManager.getInstance(cred.resolved).updateEvent(calendarId, eventId, summary, start, end, description);
+  }
+
+  static async deleteEvent(credentialName: string, calendarId: string, eventId: string): Promise<GoogleCalendarOpResult> {
+    const cred = await GoogleCalendarManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleCalendarManager.getInstance(cred.resolved).deleteEvent(calendarId, eventId);
+  }
+
+  static async quickAddEvent(credentialName: string, calendarId: string, text: string): Promise<GoogleCalendarEventResult> {
+    const cred = await GoogleCalendarManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleCalendarManager.getInstance(cred.resolved).quickAddEvent(calendarId, text);
+  }
+
+  static async listCalendars(credentialName: string): Promise<GoogleCalendarListCalendarsResult> {
+    const cred = await GoogleCalendarManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, calendars: [], error: cred.error };
+    return GoogleCalendarManager.getInstance(cred.resolved).listCalendars();
+  }
+
+  private async listEvents(calendarId: string, timeMin: string, timeMax: string, maxResults: number): Promise<GoogleCalendarListEventsResult> {
     try {
       const res = await this.client.events.list({
         calendarId: calendarId || "primary",
@@ -93,7 +153,7 @@ export class GoogleCalendarManager {
     }
   }
 
-  async getEvent(calendarId: string, eventId: string): Promise<GoogleCalendarEventResult> {
+  private async getEvent(calendarId: string, eventId: string): Promise<GoogleCalendarEventResult> {
     try {
       const res = await this.client.events.get({ calendarId: calendarId || "primary", eventId });
       return { success: true, ...toEvent(res.data), error: "" };
@@ -102,7 +162,7 @@ export class GoogleCalendarManager {
     }
   }
 
-  async createEvent(calendarId: string, summary: string, start: string, end: string, description: string): Promise<GoogleCalendarEventResult> {
+  private async createEvent(calendarId: string, summary: string, start: string, end: string, description: string): Promise<GoogleCalendarEventResult> {
     try {
       const res = await this.client.events.insert({
         calendarId: calendarId || "primary",
@@ -119,7 +179,7 @@ export class GoogleCalendarManager {
     }
   }
 
-  async updateEvent(calendarId: string, eventId: string, summary: string, start: string, end: string, description: string): Promise<GoogleCalendarEventResult> {
+  private async updateEvent(calendarId: string, eventId: string, summary: string, start: string, end: string, description: string): Promise<GoogleCalendarEventResult> {
     try {
       const res = await this.client.events.patch({
         calendarId: calendarId || "primary",
@@ -137,7 +197,7 @@ export class GoogleCalendarManager {
     }
   }
 
-  async deleteEvent(calendarId: string, eventId: string): Promise<GoogleCalendarOpResult> {
+  private async deleteEvent(calendarId: string, eventId: string): Promise<GoogleCalendarOpResult> {
     try {
       await this.client.events.delete({ calendarId: calendarId || "primary", eventId });
       return { success: true, error: "" };
@@ -148,7 +208,7 @@ export class GoogleCalendarManager {
 
   /** Calendar's quickAdd route parses a single free-text string ("Dinner with Sam Fri 8pm") into a
    * full event server-side via natural-language parsing, instead of requiring structured start/end. */
-  async quickAddEvent(calendarId: string, text: string): Promise<GoogleCalendarEventResult> {
+  private async quickAddEvent(calendarId: string, text: string): Promise<GoogleCalendarEventResult> {
     try {
       const res = await this.client.events.quickAdd({ calendarId: calendarId || "primary", text });
       return { success: true, ...toEvent(res.data), error: "" };
@@ -157,7 +217,7 @@ export class GoogleCalendarManager {
     }
   }
 
-  async listCalendars(): Promise<GoogleCalendarListCalendarsResult> {
+  private async listCalendars(): Promise<GoogleCalendarListCalendarsResult> {
     try {
       const res = await this.client.calendarList.list();
       const calendars = (res.data.items ?? []).map((c) => ({ id: c.id ?? "", summary: c.summary ?? "" }));

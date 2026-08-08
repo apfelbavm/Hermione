@@ -33,26 +33,26 @@ export const FUNCTION_LIBRARY_SFTP_IMPORT = 'import * as functionLibrarySftp fro
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryJira.ts — kept in its own file
  * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/jira.ts). */
-export const FUNCTION_LIBRARY_JIRA_IMPORT = 'import * as functionLibraryJira from "../../packages/core/src/server/functionLibraryJira.ts";';
+export const JIRA_MANAGER_IMPORT = 'import { JiraManager } from "../../packages/core/src/lib/jiraManager.ts";';
 
-/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryDropbox.ts — kept in its own file
- * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/dropbox.ts). */
-export const FUNCTION_LIBRARY_DROPBOX_IMPORT = 'import * as functionLibraryDropbox from "../../packages/core/src/server/functionLibraryDropbox.ts";';
+export const DROPBOX_MANAGER_IMPORT = 'import { DropboxManager } from "../../packages/core/src/lib/dropboxManager.ts";';
 
-/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryMicrosoft365.ts — kept in its own
- * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/microsoft365.ts). */
-export const FUNCTION_LIBRARY_MICROSOFT365_IMPORT = 'import * as functionLibraryMicrosoft365 from "../../packages/core/src/server/functionLibraryMicrosoft365.ts";';
+/** GraphManager (packages/core/src/lib/graphManager.ts) resolves its own credentials straight from
+ * the database (see its findCredential), so both the interpreter and the compiled/deployed script
+ * call the exact same manager methods directly instead of going through a separate env-var-reading
+ * layer — mirrors TWILIO_MANAGER_IMPORT. */
+export const MICROSOFT365_MANAGER_IMPORT = 'import { GraphManager } from "../../packages/core/src/lib/graphManager.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for each new enterprise connector's own functionLibrary file —
  * same one-node-family-per-file convention as above (see nodes/slack.ts, nodes/stripe.ts, etc.). */
-export const FUNCTION_LIBRARY_SLACK_IMPORT = 'import * as functionLibrarySlack from "../../packages/core/src/server/functionLibrarySlack.ts";';
+export const SLACK_MANAGER_IMPORT = 'import { SlackManager } from "../../packages/core/src/lib/slackManager.ts";';
 /** Unlike every other provider (besides Twilio), Stripe has no functionLibraryStripe.ts of its own —
  * StripeManager (packages/core/src/lib/stripeManager.ts) resolves its own credentials straight from
  * the database (see its findCredential), so both the interpreter and the compiled/deployed script
  * call the exact same manager methods directly instead of going through a separate env-var-reading
  * layer. */
 export const STRIPE_MANAGER_IMPORT = 'import { StripeManager } from "../../packages/core/src/lib/stripeManager.ts";';
-export const FUNCTION_LIBRARY_SALESFORCE_IMPORT = 'import * as functionLibrarySalesforce from "../../packages/core/src/server/functionLibrarySalesforce.ts";';
+export const SALESFORCE_MANAGER_IMPORT = 'import { SalesforceManager } from "../../packages/core/src/lib/salesforceManager.ts";';
 /** Unlike most other providers, Workday has no functionLibraryWorkday.ts of its own — WorkdayManager
  * (packages/core/src/lib/workdayManager.ts) resolves its own credentials straight from the database
  * (see its findCredential), so both the interpreter and the compiled/deployed script call the
@@ -65,16 +65,26 @@ export const WORKDAY_MANAGER_IMPORT = 'import { WorkdayManager } from "../../pac
 export const TWILIO_MANAGER_IMPORT = 'import { TwilioManager } from "../../packages/core/src/lib/twilioManager.ts";';
 export const SMTP_MANAGER_IMPORT = 'import { SmtpManager } from "../../packages/core/src/lib/smtpManager.ts";';
 export const SAP_MANAGER_IMPORT = 'import { SapManager } from "../../packages/core/src/lib/sapManager.ts";';
-export const FUNCTION_LIBRARY_LINKEDIN_IMPORT = 'import * as functionLibraryLinkedIn from "../../packages/core/src/server/functionLibraryLinkedIn.ts";';
-export const FUNCTION_LIBRARY_SENDGRID_IMPORT = 'import * as functionLibrarySendGrid from "../../packages/core/src/server/functionLibrarySendGrid.ts";';
+export const LINKEDIN_MANAGER_IMPORT = 'import { LinkedInManager } from "../../packages/core/src/lib/linkedinManager.ts";';
+export const SENDGRID_MANAGER_IMPORT = 'import { SendGridManager } from "../../packages/core/src/lib/sendGridManager.ts";';
 
-/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryGithub.ts — kept in its own file
- * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/github.ts). */
-export const FUNCTION_LIBRARY_GITHUB_IMPORT = 'import * as functionLibraryGithub from "../../packages/core/src/server/functionLibraryGithub.ts";';
+export const GITHUB_MANAGER_IMPORT = 'import { GithubManager } from "../../packages/core/src/lib/githubManager.ts";';
 
-/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryGoogle.ts — kept in its own file
- * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/google.ts). */
-export const FUNCTION_LIBRARY_GOOGLE_IMPORT = 'import * as functionLibraryGoogle from "../../packages/core/src/server/functionLibraryGoogle.ts";';
+/** Unlike every other provider, Google has no single functionLibraryGoogle.ts of its own anymore —
+ * each of these six lib/google*Manager.ts classes resolves its own credentials straight from the
+ * database (see each one's findCredential), so both the interpreter and the compiled/deployed
+ * script call the exact same manager methods directly instead of going through a separate
+ * env-var-reading layer. Mirrors TWILIO_MANAGER_IMPORT/FACEBOOK_MANAGER_IMPORT. */
+export const GOOGLE_ADMIN_MANAGER_IMPORT = 'import { GoogleAdminManager } from "../../packages/core/src/lib/googleAdminManager.ts";';
+export const GOOGLE_CALENDAR_MANAGER_IMPORT = 'import { GoogleCalendarManager } from "../../packages/core/src/lib/googleCalendarManager.ts";';
+export const GOOGLE_DOCS_MANAGER_IMPORT = 'import { GoogleDocsManager } from "../../packages/core/src/lib/googleDocsManager.ts";';
+export const GOOGLE_DRIVE_MANAGER_IMPORT = 'import { GoogleDriveManager } from "../../packages/core/src/lib/googleDriveManager.ts";';
+export const GOOGLE_GMAIL_MANAGER_IMPORT = 'import { GoogleGmailManager } from "../../packages/core/src/lib/googleGmailManager.ts";';
+export const GOOGLE_SHEETS_MANAGER_IMPORT = 'import { GoogleSheetsManager } from "../../packages/core/src/lib/googleSheetsManager.ts";';
+/** google.authorize is the one Google node that isn't a per-service manager method — it exchanges
+ * an OAuth2 credential's staging authCode for a refresh token via googleAuthManager.ts's own
+ * credentialName-taking `authorize` export (see that file). */
+export const GOOGLE_AUTH_MANAGER_IMPORT = 'import { authorize as googleAuthorize } from "../../packages/core/src/lib/googleAuthManager.ts";';
 
 /** Unlike every other provider, Facebook has no functionLibrary<Provider>.ts of its own — FacebookManager
  * (packages/core/src/lib/facebookManager.ts) resolves its own credentials straight from the database
@@ -85,7 +95,7 @@ export const FACEBOOK_MANAGER_IMPORT = 'import { FacebookManager } from "../../p
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryAzureStorage.ts — kept in its
  * own file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see
  * nodes/azureStorage.ts). */
-export const FUNCTION_LIBRARY_AZURE_STORAGE_IMPORT = 'import * as functionLibraryAzureStorage from "../../packages/core/src/server/functionLibraryAzureStorage.ts";';
+export const AZURE_STORAGE_MANAGER_IMPORT = 'import { AzureStorageManager } from "../../packages/core/src/lib/azureStorageManager.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibrarySoap.ts — kept in its own file
  * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/soap.ts). */
@@ -94,17 +104,17 @@ export const FUNCTION_LIBRARY_SOAP_IMPORT = 'import * as functionLibrarySoap fro
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryAwsDynamoDb.ts — kept in its own
  * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see
  * nodes/AwsdynamoDb.ts). */
-export const FUNCTION_LIBRARY_DYNAMODB_IMPORT = 'import * as functionLibraryDynamoDb from "../../packages/core/src/server/functionLibraryAwsDynamoDb.ts";';
+export const DYNAMODB_MANAGER_IMPORT = 'import { DynamoDbManager } from "../../packages/core/src/lib/dynamoDbManager.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryAwsKinesis.ts — kept in its own
  * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see
  * nodes/Awskinesis.ts). */
-export const FUNCTION_LIBRARY_KINESIS_IMPORT = 'import * as functionLibraryKinesis from "../../packages/core/src/server/functionLibraryAwsKinesis.ts";';
+export const KINESIS_MANAGER_IMPORT = 'import { KinesisManager } from "../../packages/core/src/lib/kinesisManager.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryMongo.ts — kept in its own
  * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see
  * nodes/mongo.ts). */
-export const FUNCTION_LIBRARY_MONGO_IMPORT = 'import * as functionLibraryMongo from "../../packages/core/src/server/functionLibraryMongo.ts";';
+export const MONGO_MANAGER_IMPORT = 'import { MongoManager } from "../../packages/core/src/lib/mongoManager.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibrarySmartRecruiters.ts — kept in
  * its own file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see

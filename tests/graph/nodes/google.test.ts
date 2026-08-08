@@ -56,12 +56,25 @@ vi.mock("googleapis", () => ({
   },
 }));
 
+/** Each google*Manager.ts (like TwilioManager/FacebookManager) resolves its named credential
+ * straight from the database via resolveAllCredentials(getDatabaseManager()) instead of
+ * ctx.getCredential — mock that resolution layer directly rather than standing up a real
+ * DatabaseManager. */
+let credentials: Map<string, CredentialRecord> = new Map();
+vi.mock("@hermione/core/server/DatabaseManager", () => ({
+  getDatabaseManager: () => ({}),
+}));
+vi.mock("@hermione/core/server/vaultCredentials", () => ({
+  resolveAllCredentials: async () => credentials,
+}));
+
 beforeAll(() => {
   registerBuiltins();
 });
 
 afterEach(() => {
   vi.clearAllMocks();
+  credentials = new Map();
 });
 
 function buildGraph(type: string, id: string, pinValues: Record<string, unknown> = {}) {
@@ -80,7 +93,7 @@ function buildGraph(type: string, id: string, pinValues: Record<string, unknown>
  * from a previous test leaking in. */
 let credentialCounter = 0;
 
-function freshServiceAccountCredential(): { name: string; getCredential: (name: string) => CredentialRecord | undefined } {
+function freshServiceAccountCredential(): { name: string } {
   credentialCounter += 1;
   const data: GoogleServiceAccountCredentialData = {
     serviceAccountKeyJson: JSON.stringify({ client_email: `svc-${credentialCounter}@example.iam.gserviceaccount.com`, private_key: "key" }),
@@ -94,10 +107,11 @@ function freshServiceAccountCredential(): { name: string; getCredential: (name: 
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
-  return { name: credential.name, getCredential: (name) => (name === credential.name ? credential : undefined) };
+  credentials.set(credential.name, credential);
+  return { name: credential.name };
 }
 
-function freshOAuth2Credential(): { name: string; getCredential: (name: string) => CredentialRecord | undefined } {
+function freshOAuth2Credential(): { name: string } {
   credentialCounter += 1;
   const data: GoogleOAuth2CredentialData = {
     clientId: "client-id",
@@ -114,16 +128,17 @@ function freshOAuth2Credential(): { name: string; getCredential: (name: string) 
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
-  return { name: credential.name, getCredential: (name) => (name === credential.name ? credential : undefined) };
+  credentials.set(credential.name, credential);
+  return { name: credential.name };
 }
 
 describe("google.authorize", () => {
   it("exchanges an auth code for tokens", async () => {
-    const { name, getCredential } = freshOAuth2Credential();
+    const { name } = freshOAuth2Credential();
     oauth2GetToken.mockResolvedValue({ tokens: { access_token: "tok-1", refresh_token: "refresh-1", expiry_date: Date.now() + 3600_000 } });
 
     const { graph } = buildGraph("google.authorize", "auth", { credentialName: name });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("auth", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("auth:success")).toBe(true);
@@ -133,7 +148,7 @@ describe("google.authorize", () => {
 
   it("reports an error when the named credential doesn't exist", async () => {
     const { graph } = buildGraph("google.authorize", "auth", { credentialName: "missing" });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential: () => undefined });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("auth", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("auth:success")).toBe(false);
@@ -144,13 +159,13 @@ describe("google.authorize", () => {
 
 describe("google.driveListFiles", () => {
   it("lists files and reports success", async () => {
-    const { name, getCredential } = freshServiceAccountCredential();
+    const { name } = freshServiceAccountCredential();
     driveFilesList.mockResolvedValue({
       data: { files: [{ id: "f1", name: "Report.pdf", mimeType: "application/pdf", size: "1024", webViewLink: "https://drive.google.com/f1" }] },
     });
 
     const { graph } = buildGraph("google.driveListFiles", "ld", { credentialName: name, query: "" });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("ld", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("ld:success")).toBe(true);
@@ -160,7 +175,7 @@ describe("google.driveListFiles", () => {
 
   it("reports an error and never calls the SDK when the named credential doesn't exist", async () => {
     const { graph } = buildGraph("google.driveListFiles", "ld", { credentialName: "missing", query: "" });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential: () => undefined });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("ld", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("ld:success")).toBe(false);
@@ -171,11 +186,11 @@ describe("google.driveListFiles", () => {
 
 describe("google.gmailSendMessage", () => {
   it("sends a message and reports success", async () => {
-    const { name, getCredential } = freshServiceAccountCredential();
+    const { name } = freshServiceAccountCredential();
     gmailMessagesSend.mockResolvedValue({ data: { id: "msg-1" } });
 
     const { graph } = buildGraph("google.gmailSendMessage", "gs", { credentialName: name, to: "someone@example.com", subject: "Hi", body: "Hello there" });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("gs", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("gs:success")).toBe(true);
@@ -186,7 +201,7 @@ describe("google.gmailSendMessage", () => {
 
 describe("google.calendarCreateEvent", () => {
   it("creates an event and reports success", async () => {
-    const { name, getCredential } = freshServiceAccountCredential();
+    const { name } = freshServiceAccountCredential();
     calendarEventsInsert.mockResolvedValue({
       data: { id: "evt-1", summary: "Standup", start: { dateTime: "2024-01-01T09:00:00Z" }, end: { dateTime: "2024-01-01T09:30:00Z" }, htmlLink: "https://calendar.google.com/evt-1" },
     });
@@ -199,7 +214,7 @@ describe("google.calendarCreateEvent", () => {
       end: "2024-01-01T09:30:00Z",
       description: "",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("cc", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("cc:success")).toBe(true);
@@ -216,13 +231,13 @@ describe("google.calendarCreateEvent", () => {
 
 describe("google.adminListUsers", () => {
   it("lists users and reports success", async () => {
-    const { name, getCredential } = freshServiceAccountCredential();
+    const { name } = freshServiceAccountCredential();
     adminUsersList.mockResolvedValue({
       data: { users: [{ id: "u1", primaryEmail: "ada@example.com", name: { fullName: "Ada Lovelace" }, suspended: false }] },
     });
 
     const { graph } = buildGraph("google.adminListUsers", "au", { credentialName: name, domain: "example.com", query: "" });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("au", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("au:success")).toBe(true);
@@ -231,10 +246,10 @@ describe("google.adminListUsers", () => {
   });
 
   it("reports an error when given an OAuth2 credential instead of a service account", async () => {
-    const { name, getCredential } = freshOAuth2Credential();
+    const { name } = freshOAuth2Credential();
 
     const { graph } = buildGraph("google.adminListUsers", "au", { credentialName: name, domain: "example.com", query: "" });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("au", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("au:success")).toBe(false);

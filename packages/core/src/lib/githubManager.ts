@@ -2,6 +2,9 @@ import { Octokit as OctokitCore } from "@octokit/core";
 import { restEndpointMethods } from "@octokit/plugin-rest-endpoint-methods";
 import { createAppAuth } from "@octokit/auth-app";
 import { RequestError } from "@octokit/request-error";
+import { getDatabaseManager } from "../server/DatabaseManager.ts";
+import { resolveAllCredentials } from "../server/vaultCredentials.ts";
+import type { GithubTokenCredentialData, GithubAppCredentialData } from "@hermione/shared/types";
 
 // Deliberately @octokit/core + the REST plugin only, not the "octokit"/"@octokit/rest" bundles —
 // those also pull in the retry/throttling plugins, which add multi-second backoff delays to every
@@ -14,14 +17,6 @@ type Octokit = InstanceType<typeof Octokit>;
  * Octokit client from either a personal access token or a GitHub App installation, call one REST
  * route, and turn either a result or a thrown RequestError into a plain {success, error} shape.
  * Centralized here once instead of repeated per node. */
-
-function githubErrorMessage(err: unknown): string {
-  if (err instanceof RequestError) {
-    const data = err.response?.data as { message?: string } | undefined;
-    return data?.message ? `${data.message} (status ${err.status})` : `GitHub API error (status ${err.status})`;
-  }
-  return err instanceof Error ? err.message : String(err);
-}
 
 export interface GithubOpResult {
   success: boolean;
@@ -106,7 +101,7 @@ export class GithubManager {
    * auth-app caches the installation access token on the auth strategy instance itself, so only a
    * fresh Octokit client re-authenticates on every call; a reused one only refreshes once that
    * cached token is actually about to expire. */
-  static forAuth(auth: GithubAuth): GithubManager {
+  static getInstance(auth: GithubAuth): GithubManager {
     const key = cacheKey(auth);
     let manager = managerCache.get(key);
     if (!manager) {
@@ -116,7 +111,86 @@ export class GithubManager {
     return manager;
   }
 
-  constructor(auth: GithubAuth) {
+  static errorMessage(err: unknown): string {
+    if (err instanceof RequestError) {
+      const data = err.response?.data as { message?: string } | undefined;
+      return data?.message ? `${data.message} (status ${err.status})` : `GitHub API error (status ${err.status})`;
+    }
+    return err instanceof Error ? err.message : String(err);
+  }
+
+  /** Mirrors resolveGithubCredential's/githubCredentialFromEnv's shape check — GitHub has two
+   * credential kinds (personal access token vs. GitHub App installation), so branch on the vault
+   * record's type to build the right GithubAuth union member. */
+  private static async findCredential(credentialName: string): Promise<{ ok: true; auth: GithubAuth } | { ok: false; error: string }> {
+    const credRecord = (await resolveAllCredentials(getDatabaseManager())).get(credentialName);
+    if (!credRecord) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
+    if (credRecord.type === "githubToken") {
+      const data = credRecord.data as GithubTokenCredentialData;
+      return { ok: true, auth: { token: data.token } };
+    }
+    if (credRecord.type === "githubApp") {
+      const data = credRecord.data as GithubAppCredentialData;
+      return { ok: true, auth: { appId: data.appId, privateKey: data.privateKey, installationId: data.installationId } };
+    }
+    return { ok: false, error: `Credential "${credentialName}" is not a GitHub Token or GitHub App credential` };
+  }
+
+  static async listIssues(credentialName: string, owner: string, repo: string, state: "open" | "closed" | "all" = "open"): Promise<GithubListIssuesResult> {
+    const cred = await GithubManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, issues: [], error: cred.error };
+    return GithubManager.getInstance(cred.auth).listIssues(owner, repo, state);
+  }
+
+  static async createIssue(credentialName: string, owner: string, repo: string, title: string, body: string): Promise<GithubIssueResult> {
+    const cred = await GithubManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, number: 0, url: "", error: cred.error };
+    return GithubManager.getInstance(cred.auth).createIssue(owner, repo, title, body);
+  }
+
+  static async commentOnIssue(credentialName: string, owner: string, repo: string, issueNumber: number, body: string): Promise<GithubOpResult> {
+    const cred = await GithubManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GithubManager.getInstance(cred.auth).commentOnIssue(owner, repo, issueNumber, body);
+  }
+
+  static async listPullRequests(credentialName: string, owner: string, repo: string, state: "open" | "closed" | "all" = "open"): Promise<GithubListPullRequestsResult> {
+    const cred = await GithubManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, pullRequests: [], error: cred.error };
+    return GithubManager.getInstance(cred.auth).listPullRequests(owner, repo, state);
+  }
+
+  static async createPullRequest(credentialName: string, owner: string, repo: string, title: string, head: string, base: string, body: string): Promise<GithubPullRequestResult> {
+    const cred = await GithubManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, number: 0, url: "", error: cred.error };
+    return GithubManager.getInstance(cred.auth).createPullRequest(owner, repo, title, head, base, body);
+  }
+
+  static async mergePullRequest(credentialName: string, owner: string, repo: string, pullNumber: number, mergeMethod: "merge" | "squash" | "rebase" = "merge"): Promise<GithubMergeResult> {
+    const cred = await GithubManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, merged: false, sha: "", error: cred.error };
+    return GithubManager.getInstance(cred.auth).mergePullRequest(owner, repo, pullNumber, mergeMethod);
+  }
+
+  static async getFileContent(credentialName: string, owner: string, repo: string, path: string, ref?: string): Promise<GithubFileContentResult> {
+    const cred = await GithubManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, content: "", sha: "", error: cred.error };
+    return GithubManager.getInstance(cred.auth).getFileContent(owner, repo, path, ref);
+  }
+
+  static async createOrUpdateFile(credentialName: string, owner: string, repo: string, path: string, content: string, message: string, branch?: string, sha?: string): Promise<GithubFileWriteResult> {
+    const cred = await GithubManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, sha: "", commitSha: "", error: cred.error };
+    return GithubManager.getInstance(cred.auth).createOrUpdateFile(owner, repo, path, content, message, branch, sha);
+  }
+
+  static async request(credentialName: string, route: string, paramsJson: string): Promise<GithubRequestResult> {
+    const cred = await GithubManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, data: undefined, error: cred.error };
+    return GithubManager.getInstance(cred.auth).request(route, paramsJson);
+  }
+
+  private constructor(auth: GithubAuth) {
     this.client = isAppAuth(auth)
       ? new Octokit({
           authStrategy: createAppAuth,
@@ -129,7 +203,7 @@ export class GithubManager {
       : new Octokit({ auth: auth.token });
   }
 
-  async listIssues(owner: string, repo: string, state: "open" | "closed" | "all" = "open"): Promise<GithubListIssuesResult> {
+  private async listIssues(owner: string, repo: string, state: "open" | "closed" | "all" = "open"): Promise<GithubListIssuesResult> {
     try {
       const res = await this.client.rest.issues.listForRepo({
         owner,
@@ -147,11 +221,11 @@ export class GithubManager {
         }));
       return { success: true, issues, error: "" };
     } catch (err) {
-      return { success: false, issues: [], error: githubErrorMessage(err) };
+      return { success: false, issues: [], error: GithubManager.errorMessage(err) };
     }
   }
 
-  async createIssue(owner: string, repo: string, title: string, body: string): Promise<GithubIssueResult> {
+  private async createIssue(owner: string, repo: string, title: string, body: string): Promise<GithubIssueResult> {
     try {
       const res = await this.client.rest.issues.create({
         owner,
@@ -170,12 +244,12 @@ export class GithubManager {
         success: false,
         number: 0,
         url: "",
-        error: githubErrorMessage(err),
+        error: GithubManager.errorMessage(err),
       };
     }
   }
 
-  async commentOnIssue(owner: string, repo: string, issueNumber: number, body: string): Promise<GithubOpResult> {
+  private async commentOnIssue(owner: string, repo: string, issueNumber: number, body: string): Promise<GithubOpResult> {
     try {
       await this.client.rest.issues.createComment({
         owner,
@@ -185,11 +259,11 @@ export class GithubManager {
       });
       return { success: true, error: "" };
     } catch (err) {
-      return { success: false, error: githubErrorMessage(err) };
+      return { success: false, error: GithubManager.errorMessage(err) };
     }
   }
 
-  async listPullRequests(owner: string, repo: string, state: "open" | "closed" | "all" = "open"): Promise<GithubListPullRequestsResult> {
+  private async listPullRequests(owner: string, repo: string, state: "open" | "closed" | "all" = "open"): Promise<GithubListPullRequestsResult> {
     try {
       const res = await this.client.rest.pulls.list({ owner, repo, state });
       const pullRequests = res.data.map((pr) => ({
@@ -203,12 +277,12 @@ export class GithubManager {
       return {
         success: false,
         pullRequests: [],
-        error: githubErrorMessage(err),
+        error: GithubManager.errorMessage(err),
       };
     }
   }
 
-  async createPullRequest(owner: string, repo: string, title: string, head: string, base: string, body: string): Promise<GithubPullRequestResult> {
+  private async createPullRequest(owner: string, repo: string, title: string, head: string, base: string, body: string): Promise<GithubPullRequestResult> {
     try {
       const res = await this.client.rest.pulls.create({
         owner,
@@ -229,12 +303,12 @@ export class GithubManager {
         success: false,
         number: 0,
         url: "",
-        error: githubErrorMessage(err),
+        error: GithubManager.errorMessage(err),
       };
     }
   }
 
-  async mergePullRequest(owner: string, repo: string, pullNumber: number, mergeMethod: "merge" | "squash" | "rebase" = "merge"): Promise<GithubMergeResult> {
+  private async mergePullRequest(owner: string, repo: string, pullNumber: number, mergeMethod: "merge" | "squash" | "rebase" = "merge"): Promise<GithubMergeResult> {
     try {
       const res = await this.client.rest.pulls.merge({
         owner,
@@ -253,14 +327,14 @@ export class GithubManager {
         success: false,
         merged: false,
         sha: "",
-        error: githubErrorMessage(err),
+        error: GithubManager.errorMessage(err),
       };
     }
   }
 
   /** Content comes back base64-encoded from the API; sha must be threaded back into
    * createOrUpdateFile so GitHub can detect update-vs-create and resolve conflicts. */
-  async getFileContent(owner: string, repo: string, path: string, ref?: string): Promise<GithubFileContentResult> {
+  private async getFileContent(owner: string, repo: string, path: string, ref?: string): Promise<GithubFileContentResult> {
     try {
       const res = await this.client.rest.repos.getContent({
         owner,
@@ -287,13 +361,13 @@ export class GithubManager {
         success: false,
         content: "",
         sha: "",
-        error: githubErrorMessage(err),
+        error: GithubManager.errorMessage(err),
       };
     }
   }
 
   /** Pass the sha returned by getFileContent to update an existing file; omit it to create a new one. */
-  async createOrUpdateFile(owner: string, repo: string, path: string, content: string, message: string, branch?: string, sha?: string): Promise<GithubFileWriteResult> {
+  private async createOrUpdateFile(owner: string, repo: string, path: string, content: string, message: string, branch?: string, sha?: string): Promise<GithubFileWriteResult> {
     try {
       const res = await this.client.rest.repos.createOrUpdateFileContents({
         owner,
@@ -315,22 +389,24 @@ export class GithubManager {
         success: false,
         sha: "",
         commitSha: "",
-        error: githubErrorMessage(err),
+        error: GithubManager.errorMessage(err),
       };
     }
   }
 
   /** Escape hatch for any endpoint not wrapped above — thin pass-through to octokit.request with the
    * same error normalization as every typed method here. */
-  async request(route: string, params?: Record<string, unknown>): Promise<GithubRequestResult> {
+  private async request(route: string, paramsJson: string): Promise<GithubRequestResult> {
     try {
+      const rawParams = String(paramsJson ?? "").trim();
+      const params = rawParams ? (JSON.parse(rawParams) as Record<string, unknown>) : undefined;
       const res = await this.client.request(route, params);
       return { success: true, data: res.data, error: "" };
     } catch (err) {
       return {
         success: false,
         data: undefined,
-        error: githubErrorMessage(err),
+        error: GithubManager.errorMessage(err),
       };
     }
   }

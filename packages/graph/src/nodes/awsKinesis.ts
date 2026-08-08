@@ -1,29 +1,31 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
-import { compileResultVar, FUNCTION_LIBRARY_KINESIS_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, KINESIS_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { KINESIS_STREAM_MODE_ENUM_TYPE, KINESIS_SHARD_ITERATOR_TYPE_ENUM_TYPE, KINESIS_ENCRYPTION_TYPE_ENUM_TYPE, KINESIS_SCALING_TYPE_ENUM_TYPE } from "@hermione/graph/enum/kinesis";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
-import { KinesisManager } from "@hermione/core/lib/kinesisManager";
-import type { AwsAccessKeyCredentialData } from "@hermione/shared/types";
 import { i18n } from "@i18n";
 
-// Every operation below is a thin pin-wiring shim over KinesisManager (src/lib/kinesisManager.ts),
-// which owns the actual SDK calls and error normalization — this file only ever translates pins to
-// method arguments and method results back to pins. Same structure/conventions as nodes/AwsdynamoDb.ts.
-//
-// Every operation node takes a Credential Name directly (no separate auth/refresh node): each
-// resolves the named vault entry and hands its access key pair to KinesisManager.forCredential,
-// which caches the underlying KinesisClient — see kinesisManager.ts.
+// Every operation below calls the exact same KinesisManager static method (packages/core/src/lib/
+// kinesisManager.ts) from both execute() (interpreter path) and compileExecute() (compiled/deployed
+// path) — KinesisManager resolves the named credential straight from the database itself (see its
+// findCredential), so unlike the old two-layer split there is no separate functionLibraryAwsKinesis.ts
+// env-var-reading layer and no ctx.getCredential vault lookup here: both paths are already identical.
+// Same structure as nodes/twilio.ts.
 //
 // Shard lists, record batches, and tag maps are carried as JSON string pins rather than
 // "map"/"struct" pins, since their shapes are arrays/nested objects of varying size — same
 // convention as AwsdynamoDb.ts's items/keys/expression pins.
 //
-// Every node here also has a compileExecute: the compiled path calls a same-named
-// `functionLibraryKinesis.kinesis*` wrapper (see server/functionLibraryAwsKinesis.ts), which reads the
-// credential's access key back from environment variables instead of the vault — same split as
-// AwsdynamoDb.ts's execute()/compileExecute().
+// KinesisManager now reaches the database directly, which pulls in better-sqlite3 and Node builtins
+// — fine for execute(), which only ever runs server-side, but this file is still statically imported
+// client-side too (for the node-creation menu), so a plain top-level import here would drag that
+// whole chain into the browser bundle. Loaded with a runtime `import()` instead, ignored by both
+// bundlers, so it's never even resolved for the client build; only ever actually called server-side,
+// where it resolves normally.
+async function loadKinesisManager(): Promise<typeof import("@hermione/core/lib/kinesisManager").KinesisManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/kinesisManager");
+  return mod.KinesisManager;
+}
 
 const GROUP_NAME = "Request.AWS Kinesis";
 
@@ -51,44 +53,6 @@ function errorPin() {
   return { id: "error", label: i18n.nodes.__shared.pin_error, type: "string" as const, direction: "output" as const };
 }
 
-function parseJsonArray(json: unknown): unknown[] {
-  const str = String(json ?? "");
-  if (!str) return [];
-  try {
-    const parsed: unknown = JSON.parse(str);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function parseJsonObject(json: unknown): Record<string, unknown> {
-  const str = String(json ?? "");
-  if (!str) return {};
-  try {
-    const parsed: unknown = JSON.parse(str);
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
-
-/** Shared by every Kinesis node — looks up a named Credential Vault entry and returns its access
- * key data, or a clear error if the name is wrong/missing. */
-function resolveKinesisCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: AwsAccessKeyCredentialData } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
-  if (credential.type !== "awsAccessKey") return { ok: false, error: `Credential "${credentialName}" is not an AWS Access Key credential` };
-  return { ok: true, data: credential.data as AwsAccessKeyCredentialData };
-}
-
-function managerFor(ctx: ExecutionContext, credentialName: string): { ok: true; manager: KinesisManager } | { ok: false; error: string } {
-  const resolved = resolveKinesisCredential(ctx, credentialName);
-  if (!resolved.ok) return resolved;
-  const data = resolved.data;
-  return { ok: true, manager: KinesisManager.forCredential(data.accessKeyId, data.secretAccessKey, data.region, data.sessionToken, data.endpoint) };
-}
-
 registerNode({
   type: "kinesis.createStream",
   label: i18n.nodes.kinesis.createStream.label,
@@ -106,19 +70,17 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+  execute: async ({ inputs }) => {
     const streamMode = inputs.streamMode === "PROVISIONED" ? "PROVISIONED" : "ON_DEMAND";
-    const result = await resolved.manager.createStream(String(inputs.streamName ?? ""), Number(inputs.shardCount) || 0, streamMode);
+    const result = await (await loadKinesisManager()).createStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.shardCount) || 0, streamMode);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisCreateStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardCount}, ${inputs.streamMode});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.createStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardCount}, ${inputs.streamMode});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -129,18 +91,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "enforceConsumerDeletion", label: i18n.nodes.kinesis.deleteStream.pin_enforce_consumer_deletion, type: "boolean", direction: "input", defaultValue: false }, execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await resolved.manager.deleteStream(String(inputs.streamName ?? ""), Boolean(inputs.enforceConsumerDeletion));
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).deleteStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Boolean(inputs.enforceConsumerDeletion));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisDeleteStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.enforceConsumerDeletion});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.deleteStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.enforceConsumerDeletion});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -161,18 +121,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, streamNames: [], hasMoreStreams: false, error: resolved.error } };
-    const result = await resolved.manager.listStreams(String(inputs.exclusiveStartStreamName ?? ""), Number(inputs.limit) || 0);
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).listStreams(String(inputs.credentialName ?? ""), String(inputs.exclusiveStartStreamName ?? ""), Number(inputs.limit) || 0);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisListStreams(${inputs.credentialName}, ${inputs.exclusiveStartStreamName}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.listStreams(${inputs.credentialName}, ${inputs.exclusiveStartStreamName}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, streamNames: `${v}.streamNames`, hasMoreStreams: `${v}.hasMoreStreams`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -197,13 +155,11 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, streamArn: "", status: "", streamMode: "", retentionPeriodHours: 0, openShardCount: 0, encryptionType: "", keyId: "", error: resolved.error } };
-    const result = await resolved.manager.describeStreamSummary(String(inputs.streamName ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).describeStreamSummary(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisDescribeStreamSummary(${inputs.credentialName}, ${inputs.streamName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.describeStreamSummary(${inputs.credentialName}, ${inputs.streamName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -218,7 +174,7 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -237,18 +193,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, shardLimit: 0, openShardCount: 0, error: resolved.error } };
-    const result = await resolved.manager.describeLimits();
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).describeLimits(String(inputs.credentialName ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisDescribeLimits(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.describeLimits(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, shardLimit: `${v}.shardLimit`, openShardCount: `${v}.openShardCount`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -259,18 +213,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "retentionPeriodHours", label: i18n.nodes.kinesis.__shared.pin_retention_period_hours, type: "number", direction: "input", defaultValue: 24, integer: true }, execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await resolved.manager.increaseStreamRetentionPeriod(String(inputs.streamName ?? ""), Number(inputs.retentionPeriodHours) || 0);
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).increaseStreamRetentionPeriod(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.retentionPeriodHours) || 0);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisIncreaseStreamRetentionPeriod(${inputs.credentialName}, ${inputs.streamName}, ${inputs.retentionPeriodHours});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.increaseStreamRetentionPeriod(${inputs.credentialName}, ${inputs.streamName}, ${inputs.retentionPeriodHours});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -281,18 +233,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "retentionPeriodHours", label: i18n.nodes.kinesis.__shared.pin_retention_period_hours, type: "number", direction: "input", defaultValue: 24, integer: true }, execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await resolved.manager.decreaseStreamRetentionPeriod(String(inputs.streamName ?? ""), Number(inputs.retentionPeriodHours) || 0);
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).decreaseStreamRetentionPeriod(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.retentionPeriodHours) || 0);
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisDecreaseStreamRetentionPeriod(${inputs.credentialName}, ${inputs.streamName}, ${inputs.retentionPeriodHours});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.decreaseStreamRetentionPeriod(${inputs.credentialName}, ${inputs.streamName}, ${inputs.retentionPeriodHours});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -314,18 +264,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, currentShardCount: 0, targetShardCountResult: 0, error: resolved.error } };
-    const result = await resolved.manager.updateShardCount(String(inputs.streamName ?? ""), Number(inputs.targetShardCount) || 0, "UNIFORM_SCALING");
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).updateShardCount(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.targetShardCount) || 0, "UNIFORM_SCALING");
     return { nextExec: "exec-out", outputs: { success: result.success, currentShardCount: result.currentShardCount, targetShardCountResult: result.targetShardCount, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisUpdateShardCount(${inputs.credentialName}, ${inputs.streamName}, ${inputs.targetShardCount}, ${inputs.scalingType});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.updateShardCount(${inputs.credentialName}, ${inputs.streamName}, ${inputs.targetShardCount}, ${inputs.scalingType});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, currentShardCount: `${v}.currentShardCount`, targetShardCountResult: `${v}.targetShardCount`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -348,18 +296,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, shards: "[]", nextTokenOut: "", error: resolved.error } };
-    const result = await resolved.manager.listShards(String(inputs.streamName ?? ""), String(inputs.exclusiveStartShardId ?? ""), Number(inputs.maxResults) || 0, String(inputs.nextToken ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, shards: JSON.stringify(result.shards), nextTokenOut: result.nextToken, error: result.error } };
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).listShards(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.exclusiveStartShardId ?? ""), Number(inputs.maxResults) || 0, String(inputs.nextToken ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, shards: result.shardsJson, nextTokenOut: result.nextToken, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisListShards(${inputs.credentialName}, ${inputs.streamName}, ${inputs.exclusiveStartShardId}, ${inputs.maxResults}, ${inputs.nextToken});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.listShards(${inputs.credentialName}, ${inputs.streamName}, ${inputs.exclusiveStartShardId}, ${inputs.maxResults}, ${inputs.nextToken});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, shards: `${v}.shardsJson`, nextTokenOut: `${v}.nextToken`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -379,18 +325,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await resolved.manager.mergeShards(String(inputs.streamName ?? ""), String(inputs.shardToMerge ?? ""), String(inputs.adjacentShardToMerge ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).mergeShards(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.shardToMerge ?? ""), String(inputs.adjacentShardToMerge ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisMergeShards(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardToMerge}, ${inputs.adjacentShardToMerge});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.mergeShards(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardToMerge}, ${inputs.adjacentShardToMerge});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -410,18 +354,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await resolved.manager.splitShard(String(inputs.streamName ?? ""), String(inputs.shardToSplit ?? ""), String(inputs.newStartingHashKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).splitShard(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.shardToSplit ?? ""), String(inputs.newStartingHashKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisSplitShard(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardToSplit}, ${inputs.newStartingHashKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.splitShard(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardToSplit}, ${inputs.newStartingHashKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -444,18 +386,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, shardId: "", sequenceNumber: "", error: resolved.error } };
-    const result = await resolved.manager.putRecord(String(inputs.streamName ?? ""), String(inputs.data ?? ""), String(inputs.partitionKey ?? ""), String(inputs.explicitHashKey ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).putRecord(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.data ?? ""), String(inputs.partitionKey ?? ""), String(inputs.explicitHashKey ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisPutRecord(${inputs.credentialName}, ${inputs.streamName}, ${inputs.data}, ${inputs.partitionKey}, ${inputs.explicitHashKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.putRecord(${inputs.credentialName}, ${inputs.streamName}, ${inputs.data}, ${inputs.partitionKey}, ${inputs.explicitHashKey});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, shardId: `${v}.shardId`, sequenceNumber: `${v}.sequenceNumber`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -476,19 +416,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, failedRecordCount: 0, resultRecords: "[]", error: resolved.error } };
-    const records = parseJsonArray(inputs.records) as { data: string; partitionKey: string; explicitHashKey?: string }[];
-    const result = await resolved.manager.putRecords(String(inputs.streamName ?? ""), records);
-    return { nextExec: "exec-out", outputs: { success: result.success, failedRecordCount: result.failedRecordCount, resultRecords: JSON.stringify(result.records), error: result.error } };
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).putRecords(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.records ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, failedRecordCount: result.failedRecordCount, resultRecords: result.recordsJson, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisPutRecords(${inputs.credentialName}, ${inputs.streamName}, ${inputs.records});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.putRecords(${inputs.credentialName}, ${inputs.streamName}, ${inputs.records});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, failedRecordCount: `${v}.failedRecordCount`, resultRecords: `${v}.recordsJson`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -511,23 +448,21 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, shardIterator: "", error: resolved.error } };
+  execute: async ({ inputs }) => {
     const validTypes = ["AT_SEQUENCE_NUMBER", "AFTER_SEQUENCE_NUMBER", "AT_TIMESTAMP", "TRIM_HORIZON", "LATEST"];
     const shardIteratorType = validTypes.includes(String(inputs.shardIteratorType)) ? (inputs.shardIteratorType as "AT_SEQUENCE_NUMBER" | "AFTER_SEQUENCE_NUMBER" | "AT_TIMESTAMP" | "TRIM_HORIZON" | "LATEST") : "LATEST";
-    const result = await resolved.manager.getShardIterator(String(inputs.streamName ?? ""), String(inputs.shardId ?? ""), shardIteratorType, String(inputs.startingSequenceNumber ?? ""), Number(inputs.timestamp) || 0);
+    const result = await (await loadKinesisManager()).getShardIterator(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.shardId ?? ""), shardIteratorType, String(inputs.startingSequenceNumber ?? ""), Number(inputs.timestamp) || 0);
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisGetShardIterator(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardId}, ${inputs.shardIteratorType}, ${inputs.startingSequenceNumber}, ${inputs.timestamp});`,
+    `const ${compileResultVar(node.id)} = await KinesisManager.getShardIterator(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardId}, ${inputs.shardIteratorType}, ${inputs.startingSequenceNumber}, ${inputs.timestamp});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, shardIterator: `${v}.shardIterator`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -549,18 +484,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, records: "[]", nextShardIterator: "", millisBehindLatest: 0, error: resolved.error } };
-    const result = await resolved.manager.getRecords(String(inputs.shardIterator ?? ""), Number(inputs.limit) || 0);
-    return { nextExec: "exec-out", outputs: { success: result.success, records: JSON.stringify(result.records), nextShardIterator: result.nextShardIterator, millisBehindLatest: result.millisBehindLatest, error: result.error } };
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).getRecords(String(inputs.credentialName ?? ""), String(inputs.shardIterator ?? ""), Number(inputs.limit) || 0);
+    return { nextExec: "exec-out", outputs: { success: result.success, records: result.recordsJson, nextShardIterator: result.nextShardIterator, millisBehindLatest: result.millisBehindLatest, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisGetRecords(${inputs.credentialName}, ${inputs.shardIterator}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.getRecords(${inputs.credentialName}, ${inputs.shardIterator}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, records: `${v}.recordsJson`, nextShardIterator: `${v}.nextShardIterator`, millisBehindLatest: `${v}.millisBehindLatest`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -571,18 +504,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "tags", label: i18n.nodes.kinesis.addTagsToStream.pin_tags, type: "string", direction: "input", defaultValue: "{}" }, execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await resolved.manager.addTagsToStream(String(inputs.streamName ?? ""), parseJsonObject(inputs.tags) as Record<string, string>);
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).addTagsToStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.tags ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisAddTagsToStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.tags});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.addTagsToStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.tags});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -593,18 +524,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "tagKeys", label: i18n.nodes.kinesis.removeTagsFromStream.pin_tag_keys, type: "string", direction: "input", defaultValue: "[]" }, execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
-    const result = await resolved.manager.removeTagsFromStream(String(inputs.streamName ?? ""), parseJsonArray(inputs.tagKeys) as string[]);
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).removeTagsFromStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.tagKeys ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisRemoveTagsFromStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.tagKeys});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.removeTagsFromStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.tagKeys});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -626,18 +555,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, tags: "[]", hasMoreTags: false, error: resolved.error } };
-    const result = await resolved.manager.listTagsForStream(String(inputs.streamName ?? ""), String(inputs.exclusiveStartTagKey ?? ""), Number(inputs.limit) || 0);
-    return { nextExec: "exec-out", outputs: { success: result.success, tags: JSON.stringify(result.tags), hasMoreTags: result.hasMoreTags, error: result.error } };
+  execute: async ({ inputs }) => {
+    const result = await (await loadKinesisManager()).listTagsForStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.exclusiveStartTagKey ?? ""), Number(inputs.limit) || 0);
+    return { nextExec: "exec-out", outputs: { success: result.success, tags: result.tagsJson, hasMoreTags: result.hasMoreTags, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisListTagsForStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.exclusiveStartTagKey}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.listTagsForStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.exclusiveStartTagKey}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, tags: `${v}.tagsJson`, hasMoreTags: `${v}.hasMoreTags`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -657,19 +584,17 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+  execute: async ({ inputs }) => {
     const encryptionType = inputs.encryptionType === "NONE" ? "NONE" : "KMS";
-    const result = await resolved.manager.startStreamEncryption(String(inputs.streamName ?? ""), encryptionType, String(inputs.keyId ?? ""));
+    const result = await (await loadKinesisManager()).startStreamEncryption(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), encryptionType, String(inputs.keyId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisStartStreamEncryption(${inputs.credentialName}, ${inputs.streamName}, ${inputs.encryptionType}, ${inputs.keyId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.startStreamEncryption(${inputs.credentialName}, ${inputs.streamName}, ${inputs.encryptionType}, ${inputs.keyId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -689,17 +614,15 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = managerFor(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, error: resolved.error } };
+  execute: async ({ inputs }) => {
     const encryptionType = inputs.encryptionType === "NONE" ? "NONE" : "KMS";
-    const result = await resolved.manager.stopStreamEncryption(String(inputs.streamName ?? ""), encryptionType, String(inputs.keyId ?? ""));
+    const result = await (await loadKinesisManager()).stopStreamEncryption(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), encryptionType, String(inputs.keyId ?? ""));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryKinesis.kinesisStopStreamEncryption(${inputs.credentialName}, ${inputs.streamName}, ${inputs.encryptionType}, ${inputs.keyId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.stopStreamEncryption(${inputs.credentialName}, ${inputs.streamName}, ${inputs.encryptionType}, ${inputs.keyId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_KINESIS_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT],
 });

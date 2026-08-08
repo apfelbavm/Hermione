@@ -22,12 +22,25 @@ vi.mock("@azure/identity", () => ({
   }),
 }));
 
+/** GraphManager (like TwilioManager/FacebookManager) resolves its named credential straight from
+ * the database via resolveAllCredentials(getDatabaseManager()) instead of ctx.getCredential — mock
+ * that resolution layer directly rather than standing up a real DatabaseManager. */
+let credentials: Map<string, CredentialRecord> = new Map();
+vi.mock("@hermione/core/server/DatabaseManager", () => ({
+  getDatabaseManager: () => ({}),
+}));
+vi.mock("@hermione/core/server/vaultCredentials", () => ({
+  resolveAllCredentials: async () => credentials,
+}));
+
 beforeAll(() => {
   registerBuiltins();
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.clearAllMocks();
+  credentials = new Map();
 });
 
 function buildGraph(type: string, id: string, pinValues: Record<string, unknown> = {}) {
@@ -41,14 +54,11 @@ function buildGraph(type: string, id: string, pinValues: Record<string, unknown>
   return { graph, node };
 }
 
-/** Every operation node resolves GraphManager.forCredential(tenantId, clientId, clientSecret), which
+/** Every operation node resolves GraphManager.getInstance({tenantId, clientId, clientSecret}), which
  * is cached by that triple — so each test uses its own unique client secret to guarantee a fresh
  * (uncached) manager, keeping tests independent of run order and of each other's state. */
 let credentialCounter = 0;
-function freshCredential(): {
-  name: string;
-  getCredential: (name: string) => CredentialRecord | undefined;
-} {
+function freshCredential(): { name: string } {
   credentialCounter += 1;
   const data: MicrosoftGraphClientCredentialsData = {
     tenantId: "tenant-1",
@@ -63,10 +73,8 @@ function freshCredential(): {
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
-  return {
-    name: credential.name,
-    getCredential: (name) => (name === credential.name ? credential : undefined),
-  };
+  credentials.set(credential.name, credential);
+  return { name: credential.name };
 }
 
 /** Graph client SDK calls go through global fetch (see HTTPMessageHandler); token acquisition is
@@ -78,7 +86,7 @@ function mockGraphFetch(handleOp: (url: string, init?: RequestInit) => Response 
 
 describe("microsoft365.listUsers", () => {
   it("lists users and reports success", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     const fetchMock = mockGraphFetch(async (url) => {
       expect(String(url)).toContain("/users?");
       return new Response(
@@ -103,7 +111,7 @@ describe("microsoft365.listUsers", () => {
     const { graph } = buildGraph("microsoft365.listUsers", "lu", {
       credentialName: name,
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("lu", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lu:success")).toBe(true);
@@ -125,10 +133,7 @@ describe("microsoft365.listUsers", () => {
     const { graph } = buildGraph("microsoft365.listUsers", "lu", {
       credentialName: "Nonexistent",
     });
-    const ctx = createExecutionContext(graph, {
-      log: () => {},
-      getCredential: () => undefined,
-    });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("lu", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lu:success")).toBe(false);
@@ -138,7 +143,7 @@ describe("microsoft365.listUsers", () => {
   });
 
   it("surfaces a Graph API error via the error output instead of throwing", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(
@@ -155,7 +160,7 @@ describe("microsoft365.listUsers", () => {
     const { graph } = buildGraph("microsoft365.listUsers", "lu", {
       credentialName: name,
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("lu", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lu:success")).toBe(false);
@@ -165,7 +170,7 @@ describe("microsoft365.listUsers", () => {
 
 describe("microsoft365.getUser", () => {
   it("fetches a single user's profile", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url) => {
@@ -189,7 +194,7 @@ describe("microsoft365.getUser", () => {
       credentialName: name,
       userId: "ada@contoso.com",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("gu", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("gu:success")).toBe(true);
@@ -204,7 +209,7 @@ describe("microsoft365.getUser", () => {
 
 describe("microsoft365.sendMail", () => {
   it("posts a sendMail request with the given recipients and reports success", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url, init) => {
@@ -222,7 +227,7 @@ describe("microsoft365.sendMail", () => {
       subject: "Hi",
       body: "Hello there",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("sm", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("sm:success")).toBe(true);
@@ -232,7 +237,7 @@ describe("microsoft365.sendMail", () => {
 
 describe("microsoft365.uploadFile / downloadFile", () => {
   it("uploads content to a OneDrive path", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url) => {
@@ -250,14 +255,14 @@ describe("microsoft365.uploadFile / downloadFile", () => {
       filePath: "reports/report.csv",
       content: "a,b\n1,2",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("up", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("up:success")).toBe(true);
   });
 
   it("downloads and decodes the content of a OneDrive file", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(
@@ -274,7 +279,7 @@ describe("microsoft365.uploadFile / downloadFile", () => {
       userId: "ada@contoso.com",
       filePath: "reports/report.csv",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("dl", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("dl:success")).toBe(true);
@@ -284,7 +289,7 @@ describe("microsoft365.uploadFile / downloadFile", () => {
 
 describe("microsoft365.request", () => {
   it("sends a raw request to an arbitrary Graph route", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url) => {
@@ -301,7 +306,7 @@ describe("microsoft365.request", () => {
       method: "GET",
       path: "/me/drive",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("rq", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("rq:success")).toBe(true);
@@ -311,7 +316,7 @@ describe("microsoft365.request", () => {
 
 describe("microsoft365 token reuse", () => {
   it("only builds one credential/client across multiple calls sharing the same credential", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.mocked(ClientSecretCredential).mockClear();
     vi.stubGlobal(
       "fetch",
@@ -327,13 +332,13 @@ describe("microsoft365 token reuse", () => {
     const { graph: g1 } = buildGraph("microsoft365.listUsers", "lu1", {
       credentialName: name,
     });
-    const ctx1 = createExecutionContext(g1, { log: () => {}, getCredential });
+    const ctx1 = createExecutionContext(g1, { log: () => {} });
     await runExecFrom("lu1", "exec-in", ctx1);
 
     const { graph: g2 } = buildGraph("microsoft365.listUsers", "lu2", {
       credentialName: name,
     });
-    const ctx2 = createExecutionContext(g2, { log: () => {}, getCredential });
+    const ctx2 = createExecutionContext(g2, { log: () => {} });
     await runExecFrom("lu2", "exec-in", ctx2);
 
     expect(ctx1.execOutputs.get("lu1:success")).toBe(true);
@@ -344,7 +349,7 @@ describe("microsoft365 token reuse", () => {
 
 describe("microsoft365.listChannels", () => {
   it("lists the channels in a team", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url) => {
@@ -365,7 +370,7 @@ describe("microsoft365.listChannels", () => {
       credentialName: name,
       teamId: "team-1",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("lc", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lc:success")).toBe(true);
@@ -375,7 +380,7 @@ describe("microsoft365.listChannels", () => {
 
 describe("microsoft365.listSites", () => {
   it("searches SharePoint sites", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url) => {
@@ -402,7 +407,7 @@ describe("microsoft365.listSites", () => {
       credentialName: name,
       search: "team",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("ls", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("ls:success")).toBe(true);
@@ -418,7 +423,7 @@ describe("microsoft365.listSites", () => {
 
 describe("microsoft365.createFolder", () => {
   it("creates a folder in a user's OneDrive", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url, init) => {
@@ -438,7 +443,7 @@ describe("microsoft365.createFolder", () => {
       parentPath: "reports",
       name: "archive",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("cf", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("cf:success")).toBe(true);
@@ -448,7 +453,7 @@ describe("microsoft365.createFolder", () => {
 
 describe("microsoft365.getWorksheetRange / setWorksheetRange", () => {
   it("reads a range as JSON", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url) => {
@@ -467,7 +472,7 @@ describe("microsoft365.getWorksheetRange / setWorksheetRange", () => {
       worksheetName: "Sheet1",
       address: "A1:B2",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("gr", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("gr:success")).toBe(true);
@@ -475,7 +480,7 @@ describe("microsoft365.getWorksheetRange / setWorksheetRange", () => {
   });
 
   it("writes a range from JSON", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url, init) => {
@@ -494,7 +499,7 @@ describe("microsoft365.getWorksheetRange / setWorksheetRange", () => {
       address: "A1:B2",
       valuesJson: "[[1,2]]",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("sr", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("sr:success")).toBe(true);
@@ -503,7 +508,7 @@ describe("microsoft365.getWorksheetRange / setWorksheetRange", () => {
 
 describe("microsoft365.listPlannerTasks", () => {
   it("lists tasks in a Planner plan", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url) => {
@@ -524,7 +529,7 @@ describe("microsoft365.listPlannerTasks", () => {
       credentialName: name,
       planId: "plan-1",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("lp", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lp:success")).toBe(true);
@@ -534,7 +539,7 @@ describe("microsoft365.listPlannerTasks", () => {
 
 describe("microsoft365.listContacts", () => {
   it("lists a user's Outlook contacts", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url) => {
@@ -561,7 +566,7 @@ describe("microsoft365.listContacts", () => {
       credentialName: name,
       userId: "ada@contoso.com",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("lct", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lct:success")).toBe(true);
@@ -571,7 +576,7 @@ describe("microsoft365.listContacts", () => {
 
 describe("microsoft365.listApplications", () => {
   it("lists app registrations in the tenant", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url) => {
@@ -591,7 +596,7 @@ describe("microsoft365.listApplications", () => {
     const { graph } = buildGraph("microsoft365.listApplications", "la", {
       credentialName: name,
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("la", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("la:success")).toBe(true);
@@ -601,7 +606,7 @@ describe("microsoft365.listApplications", () => {
 
 describe("microsoft365.createSubscription", () => {
   it("creates a change notification subscription", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       mockGraphFetch(async (url, init) => {
@@ -622,7 +627,7 @@ describe("microsoft365.createSubscription", () => {
       notificationUrl: "https://example.com/notify",
       expirationDateTime: "2026-08-02T00:00:00Z",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("cs", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("cs:success")).toBe(true);

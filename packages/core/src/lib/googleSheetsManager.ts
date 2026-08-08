@@ -1,5 +1,7 @@
 import { google, type sheets_v4 } from "googleapis";
 import { googleErrorMessage, serviceAccountClient, oauth2Client, type GoogleAuthClient } from "./googleAuthManager.ts";
+import { getDatabaseManager } from "../server/DatabaseManager.ts";
+import { resolveAllCredentials } from "../server/vaultCredentials.ts";
 import type { GoogleServiceAccountCredentialData, GoogleOAuth2CredentialData } from "@hermione/shared/types";
 
 /** Every Google Sheets node (get/update/append/clear values, create spreadsheet, add/delete sheet)
@@ -37,6 +39,8 @@ export interface GoogleSheetsMetadataResult extends GoogleSheetsOpResult {
   sheetTitlesJson: string;
 }
 
+type ResolvedGoogleCredential = { kind: "serviceAccount"; data: GoogleServiceAccountCredentialData } | { kind: "oauth2"; data: GoogleOAuth2CredentialData };
+
 const managerCache = new Map<string, GoogleSheetsManager>();
 
 export class GoogleSheetsManager {
@@ -46,7 +50,7 @@ export class GoogleSheetsManager {
     this.client = google.sheets({ version: "v4", auth });
   }
 
-  static forServiceAccount(data: GoogleServiceAccountCredentialData): GoogleSheetsManager {
+  private static forServiceAccount(data: GoogleServiceAccountCredentialData): GoogleSheetsManager {
     const key = `sa:${data.serviceAccountKeyJson}:${data.impersonateUser}`;
     let manager = managerCache.get(key);
     if (!manager) {
@@ -56,7 +60,7 @@ export class GoogleSheetsManager {
     return manager;
   }
 
-  static forOAuth2(data: GoogleOAuth2CredentialData): GoogleSheetsManager {
+  private static forOAuth2(data: GoogleOAuth2CredentialData): GoogleSheetsManager {
     const key = `oauth2:${data.clientId}:${data.refreshToken}`;
     let manager = managerCache.get(key);
     if (!manager) {
@@ -66,7 +70,69 @@ export class GoogleSheetsManager {
     return manager;
   }
 
-  async getValues(spreadsheetId: string, range: string): Promise<GoogleSheetsValuesResult> {
+  private static getInstance(resolved: ResolvedGoogleCredential): GoogleSheetsManager {
+    return resolved.kind === "serviceAccount" ? GoogleSheetsManager.forServiceAccount(resolved.data) : GoogleSheetsManager.forOAuth2(resolved.data);
+  }
+
+  /** Looks up a named Credential Vault entry and accepts either a Google Service Account or a
+   * Google OAuth2 credential — Sheets works fine under either auth flow. */
+  private static async findCredential(credentialName: string): Promise<{ ok: true; resolved: ResolvedGoogleCredential } | { ok: false; error: string }> {
+    const credRecord = (await resolveAllCredentials(getDatabaseManager())).get(credentialName);
+    if (!credRecord) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
+    if (credRecord.type === "googleServiceAccount") return { ok: true, resolved: { kind: "serviceAccount", data: credRecord.data as GoogleServiceAccountCredentialData } };
+    if (credRecord.type === "googleOAuth2") return { ok: true, resolved: { kind: "oauth2", data: credRecord.data as GoogleOAuth2CredentialData } };
+    return { ok: false, error: `Credential "${credentialName}" is not a Google Service Account or Google OAuth2 credential` };
+  }
+
+  static async getValues(credentialName: string, spreadsheetId: string, range: string): Promise<GoogleSheetsValuesResult> {
+    const cred = await GoogleSheetsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, valuesJson: "[]", error: cred.error };
+    return GoogleSheetsManager.getInstance(cred.resolved).getValues(spreadsheetId, range);
+  }
+
+  static async updateValues(credentialName: string, spreadsheetId: string, range: string, valuesJson: string): Promise<GoogleSheetsUpdateResult> {
+    const cred = await GoogleSheetsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, updatedCells: 0, error: cred.error };
+    return GoogleSheetsManager.getInstance(cred.resolved).updateValues(spreadsheetId, range, valuesJson);
+  }
+
+  static async appendValues(credentialName: string, spreadsheetId: string, range: string, valuesJson: string): Promise<GoogleSheetsUpdateResult> {
+    const cred = await GoogleSheetsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, updatedCells: 0, error: cred.error };
+    return GoogleSheetsManager.getInstance(cred.resolved).appendValues(spreadsheetId, range, valuesJson);
+  }
+
+  static async clearValues(credentialName: string, spreadsheetId: string, range: string): Promise<GoogleSheetsOpResult> {
+    const cred = await GoogleSheetsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleSheetsManager.getInstance(cred.resolved).clearValues(spreadsheetId, range);
+  }
+
+  static async createSpreadsheet(credentialName: string, title: string): Promise<GoogleSheetsCreateResult> {
+    const cred = await GoogleSheetsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, spreadsheetId: "", spreadsheetUrl: "", error: cred.error };
+    return GoogleSheetsManager.getInstance(cred.resolved).createSpreadsheet(title);
+  }
+
+  static async addSheet(credentialName: string, spreadsheetId: string, title: string): Promise<GoogleSheetsSheetResult> {
+    const cred = await GoogleSheetsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, sheetId: 0, error: cred.error };
+    return GoogleSheetsManager.getInstance(cred.resolved).addSheet(spreadsheetId, title);
+  }
+
+  static async deleteSheet(credentialName: string, spreadsheetId: string, sheetId: number): Promise<GoogleSheetsOpResult> {
+    const cred = await GoogleSheetsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return GoogleSheetsManager.getInstance(cred.resolved).deleteSheet(spreadsheetId, sheetId);
+  }
+
+  static async getMetadata(credentialName: string, spreadsheetId: string): Promise<GoogleSheetsMetadataResult> {
+    const cred = await GoogleSheetsManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, title: "", sheetTitlesJson: "[]", error: cred.error };
+    return GoogleSheetsManager.getInstance(cred.resolved).getMetadata(spreadsheetId);
+  }
+
+  private async getValues(spreadsheetId: string, range: string): Promise<GoogleSheetsValuesResult> {
     try {
       const res = await this.client.spreadsheets.values.get({ spreadsheetId, range });
       return { success: true, valuesJson: JSON.stringify(res.data.values ?? []), error: "" };
@@ -75,7 +141,7 @@ export class GoogleSheetsManager {
     }
   }
 
-  async updateValues(spreadsheetId: string, range: string, valuesJson: string): Promise<GoogleSheetsUpdateResult> {
+  private async updateValues(spreadsheetId: string, range: string, valuesJson: string): Promise<GoogleSheetsUpdateResult> {
     try {
       const values = JSON.parse(valuesJson || "[]") as unknown[][];
       const res = await this.client.spreadsheets.values.update({
@@ -90,7 +156,7 @@ export class GoogleSheetsManager {
     }
   }
 
-  async appendValues(spreadsheetId: string, range: string, valuesJson: string): Promise<GoogleSheetsUpdateResult> {
+  private async appendValues(spreadsheetId: string, range: string, valuesJson: string): Promise<GoogleSheetsUpdateResult> {
     try {
       const values = JSON.parse(valuesJson || "[]") as unknown[][];
       const res = await this.client.spreadsheets.values.append({
@@ -106,7 +172,7 @@ export class GoogleSheetsManager {
     }
   }
 
-  async clearValues(spreadsheetId: string, range: string): Promise<GoogleSheetsOpResult> {
+  private async clearValues(spreadsheetId: string, range: string): Promise<GoogleSheetsOpResult> {
     try {
       await this.client.spreadsheets.values.clear({ spreadsheetId, range });
       return { success: true, error: "" };
@@ -115,7 +181,7 @@ export class GoogleSheetsManager {
     }
   }
 
-  async createSpreadsheet(title: string): Promise<GoogleSheetsCreateResult> {
+  private async createSpreadsheet(title: string): Promise<GoogleSheetsCreateResult> {
     try {
       const res = await this.client.spreadsheets.create({
         requestBody: { properties: { title } },
@@ -131,7 +197,7 @@ export class GoogleSheetsManager {
     }
   }
 
-  async addSheet(spreadsheetId: string, title: string): Promise<GoogleSheetsSheetResult> {
+  private async addSheet(spreadsheetId: string, title: string): Promise<GoogleSheetsSheetResult> {
     try {
       const res = await this.client.spreadsheets.batchUpdate({
         spreadsheetId,
@@ -147,7 +213,7 @@ export class GoogleSheetsManager {
     }
   }
 
-  async deleteSheet(spreadsheetId: string, sheetId: number): Promise<GoogleSheetsOpResult> {
+  private async deleteSheet(spreadsheetId: string, sheetId: number): Promise<GoogleSheetsOpResult> {
     try {
       await this.client.spreadsheets.batchUpdate({
         spreadsheetId,
@@ -159,7 +225,7 @@ export class GoogleSheetsManager {
     }
   }
 
-  async getMetadata(spreadsheetId: string): Promise<GoogleSheetsMetadataResult> {
+  private async getMetadata(spreadsheetId: string): Promise<GoogleSheetsMetadataResult> {
     try {
       const res = await this.client.spreadsheets.get({ spreadsheetId });
       const sheetTitles = (res.data.sheets ?? []).map((s) => s.properties?.title ?? "");

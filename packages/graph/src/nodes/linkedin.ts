@@ -1,17 +1,27 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_LINKEDIN_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, LINKEDIN_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { TOKEN_STRUCT_TYPE, INTROSPECT_STRUCT_TYPE } from "@hermione/graph/structs/linkedin";
-import { LinkedInManager } from "@hermione/core/lib/linkedinManager";
-import type { LinkedInOAuth2CredentialData } from "@hermione/shared/types";
 import { i18n } from "@i18n";
 
-// Every node here also has a compileExecute: the compiled path calls a same-named
-// `functionLibraryLinkedIn.linkedin*` wrapper (see server/functionLibraryLinkedIn.ts), which reads
-// the credential back from environment variables instead of the vault — same split as
-// facebook.ts's execute()/compileExecute().
+// Every operation below calls the exact same LinkedInManager static method (packages/core/src/lib/
+// linkedinManager.ts) from both execute() (interpreter path) and compileExecute() (compiled/deployed
+// path) — LinkedInManager resolves the named credential straight from the database itself (see its
+// findCredential), so unlike before there is no separate functionLibraryLinkedIn.ts env-var-reading
+// layer and no ctx.getCredential vault lookup here: both paths are already identical (mirrors
+// twilio.ts).
 //
+// LinkedInManager now reaches the database directly (see its own header comment), which pulls in
+// better-sqlite3 and Node builtins — fine for execute(), which only ever runs server-side, but this
+// file is still statically imported client-side too (for the node-creation menu), so a plain
+// top-level import here would drag that whole chain into the browser bundle. Loaded with a runtime
+// `import()` instead, ignored by both bundlers, so it's never even resolved for the client build;
+// only ever actually called server-side, where it resolves normally.
+async function loadLinkedInManager(): Promise<typeof import("@hermione/core/lib/linkedinManager").LinkedInManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/linkedinManager");
+  return mod.LinkedInManager;
+}
+
 // LinkedIn's official SDK (linkedin-api-client) exposes only generic Rest.li verbs (get/finder/
 // create/update/delete/...) rather than per-resource helper methods, so this file has one node per
 // SDK method instead of one node per business object — that's the complete, "all possible" surface
@@ -19,19 +29,6 @@ import { i18n } from "@i18n";
 // objects) use JSON-string pins rather than rigid structs, mirroring salesforce.ts/workday.ts.
 
 const GROUP_NAME = "Request.LinkedIn";
-
-function resolveLinkedInCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: LinkedInOAuth2CredentialData } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
-  if (credential.type !== "linkedInOAuth2") return { ok: false, error: `Credential "${credentialName}" is not a LinkedIn OAuth2 credential` };
-  return { ok: true, data: credential.data as LinkedInOAuth2CredentialData };
-}
-
-function requireAccessToken(ctx: ExecutionContext, credentialName: string): { ok: true; accessToken: string } | { ok: false; error: string } {
-  const resolved = resolveLinkedInCredential(ctx, credentialName);
-  if (!resolved.ok) return resolved;
-  return { ok: true, accessToken: resolved.data.accessToken };
-}
 
 function emptyToken() {
   return { success: false, accessToken: "", expiresIn: 0, refreshToken: "", refreshTokenExpiresIn: 0, scope: "" };
@@ -110,15 +107,15 @@ registerNode({
     { id: "state", label: i18n.nodes.linkedin.generateAuthorizationUrl.pin_state, type: "string", direction: "input", defaultValue: "" },
     { id: "url", label: i18n.nodes.linkedin.generateAuthorizationUrl.pin_url, type: "string", direction: "output" },
   ],
-  evaluate: ({ inputs }) => {
+  evaluate: async ({ inputs }) => {
     const scopes = Array.isArray(inputs.scopes) ? (inputs.scopes as unknown[]).map(String) : [];
-    const result = LinkedInManager.generateAuthorizationUrl(String(inputs.clientId ?? ""), String(inputs.redirectUri ?? ""), scopes, String(inputs.state ?? ""));
+    const result = (await loadLinkedInManager()).generateAuthorizationUrl(String(inputs.clientId ?? ""), String(inputs.redirectUri ?? ""), scopes, String(inputs.state ?? ""));
     return { url: result.url };
   },
   compileEvaluate: ({ inputs }) => ({
-    url: `functionLibraryLinkedIn.linkedinGenerateAuthorizationUrl(${inputs.clientId}, ${inputs.redirectUri}, ${inputs.scopes}, ${inputs.state}).url`,
+    url: `LinkedInManager.generateAuthorizationUrl(${inputs.clientId}, ${inputs.redirectUri}, ${inputs.scopes}, ${inputs.state}).url`,
   }),
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -129,18 +126,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "tokens", label: i18n.nodes.linkedin.token.label, type: "struct", subType: TOKEN_STRUCT_TYPE, direction: "output" }, errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveLinkedInCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, tokens: emptyToken(), error: resolved.error } };
-    const result = await LinkedInManager.exchangeAuthCode(resolved.data.clientId, resolved.data.clientSecret, resolved.data.redirectUri, resolved.data.authCode);
-    return { nextExec: "exec-out", outputs: { success: result.success, tokens: toTokenStruct(result), error: result.error } };
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).exchangeAuthCode(String(inputs.credentialName ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, tokens: result.success ? toTokenStruct(result) : emptyToken(), error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinAuthorize(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.exchangeAuthCode(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, tokens: tokenStructExpr(v), error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -151,18 +146,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "tokens", label: i18n.nodes.linkedin.token.label, type: "struct", subType: TOKEN_STRUCT_TYPE, direction: "output" }, errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveLinkedInCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, tokens: emptyToken(), error: resolved.error } };
-    const result = await LinkedInManager.exchangeRefreshToken(resolved.data.clientId, resolved.data.clientSecret, resolved.data.refreshToken);
-    return { nextExec: "exec-out", outputs: { success: result.success, tokens: toTokenStruct(result), error: result.error } };
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).exchangeRefreshToken(String(inputs.credentialName ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, tokens: result.success ? toTokenStruct(result) : emptyToken(), error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinRefreshToken(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.exchangeRefreshToken(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, tokens: tokenStructExpr(v), error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -173,18 +166,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "tokens", label: i18n.nodes.linkedin.token.label, type: "struct", subType: TOKEN_STRUCT_TYPE, direction: "output" }, errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveLinkedInCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, tokens: emptyToken(), error: resolved.error } };
-    const result = await LinkedInManager.getTwoLeggedAccessToken(resolved.data.clientId, resolved.data.clientSecret);
-    return { nextExec: "exec-out", outputs: { success: result.success, tokens: toTokenStruct(result), error: result.error } };
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).getTwoLeggedAccessToken(String(inputs.credentialName ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, tokens: result.success ? toTokenStruct(result) : emptyToken(), error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinGetTwoLeggedAccessToken(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.getTwoLeggedAccessToken(${inputs.credentialName});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, tokens: tokenStructExpr(v), error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -203,19 +194,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveLinkedInCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, result: emptyIntrospect(), error: resolved.error } };
-    const tokenToInspect = String(inputs.accessToken ?? "") || resolved.data.accessToken;
-    const result = await LinkedInManager.introspectAccessToken(resolved.data.clientId, resolved.data.clientSecret, tokenToInspect);
-    return { nextExec: "exec-out", outputs: { success: result.success, result: toIntrospectStruct(result), error: result.error } };
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).introspectAccessToken(String(inputs.credentialName ?? ""), String(inputs.accessToken ?? ""));
+    return { nextExec: "exec-out", outputs: { success: result.success, result: result.success ? toIntrospectStruct(result) : emptyIntrospect(), error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinIntrospectAccessToken(${inputs.credentialName}, ${inputs.accessToken});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.introspectAccessToken(${inputs.credentialName}, ${inputs.accessToken});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, result: introspectStructExpr(v), error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 function tokenStructExpr(v: string): string {
@@ -234,21 +222,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), resourcePathPin(), idJsonPin(), pathKeysJsonPin(), queryParamsJsonPin(), versionStringPin(), execOutPin(), successPin(), resultJsonPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, resultJson: "", error: auth.error } };
-    const result = await LinkedInManager.get(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).get(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinGet(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.get(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -259,21 +242,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), resourcePathPin(), idsJsonPin(), pathKeysJsonPin(), queryParamsJsonPin(), versionStringPin(), execOutPin(), successPin(), resultJsonPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, resultJson: "", error: auth.error } };
-    const result = await LinkedInManager.batchGet(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).batchGet(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinBatchGet(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.batchGet(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -284,18 +262,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), resourcePathPin(), pathKeysJsonPin(), queryParamsJsonPin(), versionStringPin(), execOutPin(), successPin(), resultJsonPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, resultJson: "", error: auth.error } };
-    const result = await LinkedInManager.getAll(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).getAll(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinGetAll(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.getAll(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -318,21 +294,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, resultJson: "", error: auth.error } };
-    const result = await LinkedInManager.finder(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.finderName ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).finder(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.finderName ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinFinder(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.finderName}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.finder(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.finderName}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -357,11 +328,11 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, resultJson: "", error: auth.error } };
-    const result = await LinkedInManager.batchFinder(
-      auth.accessToken,
+  execute: async ({ inputs }) => {
+    const result = await (
+      await loadLinkedInManager()
+    ).batchFinder(
+      String(inputs.credentialName ?? ""),
       String(inputs.resourcePath ?? ""),
       String(inputs.finderName ?? ""),
       String(inputs.finderCriteriaName ?? ""),
@@ -373,14 +344,14 @@ registerNode({
     return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinBatchFinder(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.finderName}, ${inputs.finderCriteriaName}, ${inputs.finderCriteriaValuesJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`,
+    `const ${compileResultVar(node.id)} = await LinkedInManager.batchFinder(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.finderName}, ${inputs.finderCriteriaName}, ${inputs.finderCriteriaValuesJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -402,18 +373,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, createdEntityId: "", error: auth.error } };
-    const result = await LinkedInManager.create(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.entityJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).create(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.entityJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, createdEntityId: result.createdEntityId, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinCreate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.entityJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.create(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.entityJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, createdEntityId: `${v}.createdEntityId`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -424,18 +393,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), resourcePathPin(), { id: "entitiesJson", label: i18n.nodes.linkedin.batchCreate.pin_entities_json, type: "string", direction: "input", defaultValue: "[]" }, pathKeysJsonPin(), versionStringPin(), execOutPin(), successPin(), resultJsonPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, resultJson: "", error: auth.error } };
-    const result = await LinkedInManager.batchCreate(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.entitiesJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).batchCreate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.entitiesJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinBatchCreate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.entitiesJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.batchCreate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.entitiesJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -446,18 +413,13 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), resourcePathPin(), idJsonPin(), { id: "entityJson", label: i18n.nodes.linkedin.__shared.pin_entity_json, type: "string", direction: "input", defaultValue: "{}" }, pathKeysJsonPin(), versionStringPin(), execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, error: auth.error } };
-    const result = await LinkedInManager.update(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.entityJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).update(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.entityJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.entityJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.update(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.entityJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => ({ success: `${compileResultVar(node.id)}.success`, error: `${compileResultVar(node.id)}.error` }),
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -480,21 +442,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, resultJson: "", error: auth.error } };
-    const result = await LinkedInManager.batchUpdate(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.entitiesJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).batchUpdate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.entitiesJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinBatchUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.entitiesJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.batchUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.entitiesJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -516,18 +473,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, error: auth.error } };
-    const result = await LinkedInManager.partialUpdate(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.patchSetObjectJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).partialUpdate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.patchSetObjectJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinPartialUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.patchSetObjectJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`,
+    `const ${compileResultVar(node.id)} = await LinkedInManager.partialUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.patchSetObjectJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => ({ success: `${compileResultVar(node.id)}.success`, error: `${compileResultVar(node.id)}.error` }),
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -550,21 +505,19 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, resultJson: "", error: auth.error } };
-    const result = await LinkedInManager.batchPartialUpdate(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.patchSetObjectsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).batchPartialUpdate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.patchSetObjectsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinBatchPartialUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.patchSetObjectsJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`,
+    `const ${compileResultVar(node.id)} = await LinkedInManager.batchPartialUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.patchSetObjectsJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -575,15 +528,13 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), resourcePathPin(), idJsonPin(), pathKeysJsonPin(), versionStringPin(), execOutPin(), successPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, error: auth.error } };
-    const result = await LinkedInManager.delete(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).delete(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinDelete(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.delete(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => ({ success: `${compileResultVar(node.id)}.success`, error: `${compileResultVar(node.id)}.error` }),
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -594,18 +545,16 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [execInPin(), credentialNamePin(), resourcePathPin(), idsJsonPin(), pathKeysJsonPin(), versionStringPin(), execOutPin(), successPin(), resultJsonPin(), errorPin()],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, resultJson: "", error: auth.error } };
-    const result = await LinkedInManager.batchDelete(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).batchDelete(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinBatchDelete(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.batchDelete(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -628,19 +577,14 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const auth = requireAccessToken(ctx, String(inputs.credentialName ?? ""));
-    if (!auth.ok) return { nextExec: "exec-out", outputs: { success: false, valueJson: "", error: auth.error } };
-    const result = await LinkedInManager.action(auth.accessToken, String(inputs.resourcePath ?? ""), String(inputs.actionName ?? ""), String(inputs.dataJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadLinkedInManager()).action(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.actionName ?? ""), String(inputs.dataJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, valueJson: result.json, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibraryLinkedIn.linkedinAction(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.actionName}, ${inputs.dataJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`,
-    ...compileFrom("exec-out"),
-  ],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.action(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.actionName}, ${inputs.dataJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, valueJson: `${v}.json`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_LINKEDIN_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT],
 });

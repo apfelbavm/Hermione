@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
 import { createExecutionContext, runExecFrom } from "@hermione/graph/engine/executor";
 import { getNodeDef } from "@hermione/graph/engine/registry";
@@ -6,12 +6,29 @@ import { Graph } from "@hermione/graph/engine/graph";
 import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
 import type { CredentialRecord, GithubTokenCredentialData } from "@hermione/shared/types";
 
+/** GithubManager (like TwilioManager/FacebookManager) resolves its named credential straight from
+ * the database via resolveAllCredentials(getDatabaseManager()) instead of ctx.getCredential — mock
+ * that resolution layer directly rather than standing up a real DatabaseManager. */
+let credentials: Map<string, CredentialRecord> = new Map();
+vi.mock("@hermione/core/server/DatabaseManager", () => ({
+  getDatabaseManager: () => ({}),
+}));
+vi.mock("@hermione/core/server/vaultCredentials", () => ({
+  resolveAllCredentials: async () => credentials,
+}));
+
 beforeAll(() => {
   registerBuiltins();
 });
 
+beforeEach(() => {
+  credentials.set(TEST_CREDENTIAL.name, TEST_CREDENTIAL);
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.clearAllMocks();
+  credentials = new Map();
 });
 
 function buildGraph(type: string, id: string, pinValues: Record<string, unknown> = {}) {
@@ -35,10 +52,6 @@ const TEST_CREDENTIAL: CredentialRecord = {
   createdAt: "2024-01-01T00:00:00.000Z",
   updatedAt: "2024-01-01T00:00:00.000Z",
 };
-
-function getCredentialStub(name: string): CredentialRecord | undefined {
-  return name === TEST_CREDENTIAL.name ? TEST_CREDENTIAL : undefined;
-}
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -78,7 +91,6 @@ describe("github.listIssues", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("li", "exec-in", ctx);
 
@@ -105,7 +117,6 @@ describe("github.listIssues", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("li", "exec-in", ctx);
 
@@ -131,7 +142,6 @@ describe("github.createIssue", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("ci", "exec-in", ctx);
 
@@ -157,7 +167,6 @@ describe("github.createIssue", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("ci", "exec-in", ctx);
 
@@ -185,7 +194,6 @@ describe("github.mergePullRequest", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("mp", "exec-in", ctx);
 
@@ -218,7 +226,6 @@ describe("github.getFileContent", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("gf", "exec-in", ctx);
 
@@ -247,7 +254,6 @@ describe("github.request", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("rq", "exec-in", ctx);
 
@@ -268,7 +274,6 @@ describe("github.request", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("rq", "exec-in", ctx);
 

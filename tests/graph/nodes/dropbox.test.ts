@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
 import { createExecutionContext, runExecFrom } from "@hermione/graph/engine/executor";
 import { getNodeDef } from "@hermione/graph/engine/registry";
@@ -6,12 +6,29 @@ import { Graph } from "@hermione/graph/engine/graph";
 import { NodeInstance } from "@hermione/graph/engine/nodeInstance";
 import type { CredentialRecord, DropboxOAuth2CredentialData } from "@hermione/shared/types";
 
+/** DropboxManager (like TwilioManager/FacebookManager) resolves its named credential straight from
+ * the database via resolveAllCredentials(getDatabaseManager()) instead of ctx.getCredential — mock
+ * that resolution layer directly rather than standing up a real DatabaseManager. */
+let credentials: Map<string, CredentialRecord> = new Map();
+vi.mock("@hermione/core/server/DatabaseManager", () => ({
+  getDatabaseManager: () => ({}),
+}));
+vi.mock("@hermione/core/server/vaultCredentials", () => ({
+  resolveAllCredentials: async () => credentials,
+}));
+
 beforeAll(() => {
   registerBuiltins();
 });
 
+beforeEach(() => {
+  credentials.set(TEST_CREDENTIAL.name, TEST_CREDENTIAL);
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.clearAllMocks();
+  credentials = new Map();
 });
 
 function buildGraph(type: string, id: string, pinValues: Record<string, unknown> = {}) {
@@ -41,18 +58,11 @@ const TEST_CREDENTIAL: CredentialRecord = {
   updatedAt: "2024-01-01T00:00:00.000Z",
 };
 
-function getCredentialStub(name: string): CredentialRecord | undefined {
-  return name === TEST_CREDENTIAL.name ? TEST_CREDENTIAL : undefined;
-}
-
 /** Every operation node now resolves DropboxManager.forCredential(appKey, appSecret, refreshToken),
  * which is cached by that triple — so each test uses its own unique refresh token to guarantee a
  * fresh (uncached) manager, keeping tests independent of run order and of each other's state. */
 let credentialCounter = 0;
-function freshCredential(): {
-  name: string;
-  getCredential: (name: string) => CredentialRecord | undefined;
-} {
+function freshCredential(): { name: string } {
   credentialCounter += 1;
   const credential: CredentialRecord = {
     id: `cred-op-${credentialCounter}`,
@@ -67,10 +77,8 @@ function freshCredential(): {
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
-  return {
-    name: credential.name,
-    getCredential: (name) => (name === credential.name ? credential : undefined),
-  };
+  credentials.set(credential.name, credential);
+  return { name: credential.name };
 }
 
 /** Every real Dropbox request first goes through DropboxAuth.checkAndRefreshAccessToken, which
@@ -113,7 +121,6 @@ describe("dropbox.authorize", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("az", "exec-in", ctx);
 
@@ -146,7 +153,6 @@ describe("dropbox.authorize", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("az", "exec-in", ctx);
 
@@ -168,7 +174,6 @@ describe("dropbox.authorize", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("az", "exec-in", ctx);
 
@@ -180,7 +185,7 @@ describe("dropbox.authorize", () => {
 
 describe("dropbox.upload", () => {
   it("uploads content to the given path and reports success", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     const fetchMock = withTokenRefresh(async (url, init) => {
       expect(String(url)).toContain("/files/upload");
       expect((init?.headers as Record<string, string>)["Dropbox-API-Arg"]).toContain('"path":"/report.csv"');
@@ -196,7 +201,7 @@ describe("dropbox.upload", () => {
       path: "/report.csv",
       content: "a,b\n1,2",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("up", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("up:success")).toBe(true);
@@ -204,7 +209,7 @@ describe("dropbox.upload", () => {
   });
 
   it("reports a Dropbox API error (e.g. path conflict) via the error output instead of throwing", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       withTokenRefresh(async () => new Response(JSON.stringify({ error_summary: "path/conflict/file/..." }), { status: 409 })),
@@ -215,7 +220,7 @@ describe("dropbox.upload", () => {
       path: "/report.csv",
       content: "x",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("up", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("up:success")).toBe(false);
@@ -233,7 +238,6 @@ describe("dropbox.upload", () => {
     });
     const ctx = createExecutionContext(graph, {
       log: () => {},
-      getCredential: getCredentialStub,
     });
     await runExecFrom("up", "exec-in", ctx);
 
@@ -245,7 +249,7 @@ describe("dropbox.upload", () => {
 
 describe("dropbox.download", () => {
   it("downloads a file's content and decodes it per the Encoding pin", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       withTokenRefresh(async (url) => {
@@ -264,7 +268,7 @@ describe("dropbox.download", () => {
       path: "/report.csv",
       encoding: "utf8",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("dl", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("dl:success")).toBe(true);
@@ -273,7 +277,7 @@ describe("dropbox.download", () => {
   });
 
   it("reports a not-found error instead of throwing", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       withTokenRefresh(
@@ -288,7 +292,7 @@ describe("dropbox.download", () => {
       credentialName: name,
       path: "/missing.csv",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("dl", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("dl:success")).toBe(false);
@@ -299,7 +303,7 @@ describe("dropbox.download", () => {
 
 describe("dropbox.listFolders", () => {
   it("returns only folder entries, ignoring files, and passes the Recursive pin through", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       withTokenRefresh(async (url, init) => {
@@ -331,7 +335,7 @@ describe("dropbox.listFolders", () => {
       path: "/root",
       recursive: true,
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("lf", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lf:success")).toBe(true);
@@ -340,7 +344,7 @@ describe("dropbox.listFolders", () => {
   });
 
   it("paginates through list_folder/continue until has_more is false", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       withTokenRefresh(async (url) => {
@@ -375,7 +379,7 @@ describe("dropbox.listFolders", () => {
       credentialName: name,
       path: "/root",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("lf", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lf:success")).toBe(true);
@@ -383,7 +387,7 @@ describe("dropbox.listFolders", () => {
   });
 
   it("reports a Dropbox API error via the error output instead of throwing", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     vi.stubGlobal(
       "fetch",
       withTokenRefresh(
@@ -398,7 +402,7 @@ describe("dropbox.listFolders", () => {
       credentialName: name,
       path: "/missing",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("lf", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("lf:success")).toBe(false);
@@ -411,7 +415,7 @@ describe.each(["move", "copy", "rename"])("dropbox.%s", (op) => {
   const type = `dropbox.${op}`;
 
   it("sends from_path/to_path and reports success", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     const fetchMock = withTokenRefresh(async (url, init) => {
       expect(String(url)).toContain(op === "copy" ? "/files/copy_v2" : "/files/move_v2");
       const body = JSON.parse(String(init?.body));
@@ -429,7 +433,7 @@ describe.each(["move", "copy", "rename"])("dropbox.%s", (op) => {
       fromPath: "/a.txt",
       toPath: "/b.txt",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("op", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("op:success")).toBe(true);
@@ -439,7 +443,7 @@ describe.each(["move", "copy", "rename"])("dropbox.%s", (op) => {
 
 describe("dropbox.delete", () => {
   it("deletes the given path and reports success", async () => {
-    const { name, getCredential } = freshCredential();
+    const { name } = freshCredential();
     const fetchMock = withTokenRefresh(async (url) => {
       expect(String(url)).toContain("/files/delete_v2");
       return new Response(JSON.stringify({ metadata: { name: "a.txt" } }), {
@@ -453,7 +457,7 @@ describe("dropbox.delete", () => {
       credentialName: name,
       path: "/a.txt",
     });
-    const ctx = createExecutionContext(graph, { log: () => {}, getCredential });
+    const ctx = createExecutionContext(graph, { log: () => {} });
     await runExecFrom("del", "exec-in", ctx);
 
     expect(ctx.execOutputs.get("del:success")).toBe(true);

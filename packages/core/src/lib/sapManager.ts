@@ -21,23 +21,27 @@
  * SAP's proprietary IDoc/BAPI/RFC protocols still require the NetWeaver RFC SDK (not available via
  * npm, and not something either of the adopted packages provides) and remain out of scope here; this
  * connector only covers OData/Gateway services. RFC-enabled function modules exposed as a SOAP web
- * service can still be reached via the existing generic soap.call node (src/graph/nodes/soap.ts). */
+ * service can still be reached via the existing generic soap.call node (src/graph/nodes/soap.ts).
+ *
+ * Credential resolution mirrors twilioManager.ts: this manager reaches the Credential Vault database
+ * directly via findCredential/resolveAllCredentials, so both the interpreter (nodes/sap.ts) and the
+ * compiled/deployed path call the same static methods here — there is no separate
+ * functionLibrarySap.ts env-var-reading layer. */
 import { executeHttpRequest } from "@sap-cloud-sdk/http-client";
 import type { HttpDestination } from "@sap-cloud-sdk/connectivity";
+import { getDatabaseManager } from "../server/DatabaseManager.ts";
+import { resolveAllCredentials } from "../server/vaultCredentials.ts";
+import type { SapBasicAuthCredentialData } from "@hermione/shared/types";
+
+export interface SapAuth {
+  baseUrl: string;
+  client: string;
+  username: string;
+  password: string;
+}
 
 interface SapErrorBody {
   error?: { code?: string; message?: { value?: string }; innererror?: unknown };
-}
-
-function errorMessage(err: unknown): string {
-  if (err && typeof err === "object" && "response" in err) {
-    const response = (err as { response?: { data?: unknown; status?: number; statusText?: string } }).response;
-    const body = (response?.data ?? {}) as SapErrorBody;
-    if (body.error?.message?.value) return body.error.message.value;
-    if (response?.statusText) return `SAP OData error (status ${response.status}): ${response.statusText}`;
-  }
-  if (err instanceof Error) return err.message;
-  return String(err);
 }
 
 export interface SapOpResult {
@@ -58,14 +62,75 @@ export interface SapCreateEntityResult extends SapOpResult {
   entity: Record<string, unknown>;
 }
 
+const managerCache = new Map<string, SapManager>();
+
 export class SapManager {
   private readonly destination: HttpDestination;
 
-  constructor(baseUrl: string, client: string, username: string, password: string) {
+  static getInstance(auth: SapAuth): SapManager {
+    const key = `${auth.baseUrl}:${auth.client}:${auth.username}:${auth.password}`;
+    let manager = managerCache.get(key);
+    if (!manager) {
+      manager = new SapManager(auth.baseUrl, auth.client, auth.username, auth.password);
+      managerCache.set(key, manager);
+    }
+    return manager;
+  }
+
+  private constructor(baseUrl: string, client: string, username: string, password: string) {
     this.destination = { url: baseUrl, sapClient: client, username, password, authentication: "BasicAuthentication" };
   }
 
-  async getEntitySet(servicePath: string, entitySet: string, queryOptions: string): Promise<SapGetEntitySetResult> {
+  static errorMessage(err: unknown): string {
+    if (err && typeof err === "object" && "response" in err) {
+      const response = (err as { response?: { data?: unknown; status?: number; statusText?: string } }).response;
+      const body = (response?.data ?? {}) as SapErrorBody;
+      if (body.error?.message?.value) return body.error.message.value;
+      if (response?.statusText) return `SAP OData error (status ${response.status}): ${response.statusText}`;
+    }
+    if (err instanceof Error) return err.message;
+    return String(err);
+  }
+
+  private static async findCredential(credentialName: string): Promise<{ ok: true; auth: SapAuth } | { ok: false; error: string }> {
+    const credRecord = (await resolveAllCredentials(getDatabaseManager())).get(credentialName);
+    if (!credRecord) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
+    if (credRecord.type !== "sapBasicAuth") return { ok: false, error: `Credential "${credentialName}" is not a SAP Basic Auth credential` };
+    const data = credRecord.data as SapBasicAuthCredentialData;
+    return { ok: true, auth: { baseUrl: data.baseUrl, client: data.client, username: data.username, password: data.password } };
+  }
+
+  static async getEntitySet(credentialName: string, servicePath: string, entitySet: string, queryOptions: string): Promise<SapGetEntitySetResult> {
+    const cred = await SapManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, results: [], error: cred.error };
+    return SapManager.getInstance(cred.auth).getEntitySet(servicePath, entitySet, queryOptions);
+  }
+
+  static async getEntity(credentialName: string, servicePath: string, entitySet: string, keyPredicate: string): Promise<SapGetEntityResult> {
+    const cred = await SapManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, entity: {}, error: cred.error };
+    return SapManager.getInstance(cred.auth).getEntity(servicePath, entitySet, keyPredicate);
+  }
+
+  static async createEntity(credentialName: string, servicePath: string, entitySet: string, bodyJson: Record<string, unknown>): Promise<SapCreateEntityResult> {
+    const cred = await SapManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, entity: {}, error: cred.error };
+    return SapManager.getInstance(cred.auth).createEntity(servicePath, entitySet, bodyJson);
+  }
+
+  static async updateEntity(credentialName: string, servicePath: string, entitySet: string, keyPredicate: string, bodyJson: Record<string, unknown>): Promise<SapOpResult> {
+    const cred = await SapManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SapManager.getInstance(cred.auth).updateEntity(servicePath, entitySet, keyPredicate, bodyJson);
+  }
+
+  static async deleteEntity(credentialName: string, servicePath: string, entitySet: string, keyPredicate: string): Promise<SapOpResult> {
+    const cred = await SapManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SapManager.getInstance(cred.auth).deleteEntity(servicePath, entitySet, keyPredicate);
+  }
+
+  private async getEntitySet(servicePath: string, entitySet: string, queryOptions: string): Promise<SapGetEntitySetResult> {
     try {
       const params: Record<string, string> = { $format: "json" };
       if (queryOptions) {
@@ -78,31 +143,31 @@ export class SapManager {
       const d = (res.data as { d?: { results?: Record<string, unknown>[] } })?.d;
       return { success: true, results: d?.results ?? [], error: "" };
     } catch (err) {
-      return { success: false, results: [], error: errorMessage(err) };
+      return { success: false, results: [], error: SapManager.errorMessage(err) };
     }
   }
 
-  async getEntity(servicePath: string, entitySet: string, keyPredicate: string): Promise<SapGetEntityResult> {
+  private async getEntity(servicePath: string, entitySet: string, keyPredicate: string): Promise<SapGetEntityResult> {
     try {
       const res = await executeHttpRequest(this.destination, { method: "GET", url: `${servicePath}/${entitySet}(${keyPredicate})`, params: { $format: "json" } });
       const d = (res.data as { d?: Record<string, unknown> })?.d;
       return { success: true, entity: d ?? {}, error: "" };
     } catch (err) {
-      return { success: false, entity: {}, error: errorMessage(err) };
+      return { success: false, entity: {}, error: SapManager.errorMessage(err) };
     }
   }
 
-  async createEntity(servicePath: string, entitySet: string, bodyJson: Record<string, unknown>): Promise<SapCreateEntityResult> {
+  private async createEntity(servicePath: string, entitySet: string, bodyJson: Record<string, unknown>): Promise<SapCreateEntityResult> {
     try {
       const res = await executeHttpRequest(this.destination, { method: "POST", url: `${servicePath}/${entitySet}`, headers: { "Content-Type": "application/json", Accept: "application/json" }, data: bodyJson });
       const d = (res.data as { d?: Record<string, unknown> })?.d;
       return { success: true, entity: d ?? {}, error: "" };
     } catch (err) {
-      return { success: false, entity: {}, error: errorMessage(err) };
+      return { success: false, entity: {}, error: SapManager.errorMessage(err) };
     }
   }
 
-  async updateEntity(servicePath: string, entitySet: string, keyPredicate: string, bodyJson: Record<string, unknown>): Promise<SapOpResult> {
+  private async updateEntity(servicePath: string, entitySet: string, keyPredicate: string, bodyJson: Record<string, unknown>): Promise<SapOpResult> {
     try {
       // SAP Gateway traditionally expects the X-HTTP-Method override on a POST rather than a literal
       // MERGE/PATCH verb, since many HTTP clients/environments can't send one.
@@ -110,16 +175,16 @@ export class SapManager {
       // SAP typically returns 204 No Content on a successful MERGE — nothing to parse.
       return { success: true, error: "" };
     } catch (err) {
-      return { success: false, error: errorMessage(err) };
+      return { success: false, error: SapManager.errorMessage(err) };
     }
   }
 
-  async deleteEntity(servicePath: string, entitySet: string, keyPredicate: string): Promise<SapOpResult> {
+  private async deleteEntity(servicePath: string, entitySet: string, keyPredicate: string): Promise<SapOpResult> {
     try {
       await executeHttpRequest(this.destination, { method: "DELETE", url: `${servicePath}/${entitySet}(${keyPredicate})` });
       return { success: true, error: "" };
     } catch (err) {
-      return { success: false, error: errorMessage(err) };
+      return { success: false, error: SapManager.errorMessage(err) };
     }
   }
 }

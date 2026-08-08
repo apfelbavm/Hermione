@@ -1,18 +1,17 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
-import type { ExecutionContext } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_WORKDAY_IMPORT } from "@hermione/graph/engine/compileUtils";
-import { WorkdayManager } from "@hermione/core/lib/workdayManager";
-import type { WorkdayBasicAuthCredentialData } from "@hermione/shared/types";
+import { compileResultVar, WORKDAY_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { i18n } from "@i18n";
 
 const GROUP_NAME = "Request.Workday";
 
-function resolveWorkdayCredential(ctx: ExecutionContext, credentialName: string): { ok: true; data: WorkdayBasicAuthCredentialData } | { ok: false; error: string } {
-  const credential = ctx.getCredential?.(credentialName);
-  if (!credential) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
-  if (credential.type !== "workdayBasicAuth") return { ok: false, error: `Credential "${credentialName}" is not a Workday Basic Auth credential` };
-  return { ok: true, data: credential.data as WorkdayBasicAuthCredentialData };
+// Loaded via runtime import() rather than a top-level import for the same reason as
+// nodes/twilio.ts's loadTwilioManager: WorkdayManager reaches the database directly, pulling in
+// better-sqlite3 and Node builtins that must never be dragged into the client bundle that
+// statically imports this file for the node-creation menu.
+async function loadWorkdayManager(): Promise<typeof import("@hermione/core/lib/workdayManager").WorkdayManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/workdayManager");
+  return mod.WorkdayManager;
 }
 
 function credentialNamePin() {
@@ -54,19 +53,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveWorkdayCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, workersJson: "[]", total: 0, error: resolved.error } };
-    const manager = new WorkdayManager(resolved.data.tenantUrl, resolved.data.username, resolved.data.password);
-    const result = await manager.getWorkers(Number(inputs.limit ?? 20), Number(inputs.offset ?? 0), String(inputs.searchTerm ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadWorkdayManager()).getWorkers(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 20), Number(inputs.offset ?? 0), String(inputs.searchTerm ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, workersJson: JSON.stringify(result.workers), total: result.total, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryWorkday.workdayGetWorkers(${inputs.credentialName}, ${inputs.limit}, ${inputs.offset}, ${inputs.searchTerm});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await WorkdayManager.getWorkers(${inputs.credentialName}, ${inputs.limit}, ${inputs.offset}, ${inputs.searchTerm});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, workersJson: `JSON.stringify(${v}.workers)`, total: `${v}.total`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_WORKDAY_IMPORT],
+  compileImports: [WORKDAY_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -85,19 +81,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveWorkdayCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, workerJson: "{}", error: resolved.error } };
-    const manager = new WorkdayManager(resolved.data.tenantUrl, resolved.data.username, resolved.data.password);
-    const result = await manager.getWorker(String(inputs.workerId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadWorkdayManager()).getWorker(String(inputs.credentialName ?? ""), String(inputs.workerId ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, workerJson: JSON.stringify(result.worker), error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryWorkday.workdayGetWorker(${inputs.credentialName}, ${inputs.workerId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await WorkdayManager.getWorker(${inputs.credentialName}, ${inputs.workerId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, workerJson: `JSON.stringify(${v}.worker)`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_WORKDAY_IMPORT],
+  compileImports: [WORKDAY_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -118,19 +111,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveWorkdayCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, workersJson: "[]", total: 0, error: resolved.error } };
-    const manager = new WorkdayManager(resolved.data.tenantUrl, resolved.data.username, resolved.data.password);
-    const result = await manager.searchWorkers(String(inputs.query ?? ""), Number(inputs.limit ?? 20));
+  execute: async ({ inputs }) => {
+    const result = await (await loadWorkdayManager()).searchWorkers(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), Number(inputs.limit ?? 20));
     return { nextExec: "exec-out", outputs: { success: result.success, workersJson: JSON.stringify(result.workers), total: result.total, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryWorkday.workdaySearchWorkers(${inputs.credentialName}, ${inputs.query}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await WorkdayManager.searchWorkers(${inputs.credentialName}, ${inputs.query}, ${inputs.limit});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, workersJson: `JSON.stringify(${v}.workers)`, total: `${v}.total`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_WORKDAY_IMPORT],
+  compileImports: [WORKDAY_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -151,19 +141,16 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveWorkdayCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, organizationsJson: "[]", total: 0, error: resolved.error } };
-    const manager = new WorkdayManager(resolved.data.tenantUrl, resolved.data.username, resolved.data.password);
-    const result = await manager.getStaffingOrganizations(Number(inputs.limit ?? 20), Number(inputs.offset ?? 0));
+  execute: async ({ inputs }) => {
+    const result = await (await loadWorkdayManager()).getStaffingOrganizations(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 20), Number(inputs.offset ?? 0));
     return { nextExec: "exec-out", outputs: { success: result.success, organizationsJson: JSON.stringify(result.organizations), total: result.total, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryWorkday.workdayGetStaffingOrganizations(${inputs.credentialName}, ${inputs.limit}, ${inputs.offset});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await WorkdayManager.getStaffingOrganizations(${inputs.credentialName}, ${inputs.limit}, ${inputs.offset});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, organizationsJson: `JSON.stringify(${v}.organizations)`, total: `${v}.total`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_WORKDAY_IMPORT],
+  compileImports: [WORKDAY_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -182,17 +169,14 @@ registerNode({
     errorPin(),
   ],
   latent: true,
-  execute: async ({ inputs, ctx }) => {
-    const resolved = resolveWorkdayCredential(ctx, String(inputs.credentialName ?? ""));
-    if (!resolved.ok) return { nextExec: "exec-out", outputs: { success: false, organizationJson: "{}", error: resolved.error } };
-    const manager = new WorkdayManager(resolved.data.tenantUrl, resolved.data.username, resolved.data.password);
-    const result = await manager.getOrganization(String(inputs.organizationId ?? ""));
+  execute: async ({ inputs }) => {
+    const result = await (await loadWorkdayManager()).getOrganization(String(inputs.credentialName ?? ""), String(inputs.organizationId ?? ""));
     return { nextExec: "exec-out", outputs: { success: result.success, organizationJson: JSON.stringify(result.organization), error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibraryWorkday.workdayGetOrganization(${inputs.credentialName}, ${inputs.organizationId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await WorkdayManager.getOrganization(${inputs.credentialName}, ${inputs.organizationId});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return { success: `${v}.success`, organizationJson: `JSON.stringify(${v}.organization)`, error: `${v}.error` };
   },
-  compileImports: [FUNCTION_LIBRARY_WORKDAY_IMPORT],
+  compileImports: [WORKDAY_MANAGER_IMPORT],
 });
