@@ -9,6 +9,10 @@
 
 const API_BASE_URL = "https://api.smartrecruiters.com";
 
+import { getDatabaseManager } from "../server/DatabaseManager.ts";
+import { resolveAllCredentials } from "../server/vaultCredentials.ts";
+import type { SmartRecruitersApiKeyCredentialData, SmartRecruitersOAuth2ClientCredentialsData } from "@hermione/shared/types";
+
 export type SmartRecruitersAuth = { kind: "apiKey"; apiKey: string } | { kind: "oauth2"; clientId: string; clientSecret: string; tokenUrl: string };
 
 export interface SmartRecruitersOpResult {
@@ -271,8 +275,8 @@ export class SmartRecruitersManager {
   private constructor(private readonly auth: SmartRecruitersAuth) {}
 
   /** Reuses one manager per distinct auth instead of building a fresh one per node execution — see
-   * lib/githubManager.ts's GithubManager.forAuth for the same rationale. */
-  static forAuth(auth: SmartRecruitersAuth): SmartRecruitersManager {
+   * lib/twilioManager.ts's TwilioManager.getInstance for the same rationale. */
+  static getInstance(auth: SmartRecruitersAuth): SmartRecruitersManager {
     const key = authCacheKey(auth);
     let manager = managerCache.get(key);
     if (!manager) {
@@ -280,6 +284,875 @@ export class SmartRecruitersManager {
       managerCache.set(key, manager);
     }
     return manager;
+  }
+
+  private static async findCredential(credentialName: string): Promise<{ ok: true; auth: SmartRecruitersAuth } | { ok: false; error: string }> {
+    const credRecord = (await resolveAllCredentials(getDatabaseManager())).get(credentialName);
+    if (!credRecord) return { ok: false, error: `Credential "${credentialName}" not found in the vault` };
+    if (credRecord.type === "smartRecruitersApiKey") {
+      const data = credRecord.data as SmartRecruitersApiKeyCredentialData;
+      return { ok: true, auth: { kind: "apiKey", apiKey: data.apiKey } };
+    }
+    if (credRecord.type === "smartRecruitersOAuth2ClientCredentials") {
+      const data = credRecord.data as SmartRecruitersOAuth2ClientCredentialsData;
+      return { ok: true, auth: { kind: "oauth2", clientId: data.clientId, clientSecret: data.clientSecret, tokenUrl: data.tokenUrl } };
+    }
+    return { ok: false, error: `Credential "${credentialName}" is not a SmartRecruiters API Key or OAuth2 Client Credentials credential` };
+  }
+
+  // --- Per-operation static wrappers: resolve the named vault credential, then delegate to the
+  // matching private instance method below (mirrors lib/twilioManager.ts). ---------------------
+
+  static async apiCall(credentialName: string, method: string, path: string, query: Record<string, string>, body: unknown): Promise<SmartRecruitersOpResult & { status: number; dataJson: string }> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error, status: 0, dataJson: "" };
+    return SmartRecruitersManager.getInstance(cred.auth).apiCall(method, path, query, body);
+  }
+
+  static async searchJobs(credentialName: string, query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersJobsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, jobs: [], totalFound: 0, offset: 0, limit: 0, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).searchJobs(query);
+  }
+
+  static async createJob(credentialName: string, job: Record<string, unknown>): Promise<SmartRecruitersJobResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, job: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).createJob(job);
+  }
+
+  static async getJob(credentialName: string, jobId: string): Promise<SmartRecruitersJobResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, job: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getJob(jobId);
+  }
+
+  static async patchJob(credentialName: string, jobId: string, patch: Record<string, unknown>): Promise<SmartRecruitersJobResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, job: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).patchJob(jobId, patch);
+  }
+
+  static async updateJobStatus(credentialName: string, jobId: string, status: string): Promise<SmartRecruitersJobResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, job: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateJobStatus(jobId, status);
+  }
+
+  static async getJobStatusHistory(credentialName: string, jobId: string): Promise<SmartRecruitersJobStatusHistoryResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, history: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getJobStatusHistory(jobId);
+  }
+
+  static async getLatestApprovalRequest(credentialName: string, jobId: string): Promise<SmartRecruitersApprovalResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, approval: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getLatestApprovalRequest(jobId);
+  }
+
+  static async updateHeadcount(credentialName: string, jobId: string, headcount: number): Promise<SmartRecruitersJobResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, job: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateHeadcount(jobId, headcount);
+  }
+
+  static async getJobNote(credentialName: string, jobId: string): Promise<SmartRecruitersJobNoteResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, note: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getJobNote(jobId);
+  }
+
+  static async updateJobNote(credentialName: string, jobId: string, content: string): Promise<SmartRecruitersJobNoteResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, note: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateJobNote(jobId, content);
+  }
+
+  static async listJobAds(credentialName: string, jobId: string): Promise<SmartRecruitersJobAdsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, jobAds: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).listJobAds(jobId);
+  }
+
+  static async createJobAd(credentialName: string, jobId: string, jobAd: Record<string, unknown>): Promise<SmartRecruitersJobAdResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, jobAd: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).createJobAd(jobId, jobAd);
+  }
+
+  static async getJobAd(credentialName: string, jobId: string, jobAdId: string): Promise<SmartRecruitersJobAdResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, jobAd: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getJobAd(jobId, jobAdId);
+  }
+
+  static async updateJobAd(credentialName: string, jobId: string, jobAdId: string, jobAd: Record<string, unknown>): Promise<SmartRecruitersJobAdResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, jobAd: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateJobAd(jobId, jobAdId, jobAd);
+  }
+
+  static async publishJobAdPosting(credentialName: string, jobId: string, jobAdId: string, options: Record<string, unknown>): Promise<SmartRecruitersPostingStatusResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, status: "", error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).publishJobAdPosting(jobId, jobAdId, options);
+  }
+
+  static async unpublishJobAdPosting(credentialName: string, jobId: string, jobAdId: string): Promise<SmartRecruitersPostingStatusResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, status: "", error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).unpublishJobAdPosting(jobId, jobAdId);
+  }
+
+  static async listJobAdPostings(credentialName: string, jobId: string, jobAdId: string, activeOnly: boolean): Promise<SmartRecruitersPostingsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, postings: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).listJobAdPostings(jobId, jobAdId, activeOnly);
+  }
+
+  static async listPositions(credentialName: string, jobId: string): Promise<SmartRecruitersPositionsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, positions: [], totalFound: 0, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).listPositions(jobId);
+  }
+
+  static async createPosition(credentialName: string, jobId: string, position: Record<string, unknown>): Promise<SmartRecruitersPositionResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, position: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).createPosition(jobId, position);
+  }
+
+  static async getPosition(credentialName: string, jobId: string, positionId: string): Promise<SmartRecruitersPositionResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, position: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getPosition(jobId, positionId);
+  }
+
+  static async updatePosition(credentialName: string, jobId: string, positionId: string, position: Record<string, unknown>): Promise<SmartRecruitersPositionResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, position: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updatePosition(jobId, positionId, position);
+  }
+
+  static async deletePosition(credentialName: string, jobId: string, positionId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deletePosition(jobId, positionId);
+  }
+
+  static async getHiringTeam(credentialName: string, jobId: string): Promise<SmartRecruitersHiringTeamListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, members: [], totalFound: 0, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getHiringTeam(jobId);
+  }
+
+  static async addHiringTeamMember(credentialName: string, jobId: string, userId: string, role: string): Promise<SmartRecruitersHiringTeamMemberResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, member: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).addHiringTeamMember(jobId, userId, role);
+  }
+
+  static async removeHiringTeamMember(credentialName: string, jobId: string, userId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).removeHiringTeamMember(jobId, userId);
+  }
+
+  static async searchCandidates(credentialName: string, query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersCandidatesListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, candidates: [], totalFound: 0, nextPageId: "", error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).searchCandidates(query);
+  }
+
+  static async addCandidate(credentialName: string, candidate: Record<string, unknown>): Promise<SmartRecruitersCandidateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).addCandidate(candidate);
+  }
+
+  static async addCandidateToJob(credentialName: string, jobId: string, candidate: Record<string, unknown>): Promise<SmartRecruitersCandidateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).addCandidateToJob(jobId, candidate);
+  }
+
+  static async parseResume(credentialName: string, fileBase64: string, fileName: string, fileContentType: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string, internal: boolean): Promise<SmartRecruitersCandidateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).parseResume(fileBase64, fileName, fileContentType, sourceTypeId, sourceSubTypeId, sourceId, internal);
+  }
+
+  static async parseResumeForJob(credentialName: string, jobId: string, fileBase64: string, fileName: string, fileContentType: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string, internal: boolean): Promise<SmartRecruitersCandidateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).parseResumeForJob(jobId, fileBase64, fileName, fileContentType, sourceTypeId, sourceSubTypeId, sourceId, internal);
+  }
+
+  static async getCandidate(credentialName: string, candidateId: string): Promise<SmartRecruitersCandidateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getCandidate(candidateId);
+  }
+
+  static async deleteCandidate(credentialName: string, candidateId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deleteCandidate(candidateId);
+  }
+
+  static async updateCandidate(credentialName: string, candidateId: string, patch: Record<string, unknown>): Promise<SmartRecruitersCandidateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, candidate: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateCandidate(candidateId, patch);
+  }
+
+  static async getCandidateTags(credentialName: string, candidateId: string): Promise<SmartRecruitersCandidateTagsResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, tags: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getCandidateTags(candidateId);
+  }
+
+  static async addCandidateTags(credentialName: string, candidateId: string, tags: string[]): Promise<SmartRecruitersCandidateTagsResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, tags: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).addCandidateTags(candidateId, tags);
+  }
+
+  static async replaceCandidateTags(credentialName: string, candidateId: string, tags: string[]): Promise<SmartRecruitersCandidateTagsResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, tags: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).replaceCandidateTags(candidateId, tags);
+  }
+
+  static async deleteCandidateTags(credentialName: string, candidateId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deleteCandidateTags(candidateId);
+  }
+
+  static async updateCandidateJobStatus(credentialName: string, candidateId: string, jobId: string, status: string, subStatus: string, startsOn: string, reason: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateCandidateJobStatus(candidateId, jobId, status, subStatus, startsOn, reason);
+  }
+
+  static async getCandidateJobStatusHistory(credentialName: string, candidateId: string, jobId: string): Promise<SmartRecruitersCandidateStatusHistoryResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, history: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getCandidateJobStatusHistory(candidateId, jobId);
+  }
+
+  static async updateCandidateSource(credentialName: string, candidateId: string, jobId: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateCandidateSource(candidateId, jobId, sourceTypeId, sourceSubTypeId, sourceId);
+  }
+
+  static async requestCandidateConsent(credentialName: string, candidateIds: string[]): Promise<SmartRecruitersConsentRequestResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, results: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).requestCandidateConsent(candidateIds);
+  }
+
+  static async getCandidateConsentStatus(credentialName: string, candidateId: string): Promise<SmartRecruitersConsentStatusResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, status: "", date: "", error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getCandidateConsentStatus(candidateId);
+  }
+
+  static async getCandidateConsentDecisions(credentialName: string, candidateId: string): Promise<SmartRecruitersConsentDecisionsResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, decisions: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getCandidateConsentDecisions(candidateId);
+  }
+
+  static async getCandidateProperties(credentialName: string, candidateId: string, context: string): Promise<SmartRecruitersCandidatePropertiesResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, properties: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getCandidateProperties(candidateId, context);
+  }
+
+  static async updateCandidateProperty(credentialName: string, candidateId: string, propertyId: string, value: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateCandidateProperty(candidateId, propertyId, value);
+  }
+
+  static async getCandidateJobProperties(credentialName: string, candidateId: string, jobId: string, context: string): Promise<SmartRecruitersCandidatePropertiesResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, properties: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getCandidateJobProperties(candidateId, jobId, context);
+  }
+
+  static async updateCandidateJobProperties(credentialName: string, candidateId: string, jobId: string, properties: { id: string; value: unknown }[]): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateCandidateJobProperties(candidateId, jobId, properties);
+  }
+
+  static async listCandidateAttachments(credentialName: string, candidateId: string): Promise<SmartRecruitersCandidateAttachmentsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, attachments: [], totalFound: 0, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).listCandidateAttachments(candidateId);
+  }
+
+  static async addCandidateAttachment(credentialName: string, candidateId: string, attachmentType: string, fileBase64: string, fileName: string, fileContentType: string): Promise<SmartRecruitersCandidateAttachmentResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, attachment: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).addCandidateAttachment(candidateId, attachmentType, fileBase64, fileName, fileContentType);
+  }
+
+  static async getCandidateAttachment(credentialName: string, candidateId: string, attachmentId: string): Promise<SmartRecruitersCandidateAttachmentContentResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, contentBase64: "", contentType: "", error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getCandidateAttachment(candidateId, attachmentId);
+  }
+
+  static async getCandidateOnboardingStatus(credentialName: string, candidateId: string): Promise<SmartRecruitersOnboardingStatusResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, onboardingStatus: "", error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getCandidateOnboardingStatus(candidateId);
+  }
+
+  static async updateCandidateOnboardingStatus(credentialName: string, candidateId: string, onboardingStatus: string): Promise<SmartRecruitersOnboardingStatusResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, onboardingStatus: "", error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateCandidateOnboardingStatus(candidateId, onboardingStatus);
+  }
+
+  static async getCandidateJobOnboardingStatus(credentialName: string, candidateId: string, jobId: string): Promise<SmartRecruitersOnboardingStatusResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, onboardingStatus: "", error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getCandidateJobOnboardingStatus(candidateId, jobId);
+  }
+
+  static async updateCandidateJobOnboardingStatus(credentialName: string, candidateId: string, jobId: string, onboardingStatus: string): Promise<SmartRecruitersOnboardingStatusResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, onboardingStatus: "", error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateCandidateJobOnboardingStatus(candidateId, jobId, onboardingStatus);
+  }
+
+  static async getCandidateScreeningAnswers(credentialName: string, candidateId: string, jobId: string): Promise<SmartRecruitersScreeningAnswersResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, answers: [], totalFound: 0, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getCandidateScreeningAnswers(candidateId, jobId);
+  }
+
+  static async getJobApplication(credentialName: string, jobApplicationId: string): Promise<SmartRecruitersJobApplicationResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, jobApplication: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getJobApplication(jobApplicationId);
+  }
+
+  static async deleteJobApplication(credentialName: string, jobApplicationId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deleteJobApplication(jobApplicationId);
+  }
+
+  static async searchUsers(credentialName: string, query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersUsersListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, users: [], nextPageId: "", error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).searchUsers(query);
+  }
+
+  static async createUser(credentialName: string, user: Record<string, unknown>): Promise<SmartRecruitersUserResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, user: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).createUser(user);
+  }
+
+  static async getUser(credentialName: string, userId: string): Promise<SmartRecruitersUserResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, user: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getUser(userId);
+  }
+
+  static async updateUser(credentialName: string, userId: string, patch: unknown[]): Promise<SmartRecruitersUserResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, user: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateUser(userId, patch);
+  }
+
+  static async resetUserPassword(credentialName: string, userId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).resetUserPassword(userId);
+  }
+
+  static async sendUserActivationEmail(credentialName: string, userId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).sendUserActivationEmail(userId);
+  }
+
+  static async activateUser(credentialName: string, userId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).activateUser(userId);
+  }
+
+  static async deactivateUser(credentialName: string, userId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deactivateUser(userId);
+  }
+
+  static async updateUserAvatar(credentialName: string, userId: string, fileBase64: string, fileName: string, fileContentType: string): Promise<SmartRecruitersUserResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, user: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateUserAvatar(userId, fileBase64, fileName, fileContentType);
+  }
+
+  static async listSystemRoles(credentialName: string): Promise<SmartRecruitersSystemRolesResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, roles: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).listSystemRoles();
+  }
+
+  static async listAccessGroups(credentialName: string): Promise<SmartRecruitersAccessGroupsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, accessGroups: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).listAccessGroups();
+  }
+
+  static async createAccessGroup(credentialName: string, accessGroup: Record<string, unknown>): Promise<SmartRecruitersAccessGroupResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, accessGroup: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).createAccessGroup(accessGroup);
+  }
+
+  static async getAccessGroup(credentialName: string, accessGroupId: string): Promise<SmartRecruitersAccessGroupResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, accessGroup: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getAccessGroup(accessGroupId);
+  }
+
+  static async updateAccessGroup(credentialName: string, accessGroupId: string, accessGroup: Record<string, unknown>): Promise<SmartRecruitersAccessGroupResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, accessGroup: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateAccessGroup(accessGroupId, accessGroup);
+  }
+
+  static async deleteAccessGroup(credentialName: string, accessGroupId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deleteAccessGroup(accessGroupId);
+  }
+
+  static async assignUsersToAccessGroup(credentialName: string, accessGroupId: string, userIds: string[]): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).assignUsersToAccessGroup(accessGroupId, userIds);
+  }
+
+  static async removeUserFromAccessGroup(credentialName: string, accessGroupId: string, userId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).removeUserFromAccessGroup(accessGroupId, userId);
+  }
+
+  static async searchInterviews(credentialName: string, applicationId: string): Promise<SmartRecruitersInterviewsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, interviews: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).searchInterviews(applicationId);
+  }
+
+  static async createInterview(credentialName: string, interview: Record<string, unknown>): Promise<SmartRecruitersInterviewResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).createInterview(interview);
+  }
+
+  static async getInterview(credentialName: string, interviewId: string): Promise<SmartRecruitersInterviewResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getInterview(interviewId);
+  }
+
+  static async updateInterview(credentialName: string, interviewId: string, patch: Record<string, unknown>): Promise<SmartRecruitersInterviewResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateInterview(interviewId, patch);
+  }
+
+  static async deleteInterview(credentialName: string, interviewId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deleteInterview(interviewId);
+  }
+
+  static async listInterviewTypes(credentialName: string): Promise<SmartRecruitersInterviewTypesResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, interviewTypes: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).listInterviewTypes();
+  }
+
+  static async addInterviewTypes(credentialName: string, interviewTypes: string[]): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).addInterviewTypes(interviewTypes);
+  }
+
+  static async deleteInterviewType(credentialName: string, interviewType: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deleteInterviewType(interviewType);
+  }
+
+  static async createInterviewTimeslot(credentialName: string, interviewId: string, timeslot: Record<string, unknown>): Promise<SmartRecruitersTimeslotResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, timeslot: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).createInterviewTimeslot(interviewId, timeslot);
+  }
+
+  static async getInterviewTimeslot(credentialName: string, interviewId: string, timeslotId: string): Promise<SmartRecruitersTimeslotResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, timeslot: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getInterviewTimeslot(interviewId, timeslotId);
+  }
+
+  static async updateInterviewTimeslot(credentialName: string, interviewId: string, timeslotId: string, timeslot: Record<string, unknown>): Promise<SmartRecruitersTimeslotResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, timeslot: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateInterviewTimeslot(interviewId, timeslotId, timeslot);
+  }
+
+  static async deleteInterviewTimeslot(credentialName: string, interviewId: string, timeslotId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deleteInterviewTimeslot(interviewId, timeslotId);
+  }
+
+  static async setInterviewTimeslotNoShow(credentialName: string, interviewId: string, timeslotId: string, value: boolean): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).setInterviewTimeslotNoShow(interviewId, timeslotId, value);
+  }
+
+  static async updateInterviewCandidateStatus(credentialName: string, interviewId: string, status: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateInterviewCandidateStatus(interviewId, status);
+  }
+
+  static async updateTimeslotCandidateStatus(credentialName: string, interviewId: string, timeslotId: string, status: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateTimeslotCandidateStatus(interviewId, timeslotId, status);
+  }
+
+  static async updateTimeslotInterviewerStatus(credentialName: string, interviewId: string, timeslotId: string, userId: string, status: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateTimeslotInterviewerStatus(interviewId, timeslotId, userId, status);
+  }
+
+  static async getSchedulePreferences(credentialName: string, userId: string): Promise<SmartRecruitersSchedulePreferencesResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, preferences: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getSchedulePreferences(userId);
+  }
+
+  static async createEvent(credentialName: string, event: Record<string, unknown>): Promise<SmartRecruitersEventResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, event: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).createEvent(event);
+  }
+
+  static async getEvent(credentialName: string, eventId: string): Promise<SmartRecruitersEventResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, event: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getEvent(eventId);
+  }
+
+  static async updateEvent(credentialName: string, eventId: string, event: Record<string, unknown>): Promise<SmartRecruitersEventResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, event: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateEvent(eventId, event);
+  }
+
+  static async deleteEvent(credentialName: string, eventId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deleteEvent(eventId);
+  }
+
+  static async listJobEvents(credentialName: string, jobId: string, state: string, page: number, pageSize: number): Promise<SmartRecruitersEventsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, events: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).listJobEvents(jobId, state, page, pageSize);
+  }
+
+  static async getEventsForCandidate(credentialName: string, profileId: string, state: string): Promise<SmartRecruitersEventsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, events: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getEventsForCandidate(profileId, state);
+  }
+
+  static async getEventsForApplication(credentialName: string, applicationId: string, state: string): Promise<SmartRecruitersEventsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, events: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getEventsForApplication(applicationId, state);
+  }
+
+  static async getEventSession(credentialName: string, eventId: string, sessionId: string): Promise<SmartRecruitersEventSessionResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, session: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getEventSession(eventId, sessionId);
+  }
+
+  static async deleteEventSession(credentialName: string, eventId: string, sessionId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deleteEventSession(eventId, sessionId);
+  }
+
+  static async addSessionInterviewers(credentialName: string, eventId: string, sessionId: string, interviewerIds: string[]): Promise<SmartRecruitersInterviewersListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, interviewers: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).addSessionInterviewers(eventId, sessionId, interviewerIds);
+  }
+
+  static async removeSessionInterviewers(credentialName: string, eventId: string, sessionId: string, interviewerIds: string[]): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).removeSessionInterviewers(eventId, sessionId, interviewerIds);
+  }
+
+  static async getAllEventApplicants(credentialName: string, eventId: string): Promise<SmartRecruitersApplicantsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, applicants: [], totalFound: 0, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getAllEventApplicants(eventId);
+  }
+
+  static async getEventPoolApplicants(credentialName: string, eventId: string, page: number, pageSize: number): Promise<SmartRecruitersApplicantsListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, applicants: [], totalFound: 0, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getEventPoolApplicants(eventId, page, pageSize);
+  }
+
+  static async addApplicantsToEvent(credentialName: string, eventId: string, applicantIds: string[]): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).addApplicantsToEvent(eventId, applicantIds);
+  }
+
+  static async addApplicantsToSession(credentialName: string, eventId: string, sessionId: string, applicantIds: string[], allowOverbooking: boolean): Promise<SmartRecruitersSessionApplicantsResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, applicants: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).addApplicantsToSession(eventId, sessionId, applicantIds, allowOverbooking);
+  }
+
+  static async moveApplicantsToSession(credentialName: string, eventId: string, sessionId: string, fromSessionId: string, applicantIds: string[], allowOverbooking: boolean): Promise<SmartRecruitersSessionApplicantsResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, applicants: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).moveApplicantsToSession(eventId, sessionId, fromSessionId, applicantIds, allowOverbooking);
+  }
+
+  static async searchSelfSchedules(credentialName: string, applicationId: string, withInterviews: boolean | undefined, limit: number, offset: number): Promise<SmartRecruitersSelfSchedulesListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, selfSchedules: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).searchSelfSchedules(applicationId, withInterviews, limit, offset);
+  }
+
+  static async getSelfSchedule(credentialName: string, selfScheduleId: string): Promise<SmartRecruitersSelfScheduleResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, selfSchedule: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getSelfSchedule(selfScheduleId);
+  }
+
+  static async cancelSelfSchedule(credentialName: string, selfScheduleId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).cancelSelfSchedule(selfScheduleId);
+  }
+
+  static async getApplicationSelfSchedule(credentialName: string, selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, selfSchedule: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getApplicationSelfSchedule(selfScheduleId, applicationUuid);
+  }
+
+  static async getSelfScheduleSlots(credentialName: string, selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleSlotsResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, slots: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getSelfScheduleSlots(selfScheduleId, applicationUuid);
+  }
+
+  static async createSelfScheduleInterview(credentialName: string, selfScheduleId: string, applicationUuid: string, startsAt: string, endsAt: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).createSelfScheduleInterview(selfScheduleId, applicationUuid, startsAt, endsAt);
+  }
+
+  static async updateSelfScheduleInterview(credentialName: string, selfScheduleId: string, applicationUuid: string, startsAt: string, endsAt: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateSelfScheduleInterview(selfScheduleId, applicationUuid, startsAt, endsAt);
+  }
+
+  static async getSelfScheduledInterview(credentialName: string, selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, interview: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getSelfScheduledInterview(selfScheduleId, applicationUuid);
+  }
+
+  static async createAutomatedSelfSchedule(credentialName: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleIdResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, selfScheduleId: "", error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).createAutomatedSelfSchedule(applicationUuid);
+  }
+
+  static async updateAutomatedSelfScheduleInvite(credentialName: string, config: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateAutomatedSelfScheduleInvite(config);
+  }
+
+  static async requestAutomatedSelfReschedule(credentialName: string, config: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).requestAutomatedSelfReschedule(config);
+  }
+
+  static async getAutomatedScheduleAvailableSlotsCount(credentialName: string, scheduleType: string, applicationUuid: string, interviewerIdsByRole: Record<string, string[]>, startDate: string, endDate: string, slotsAvailabilityLimitInDays: number): Promise<SmartRecruitersAvailableSlotsCountResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, count: 0, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getAutomatedScheduleAvailableSlotsCount(scheduleType, applicationUuid, interviewerIdsByRole, startDate, endDate, slotsAvailabilityLimitInDays);
+  }
+
+  static async searchInterviewTemplates(credentialName: string, query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersInterviewTemplatesListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, templates: [], totalFound: 0, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).searchInterviewTemplates(query);
+  }
+
+  static async createInterviewTemplate(credentialName: string, template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, template: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).createInterviewTemplate(template);
+  }
+
+  static async getInterviewTemplate(credentialName: string, templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, template: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getInterviewTemplate(templateId);
+  }
+
+  static async updateInterviewTemplate(credentialName: string, templateId: string, template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, template: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateInterviewTemplate(templateId, template);
+  }
+
+  static async deleteInterviewTemplate(credentialName: string, templateId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deleteInterviewTemplate(templateId);
+  }
+
+  static async searchInterviewTemplatesDeprecated(credentialName: string, page: number, limit: number, search: string): Promise<SmartRecruitersInterviewTemplatesListResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, templates: [], totalFound: 0, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).searchInterviewTemplatesDeprecated(page, limit, search);
+  }
+
+  static async getInterviewTemplateDeprecated(credentialName: string, templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, template: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getInterviewTemplateDeprecated(templateId);
+  }
+
+  static async updateInterviewTemplateDeprecated(credentialName: string, templateId: string, template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, template: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateInterviewTemplateDeprecated(templateId, template);
+  }
+
+  static async deleteInterviewTemplateDeprecated(credentialName: string, templateId: string): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).deleteInterviewTemplateDeprecated(templateId);
+  }
+
+  static async getJobManagedSteps(credentialName: string, jobId: string): Promise<SmartRecruitersJobManagedStepsResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, states: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getJobManagedSteps(jobId);
+  }
+
+  static async updateJobManagedSteps(credentialName: string, jobId: string, states: Record<string, unknown>[]): Promise<SmartRecruitersJobManagedStepsResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, states: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateJobManagedSteps(jobId, states);
+  }
+
+  static async updateJobInterviewTemplateDeprecated(credentialName: string, jobInterviewTemplateId: string, template: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateJobInterviewTemplateDeprecated(jobInterviewTemplateId, template);
+  }
+
+  static async updateJobInterviewTemplateInterviewersDeprecated(credentialName: string, jobInterviewTemplateId: string, hiringTeamRoleToInterviewers: Record<string, string[]>): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateJobInterviewTemplateInterviewersDeprecated(jobInterviewTemplateId, hiringTeamRoleToInterviewers);
+  }
+
+  static async getJobInterviewTemplatesDeprecated(credentialName: string, jobId: string): Promise<SmartRecruitersJobTemplateStagesResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, stages: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getJobInterviewTemplatesDeprecated(jobId);
+  }
+
+  static async getJobApplicationInterviewTemplateDeprecated(credentialName: string, applicationId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, template: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).getJobApplicationInterviewTemplateDeprecated(applicationId);
+  }
+
+  static async updateJobTemplate(credentialName: string, jobInterviewTemplateId: string, template: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateJobTemplate(jobInterviewTemplateId, template);
+  }
+
+  static async updateJobTemplateInterviewers(credentialName: string, jobInterviewTemplateId: string, hiringTeamRoleToInterviewers: Record<string, string[]>): Promise<SmartRecruitersOpResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).updateJobTemplateInterviewers(jobInterviewTemplateId, hiringTeamRoleToInterviewers);
+  }
+
+  static async findJobTemplateByHiringStage(credentialName: string, jobId: string, hiringStage: string, hiringStep: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, template: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).findJobTemplateByHiringStage(jobId, hiringStage, hiringStep);
+  }
+
+  static async upsertJobTemplate(credentialName: string, jobId: string, hiringStage: string, hiringStep: string, templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, template: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).upsertJobTemplate(jobId, hiringStage, hiringStep, templateId);
+  }
+
+  static async findJobTemplatesByJobId(credentialName: string, jobId: string): Promise<SmartRecruitersJobTemplateStagesResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, stages: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).findJobTemplatesByJobId(jobId);
+  }
+
+  static async findJobTemplateByApplicationId(credentialName: string, applicationId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, template: {}, error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).findJobTemplateByApplicationId(applicationId);
+  }
+
+  static async searchJobTemplatesByApplicationIds(credentialName: string, jobId: string, applicationIds: string[]): Promise<SmartRecruitersJobTemplateBlueprintsResult> {
+    const cred = await SmartRecruitersManager.findCredential(credentialName);
+    if (!cred.ok) return { success: false, blueprints: [], error: cred.error };
+    return SmartRecruitersManager.getInstance(cred.auth).searchJobTemplatesByApplicationIds(jobId, applicationIds);
   }
 
   private async parseErrorBody(res: Response): Promise<unknown> {
@@ -356,7 +1229,7 @@ export class SmartRecruitersManager {
    * build-out of dedicated resource methods (Jobs, Candidates, Applications, Users, ...). `query`
    * and `body` are already-parsed plain objects; `body` should be `undefined` for methods without
    * a request body (GET/DELETE). */
-  async apiCall(method: string, path: string, query: Record<string, string>, body: unknown): Promise<SmartRecruitersOpResult & { status: number; dataJson: string }> {
+  private async apiCall(method: string, path: string, query: Record<string, string>, body: unknown): Promise<SmartRecruitersOpResult & { status: number; dataJson: string }> {
     const result = await this.request(method, path, { query, body });
     if (!result.success) return { success: false, error: result.error, status: result.status, dataJson: "" };
     return { success: true, error: "", status: result.status, dataJson: JSON.stringify(result.data) };
@@ -364,63 +1237,63 @@ export class SmartRecruitersManager {
 
   // --- Jobs core (Phase 1) ---------------------------------------------------------------
 
-  async searchJobs(query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersJobsListResult> {
+  private async searchJobs(query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersJobsListResult> {
     const result = await this.request<{ totalFound?: number; offset?: number; limit?: number; content?: Record<string, unknown>[] }>("GET", "/jobs", { query });
     if (!result.success) return { success: false, jobs: [], totalFound: 0, offset: 0, limit: 0, error: result.error };
     return { success: true, jobs: result.data.content ?? [], totalFound: result.data.totalFound ?? 0, offset: result.data.offset ?? 0, limit: result.data.limit ?? 0, error: "" };
   }
 
-  async createJob(job: Record<string, unknown>): Promise<SmartRecruitersJobResult> {
+  private async createJob(job: Record<string, unknown>): Promise<SmartRecruitersJobResult> {
     const result = await this.request<Record<string, unknown>>("POST", "/jobs", { body: job });
     if (!result.success) return { success: false, job: {}, error: result.error };
     return { success: true, job: result.data, error: "" };
   }
 
-  async getJob(jobId: string): Promise<SmartRecruitersJobResult> {
+  private async getJob(jobId: string): Promise<SmartRecruitersJobResult> {
     const result = await this.request<Record<string, unknown>>("GET", `/jobs/${encodeURIComponent(jobId)}`);
     if (!result.success) return { success: false, job: {}, error: result.error };
     return { success: true, job: result.data, error: "" };
   }
 
   /** RFC 7396 JSON Merge Patch — only the fields present in `patch` are changed. */
-  async patchJob(jobId: string, patch: Record<string, unknown>): Promise<SmartRecruitersJobResult> {
+  private async patchJob(jobId: string, patch: Record<string, unknown>): Promise<SmartRecruitersJobResult> {
     const result = await this.request<Record<string, unknown>>("PATCH", `/jobs/${encodeURIComponent(jobId)}`, { body: patch, contentType: "application/merge-patch+json" });
     if (!result.success) return { success: false, job: {}, error: result.error };
     return { success: true, job: result.data, error: "" };
   }
 
-  async updateJobStatus(jobId: string, status: string): Promise<SmartRecruitersJobResult> {
+  private async updateJobStatus(jobId: string, status: string): Promise<SmartRecruitersJobResult> {
     const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/status`, { body: { status } });
     if (!result.success) return { success: false, job: {}, error: result.error };
     return { success: true, job: result.data, error: "" };
   }
 
-  async getJobStatusHistory(jobId: string): Promise<SmartRecruitersJobStatusHistoryResult> {
+  private async getJobStatusHistory(jobId: string): Promise<SmartRecruitersJobStatusHistoryResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", `/jobs/${encodeURIComponent(jobId)}/status-history`);
     if (!result.success) return { success: false, history: [], error: result.error };
     const history = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
     return { success: true, history, error: "" };
   }
 
-  async getLatestApprovalRequest(jobId: string): Promise<SmartRecruitersApprovalResult> {
+  private async getLatestApprovalRequest(jobId: string): Promise<SmartRecruitersApprovalResult> {
     const result = await this.request<Record<string, unknown>>("GET", `/jobs/${encodeURIComponent(jobId)}/approvals/latest`);
     if (!result.success) return { success: false, approval: {}, error: result.error };
     return { success: true, approval: result.data, error: "" };
   }
 
-  async updateHeadcount(jobId: string, headcount: number): Promise<SmartRecruitersJobResult> {
+  private async updateHeadcount(jobId: string, headcount: number): Promise<SmartRecruitersJobResult> {
     const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/headcount`, { body: { headcount } });
     if (!result.success) return { success: false, job: {}, error: result.error };
     return { success: true, job: result.data, error: "" };
   }
 
-  async getJobNote(jobId: string): Promise<SmartRecruitersJobNoteResult> {
+  private async getJobNote(jobId: string): Promise<SmartRecruitersJobNoteResult> {
     const result = await this.request<Record<string, unknown>>("GET", `/jobs/${encodeURIComponent(jobId)}/note`);
     if (!result.success) return { success: false, note: {}, error: result.error };
     return { success: true, note: result.data, error: "" };
   }
 
-  async updateJobNote(jobId: string, content: string): Promise<SmartRecruitersJobNoteResult> {
+  private async updateJobNote(jobId: string, content: string): Promise<SmartRecruitersJobNoteResult> {
     const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/note`, { body: { content } });
     if (!result.success) return { success: false, note: {}, error: result.error };
     return { success: true, note: result.data, error: "" };
@@ -428,26 +1301,26 @@ export class SmartRecruitersManager {
 
   // --- Job Ads, Postings, Positions, Hiring Team (Phase 2) -------------------------------
 
-  async listJobAds(jobId: string): Promise<SmartRecruitersJobAdsListResult> {
+  private async listJobAds(jobId: string): Promise<SmartRecruitersJobAdsListResult> {
     const result = await this.request<Record<string, unknown>[] | { content?: Record<string, unknown>[] }>("GET", `/jobs/${encodeURIComponent(jobId)}/jobads`);
     if (!result.success) return { success: false, jobAds: [], error: result.error };
     const jobAds = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
     return { success: true, jobAds, error: "" };
   }
 
-  async createJobAd(jobId: string, jobAd: Record<string, unknown>): Promise<SmartRecruitersJobAdResult> {
+  private async createJobAd(jobId: string, jobAd: Record<string, unknown>): Promise<SmartRecruitersJobAdResult> {
     const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/jobads`, { body: jobAd });
     if (!result.success) return { success: false, jobAd: {}, error: result.error };
     return { success: true, jobAd: result.data, error: "" };
   }
 
-  async getJobAd(jobId: string, jobAdId: string): Promise<SmartRecruitersJobAdResult> {
+  private async getJobAd(jobId: string, jobAdId: string): Promise<SmartRecruitersJobAdResult> {
     const result = await this.request<Record<string, unknown>>("GET", `/jobs/${encodeURIComponent(jobId)}/jobads/${encodeURIComponent(jobAdId)}`);
     if (!result.success) return { success: false, jobAd: {}, error: result.error };
     return { success: true, jobAd: result.data, error: "" };
   }
 
-  async updateJobAd(jobId: string, jobAdId: string, jobAd: Record<string, unknown>): Promise<SmartRecruitersJobAdResult> {
+  private async updateJobAd(jobId: string, jobAdId: string, jobAd: Record<string, unknown>): Promise<SmartRecruitersJobAdResult> {
     const result = await this.request<Record<string, unknown>>("PUT", `/jobs/${encodeURIComponent(jobId)}/jobads/${encodeURIComponent(jobAdId)}`, { body: jobAd });
     if (!result.success) return { success: false, jobAd: {}, error: result.error };
     return { success: true, jobAd: result.data, error: "" };
@@ -455,7 +1328,7 @@ export class SmartRecruitersManager {
 
   /** POST .../postings — asynchronously publishes a job ad to its configured channels; the API
    * returns 202 with `{postingStatus: "PENDING"}`, not the fully-published state. */
-  async publishJobAdPosting(jobId: string, jobAdId: string, options: Record<string, unknown>): Promise<SmartRecruitersPostingStatusResult> {
+  private async publishJobAdPosting(jobId: string, jobAdId: string, options: Record<string, unknown>): Promise<SmartRecruitersPostingStatusResult> {
     const result = await this.request<{ postingStatus?: string }>("POST", `/jobs/${encodeURIComponent(jobId)}/jobads/${encodeURIComponent(jobAdId)}/postings`, { body: options });
     if (!result.success) return { success: false, status: "", error: result.error };
     return { success: true, status: result.data.postingStatus ?? "", error: "" };
@@ -463,61 +1336,61 @@ export class SmartRecruitersManager {
 
   /** DELETE .../postings — asynchronously unpublishes; the API returns 202 with
    * `{unpostingStatus: "PENDING"}`. */
-  async unpublishJobAdPosting(jobId: string, jobAdId: string): Promise<SmartRecruitersPostingStatusResult> {
+  private async unpublishJobAdPosting(jobId: string, jobAdId: string): Promise<SmartRecruitersPostingStatusResult> {
     const result = await this.request<{ unpostingStatus?: string }>("DELETE", `/jobs/${encodeURIComponent(jobId)}/jobads/${encodeURIComponent(jobAdId)}/postings`);
     if (!result.success) return { success: false, status: "", error: result.error };
     return { success: true, status: result.data.unpostingStatus ?? "", error: "" };
   }
 
-  async listJobAdPostings(jobId: string, jobAdId: string, activeOnly: boolean): Promise<SmartRecruitersPostingsListResult> {
+  private async listJobAdPostings(jobId: string, jobAdId: string, activeOnly: boolean): Promise<SmartRecruitersPostingsListResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] }>("GET", `/jobs/${encodeURIComponent(jobId)}/jobads/${encodeURIComponent(jobAdId)}/postings`, { query: { activeOnly } });
     if (!result.success) return { success: false, postings: [], error: result.error };
     return { success: true, postings: result.data.content ?? [], error: "" };
   }
 
-  async listPositions(jobId: string): Promise<SmartRecruitersPositionsListResult> {
+  private async listPositions(jobId: string): Promise<SmartRecruitersPositionsListResult> {
     const result = await this.request<{ totalFound?: number; content?: Record<string, unknown>[] }>("GET", `/jobs/${encodeURIComponent(jobId)}/positions`);
     if (!result.success) return { success: false, positions: [], totalFound: 0, error: result.error };
     return { success: true, positions: result.data.content ?? [], totalFound: result.data.totalFound ?? 0, error: "" };
   }
 
-  async createPosition(jobId: string, position: Record<string, unknown>): Promise<SmartRecruitersPositionResult> {
+  private async createPosition(jobId: string, position: Record<string, unknown>): Promise<SmartRecruitersPositionResult> {
     const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/positions`, { body: position });
     if (!result.success) return { success: false, position: {}, error: result.error };
     return { success: true, position: result.data, error: "" };
   }
 
-  async getPosition(jobId: string, positionId: string): Promise<SmartRecruitersPositionResult> {
+  private async getPosition(jobId: string, positionId: string): Promise<SmartRecruitersPositionResult> {
     const result = await this.request<Record<string, unknown>>("GET", `/jobs/${encodeURIComponent(jobId)}/positions/${encodeURIComponent(positionId)}`);
     if (!result.success) return { success: false, position: {}, error: result.error };
     return { success: true, position: result.data, error: "" };
   }
 
-  async updatePosition(jobId: string, positionId: string, position: Record<string, unknown>): Promise<SmartRecruitersPositionResult> {
+  private async updatePosition(jobId: string, positionId: string, position: Record<string, unknown>): Promise<SmartRecruitersPositionResult> {
     const result = await this.request<Record<string, unknown>>("PUT", `/jobs/${encodeURIComponent(jobId)}/positions/${encodeURIComponent(positionId)}`, { body: position });
     if (!result.success) return { success: false, position: {}, error: result.error };
     return { success: true, position: result.data, error: "" };
   }
 
-  async deletePosition(jobId: string, positionId: string): Promise<SmartRecruitersOpResult> {
+  private async deletePosition(jobId: string, positionId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `/jobs/${encodeURIComponent(jobId)}/positions/${encodeURIComponent(positionId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async getHiringTeam(jobId: string): Promise<SmartRecruitersHiringTeamListResult> {
+  private async getHiringTeam(jobId: string): Promise<SmartRecruitersHiringTeamListResult> {
     const result = await this.request<{ totalFound?: number; content?: Record<string, unknown>[] }>("GET", `/jobs/${encodeURIComponent(jobId)}/hiring-team`);
     if (!result.success) return { success: false, members: [], totalFound: 0, error: result.error };
     return { success: true, members: result.data.content ?? [], totalFound: result.data.totalFound ?? 0, error: "" };
   }
 
-  async addHiringTeamMember(jobId: string, userId: string, role: string): Promise<SmartRecruitersHiringTeamMemberResult> {
+  private async addHiringTeamMember(jobId: string, userId: string, role: string): Promise<SmartRecruitersHiringTeamMemberResult> {
     const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/hiring-team`, { body: { id: userId, role } });
     if (!result.success) return { success: false, member: {}, error: result.error };
     return { success: true, member: result.data, error: "" };
   }
 
-  async removeHiringTeamMember(jobId: string, userId: string): Promise<SmartRecruitersOpResult> {
+  private async removeHiringTeamMember(jobId: string, userId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `/jobs/${encodeURIComponent(jobId)}/hiring-team/${encodeURIComponent(userId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
@@ -536,26 +1409,26 @@ export class SmartRecruitersManager {
     return form;
   }
 
-  async searchCandidates(query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersCandidatesListResult> {
+  private async searchCandidates(query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersCandidatesListResult> {
     const result = await this.request<{ totalFound?: number; nextPageId?: string; content?: Record<string, unknown>[] }>("GET", "/candidates", { query });
     if (!result.success) return { success: false, candidates: [], totalFound: 0, nextPageId: "", error: result.error };
     return { success: true, candidates: result.data.content ?? [], totalFound: result.data.totalFound ?? 0, nextPageId: result.data.nextPageId ?? "", error: "" };
   }
 
-  async addCandidate(candidate: Record<string, unknown>): Promise<SmartRecruitersCandidateResult> {
+  private async addCandidate(candidate: Record<string, unknown>): Promise<SmartRecruitersCandidateResult> {
     const result = await this.request<Record<string, unknown>>("POST", "/candidates", { body: candidate });
     if (!result.success) return { success: false, candidate: {}, error: result.error };
     return { success: true, candidate: result.data, error: "" };
   }
 
-  async addCandidateToJob(jobId: string, candidate: Record<string, unknown>): Promise<SmartRecruitersCandidateResult> {
+  private async addCandidateToJob(jobId: string, candidate: Record<string, unknown>): Promise<SmartRecruitersCandidateResult> {
     const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/candidates`, { body: candidate });
     if (!result.success) return { success: false, candidate: {}, error: result.error };
     return { success: true, candidate: result.data, error: "" };
   }
 
   /** POST /candidates/cv — parses a resume file and creates a talent-pool candidate from it. */
-  async parseResume(fileBase64: string, fileName: string, fileContentType: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string, internal: boolean): Promise<SmartRecruitersCandidateResult> {
+  private async parseResume(fileBase64: string, fileName: string, fileContentType: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string, internal: boolean): Promise<SmartRecruitersCandidateResult> {
     const formData = this.buildFileFormData({ sourceTypeId, sourceSubTypeId, sourceId, internal }, "file", fileBase64, fileName, fileContentType);
     const result = await this.request<Record<string, unknown>>("POST", "/candidates/cv", { formData });
     if (!result.success) return { success: false, candidate: {}, error: result.error };
@@ -563,60 +1436,60 @@ export class SmartRecruitersManager {
   }
 
   /** POST /jobs/{jobId}/candidates/cv — same as parseResume but the created candidate is attached to `jobId`. */
-  async parseResumeForJob(jobId: string, fileBase64: string, fileName: string, fileContentType: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string, internal: boolean): Promise<SmartRecruitersCandidateResult> {
+  private async parseResumeForJob(jobId: string, fileBase64: string, fileName: string, fileContentType: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string, internal: boolean): Promise<SmartRecruitersCandidateResult> {
     const formData = this.buildFileFormData({ sourceTypeId, sourceSubTypeId, sourceId, internal }, "file", fileBase64, fileName, fileContentType);
     const result = await this.request<Record<string, unknown>>("POST", `/jobs/${encodeURIComponent(jobId)}/candidates/cv`, { formData });
     if (!result.success) return { success: false, candidate: {}, error: result.error };
     return { success: true, candidate: result.data, error: "" };
   }
 
-  async getCandidate(candidateId: string): Promise<SmartRecruitersCandidateResult> {
+  private async getCandidate(candidateId: string): Promise<SmartRecruitersCandidateResult> {
     const result = await this.request<Record<string, unknown>>("GET", `/candidates/${encodeURIComponent(candidateId)}`);
     if (!result.success) return { success: false, candidate: {}, error: result.error };
     return { success: true, candidate: result.data, error: "" };
   }
 
-  async deleteCandidate(candidateId: string): Promise<SmartRecruitersOpResult> {
+  private async deleteCandidate(candidateId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `/candidates/${encodeURIComponent(candidateId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
   /** PATCH /candidates/{id} — RFC 7396 JSON Merge Patch, same partial-update semantics as patchJob. */
-  async updateCandidate(candidateId: string, patch: Record<string, unknown>): Promise<SmartRecruitersCandidateResult> {
+  private async updateCandidate(candidateId: string, patch: Record<string, unknown>): Promise<SmartRecruitersCandidateResult> {
     const result = await this.request<Record<string, unknown>>("PATCH", `/candidates/${encodeURIComponent(candidateId)}`, { body: patch, contentType: "application/merge-patch+json" });
     if (!result.success) return { success: false, candidate: {}, error: result.error };
     return { success: true, candidate: result.data, error: "" };
   }
 
-  async getCandidateTags(candidateId: string): Promise<SmartRecruitersCandidateTagsResult> {
+  private async getCandidateTags(candidateId: string): Promise<SmartRecruitersCandidateTagsResult> {
     const result = await this.request<{ tags?: string[] }>("GET", `/candidates/${encodeURIComponent(candidateId)}/tags`);
     if (!result.success) return { success: false, tags: [], error: result.error };
     return { success: true, tags: result.data.tags ?? [], error: "" };
   }
 
   /** POST — additive; existing tags are kept. */
-  async addCandidateTags(candidateId: string, tags: string[]): Promise<SmartRecruitersCandidateTagsResult> {
+  private async addCandidateTags(candidateId: string, tags: string[]): Promise<SmartRecruitersCandidateTagsResult> {
     const result = await this.request<{ tags?: string[] }>("POST", `/candidates/${encodeURIComponent(candidateId)}/tags`, { body: { tags } });
     if (!result.success) return { success: false, tags: [], error: result.error };
     return { success: true, tags: result.data.tags ?? [], error: "" };
   }
 
   /** PUT — replaces the full tag set. */
-  async replaceCandidateTags(candidateId: string, tags: string[]): Promise<SmartRecruitersCandidateTagsResult> {
+  private async replaceCandidateTags(candidateId: string, tags: string[]): Promise<SmartRecruitersCandidateTagsResult> {
     const result = await this.request<{ tags?: string[] }>("PUT", `/candidates/${encodeURIComponent(candidateId)}/tags`, { body: { tags } });
     if (!result.success) return { success: false, tags: [], error: result.error };
     return { success: true, tags: result.data.tags ?? [], error: "" };
   }
 
   /** DELETE — clears all tags from the candidate; the API has no selective single-tag delete. */
-  async deleteCandidateTags(candidateId: string): Promise<SmartRecruitersOpResult> {
+  private async deleteCandidateTags(candidateId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `/candidates/${encodeURIComponent(candidateId)}/tags`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async updateCandidateJobStatus(candidateId: string, jobId: string, status: string, subStatus: string, startsOn: string, reason: string): Promise<SmartRecruitersOpResult> {
+  private async updateCandidateJobStatus(candidateId: string, jobId: string, status: string, subStatus: string, startsOn: string, reason: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PUT", `/candidates/${encodeURIComponent(candidateId)}/jobs/${encodeURIComponent(jobId)}/status`, {
       body: { status, subStatus: subStatus || undefined, startsOn: startsOn || undefined, reason: reason || undefined },
     });
@@ -624,13 +1497,13 @@ export class SmartRecruitersManager {
     return { success: true, error: "" };
   }
 
-  async getCandidateJobStatusHistory(candidateId: string, jobId: string): Promise<SmartRecruitersCandidateStatusHistoryResult> {
+  private async getCandidateJobStatusHistory(candidateId: string, jobId: string): Promise<SmartRecruitersCandidateStatusHistoryResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] }>("GET", `/candidates/${encodeURIComponent(candidateId)}/jobs/${encodeURIComponent(jobId)}/status/history`);
     if (!result.success) return { success: false, history: [], error: result.error };
     return { success: true, history: result.data.content ?? [], error: "" };
   }
 
-  async updateCandidateSource(candidateId: string, jobId: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string): Promise<SmartRecruitersOpResult> {
+  private async updateCandidateSource(candidateId: string, jobId: string, sourceTypeId: string, sourceSubTypeId: string, sourceId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PUT", `/candidates/${encodeURIComponent(candidateId)}/jobs/${encodeURIComponent(jobId)}/source`, {
       body: { sourceTypeId, sourceSubTypeId: sourceSubTypeId || undefined, sourceId: sourceId || undefined },
     });
@@ -640,19 +1513,19 @@ export class SmartRecruitersManager {
 
   /** POST /candidates/consent-requests — batch (1-1000 candidate ids); each id gets its own
    * per-item status in the response, a single bad id doesn't fail the whole batch. */
-  async requestCandidateConsent(candidateIds: string[]): Promise<SmartRecruitersConsentRequestResult> {
+  private async requestCandidateConsent(candidateIds: string[]): Promise<SmartRecruitersConsentRequestResult> {
     const result = await this.request<{ results?: Record<string, unknown>[] }>("POST", "/candidates/consent-requests", { body: { content: candidateIds.map((id) => ({ id })) } });
     if (!result.success) return { success: false, results: [], error: result.error };
     return { success: true, results: result.data.results ?? [], error: "" };
   }
 
-  async getCandidateConsentStatus(candidateId: string): Promise<SmartRecruitersConsentStatusResult> {
+  private async getCandidateConsentStatus(candidateId: string): Promise<SmartRecruitersConsentStatusResult> {
     const result = await this.request<{ status?: string; date?: string }>("GET", `/candidates/${encodeURIComponent(candidateId)}/consent`);
     if (!result.success) return { success: false, status: "", date: "", error: result.error };
     return { success: true, status: result.data.status ?? "", date: result.data.date ?? "", error: "" };
   }
 
-  async getCandidateConsentDecisions(candidateId: string): Promise<SmartRecruitersConsentDecisionsResult> {
+  private async getCandidateConsentDecisions(candidateId: string): Promise<SmartRecruitersConsentDecisionsResult> {
     const result = await this.request<{ decisions?: Record<string, unknown>[] }>("GET", `/candidates/${encodeURIComponent(candidateId)}/consents`);
     if (!result.success) return { success: false, decisions: [], error: result.error };
     return { success: true, decisions: result.data.decisions ?? [], error: "" };
@@ -660,19 +1533,19 @@ export class SmartRecruitersManager {
 
   /** Deprecated global (non-job-scoped) properties, kept alongside the job-scoped variant below
    * because the API still serves it and this connector aims for exhaustive coverage. */
-  async getCandidateProperties(candidateId: string, context: string): Promise<SmartRecruitersCandidatePropertiesResult> {
+  private async getCandidateProperties(candidateId: string, context: string): Promise<SmartRecruitersCandidatePropertiesResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] }>("GET", `/candidates/${encodeURIComponent(candidateId)}/properties`, { query: { context: context || undefined } });
     if (!result.success) return { success: false, properties: [], error: result.error };
     return { success: true, properties: result.data.content ?? [], error: "" };
   }
 
-  async updateCandidateProperty(candidateId: string, propertyId: string, value: string): Promise<SmartRecruitersOpResult> {
+  private async updateCandidateProperty(candidateId: string, propertyId: string, value: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PUT", `/candidates/${encodeURIComponent(candidateId)}/properties/${encodeURIComponent(propertyId)}`, { body: { value } });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async getCandidateJobProperties(candidateId: string, jobId: string, context: string): Promise<SmartRecruitersCandidatePropertiesResult> {
+  private async getCandidateJobProperties(candidateId: string, jobId: string, context: string): Promise<SmartRecruitersCandidatePropertiesResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] }>("GET", `/candidates/${encodeURIComponent(candidateId)}/jobs/${encodeURIComponent(jobId)}/properties`, {
       query: { context: context || undefined },
     });
@@ -681,19 +1554,19 @@ export class SmartRecruitersManager {
   }
 
   /** PUT (batch, current) — body is an array of `{id, value}`, 1-100 items per call. */
-  async updateCandidateJobProperties(candidateId: string, jobId: string, properties: { id: string; value: unknown }[]): Promise<SmartRecruitersOpResult> {
+  private async updateCandidateJobProperties(candidateId: string, jobId: string, properties: { id: string; value: unknown }[]): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PUT", `/candidates/${encodeURIComponent(candidateId)}/jobs/${encodeURIComponent(jobId)}/properties`, { body: properties });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async listCandidateAttachments(candidateId: string): Promise<SmartRecruitersCandidateAttachmentsListResult> {
+  private async listCandidateAttachments(candidateId: string): Promise<SmartRecruitersCandidateAttachmentsListResult> {
     const result = await this.request<{ totalFound?: number; content?: Record<string, unknown>[] }>("GET", `/candidates/${encodeURIComponent(candidateId)}/attachments`);
     if (!result.success) return { success: false, attachments: [], totalFound: 0, error: result.error };
     return { success: true, attachments: result.data.content ?? [], totalFound: result.data.totalFound ?? 0, error: "" };
   }
 
-  async addCandidateAttachment(candidateId: string, attachmentType: string, fileBase64: string, fileName: string, fileContentType: string): Promise<SmartRecruitersCandidateAttachmentResult> {
+  private async addCandidateAttachment(candidateId: string, attachmentType: string, fileBase64: string, fileName: string, fileContentType: string): Promise<SmartRecruitersCandidateAttachmentResult> {
     const formData = this.buildFileFormData({ attachmentType }, "file", fileBase64, fileName, fileContentType);
     const result = await this.request<Record<string, unknown>>("POST", `/candidates/${encodeURIComponent(candidateId)}/attachments`, { formData });
     if (!result.success) return { success: false, attachment: {}, error: result.error };
@@ -703,7 +1576,7 @@ export class SmartRecruitersManager {
   /** GET /candidates/{id}/attachments/{attachmentId} — deprecated but still the only documented way
    * to fetch an attachment's binary content; returned as base64 since the rest of this manager's
    * responses are JSON. */
-  async getCandidateAttachment(candidateId: string, attachmentId: string): Promise<SmartRecruitersCandidateAttachmentContentResult> {
+  private async getCandidateAttachment(candidateId: string, attachmentId: string): Promise<SmartRecruitersCandidateAttachmentContentResult> {
     const authResult = await this.authHeader();
     if (!authResult.ok) return { success: false, contentBase64: "", contentType: "", error: authResult.error };
     try {
@@ -718,25 +1591,25 @@ export class SmartRecruitersManager {
 
   /** Deprecated global (non-job-scoped) onboarding status, kept alongside the job-scoped variant
    * below for the same exhaustive-coverage reason as getCandidateProperties. */
-  async getCandidateOnboardingStatus(candidateId: string): Promise<SmartRecruitersOnboardingStatusResult> {
+  private async getCandidateOnboardingStatus(candidateId: string): Promise<SmartRecruitersOnboardingStatusResult> {
     const result = await this.request<{ onboardingStatus?: string }>("GET", `/candidates/${encodeURIComponent(candidateId)}/onboardingStatus`);
     if (!result.success) return { success: false, onboardingStatus: "", error: result.error };
     return { success: true, onboardingStatus: result.data.onboardingStatus ?? "", error: "" };
   }
 
-  async updateCandidateOnboardingStatus(candidateId: string, onboardingStatus: string): Promise<SmartRecruitersOnboardingStatusResult> {
+  private async updateCandidateOnboardingStatus(candidateId: string, onboardingStatus: string): Promise<SmartRecruitersOnboardingStatusResult> {
     const result = await this.request<{ onboardingStatus?: string }>("PUT", `/candidates/${encodeURIComponent(candidateId)}/onboardingStatus`, { body: { onboardingStatus } });
     if (!result.success) return { success: false, onboardingStatus: "", error: result.error };
     return { success: true, onboardingStatus: result.data.onboardingStatus ?? "", error: "" };
   }
 
-  async getCandidateJobOnboardingStatus(candidateId: string, jobId: string): Promise<SmartRecruitersOnboardingStatusResult> {
+  private async getCandidateJobOnboardingStatus(candidateId: string, jobId: string): Promise<SmartRecruitersOnboardingStatusResult> {
     const result = await this.request<{ onboardingStatus?: string }>("GET", `/candidates/${encodeURIComponent(candidateId)}/jobs/${encodeURIComponent(jobId)}/onboardingStatus`);
     if (!result.success) return { success: false, onboardingStatus: "", error: result.error };
     return { success: true, onboardingStatus: result.data.onboardingStatus ?? "", error: "" };
   }
 
-  async updateCandidateJobOnboardingStatus(candidateId: string, jobId: string, onboardingStatus: string): Promise<SmartRecruitersOnboardingStatusResult> {
+  private async updateCandidateJobOnboardingStatus(candidateId: string, jobId: string, onboardingStatus: string): Promise<SmartRecruitersOnboardingStatusResult> {
     const result = await this.request<{ onboardingStatus?: string }>("PUT", `/candidates/${encodeURIComponent(candidateId)}/jobs/${encodeURIComponent(jobId)}/onboardingStatus`, {
       body: { onboardingStatus },
     });
@@ -744,7 +1617,7 @@ export class SmartRecruitersManager {
     return { success: true, onboardingStatus: result.data.onboardingStatus ?? "", error: "" };
   }
 
-  async getCandidateScreeningAnswers(candidateId: string, jobId: string): Promise<SmartRecruitersScreeningAnswersResult> {
+  private async getCandidateScreeningAnswers(candidateId: string, jobId: string): Promise<SmartRecruitersScreeningAnswersResult> {
     const result = await this.request<{ totalFound?: number; content?: Record<string, unknown>[] }>("GET", `/candidates/${encodeURIComponent(candidateId)}/jobs/${encodeURIComponent(jobId)}/screening-answers`);
     if (!result.success) return { success: false, answers: [], totalFound: 0, error: result.error };
     return { success: true, answers: result.data.content ?? [], totalFound: result.data.totalFound ?? 0, error: "" };
@@ -755,13 +1628,13 @@ export class SmartRecruitersManager {
   // on the same host, unlike the unversioned `/jobs` and `/candidates` paths above — confirmed
   // against the live OpenAPI spec's `servers` entry, not assumed from the other resources' shape.
 
-  async getJobApplication(jobApplicationId: string): Promise<SmartRecruitersJobApplicationResult> {
+  private async getJobApplication(jobApplicationId: string): Promise<SmartRecruitersJobApplicationResult> {
     const result = await this.request<Record<string, unknown>>("GET", `job-applications-api/v202112/job-applications/${encodeURIComponent(jobApplicationId)}`);
     if (!result.success) return { success: false, jobApplication: {}, error: result.error };
     return { success: true, jobApplication: result.data, error: "" };
   }
 
-  async deleteJobApplication(jobApplicationId: string): Promise<SmartRecruitersOpResult> {
+  private async deleteJobApplication(jobApplicationId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `job-applications-api/v202112/job-applications/${encodeURIComponent(jobApplicationId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
@@ -777,19 +1650,19 @@ export class SmartRecruitersManager {
   // company-defined `{id, name}` reference, not a fixed enum — callers should look the id up via
   // listSystemRoles() rather than a hardcoded enum of role names.
 
-  async searchUsers(query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersUsersListResult> {
+  private async searchUsers(query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersUsersListResult> {
     const result = await this.request<{ nextPageId?: string; content?: Record<string, unknown>[] }>("GET", "user-api/v201804/users", { query });
     if (!result.success) return { success: false, users: [], nextPageId: "", error: result.error };
     return { success: true, users: result.data.content ?? [], nextPageId: result.data.nextPageId ?? "", error: "" };
   }
 
-  async createUser(user: Record<string, unknown>): Promise<SmartRecruitersUserResult> {
+  private async createUser(user: Record<string, unknown>): Promise<SmartRecruitersUserResult> {
     const result = await this.request<Record<string, unknown>>("POST", "user-api/v201804/users", { body: user });
     if (!result.success) return { success: false, user: {}, error: result.error };
     return { success: true, user: result.data, error: "" };
   }
 
-  async getUser(userId: string): Promise<SmartRecruitersUserResult> {
+  private async getUser(userId: string): Promise<SmartRecruitersUserResult> {
     const result = await this.request<Record<string, unknown>>("GET", `user-api/v201804/users/${encodeURIComponent(userId)}`);
     if (!result.success) return { success: false, user: {}, error: result.error };
     return { success: true, user: result.data, error: "" };
@@ -797,26 +1670,26 @@ export class SmartRecruitersManager {
 
   /** RFC 6902 JSON Patch — `patch` is the raw operations array (`[{op, path, value}, ...]`), unlike
    * patchJob/updateCandidate's RFC 7396 merge-patch object. */
-  async updateUser(userId: string, patch: unknown[]): Promise<SmartRecruitersUserResult> {
+  private async updateUser(userId: string, patch: unknown[]): Promise<SmartRecruitersUserResult> {
     const result = await this.request<Record<string, unknown>>("PATCH", `user-api/v201804/users/${encodeURIComponent(userId)}`, { body: patch, contentType: "application/json-patch+json" });
     if (!result.success) return { success: false, user: {}, error: result.error };
     return { success: true, user: result.data, error: "" };
   }
 
   /** Only triggers a reset email — SmartRecruiters has no endpoint to set a password directly. */
-  async resetUserPassword(userId: string): Promise<SmartRecruitersOpResult> {
+  private async resetUserPassword(userId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("POST", `user-api/v201804/users/${encodeURIComponent(userId)}/reset-password`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async sendUserActivationEmail(userId: string): Promise<SmartRecruitersOpResult> {
+  private async sendUserActivationEmail(userId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("POST", `user-api/v201804/users/${encodeURIComponent(userId)}/activation-email`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async activateUser(userId: string): Promise<SmartRecruitersOpResult> {
+  private async activateUser(userId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PUT", `user-api/v201804/users/${encodeURIComponent(userId)}/activation`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
@@ -824,20 +1697,20 @@ export class SmartRecruitersManager {
 
   /** DELETE .../activation — the older `DELETE /users/{id}` is documented as a deprecated alias
    * for this, so it was not added separately. */
-  async deactivateUser(userId: string): Promise<SmartRecruitersOpResult> {
+  private async deactivateUser(userId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `user-api/v201804/users/${encodeURIComponent(userId)}/activation`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async updateUserAvatar(userId: string, fileBase64: string, fileName: string, fileContentType: string): Promise<SmartRecruitersUserResult> {
+  private async updateUserAvatar(userId: string, fileBase64: string, fileName: string, fileContentType: string): Promise<SmartRecruitersUserResult> {
     const formData = this.buildFileFormData({}, "file", fileBase64, fileName, fileContentType);
     const result = await this.request<Record<string, unknown>>("PUT", `user-api/v201804/users/${encodeURIComponent(userId)}/avatar`, { formData });
     if (!result.success) return { success: false, user: {}, error: result.error };
     return { success: true, user: result.data, error: "" };
   }
 
-  async listSystemRoles(): Promise<SmartRecruitersSystemRolesResult> {
+  private async listSystemRoles(): Promise<SmartRecruitersSystemRolesResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", "user-api/v201804/system-roles");
     if (!result.success) return { success: false, roles: [], error: result.error };
     const roles = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
@@ -847,32 +1720,32 @@ export class SmartRecruitersManager {
   /** GET /configuration/access-groups — the newer Configuration API variant, chosen over the
    * legacy `user-api/v201804/access-groups` list (which has no create/get/update/delete
    * counterpart) so this phase's list/create/get/update/delete set is one consistent resource. */
-  async listAccessGroups(): Promise<SmartRecruitersAccessGroupsListResult> {
+  private async listAccessGroups(): Promise<SmartRecruitersAccessGroupsListResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", "configuration/access-groups");
     if (!result.success) return { success: false, accessGroups: [], error: result.error };
     const accessGroups = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
     return { success: true, accessGroups, error: "" };
   }
 
-  async createAccessGroup(accessGroup: Record<string, unknown>): Promise<SmartRecruitersAccessGroupResult> {
+  private async createAccessGroup(accessGroup: Record<string, unknown>): Promise<SmartRecruitersAccessGroupResult> {
     const result = await this.request<Record<string, unknown>>("POST", "configuration/access-groups", { body: accessGroup });
     if (!result.success) return { success: false, accessGroup: {}, error: result.error };
     return { success: true, accessGroup: result.data, error: "" };
   }
 
-  async getAccessGroup(accessGroupId: string): Promise<SmartRecruitersAccessGroupResult> {
+  private async getAccessGroup(accessGroupId: string): Promise<SmartRecruitersAccessGroupResult> {
     const result = await this.request<Record<string, unknown>>("GET", `configuration/access-groups/${encodeURIComponent(accessGroupId)}`);
     if (!result.success) return { success: false, accessGroup: {}, error: result.error };
     return { success: true, accessGroup: result.data, error: "" };
   }
 
-  async updateAccessGroup(accessGroupId: string, accessGroup: Record<string, unknown>): Promise<SmartRecruitersAccessGroupResult> {
+  private async updateAccessGroup(accessGroupId: string, accessGroup: Record<string, unknown>): Promise<SmartRecruitersAccessGroupResult> {
     const result = await this.request<Record<string, unknown>>("PUT", `configuration/access-groups/${encodeURIComponent(accessGroupId)}`, { body: accessGroup });
     if (!result.success) return { success: false, accessGroup: {}, error: result.error };
     return { success: true, accessGroup: result.data, error: "" };
   }
 
-  async deleteAccessGroup(accessGroupId: string): Promise<SmartRecruitersOpResult> {
+  private async deleteAccessGroup(accessGroupId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `configuration/access-groups/${encodeURIComponent(accessGroupId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
@@ -880,14 +1753,14 @@ export class SmartRecruitersManager {
 
   /** POST — bulk assign (up to 5000 user ids); membership assign/remove only exists under the
    * legacy `user-api/v201804/access-groups` path, not the Configuration API. */
-  async assignUsersToAccessGroup(accessGroupId: string, userIds: string[]): Promise<SmartRecruitersOpResult> {
+  private async assignUsersToAccessGroup(accessGroupId: string, userIds: string[]): Promise<SmartRecruitersOpResult> {
     const result = await this.request("POST", `user-api/v201804/access-groups/${encodeURIComponent(accessGroupId)}/users`, { body: { UserIds: userIds } });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
   /** DELETE — removes a single user; no bulk-remove variant is documented. */
-  async removeUserFromAccessGroup(accessGroupId: string, userId: string): Promise<SmartRecruitersOpResult> {
+  private async removeUserFromAccessGroup(accessGroupId: string, userId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `user-api/v201804/access-groups/${encodeURIComponent(accessGroupId)}/users/${encodeURIComponent(userId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
@@ -903,40 +1776,40 @@ export class SmartRecruitersManager {
   // documented GET — no update endpoint exists — so it's read-only here (same kind of scope
   // correction as the Phase 3 EEO drop / Phase 4 consent drop / Phase 5 "me" drop).
 
-  async searchInterviews(applicationId: string): Promise<SmartRecruitersInterviewsListResult> {
+  private async searchInterviews(applicationId: string): Promise<SmartRecruitersInterviewsListResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", "interviews-api/v201904/interviews", { query: { applicationId } });
     if (!result.success) return { success: false, interviews: [], error: result.error };
     const interviews = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
     return { success: true, interviews, error: "" };
   }
 
-  async createInterview(interview: Record<string, unknown>): Promise<SmartRecruitersInterviewResult> {
+  private async createInterview(interview: Record<string, unknown>): Promise<SmartRecruitersInterviewResult> {
     const result = await this.request<Record<string, unknown>>("POST", "interviews-api/v201904/interviews", { body: interview });
     if (!result.success) return { success: false, interview: {}, error: result.error };
     return { success: true, interview: result.data, error: "" };
   }
 
-  async getInterview(interviewId: string): Promise<SmartRecruitersInterviewResult> {
+  private async getInterview(interviewId: string): Promise<SmartRecruitersInterviewResult> {
     const result = await this.request<Record<string, unknown>>("GET", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}`);
     if (!result.success) return { success: false, interview: {}, error: result.error };
     return { success: true, interview: result.data, error: "" };
   }
 
   /** PATCH — documented as supported only for interviews created via the Public API. */
-  async updateInterview(interviewId: string, patch: Record<string, unknown>): Promise<SmartRecruitersInterviewResult> {
+  private async updateInterview(interviewId: string, patch: Record<string, unknown>): Promise<SmartRecruitersInterviewResult> {
     const result = await this.request<Record<string, unknown>>("PATCH", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}`, { body: patch });
     if (!result.success) return { success: false, interview: {}, error: result.error };
     return { success: true, interview: result.data, error: "" };
   }
 
   /** DELETE — same Public-API-only caveat as updateInterview. */
-  async deleteInterview(interviewId: string): Promise<SmartRecruitersOpResult> {
+  private async deleteInterview(interviewId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async listInterviewTypes(): Promise<SmartRecruitersInterviewTypesResult> {
+  private async listInterviewTypes(): Promise<SmartRecruitersInterviewTypesResult> {
     const result = await this.request<string[]>("GET", "interviews-api/v201904/interview-types");
     if (!result.success) return { success: false, interviewTypes: [], error: result.error };
     return { success: true, interviewTypes: Array.isArray(result.data) ? result.data : [], error: "" };
@@ -944,46 +1817,46 @@ export class SmartRecruitersManager {
 
   /** PATCH — additive; appends to the existing type set rather than replacing it (no full-replace
    * endpoint is documented). */
-  async addInterviewTypes(interviewTypes: string[]): Promise<SmartRecruitersOpResult> {
+  private async addInterviewTypes(interviewTypes: string[]): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PATCH", "interviews-api/v201904/interview-types", { body: interviewTypes });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
   /** Interview type names double as their id — there is no separate numeric/uuid id. */
-  async deleteInterviewType(interviewType: string): Promise<SmartRecruitersOpResult> {
+  private async deleteInterviewType(interviewType: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `interviews-api/v201904/interview-types/${encodeURIComponent(interviewType)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async createInterviewTimeslot(interviewId: string, timeslot: Record<string, unknown>): Promise<SmartRecruitersTimeslotResult> {
+  private async createInterviewTimeslot(interviewId: string, timeslot: Record<string, unknown>): Promise<SmartRecruitersTimeslotResult> {
     const result = await this.request<Record<string, unknown>>("POST", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots`, { body: timeslot });
     if (!result.success) return { success: false, timeslot: {}, error: result.error };
     return { success: true, timeslot: result.data, error: "" };
   }
 
-  async getInterviewTimeslot(interviewId: string, timeslotId: string): Promise<SmartRecruitersTimeslotResult> {
+  private async getInterviewTimeslot(interviewId: string, timeslotId: string): Promise<SmartRecruitersTimeslotResult> {
     const result = await this.request<Record<string, unknown>>("GET", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}`);
     if (!result.success) return { success: false, timeslot: {}, error: result.error };
     return { success: true, timeslot: result.data, error: "" };
   }
 
-  async updateInterviewTimeslot(interviewId: string, timeslotId: string, timeslot: Record<string, unknown>): Promise<SmartRecruitersTimeslotResult> {
+  private async updateInterviewTimeslot(interviewId: string, timeslotId: string, timeslot: Record<string, unknown>): Promise<SmartRecruitersTimeslotResult> {
     const result = await this.request<Record<string, unknown>>("PATCH", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}`, { body: timeslot });
     if (!result.success) return { success: false, timeslot: {}, error: result.error };
     return { success: true, timeslot: result.data, error: "" };
   }
 
   /** 409 if this would remove an interview's last timeslot. */
-  async deleteInterviewTimeslot(interviewId: string, timeslotId: string): Promise<SmartRecruitersOpResult> {
+  private async deleteInterviewTimeslot(interviewId: string, timeslotId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
   /** PATCH — `value` travels as a query param, not a body field. */
-  async setInterviewTimeslotNoShow(interviewId: string, timeslotId: string, value: boolean): Promise<SmartRecruitersOpResult> {
+  private async setInterviewTimeslotNoShow(interviewId: string, timeslotId: string, value: boolean): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PATCH", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}/noshow`, { query: { value } });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
@@ -991,19 +1864,19 @@ export class SmartRecruitersManager {
 
   /** Deprecated, interview-scoped (not per-timeslot) — kept alongside updateTimeslotCandidateStatus
    * for the same exhaustive-coverage reason as Phase 3/5's deprecated-variant methods. Public-API-only. */
-  async updateInterviewCandidateStatus(interviewId: string, status: string): Promise<SmartRecruitersOpResult> {
+  private async updateInterviewCandidateStatus(interviewId: string, status: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PUT", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/candidate/status`, { body: { status } });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async updateTimeslotCandidateStatus(interviewId: string, timeslotId: string, status: string): Promise<SmartRecruitersOpResult> {
+  private async updateTimeslotCandidateStatus(interviewId: string, timeslotId: string, status: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PUT", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}/candidateStatus`, { body: { status } });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async updateTimeslotInterviewerStatus(interviewId: string, timeslotId: string, userId: string, status: string): Promise<SmartRecruitersOpResult> {
+  private async updateTimeslotInterviewerStatus(interviewId: string, timeslotId: string, userId: string, status: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PUT", `interviews-api/v201904/interviews/${encodeURIComponent(interviewId)}/timeslots/${encodeURIComponent(timeslotId)}/interviewers/${encodeURIComponent(userId)}/status`, { body: { status } });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
@@ -1012,45 +1885,45 @@ export class SmartRecruitersManager {
   /** GET-only — no documented update endpoint exists for schedule preferences (verified via live
    * docs), so this connector exposes it read-only. Lives under the separate `interview-templates`
    * sub-API, not `interviews-api`. */
-  async getSchedulePreferences(userId: string): Promise<SmartRecruitersSchedulePreferencesResult> {
+  private async getSchedulePreferences(userId: string): Promise<SmartRecruitersSchedulePreferencesResult> {
     const result = await this.request<Record<string, unknown>>("GET", `interview-templates/schedule/preferences/users/${encodeURIComponent(userId)}`);
     if (!result.success) return { success: false, preferences: {}, error: result.error };
     return { success: true, preferences: result.data, error: "" };
   }
 
-  async createEvent(event: Record<string, unknown>): Promise<SmartRecruitersEventResult> {
+  private async createEvent(event: Record<string, unknown>): Promise<SmartRecruitersEventResult> {
     const result = await this.request<Record<string, unknown>>("POST", "event-management-api/events", { body: event });
     if (!result.success) return { success: false, event: {}, error: result.error };
     return { success: true, event: result.data, error: "" };
   }
 
-  async getEvent(eventId: string): Promise<SmartRecruitersEventResult> {
+  private async getEvent(eventId: string): Promise<SmartRecruitersEventResult> {
     const result = await this.request<Record<string, unknown>>("GET", `event-management-api/events/${encodeURIComponent(eventId)}`);
     if (!result.success) return { success: false, event: {}, error: result.error };
     return { success: true, event: result.data, error: "" };
   }
 
-  async updateEvent(eventId: string, event: Record<string, unknown>): Promise<SmartRecruitersEventResult> {
+  private async updateEvent(eventId: string, event: Record<string, unknown>): Promise<SmartRecruitersEventResult> {
     const result = await this.request<Record<string, unknown>>("PUT", `event-management-api/events/${encodeURIComponent(eventId)}`, { body: event });
     if (!result.success) return { success: false, event: {}, error: result.error };
     return { success: true, event: result.data, error: "" };
   }
 
-  async deleteEvent(eventId: string): Promise<SmartRecruitersOpResult> {
+  private async deleteEvent(eventId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `event-management-api/events/${encodeURIComponent(eventId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
   /** GET /events — job-scoped list ("Get job's events"); state is required (PAST|ACTIVE). */
-  async listJobEvents(jobId: string, state: string, page: number, pageSize: number): Promise<SmartRecruitersEventsListResult> {
+  private async listJobEvents(jobId: string, state: string, page: number, pageSize: number): Promise<SmartRecruitersEventsListResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", "event-management-api/events", { query: { jobId, state, page, pageSize } });
     if (!result.success) return { success: false, events: [], error: result.error };
     const events = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
     return { success: true, events, error: "" };
   }
 
-  async getEventsForCandidate(profileId: string, state: string): Promise<SmartRecruitersEventsListResult> {
+  private async getEventsForCandidate(profileId: string, state: string): Promise<SmartRecruitersEventsListResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", `event-management-api/events/candidates/${encodeURIComponent(profileId)}`, {
       query: { state },
     });
@@ -1059,7 +1932,7 @@ export class SmartRecruitersManager {
     return { success: true, events, error: "" };
   }
 
-  async getEventsForApplication(applicationId: string, state: string): Promise<SmartRecruitersEventsListResult> {
+  private async getEventsForApplication(applicationId: string, state: string): Promise<SmartRecruitersEventsListResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", `event-management-api/events/applications/${encodeURIComponent(applicationId)}`, {
       query: { state },
     });
@@ -1068,7 +1941,7 @@ export class SmartRecruitersManager {
     return { success: true, events, error: "" };
   }
 
-  async getEventSession(eventId: string, sessionId: string): Promise<SmartRecruitersEventSessionResult> {
+  private async getEventSession(eventId: string, sessionId: string): Promise<SmartRecruitersEventSessionResult> {
     const result = await this.request<Record<string, unknown>>("GET", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}`);
     if (!result.success) return { success: false, session: {}, error: result.error };
     return { success: true, session: result.data, error: "" };
@@ -1076,13 +1949,13 @@ export class SmartRecruitersManager {
 
   /** Sessions have no standalone create/update endpoint — they're only created/updated as part of
    * the parent event's body (createEvent/updateEvent's `sessions` array). */
-  async deleteEventSession(eventId: string, sessionId: string): Promise<SmartRecruitersOpResult> {
+  private async deleteEventSession(eventId: string, sessionId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async addSessionInterviewers(eventId: string, sessionId: string, interviewerIds: string[]): Promise<SmartRecruitersInterviewersListResult> {
+  private async addSessionInterviewers(eventId: string, sessionId: string, interviewerIds: string[]): Promise<SmartRecruitersInterviewersListResult> {
     const result = await this.request<Record<string, unknown>[]>("PUT", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}/interviewers`, {
       body: { interviewers: interviewerIds },
     });
@@ -1090,7 +1963,7 @@ export class SmartRecruitersManager {
     return { success: true, interviewers: Array.isArray(result.data) ? result.data : [], error: "" };
   }
 
-  async removeSessionInterviewers(eventId: string, sessionId: string, interviewerIds: string[]): Promise<SmartRecruitersOpResult> {
+  private async removeSessionInterviewers(eventId: string, sessionId: string, interviewerIds: string[]): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}/interviewers`, {
       body: { interviewers: interviewerIds },
     });
@@ -1100,14 +1973,14 @@ export class SmartRecruitersManager {
 
   /** Combines both event-applicants-pool and session-applicants, unpaginated per the docs — use
    * getEventPoolApplicants instead for the paginated, pool-only view. */
-  async getAllEventApplicants(eventId: string): Promise<SmartRecruitersApplicantsListResult> {
+  private async getAllEventApplicants(eventId: string): Promise<SmartRecruitersApplicantsListResult> {
     const result = await this.request<Record<string, unknown>[] | { content?: Record<string, unknown>[] }>("GET", `event-management-api/events/${encodeURIComponent(eventId)}/applicants`);
     if (!result.success) return { success: false, applicants: [], totalFound: 0, error: result.error };
     const applicants = Array.isArray(result.data) ? result.data : (result.data.content ?? []);
     return { success: true, applicants, totalFound: applicants.length, error: "" };
   }
 
-  async getEventPoolApplicants(eventId: string, page: number, pageSize: number): Promise<SmartRecruitersApplicantsListResult> {
+  private async getEventPoolApplicants(eventId: string, page: number, pageSize: number): Promise<SmartRecruitersApplicantsListResult> {
     const result = await this.request<{ content?: Record<string, unknown>[]; totalFound?: number }>("GET", `event-management-api/events/${encodeURIComponent(eventId)}/pool-applicants`, {
       query: { page, pageSize },
     });
@@ -1115,13 +1988,13 @@ export class SmartRecruitersManager {
     return { success: true, applicants: result.data.content ?? [], totalFound: result.data.totalFound ?? 0, error: "" };
   }
 
-  async addApplicantsToEvent(eventId: string, applicantIds: string[]): Promise<SmartRecruitersOpResult> {
+  private async addApplicantsToEvent(eventId: string, applicantIds: string[]): Promise<SmartRecruitersOpResult> {
     const result = await this.request("POST", `event-management-api/events/${encodeURIComponent(eventId)}/applicants`, { body: { applicantIds } });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async addApplicantsToSession(eventId: string, sessionId: string, applicantIds: string[], allowOverbooking: boolean): Promise<SmartRecruitersSessionApplicantsResult> {
+  private async addApplicantsToSession(eventId: string, sessionId: string, applicantIds: string[], allowOverbooking: boolean): Promise<SmartRecruitersSessionApplicantsResult> {
     const result = await this.request<Record<string, unknown>[]>("POST", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}/applicants`, {
       body: { applicantIds, allowOverbooking },
     });
@@ -1129,7 +2002,7 @@ export class SmartRecruitersManager {
     return { success: true, applicants: Array.isArray(result.data) ? result.data : [], error: "" };
   }
 
-  async moveApplicantsToSession(eventId: string, sessionId: string, fromSessionId: string, applicantIds: string[], allowOverbooking: boolean): Promise<SmartRecruitersSessionApplicantsResult> {
+  private async moveApplicantsToSession(eventId: string, sessionId: string, fromSessionId: string, applicantIds: string[], allowOverbooking: boolean): Promise<SmartRecruitersSessionApplicantsResult> {
     const result = await this.request<Record<string, unknown>[]>("PUT", `event-management-api/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}/applicants`, {
       body: { fromSessionId, applicantIds, allowOverbooking },
     });
@@ -1137,7 +2010,7 @@ export class SmartRecruitersManager {
     return { success: true, applicants: Array.isArray(result.data) ? result.data : [], error: "" };
   }
 
-  async searchSelfSchedules(applicationId: string, withInterviews: boolean | undefined, limit: number, offset: number): Promise<SmartRecruitersSelfSchedulesListResult> {
+  private async searchSelfSchedules(applicationId: string, withInterviews: boolean | undefined, limit: number, offset: number): Promise<SmartRecruitersSelfSchedulesListResult> {
     const result = await this.request<{ content?: Record<string, unknown>[] } | Record<string, unknown>[]>("GET", "self-scheduling/self-schedules", {
       query: { applicationId, withInterviews, limit, offset },
     });
@@ -1146,43 +2019,43 @@ export class SmartRecruitersManager {
     return { success: true, selfSchedules, error: "" };
   }
 
-  async getSelfSchedule(selfScheduleId: string): Promise<SmartRecruitersSelfScheduleResult> {
+  private async getSelfSchedule(selfScheduleId: string): Promise<SmartRecruitersSelfScheduleResult> {
     const result = await this.request<Record<string, unknown>>("GET", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}`);
     if (!result.success) return { success: false, selfSchedule: {}, error: result.error };
     return { success: true, selfSchedule: result.data, error: "" };
   }
 
-  async cancelSelfSchedule(selfScheduleId: string): Promise<SmartRecruitersOpResult> {
+  private async cancelSelfSchedule(selfScheduleId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async getApplicationSelfSchedule(selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleResult> {
+  private async getApplicationSelfSchedule(selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleResult> {
     const result = await this.request<Record<string, unknown>>("GET", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}/application/${encodeURIComponent(applicationUuid)}`);
     if (!result.success) return { success: false, selfSchedule: {}, error: result.error };
     return { success: true, selfSchedule: result.data, error: "" };
   }
 
-  async getSelfScheduleSlots(selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleSlotsResult> {
+  private async getSelfScheduleSlots(selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleSlotsResult> {
     const result = await this.request<Record<string, unknown>[]>("GET", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}/application/${encodeURIComponent(applicationUuid)}/slots`);
     if (!result.success) return { success: false, slots: [], error: result.error };
     return { success: true, slots: Array.isArray(result.data) ? result.data : [], error: "" };
   }
 
-  async createSelfScheduleInterview(selfScheduleId: string, applicationUuid: string, startsAt: string, endsAt: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
+  private async createSelfScheduleInterview(selfScheduleId: string, applicationUuid: string, startsAt: string, endsAt: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
     const result = await this.request<Record<string, unknown>>("POST", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}/application/${encodeURIComponent(applicationUuid)}/interview`, { body: { startsAt, endsAt } });
     if (!result.success) return { success: false, interview: {}, error: result.error };
     return { success: true, interview: result.data, error: "" };
   }
 
-  async updateSelfScheduleInterview(selfScheduleId: string, applicationUuid: string, startsAt: string, endsAt: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
+  private async updateSelfScheduleInterview(selfScheduleId: string, applicationUuid: string, startsAt: string, endsAt: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
     const result = await this.request<Record<string, unknown>>("PUT", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}/application/${encodeURIComponent(applicationUuid)}/interview`, { body: { startsAt, endsAt } });
     if (!result.success) return { success: false, interview: {}, error: result.error };
     return { success: true, interview: result.data, error: "" };
   }
 
-  async getSelfScheduledInterview(selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
+  private async getSelfScheduledInterview(selfScheduleId: string, applicationUuid: string): Promise<SmartRecruitersSelfScheduleInterviewResult> {
     const result = await this.request<Record<string, unknown>>("GET", `self-scheduling/self-schedules/${encodeURIComponent(selfScheduleId)}/application/${encodeURIComponent(applicationUuid)}/interview`);
     if (!result.success) return { success: false, interview: {}, error: result.error };
     return { success: true, interview: result.data, error: "" };
@@ -1190,26 +2063,26 @@ export class SmartRecruitersManager {
 
   /** Returns only a generated `selfScheduleId` — the candidate-facing flow (invite, slots, interview
    * creation) is driven by the rest of the automated-self-schedules sub-family below. */
-  async createAutomatedSelfSchedule(applicationUuid: string): Promise<SmartRecruitersSelfScheduleIdResult> {
+  private async createAutomatedSelfSchedule(applicationUuid: string): Promise<SmartRecruitersSelfScheduleIdResult> {
     const result = await this.request<{ selfScheduleId?: string }>("POST", "self-scheduling/automated-self-schedules", { body: { applicationUuid } });
     if (!result.success) return { success: false, selfScheduleId: "", error: result.error };
     return { success: true, selfScheduleId: result.data.selfScheduleId ?? "", error: "" };
   }
 
-  async updateAutomatedSelfScheduleInvite(config: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+  private async updateAutomatedSelfScheduleInvite(config: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
     const result = await this.request("POST", "self-scheduling/automated-self-schedules/update-invite", { body: config });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async requestAutomatedSelfReschedule(config: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+  private async requestAutomatedSelfReschedule(config: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
     const result = await this.request("POST", "self-scheduling/automated-self-schedules/reschedule", { body: config });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
   /** `scheduleType` (INDIVIDUAL|GROUP) is a path segment, not a body field. */
-  async getAutomatedScheduleAvailableSlotsCount(scheduleType: string, applicationUuid: string, interviewerIdsByRole: Record<string, string[]>, startDate: string, endDate: string, slotsAvailabilityLimitInDays: number): Promise<SmartRecruitersAvailableSlotsCountResult> {
+  private async getAutomatedScheduleAvailableSlotsCount(scheduleType: string, applicationUuid: string, interviewerIdsByRole: Record<string, string[]>, startDate: string, endDate: string, slotsAvailabilityLimitInDays: number): Promise<SmartRecruitersAvailableSlotsCountResult> {
     const result = await this.request<{ count?: number }>("POST", `self-scheduling/automated-self-schedules/${encodeURIComponent(scheduleType)}/application/${encodeURIComponent(applicationUuid)}/slots/count/by-role`, {
       body: { interviewerIdsByRole, startDate: startDate || undefined, endDate: endDate || undefined, slotsAvailabilityLimitInDays: slotsAvailabilityLimitInDays || undefined },
     });
@@ -1230,31 +2103,31 @@ export class SmartRecruitersManager {
   // — there is no job-ids-batched search, confirmed via live docs (same kind of scope correction
   // as prior phases' dropped assumptions).
 
-  async searchInterviewTemplates(query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersInterviewTemplatesListResult> {
+  private async searchInterviewTemplates(query: Record<string, string | number | boolean | undefined>): Promise<SmartRecruitersInterviewTemplatesListResult> {
     const result = await this.request<{ totalElements?: number; contents?: Record<string, unknown>[] }>("GET", "interview-templates/templates", { query });
     if (!result.success) return { success: false, templates: [], totalFound: 0, error: result.error };
     return { success: true, templates: result.data.contents ?? [], totalFound: result.data.totalElements ?? 0, error: "" };
   }
 
-  async createInterviewTemplate(template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
+  private async createInterviewTemplate(template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
     const result = await this.request<Record<string, unknown>>("POST", "interview-templates/templates", { body: template });
     if (!result.success) return { success: false, template: {}, error: result.error };
     return { success: true, template: result.data, error: "" };
   }
 
-  async getInterviewTemplate(templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+  private async getInterviewTemplate(templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
     const result = await this.request<Record<string, unknown>>("GET", `interview-templates/templates/${encodeURIComponent(templateId)}`);
     if (!result.success) return { success: false, template: {}, error: result.error };
     return { success: true, template: result.data, error: "" };
   }
 
-  async updateInterviewTemplate(templateId: string, template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
+  private async updateInterviewTemplate(templateId: string, template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
     const result = await this.request<Record<string, unknown>>("PUT", `interview-templates/templates/${encodeURIComponent(templateId)}`, { body: template });
     if (!result.success) return { success: false, template: {}, error: result.error };
     return { success: true, template: result.data, error: "" };
   }
 
-  async deleteInterviewTemplate(templateId: string): Promise<SmartRecruitersOpResult> {
+  private async deleteInterviewTemplate(templateId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `interview-templates/templates/${encodeURIComponent(templateId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
@@ -1264,38 +2137,38 @@ export class SmartRecruitersManager {
    * endpoints above, same as prior phases' deprecated variants. Response shape differs
    * materially (durationInMinutes/format/location instead of slotSetup/templateType), and the
    * list field is `content` (singular) here vs. `contents` on the new endpoint. */
-  async searchInterviewTemplatesDeprecated(page: number, limit: number, search: string): Promise<SmartRecruitersInterviewTemplatesListResult> {
+  private async searchInterviewTemplatesDeprecated(page: number, limit: number, search: string): Promise<SmartRecruitersInterviewTemplatesListResult> {
     const result = await this.request<{ totalElements?: number; content?: Record<string, unknown>[] }>("GET", "interview-templates/interview/templates", { query: { page, limit, search: search || undefined } });
     if (!result.success) return { success: false, templates: [], totalFound: 0, error: result.error };
     return { success: true, templates: result.data.content ?? [], totalFound: result.data.totalElements ?? 0, error: "" };
   }
 
-  async getInterviewTemplateDeprecated(templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+  private async getInterviewTemplateDeprecated(templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
     const result = await this.request<Record<string, unknown>>("GET", `interview-templates/interview/templates/${encodeURIComponent(templateId)}`);
     if (!result.success) return { success: false, template: {}, error: result.error };
     return { success: true, template: result.data, error: "" };
   }
 
-  async updateInterviewTemplateDeprecated(templateId: string, template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
+  private async updateInterviewTemplateDeprecated(templateId: string, template: Record<string, unknown>): Promise<SmartRecruitersInterviewTemplateResult> {
     const result = await this.request<Record<string, unknown>>("PUT", `interview-templates/interview/templates/${encodeURIComponent(templateId)}`, { body: template });
     if (!result.success) return { success: false, template: {}, error: result.error };
     return { success: true, template: result.data, error: "" };
   }
 
-  async deleteInterviewTemplateDeprecated(templateId: string): Promise<SmartRecruitersOpResult> {
+  private async deleteInterviewTemplateDeprecated(templateId: string): Promise<SmartRecruitersOpResult> {
     const result = await this.request("DELETE", `interview-templates/interview/templates/${encodeURIComponent(templateId)}`);
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
   /** Controls whether a hiring stage/step requires an interview template assignment. */
-  async getJobManagedSteps(jobId: string): Promise<SmartRecruitersJobManagedStepsResult> {
+  private async getJobManagedSteps(jobId: string): Promise<SmartRecruitersJobManagedStepsResult> {
     const result = await this.request<{ states?: Record<string, unknown>[] }>("GET", `interview-templates/managed-steps/jobs/${encodeURIComponent(jobId)}`);
     if (!result.success) return { success: false, states: [], error: result.error };
     return { success: true, states: result.data.states ?? [], error: "" };
   }
 
-  async updateJobManagedSteps(jobId: string, states: Record<string, unknown>[]): Promise<SmartRecruitersJobManagedStepsResult> {
+  private async updateJobManagedSteps(jobId: string, states: Record<string, unknown>[]): Promise<SmartRecruitersJobManagedStepsResult> {
     const result = await this.request<{ states?: Record<string, unknown>[] }>("PUT", `interview-templates/managed-steps/jobs/${encodeURIComponent(jobId)}`, { body: { states } });
     if (!result.success) return { success: false, states: [], error: result.error };
     return { success: true, states: result.data.states ?? [], error: "" };
@@ -1305,27 +2178,27 @@ export class SmartRecruitersManager {
 
   /** 204 on success — the deprecated job-level template body is the older shape
    * (durationInMinutes/format/location instead of slotSetup/templateType). */
-  async updateJobInterviewTemplateDeprecated(jobInterviewTemplateId: string, template: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+  private async updateJobInterviewTemplateDeprecated(jobInterviewTemplateId: string, template: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PUT", `interview-templates/interview/templates/job/${encodeURIComponent(jobInterviewTemplateId)}`, { body: template });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
   /** 204 on success — reassigns interviewers per hiring-team role without touching the rest of the template. */
-  async updateJobInterviewTemplateInterviewersDeprecated(jobInterviewTemplateId: string, hiringTeamRoleToInterviewers: Record<string, string[]>): Promise<SmartRecruitersOpResult> {
+  private async updateJobInterviewTemplateInterviewersDeprecated(jobInterviewTemplateId: string, hiringTeamRoleToInterviewers: Record<string, string[]>): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PATCH", `interview-templates/interview/templates/job/${encodeURIComponent(jobInterviewTemplateId)}`, { body: { hiringTeamRoleToInterviewers } });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
-  async getJobInterviewTemplatesDeprecated(jobId: string): Promise<SmartRecruitersJobTemplateStagesResult> {
+  private async getJobInterviewTemplatesDeprecated(jobId: string): Promise<SmartRecruitersJobTemplateStagesResult> {
     const result = await this.request<{ stages?: Record<string, unknown>[] }>("GET", `interview-templates/interview/templates/jobs/${encodeURIComponent(jobId)}`);
     if (!result.success) return { success: false, stages: [], error: result.error };
     return { success: true, stages: result.data.stages ?? [], error: "" };
   }
 
   /** 200 if a template is assigned to the application's current hiring step, 204 if none is. */
-  async getJobApplicationInterviewTemplateDeprecated(applicationId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+  private async getJobApplicationInterviewTemplateDeprecated(applicationId: string): Promise<SmartRecruitersInterviewTemplateResult> {
     const result = await this.request<Record<string, unknown>>("GET", `interview-templates/interview/templates/job-applications/${encodeURIComponent(applicationId)}`);
     if (!result.success) return { success: false, template: {}, error: result.error };
     return { success: true, template: result.data, error: "" };
@@ -1334,41 +2207,41 @@ export class SmartRecruitersManager {
   // Job-level templates: new family (`/job-templates`).
 
   /** 204 on success. */
-  async updateJobTemplate(jobInterviewTemplateId: string, template: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
+  private async updateJobTemplate(jobInterviewTemplateId: string, template: Record<string, unknown>): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PUT", `interview-templates/job-templates/${encodeURIComponent(jobInterviewTemplateId)}`, { body: template });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
   /** 204 on success — reassigns interviewers per hiring-team role, same body shape as the deprecated variant. */
-  async updateJobTemplateInterviewers(jobInterviewTemplateId: string, hiringTeamRoleToInterviewers: Record<string, string[]>): Promise<SmartRecruitersOpResult> {
+  private async updateJobTemplateInterviewers(jobInterviewTemplateId: string, hiringTeamRoleToInterviewers: Record<string, string[]>): Promise<SmartRecruitersOpResult> {
     const result = await this.request("PATCH", `interview-templates/job-templates/${encodeURIComponent(jobInterviewTemplateId)}`, { body: { hiringTeamRoleToInterviewers } });
     if (!result.success) return { success: false, error: result.error };
     return { success: true, error: "" };
   }
 
   /** 200 if found, 204 if no template is bound to this hiring stage/step yet. */
-  async findJobTemplateByHiringStage(jobId: string, hiringStage: string, hiringStep: string): Promise<SmartRecruitersInterviewTemplateResult> {
+  private async findJobTemplateByHiringStage(jobId: string, hiringStage: string, hiringStep: string): Promise<SmartRecruitersInterviewTemplateResult> {
     const result = await this.request<Record<string, unknown>>("GET", `interview-templates/job-templates/jobs/${encodeURIComponent(jobId)}/hiringStages/${encodeURIComponent(hiringStage)}`, { query: { hiringStep } });
     if (!result.success) return { success: false, template: {}, error: result.error };
     return { success: true, template: result.data, error: "" };
   }
 
   /** Save-or-replace — binds an existing company-level template (`templateId`) to a job's hiring stage/step. */
-  async upsertJobTemplate(jobId: string, hiringStage: string, hiringStep: string, templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+  private async upsertJobTemplate(jobId: string, hiringStage: string, hiringStep: string, templateId: string): Promise<SmartRecruitersInterviewTemplateResult> {
     const result = await this.request<Record<string, unknown>>("PUT", `interview-templates/job-templates/jobs/${encodeURIComponent(jobId)}/hiringStages/${encodeURIComponent(hiringStage)}`, { query: { hiringStep }, body: { templateId } });
     if (!result.success) return { success: false, template: {}, error: result.error };
     return { success: true, template: result.data, error: "" };
   }
 
-  async findJobTemplatesByJobId(jobId: string): Promise<SmartRecruitersJobTemplateStagesResult> {
+  private async findJobTemplatesByJobId(jobId: string): Promise<SmartRecruitersJobTemplateStagesResult> {
     const result = await this.request<{ stages?: Record<string, unknown>[] }>("GET", `interview-templates/job-templates/jobs/${encodeURIComponent(jobId)}`);
     if (!result.success) return { success: false, stages: [], error: result.error };
     return { success: true, stages: result.data.stages ?? [], error: "" };
   }
 
   /** 200 if found, 204 if none is bound yet. */
-  async findJobTemplateByApplicationId(applicationId: string): Promise<SmartRecruitersInterviewTemplateResult> {
+  private async findJobTemplateByApplicationId(applicationId: string): Promise<SmartRecruitersInterviewTemplateResult> {
     const result = await this.request<Record<string, unknown>>("GET", `interview-templates/job-templates/job-applications/${encodeURIComponent(applicationId)}`);
     if (!result.success) return { success: false, template: {}, error: result.error };
     return { success: true, template: result.data, error: "" };
@@ -1377,7 +2250,7 @@ export class SmartRecruitersManager {
   /** The one batch endpoint in this area — scoped to a single job (`jobId` in the path), batched
    * by application ids (not job ids) in the body. Returns one blueprint per distinct hiring
    * state reached by the given applications. */
-  async searchJobTemplatesByApplicationIds(jobId: string, applicationIds: string[]): Promise<SmartRecruitersJobTemplateBlueprintsResult> {
+  private async searchJobTemplatesByApplicationIds(jobId: string, applicationIds: string[]): Promise<SmartRecruitersJobTemplateBlueprintsResult> {
     const result = await this.request<{ hiringStateBlueprints?: Record<string, unknown>[] }>("POST", `interview-templates/job-templates/jobs/${encodeURIComponent(jobId)}/search`, { body: { applicationIds } });
     if (!result.success) return { success: false, blueprints: [], error: result.error };
     return { success: true, blueprints: result.data.hiringStateBlueprints ?? [], error: "" };

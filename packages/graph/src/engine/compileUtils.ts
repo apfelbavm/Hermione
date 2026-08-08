@@ -116,10 +116,12 @@ export const KINESIS_MANAGER_IMPORT = 'import { KinesisManager } from "../../pac
  * nodes/mongo.ts). */
 export const MONGO_MANAGER_IMPORT = 'import { MongoManager } from "../../packages/core/src/lib/mongoManager.ts";';
 
-/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibrarySmartRecruiters.ts — kept in
- * its own file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see
- * nodes/smartRecruiters.ts). */
-export const FUNCTION_LIBRARY_SMARTRECRUITERS_IMPORT = 'import * as functionLibrarySmartRecruiters from "../../packages/core/src/server/functionLibrarySmartRecruiters.ts";';
+/** Unlike most other providers, SmartRecruiters has no functionLibrarySmartRecruiters.ts of its own
+ * — SmartRecruitersManager (packages/core/src/lib/smartRecruitersManager.ts) resolves its own
+ * credentials straight from the database (see its findCredential), so both the interpreter and the
+ * compiled/deployed script call the exact same manager methods directly instead of going through a
+ * separate env-var-reading layer (mirrors TWILIO_MANAGER_IMPORT). */
+export const SMARTRECRUITERS_MANAGER_IMPORT = 'import { SmartRecruitersManager } from "../../packages/core/src/lib/smartRecruitersManager.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/executeDeployedFlow.ts — used by
  * flow.executeFlow's compileExecute (see nodes/flow.ts) so a deployed flow's own "Execute Flow"
