@@ -304,6 +304,19 @@ registerCredentialType({
 });
 
 registerCredentialType({
+  id: "sftpCredential",
+  label: "SFTP Server",
+  fields: [
+    { id: "host", label: "Host" },
+    { id: "port", label: "Port", help: "Defaults to 22 if left blank." },
+    { id: "username", label: "Username" },
+    { id: "password", label: "Password (optional)", secret: true, help: "Leave blank if this server only accepts key-based auth." },
+    { id: "privateKey", label: "Private Key (optional)", secret: true, help: "PEM-formatted private key text. Leave blank if this server only accepts password auth." },
+    { id: "passphrase", label: "Private Key Passphrase (optional)", secret: true, help: "Only needed if the Private Key above is itself passphrase-protected." },
+  ],
+});
+
+registerCredentialType({
   id: "sendGridApiKey",
   label: "SendGrid",
   fields: [{ id: "apiKey", label: "API Key", secret: true, help: "A SendGrid API key with the scopes needed by the nodes you use (Mail Send, Marketing, etc.)." }],

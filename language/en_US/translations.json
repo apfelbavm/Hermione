@@ -4428,14 +4428,12 @@
       }
     },
     "sftp": {
+      "__shared": {
+        "pin_credential_name": "Credential Name"
+      },
       "upload": {
         "label": "SFTP Upload",
-        "description": "Uploads a file to an SFTP server, with reconnect handling and configurable existing-file behavior. Compiled output only — see this node's own tooltip note below.",
-        "pin_host": "Host",
-        "pin_port": "Port",
-        "pin_username": "Username",
-        "pin_password": "Password",
-        "pin_passphrase": "Passphrase",
+        "description": "Uploads a file to an SFTP server, with reconnect handling and configurable existing-file behavior.",
         "pin_file_path": "File Path",
         "pin_content": "Content",
         "pin_encoding": "Encoding",

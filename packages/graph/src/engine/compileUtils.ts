@@ -25,11 +25,11 @@ export function compileResultVar(nodeId: string): string {
  * NODE_OPTIONS=--experimental-strip-types set (see package.json's dev/start scripts). */
 export const FUNCTION_LIBRARY_IMPORT = 'import * as functionLibrary from "../../packages/core/src/server/functionLibrary.ts";';
 
-/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibrarySftp.ts — kept in its own file
- * (and its own compileImports entry) rather than folded into functionLibrary.ts because it depends
- * on "ssh2-sftp-client", a package deliberately NOT installed for the interpreter/browser build (see
- * that file's own header comment) — no interpreter-facing code may ever import it directly. */
-export const FUNCTION_LIBRARY_SFTP_IMPORT = 'import * as functionLibrarySftp from "../../packages/core/src/server/functionLibrarySftp.ts";';
+/** SftpManager (packages/core/src/lib/sftpManager.ts) resolves its own credentials straight from
+ * the database (see its findCredential), so both the interpreter and the compiled/deployed script
+ * call the exact same manager methods directly instead of going through a separate env-var-reading
+ * layer — mirrors TWILIO_MANAGER_IMPORT. */
+export const SFTP_MANAGER_IMPORT = 'import { SftpManager } from "../../packages/core/src/lib/sftpManager.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryJira.ts — kept in its own file
  * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/jira.ts). */

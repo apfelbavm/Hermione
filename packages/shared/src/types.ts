@@ -24,6 +24,7 @@ export type CredentialTypeId =
   | "workdayBasicAuth"
   | "twilioApiKey"
   | "soapBasicAuth"
+  | "sftpCredential"
   | "smtpCredential"
   | "sapBasicAuth"
   | "linkedInOAuth2"
@@ -227,6 +228,19 @@ export interface SoapBasicAuthCredentialData {
   wsSecurityPasswordType: string;
 }
 
+/** An SFTP server's host/port plus whichever auth a given server accepts — a password, a private
+ * key (optionally passphrase-protected), or both offered together and left to the server to pick —
+ * see lib/sftpManager.ts ("ssh2-sftp-client"). `port` is stored as a string like every other
+ * credential field and parsed by the manager. */
+export interface SftpCredentialData {
+  host: string;
+  port: string;
+  username: string;
+  password: string;
+  privateKey: string;
+  passphrase: string;
+}
+
 /** SMTP server connection details for outbound mail — see lib/smtpManager.ts (nodemailer). `port`/
  * `secure` are stored as strings like every other credential field and parsed by the manager. */
 export interface SmtpCredentialData {
@@ -318,6 +332,7 @@ export type CredentialData =
   | WorkdayBasicAuthCredentialData
   | TwilioApiKeyCredentialData
   | SoapBasicAuthCredentialData
+  | SftpCredentialData
   | SmtpCredentialData
   | SapBasicAuthCredentialData
   | LinkedInOAuth2CredentialData
