@@ -97,9 +97,11 @@ export const FACEBOOK_MANAGER_IMPORT = 'import { FacebookManager } from "../../p
  * nodes/azureStorage.ts). */
 export const AZURE_STORAGE_MANAGER_IMPORT = 'import { AzureStorageManager } from "../../packages/core/src/lib/azureStorageManager.ts";';
 
-/** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibrarySoap.ts — kept in its own file
- * purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see nodes/soap.ts). */
-export const FUNCTION_LIBRARY_SOAP_IMPORT = 'import * as functionLibrarySoap from "../../packages/core/src/server/functionLibrarySoap.ts";';
+/** SoapManager (packages/core/src/lib/soapManager.ts) resolves its own credentials straight from
+ * the database (see its findCredential), so both the interpreter and the compiled/deployed script
+ * call the exact same manager methods directly instead of going through a separate env-var-reading
+ * layer — mirrors TWILIO_MANAGER_IMPORT. */
+export const SOAP_MANAGER_IMPORT = 'import { SoapManager } from "../../packages/core/src/lib/soapManager.ts";';
 
 /** Sibling of FUNCTION_LIBRARY_IMPORT for src/server/functionLibraryAwsDynamoDb.ts — kept in its own
  * file purely to mirror functionLibrarySftp.ts's one-node-family-per-file convention (see

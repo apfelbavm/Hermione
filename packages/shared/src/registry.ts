@@ -293,6 +293,17 @@ registerCredentialType({
 });
 
 registerCredentialType({
+  id: "soapBasicAuth",
+  label: "SOAP Web Service",
+  fields: [
+    { id: "security", label: "Security", help: 'One of "None", "Basic" (HTTP Basic Auth), or "WSSecurity" (WS-Security UsernameToken).' },
+    { id: "username", label: "Username" },
+    { id: "password", label: "Password", secret: true },
+    { id: "wsSecurityPasswordType", label: "WS-Security Password Type", help: 'Only used when Security is "WSSecurity" — either "PasswordText" or "PasswordDigest".' },
+  ],
+});
+
+registerCredentialType({
   id: "sendGridApiKey",
   label: "SendGrid",
   fields: [{ id: "apiKey", label: "API Key", secret: true, help: "A SendGrid API key with the scopes needed by the nodes you use (Mail Send, Marketing, etc.)." }],

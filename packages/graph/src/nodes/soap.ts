@@ -1,22 +1,31 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_SOAP_IMPORT } from "@hermione/graph/engine/compileUtils";
-import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
-import { SOAP_SECURITY_ENUM_TYPE, SOAP_WS_SECURITY_PASSWORD_TYPE_ENUM_TYPE } from "@hermione/graph/enum/soap";
+import { compileResultVar, SOAP_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { i18n } from "@i18n";
 
-const GROUP_NAME = "Request.SOAP";
-const SECURITY_OPTIONS = enumOptionIds(SOAP_SECURITY_ENUM_TYPE);
-const WS_SECURITY_PASSWORD_TYPE_OPTIONS = enumOptionIds(SOAP_WS_SECURITY_PASSWORD_TYPE_ENUM_TYPE);
+// Every operation below calls the exact same SoapManager static method (packages/core/src/lib/
+// soapManager.ts) from both execute() (interpreter path) and compileExecute() (compiled/deployed
+// path) — SoapManager resolves the named credential straight from the database itself (see its
+// findCredential), so unlike most other providers there is no separate functionLibrarySoap.ts
+// env-var-reading layer and no ctx.getCredential vault lookup here: both paths are already identical.
+//
+// SoapManager reaches the database directly (see its own header comment), which pulls in
+// better-sqlite3 and Node builtins — fine for execute(), which only ever runs server-side, but this
+// file is still statically imported client-side too (for the node-creation menu), so a plain
+// top-level import here would drag that whole chain (plus the "soap" SDK itself) into the browser
+// bundle. Loaded with a runtime `import()` instead, ignored by both bundlers, so it's never even
+// resolved for the client build; only ever actually called server-side, where it resolves normally.
+async function loadSoapManager(): Promise<typeof import("@hermione/core/lib/soapManager").SoapManager> {
+  const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "@hermione/core/lib/soapManager");
+  return mod.SoapManager;
+}
 
-// Calls a SOAP web service via the official "soap" (node-soap) SDK — a real WSDL fetch/parse plus
-// SOAP envelope construction, which "soap" itself only ever does under Node (it transitively pulls
-// in "axios"/"sax"/etc., none of which this project wants forced into the interpreter/browser
-// bundle). Same structural situation as sftp.ts's SFTP Upload node (see that file's own header
-// comment): this node's own execute() below is therefore a permanent, honest stub reporting that
-// only the compiled output can actually reach a SOAP service; the REAL implementation lives in
-// src/server/functionLibrarySoap.ts, reached only via compileImports, never statically imported by
-// any interpreter-facing code.
+const GROUP_NAME = "Request.SOAP";
+
+function credentialNamePin() {
+  return { id: "credentialName", label: i18n.nodes.soap.__shared.pin_credential_name, type: "string" as const, direction: "input" as const, defaultValue: "" };
+}
+
 registerNode({
   type: "soap.call",
   label: i18n.nodes.soap.call.label,
@@ -25,21 +34,10 @@ registerNode({
   colorCategory: NodeColorCategory.Integration,
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
+    credentialNamePin(),
     { id: "wsdlUrl", label: i18n.nodes.soap.call.pin_wsdl_url, type: "string", direction: "input", defaultValue: "" },
     { id: "operation", label: i18n.nodes.soap.call.pin_operation, type: "string", direction: "input", defaultValue: "" },
     { id: "args", label: i18n.nodes.soap.call.pin_args, type: "string", direction: "input", defaultValue: "{}" },
-    { id: "security", label: i18n.nodes.soap.call.pin_security, type: "enum", subType: SOAP_SECURITY_ENUM_TYPE, direction: "input", defaultValue: SECURITY_OPTIONS[0], options: SECURITY_OPTIONS },
-    { id: "username", label: i18n.nodes.soap.call.pin_username, type: "string", direction: "input", defaultValue: "" },
-    { id: "password", label: i18n.nodes.soap.call.pin_password, type: "string", direction: "input", defaultValue: "" },
-    {
-      id: "wsSecurityPasswordType",
-      label: i18n.nodes.soap.call.pin_ws_security_password_type,
-      type: "enum",
-      subType: SOAP_WS_SECURITY_PASSWORD_TYPE_ENUM_TYPE,
-      direction: "input",
-      defaultValue: WS_SECURITY_PASSWORD_TYPE_OPTIONS[0],
-      options: WS_SECURITY_PASSWORD_TYPE_OPTIONS,
-    },
     { id: "endpointOverride", label: i18n.nodes.soap.call.pin_endpoint_override, type: "string", direction: "input", defaultValue: "" },
     { id: "headers", label: i18n.nodes.soap.call.pin_headers, type: "string", direction: "input", defaultValue: "{}" },
     { id: "timeoutMs", label: i18n.nodes.__shared.pin_timeout, type: "number", direction: "input", defaultValue: 10000, integer: true },
@@ -51,20 +49,11 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({
-    nextExec: "exec-out",
-    outputs: {
-      success: false,
-      result: "",
-      rawRequest: "",
-      rawResponse: "",
-      error: 'SOAP Call only runs in the compiled output (under Node.js) — the in-browser "Run" button has no way to load the "soap" SDK\'s WSDL/XML machinery. Compile this graph and run the generated script to actually call the service.',
-    },
-  }),
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibrarySoap.soapCall({ wsdlUrl: ${inputs.wsdlUrl}, operation: ${inputs.operation}, argsJson: ${inputs.args}, security: ${inputs.security}, username: ${inputs.username}, password: ${inputs.password}, wsSecurityPasswordType: ${inputs.wsSecurityPasswordType}, endpointOverride: ${inputs.endpointOverride}, headersJson: ${inputs.headers}, timeoutMs: ${inputs.timeoutMs} });`,
-    ...compileFrom("exec-out"),
-  ],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSoapManager()).call(String(inputs.credentialName ?? ""), String(inputs.wsdlUrl ?? ""), String(inputs.operation ?? ""), String(inputs.args ?? ""), String(inputs.endpointOverride ?? ""), String(inputs.headers ?? ""), Number(inputs.timeoutMs) || 0);
+    return { nextExec: "exec-out", outputs: result };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SoapManager.call(${inputs.credentialName}, ${inputs.wsdlUrl}, ${inputs.operation}, ${inputs.args}, ${inputs.endpointOverride}, ${inputs.headers}, ${inputs.timeoutMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -75,15 +64,13 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  // "soap" is a real Node dependency this project itself never needs (nothing here can run it
-  // live) — it only needs to be `npm install`ed alongside the COMPILED .mjs, same convention as
-  // "ssh2-sftp-client" (see sftp.ts).
-  compileImports: [FUNCTION_LIBRARY_SOAP_IMPORT],
+  compileImports: [SOAP_MANAGER_IMPORT],
 });
 
 // Lists the operations/services/ports a WSDL exposes — useful for exploring an unfamiliar SOAP
-// service before wiring up soap.call's Operation/Args pins. Same compiled-output-only situation as
-// soap.call above (see that node's header comment).
+// service before wiring up soap.call's Operation/Args pins. Fetching a WSDL's own metadata never
+// needs a security handshake (that only applies to the operations described within it), so unlike
+// soap.call this node takes no credential.
 registerNode({
   type: "soap.describe",
   label: i18n.nodes.soap.describe.label,
@@ -100,15 +87,11 @@ registerNode({
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
-  execute: async () => ({
-    nextExec: "exec-out",
-    outputs: {
-      success: false,
-      description: "",
-      error: 'SOAP Describe only runs in the compiled output (under Node.js) — the in-browser "Run" button has no way to load the "soap" SDK\'s WSDL/XML machinery. Compile this graph and run the generated script to actually inspect the service.',
-    },
-  }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await functionLibrarySoap.soapDescribe({ wsdlUrl: ${inputs.wsdlUrl}, timeoutMs: ${inputs.timeoutMs} });`, ...compileFrom("exec-out")],
+  execute: async ({ inputs }) => {
+    const result = await (await loadSoapManager()).describe(String(inputs.wsdlUrl ?? ""), Number(inputs.timeoutMs) || 0);
+    return { nextExec: "exec-out", outputs: { success: result.success, description: result.descriptionJson, error: result.error } };
+  },
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SoapManager.describe(${inputs.wsdlUrl}, ${inputs.timeoutMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -117,5 +100,5 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_SOAP_IMPORT],
+  compileImports: [SOAP_MANAGER_IMPORT],
 });

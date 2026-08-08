@@ -34,16 +34,19 @@ clientSecret, tokenUrl}`. `static forAuth(auth)` caches instances per auth (mirr
   (mirrors WorkdayManager's per-method style), e.g. `async listJobs(...)`,
   `async createJob(...)`. Generic `apiCall(method, path, query, body)` is the escape
   hatch already built in Phase 0.
-- `packages/core/src/server/functionLibrarySmartRecruiters.ts` — compiled/deployed-flow
-  counterpart. `smartRecruitersCredentialFromEnv(name)` reads env vars (no vault access
-  at runtime). One exported async wrapper function per manager method, e.g.
-  `smartRecruitersListJobs(credentialName, ...)` — mirrors functionLibraryGithub.ts.
+- Unlike most other providers, SmartRecruiters has no `functionLibrarySmartRecruiters.ts`
+  of its own — `SmartRecruitersManager` resolves its own credentials straight from the
+  database (see its `findCredential`), so both the interpreter and the compiled/deployed
+  script call the exact same manager methods directly instead of going through a
+  separate env-var-reading layer (mirrors `TWILIO_MANAGER_IMPORT`/`WORKDAY_MANAGER_IMPORT`
+  in `packages/graph/src/engine/compileUtils.ts`, which exports
+  `SMARTRECRUITERS_MANAGER_IMPORT` for this).
 - `packages/graph/src/nodes/smartRecruiters.ts` — one file, `GROUP_NAME =
-"Request.SmartRecruiters"`. `resolveSmartRecruitersCredential(ctx, name)` shared
-  helper already exists (Phase 0) — reuse it. Every node needs both `execute` (calls
-  `SmartRecruitersManager.forAuth(...)`) AND `compileExecute` (calls
-  `functionLibrarySmartRecruiters.smartRecruiters*`) — this is a hard repo rule, never
-  add one without the other.
+"Request.SmartRecruiters"`. Every node needs both `execute` (calls
+  `SmartRecruitersManager.forAuth(...)` via the client-safe `loadSmartRecruitersManager()`
+  dynamic import) AND `compileExecute` (emits a call to the exact same
+  `SmartRecruitersManager` method, using `SMARTRECRUITERS_MANAGER_IMPORT`) — this is a
+  hard repo rule, never add one without the other.
 - `packages/graph/src/enum/smartRecruiters.ts` — enums only for genuinely fixed,
   documented value sets (e.g. job status). `SMARTRECRUITERS_HTTP_METHOD_ENUM_TYPE`
   already exists (Phase 0).
@@ -71,7 +74,8 @@ clientSecret, tokenUrl}`. `static forAuth(auth)` caches instances per auth (mirr
 - [x] **Phase 0 — Foundation** (done): credential types (API key + OAuth2 client
       credentials), `SmartRecruitersManager` skeleton with generic `request`/`apiCall`,
       HTTP method enum, `smartRecruiters.apiCall` escape-hatch node (usable against ANY
-      documented endpoint today), functionLibrarySmartRecruiters.ts, index.ts
+      documented endpoint today), `SMARTRECRUITERS_MANAGER_IMPORT` in compileUtils.ts
+      (no functionLibrarySmartRecruiters.ts layer — see Architecture above), index.ts
       registration, i18n section. Verified: tsc clean, prettier clean.
 - [x] **Phase 1 — Jobs core** (done 2026-08-07): searchJobs (`/jobs`, paginated),
       createJob, getJob, patchJob (JSON merge patch), updateJobStatus,

@@ -4449,16 +4449,15 @@
       }
     },
     "soap": {
+      "__shared": {
+        "pin_credential_name": "Credential Name"
+      },
       "call": {
         "label": "SOAP Call",
-        "description": "Calls an operation on a SOAP web service via its WSDL. Compiled output only — see this node's own tooltip note below.",
+        "description": "Calls an operation on a SOAP web service via its WSDL.",
         "pin_wsdl_url": "WSDL URL",
         "pin_operation": "Operation",
         "pin_args": "Args (JSON)",
-        "pin_security": "Security",
-        "pin_username": "Username",
-        "pin_password": "Password",
-        "pin_ws_security_password_type": "WS-Security Password Type",
         "pin_endpoint_override": "Endpoint Override",
         "pin_headers": "SOAP Headers (JSON)",
         "pin_raw_request": "Raw Request",
@@ -4466,7 +4465,7 @@
       },
       "describe": {
         "label": "SOAP Describe",
-        "description": "Fetches a WSDL and lists the services, ports and operations it exposes. Compiled output only — see this node's own tooltip note below.",
+        "description": "Fetches a WSDL and lists the services, ports and operations it exposes.",
         "pin_wsdl_url": "WSDL URL",
         "pin_description": "Description (JSON)"
       }

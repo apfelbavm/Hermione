@@ -23,6 +23,7 @@ export type CredentialTypeId =
   | "salesforceOAuth2PasswordFlow"
   | "workdayBasicAuth"
   | "twilioApiKey"
+  | "soapBasicAuth"
   | "smtpCredential"
   | "sapBasicAuth"
   | "linkedInOAuth2"
@@ -215,6 +216,17 @@ export interface TwilioApiKeyCredentialData {
   authToken: string;
 }
 
+/** A SOAP web service's security mode ("None"/"Basic"/"WSSecurity") plus the username/password pair
+ * used by whichever mode applies, and — only for WSSecurity — the password digest type
+ * ("PasswordText"/"PasswordDigest") — see lib/soapManager.ts, which calls the "soap" (node-soap) SDK
+ * directly. `username`/`password` are unused (and may be left blank) when `security` is "None". */
+export interface SoapBasicAuthCredentialData {
+  security: string;
+  username: string;
+  password: string;
+  wsSecurityPasswordType: string;
+}
+
 /** SMTP server connection details for outbound mail — see lib/smtpManager.ts (nodemailer). `port`/
  * `secure` are stored as strings like every other credential field and parsed by the manager. */
 export interface SmtpCredentialData {
@@ -305,6 +317,7 @@ export type CredentialData =
   | SalesforceOAuth2PasswordFlowCredentialData
   | WorkdayBasicAuthCredentialData
   | TwilioApiKeyCredentialData
+  | SoapBasicAuthCredentialData
   | SmtpCredentialData
   | SapBasicAuthCredentialData
   | LinkedInOAuth2CredentialData
