@@ -46,16 +46,25 @@ export const FUNCTION_LIBRARY_MICROSOFT365_IMPORT = 'import * as functionLibrary
 /** Sibling of FUNCTION_LIBRARY_IMPORT for each new enterprise connector's own functionLibrary file —
  * same one-node-family-per-file convention as above (see nodes/slack.ts, nodes/stripe.ts, etc.). */
 export const FUNCTION_LIBRARY_SLACK_IMPORT = 'import * as functionLibrarySlack from "../../packages/core/src/server/functionLibrarySlack.ts";';
-export const FUNCTION_LIBRARY_STRIPE_IMPORT = 'import * as functionLibraryStripe from "../../packages/core/src/server/functionLibraryStripe.ts";';
+/** Unlike every other provider (besides Twilio), Stripe has no functionLibraryStripe.ts of its own —
+ * StripeManager (packages/core/src/lib/stripeManager.ts) resolves its own credentials straight from
+ * the database (see its findCredential), so both the interpreter and the compiled/deployed script
+ * call the exact same manager methods directly instead of going through a separate env-var-reading
+ * layer. */
+export const STRIPE_MANAGER_IMPORT = 'import { StripeManager } from "../../packages/core/src/lib/stripeManager.ts";';
 export const FUNCTION_LIBRARY_SALESFORCE_IMPORT = 'import * as functionLibrarySalesforce from "../../packages/core/src/server/functionLibrarySalesforce.ts";';
-export const FUNCTION_LIBRARY_WORKDAY_IMPORT = 'import * as functionLibraryWorkday from "../../packages/core/src/server/functionLibraryWorkday.ts";';
+/** Unlike most other providers, Workday has no functionLibraryWorkday.ts of its own — WorkdayManager
+ * (packages/core/src/lib/workdayManager.ts) resolves its own credentials straight from the database
+ * (see its findCredential), so both the interpreter and the compiled/deployed script call the
+ * exact same manager methods directly instead of going through a separate env-var-reading layer. */
+export const WORKDAY_MANAGER_IMPORT = 'import { WorkdayManager } from "../../packages/core/src/lib/workdayManager.ts";';
 /** Unlike every other provider, Twilio has no functionLibrary<Provider>.ts of its own — TwilioManager
  * (packages/core/src/lib/twilioManager.ts) resolves its own credentials straight from the database
  * (see its resolveCredential), so both the interpreter and the compiled/deployed script call the
  * exact same manager methods directly instead of going through a separate env-var-reading layer. */
 export const TWILIO_MANAGER_IMPORT = 'import { TwilioManager } from "../../packages/core/src/lib/twilioManager.ts";';
-export const FUNCTION_LIBRARY_SMTP_IMPORT = 'import * as functionLibrarySmtp from "../../packages/core/src/server/functionLibrarySmtp.ts";';
-export const FUNCTION_LIBRARY_SAP_IMPORT = 'import * as functionLibrarySap from "../../packages/core/src/server/functionLibrarySap.ts";';
+export const SMTP_MANAGER_IMPORT = 'import { SmtpManager } from "../../packages/core/src/lib/smtpManager.ts";';
+export const SAP_MANAGER_IMPORT = 'import { SapManager } from "../../packages/core/src/lib/sapManager.ts";';
 export const FUNCTION_LIBRARY_LINKEDIN_IMPORT = 'import * as functionLibraryLinkedIn from "../../packages/core/src/server/functionLibraryLinkedIn.ts";';
 export const FUNCTION_LIBRARY_SENDGRID_IMPORT = 'import * as functionLibrarySendGrid from "../../packages/core/src/server/functionLibrarySendGrid.ts";';
 
