@@ -250,6 +250,10 @@
       "save_and_leave": "Save and leave",
       "saving": "Saving..."
     },
+    "autosave_popup": {
+      "message": "Autosaving in {seconds}s",
+      "cancel": "Cancel"
+    },
     "app_shell": {
       "sim_failed": "Simulation request failed: ",
       "sim_error": "Error: ",
@@ -258,6 +262,8 @@
       "load_flow_failed": "Failed to load Flow: ",
       "save_start": "Saving...",
       "save_complete": "Save complete.",
+      "autosave_start": "Autosaving...",
+      "autosave_complete": "Autosave complete.",
       "deploy_start": "Saving and deploying...",
       "deploy_complete": "Save & Deploy complete.",
       "ctx_delete": "Delete (Del)",

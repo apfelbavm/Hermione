@@ -47,6 +47,9 @@ import { i18n } from "@i18n";
 
 registerBuiltins();
 
+const AUTOSAVE_INTERVAL_MS = 10* 60 * 1000;
+const AUTOSAVE_COUNTDOWN_SECONDS = 10;
+
 async function* readServerSentEvents(response: Response): AsyncGenerator<{ event: string; data: unknown }> {
   const reader = response.body?.getReader();
   if (!reader) return;
@@ -108,6 +111,8 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
   // Snapshot of the graph as last loaded/saved — compared against the current graph to decide
   // whether the back-to-project button needs to warn about unsaved changes (see onBackButtonClick).
   const lastSavedGraphJsonRef = useRef<string | null>(null);
+  const [autosaveSecondsRemaining, setAutosaveSecondsRemaining] = useState<number | null>(null);
+  const cancelAutosaveCountdownRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const canvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
@@ -808,6 +813,65 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
     }
     saveButton.addEventListener("click", onSaveClick);
 
+    let autosaveCountdownInterval: ReturnType<typeof setInterval> | null = null;
+    let autosaveScheduleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Cancelling restarts the full AUTOSAVE_INTERVAL_MS wait rather than resuming the interrupted
+    // one — the schedule timer is a fresh setTimeout, not a setInterval, so it can be reset here.
+    function scheduleNextAutosaveCheck(): void {
+      if (autosaveScheduleTimer !== null) clearTimeout(autosaveScheduleTimer);
+      autosaveScheduleTimer = setTimeout(runAutosaveCheck, AUTOSAVE_INTERVAL_MS);
+    }
+
+    function cancelAutosaveCountdown(): void {
+      if (autosaveCountdownInterval !== null) {
+        clearInterval(autosaveCountdownInterval);
+        autosaveCountdownInterval = null;
+      }
+      setAutosaveSecondsRemaining(null);
+      scheduleNextAutosaveCheck();
+    }
+    cancelAutosaveCountdownRef.current = cancelAutosaveCountdown;
+
+    async function performAutosave(): Promise<void> {
+      appendLog(i18n.components.app_shell.autosave_start);
+      await scriptEditor.flushDirtyScripts();
+      const graphJson = serializeGraph(store.state.rootGraph);
+      await saveFlowGraph(projectId, flowId, graphJson);
+      lastSavedGraphJsonRef.current = graphJson;
+      appendLog(i18n.components.app_shell.autosave_complete);
+      scheduleNextAutosaveCheck();
+    }
+
+    function runAutosaveCheck(): void {
+      if (store.state.simulating) {
+        scheduleNextAutosaveCheck();
+        return;
+      }
+      const currentGraphJson = serializeGraph(store.state.rootGraph);
+      if (currentGraphJson === lastSavedGraphJsonRef.current) {
+        scheduleNextAutosaveCheck();
+        return;
+      }
+
+      let secondsRemaining = AUTOSAVE_COUNTDOWN_SECONDS;
+      setAutosaveSecondsRemaining(secondsRemaining);
+      autosaveCountdownInterval = setInterval(() => {
+        secondsRemaining -= 1;
+        if (secondsRemaining <= 0) {
+          if (autosaveCountdownInterval !== null) {
+            clearInterval(autosaveCountdownInterval);
+            autosaveCountdownInterval = null;
+          }
+          setAutosaveSecondsRemaining(null);
+          void performAutosave();
+          return;
+        }
+        setAutosaveSecondsRemaining(secondsRemaining);
+      }, 1000);
+    }
+    scheduleNextAutosaveCheck();
+
     function onLoadClick(): void {
       loadFileInput.click();
     }
@@ -919,6 +983,8 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
       cancelledLoad = true;
       activeSimulation?.abort();
       if (panAnimationFrame !== null) cancelAnimationFrame(panAnimationFrame);
+      if (autosaveScheduleTimer !== null) clearTimeout(autosaveScheduleTimer);
+      if (autosaveCountdownInterval !== null) clearInterval(autosaveCountdownInterval);
       window.removeEventListener("mousemove", onWindowMouseMove);
       window.removeEventListener("resize", resizeCanvas);
       window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange);
@@ -961,7 +1027,7 @@ export default function AppShell({ projectId, flowId }: { projectId: string; flo
 
   return (
     <>
-      <AppShellMarkup store={store} flowName={flowName} flowId={flowId} />
+      <AppShellMarkup store={store} flowName={flowName} flowId={flowId} autosaveSecondsRemaining={autosaveSecondsRemaining} onCancelAutosave={() => cancelAutosaveCountdownRef.current()} />
       {showUnsavedDialog && (
         <UnsavedChangesDialog
           saving={savingBeforeLeave}

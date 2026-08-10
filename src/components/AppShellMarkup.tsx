@@ -10,9 +10,10 @@ import { LibraryPanel } from "./sidebar/LibraryPanel";
 import { PageHeader } from "./PageHeader";
 import { ScriptsPanel } from "./sidebar/ScriptsPanel";
 import { VariablePanel } from "./sidebar/VariablePanel";
+import { AutosavePopup } from "./AutosavePopup";
 import { IconManager } from "../shared/iconManager";
 
-export default function AppShellMarkup({ store, flowName, flowId }: { store: Store; flowName: string; flowId: string }) {
+export default function AppShellMarkup({ store, flowName, flowId, autosaveSecondsRemaining, onCancelAutosave }: { store: Store; flowName: string; flowId: string; autosaveSecondsRemaining: number | null; onCancelAutosave: () => void }) {
   useStoreRevision(store);
 
   const activeFunction: FunctionDef | null = store.state.activeFunctionId ? (store.state.rootGraph.functions.find((f) => f.id === store.state.activeFunctionId) ?? null) : null;
@@ -92,6 +93,7 @@ export default function AppShellMarkup({ store, flowName, flowId }: { store: Sto
                 ⛶
               </button>
             </div>
+            {autosaveSecondsRemaining !== null && <AutosavePopup secondsRemaining={autosaveSecondsRemaining} onCancel={onCancelAutosave} />}
           </div>
         </div>
         <div id="right-sidebar-resizer" className="resizer resizer-vertical" />

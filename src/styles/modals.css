@@ -157,3 +157,20 @@
 .flow-template-tile-name {
   font-size: 13px;
 }
+
+.autosave-popup {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--pp-text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  z-index: 100;
+  font-size: 13px;
+}
