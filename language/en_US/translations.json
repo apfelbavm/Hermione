@@ -197,6 +197,11 @@
       "no_project_selected": "Select a project…",
       "no_flow_selected": "Select a flow…"
     },
+    "library_panel": {
+      "header": "Library",
+      "search_placeholder": "Search nodes…",
+      "empty": "No matching nodes"
+    },
     "graph_tabs": {
       "main_graph": "Main Graph",
       "main_graph_title": "The main graph — always open",

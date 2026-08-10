@@ -6,6 +6,7 @@ import { AiChatPanel } from "./ai/AiChatPanel";
 import { DetailsPanel } from "./sidebar/DetailsPanel";
 import { FunctionsPanel } from "./sidebar/FunctionsPanel";
 import { GraphTabs } from "./sidebar/GraphTabs";
+import { LibraryPanel } from "./sidebar/LibraryPanel";
 import { PageHeader } from "./PageHeader";
 import { ScriptsPanel } from "./sidebar/ScriptsPanel";
 import { VariablePanel } from "./sidebar/VariablePanel";
@@ -95,6 +96,7 @@ export default function AppShellMarkup({ store, flowName, flowId }: { store: Sto
         </div>
         <div id="right-sidebar-resizer" className="resizer resizer-vertical" />
         <div id="right-sidebar" className="side-panel">
+          <LibraryPanel store={store} />
           <DetailsPanel store={store} />
         </div>
         <div id="ai-chat-resizer" className="resizer resizer-vertical" />

@@ -13,6 +13,7 @@ import { createContainerSelect, createEntityPicker, createStructTypeSelect, crea
 import { DEFAULT_COMMENT_COLOR } from "@hermione/graph/render/commentGeometry";
 import { getEditingGraph, getVisibleVariablesForState, type Store } from "@hermione/graph/state/store";
 import { useStoreRevision } from "@hermione/graph/state/useStore";
+import { IconManager } from "../../shared/iconManager";
 import { FunctionIoPanel } from "./FunctionIoPanel";
 import { ImperativeMount } from "./ImperativeMount";
 import { NodeOutputsPanel } from "./NodeOutputsPanel";
@@ -334,6 +335,7 @@ function FunctionDescription({ store, fn }: { store: Store; fn: FunctionDef }) {
 
 export function DetailsPanel({ store }: { store: Store }) {
   useStoreRevision(store);
+  const [collapsed, setCollapsed] = useState(false);
   const selection = store.state.sidebarSelection;
 
   const fn = selection?.kind === "function" ? store.state.rootGraph.functions.find((f) => f.id === selection.functionId) : undefined;
@@ -367,25 +369,32 @@ export function DetailsPanel({ store }: { store: Store }) {
   if (!variable && !fn && !script && !selectedNode && !selectedComment) return null;
 
   return (
-    <div id="details-section">
-      <div className="details-header">{i18n.components.details_panel.header}</div>
-      {variable && <VariableDetails store={store} variable={variable} />}
-      {selectedNode && <NodeDetails store={store} node={selectedNode} properties={nodeProperties ?? []} />}
-      {selectedNode && getNodeDef(selectedNode.type).editableInputs && <NodeInputsPanel store={store} getSelectedNode={() => selectedNode!} />}
-      {selectedNode && getNodeDef(selectedNode.type).editableOutputs && <NodeOutputsPanel store={store} getSelectedNode={() => selectedNode!} />}
-      {selectedComment && <CommentDetails store={store} comment={selectedComment} />}
-      {fn && (
-        <div className="details-content">
-          <FunctionDescription store={store} fn={fn} />
-          <FunctionIoPanel store={store} kind="input" getActiveFunction={() => fn} />
-          <FunctionIoPanel store={store} kind="output" getActiveFunction={() => fn} />
-        </div>
-      )}
-      {script && (
-        <div className="details-content">
-          <ScriptIoPanel store={store} kind="input" getSelectedScript={() => script} />
-          <ScriptIoPanel store={store} kind="output" getSelectedScript={() => script} />
-        </div>
+    <div id="details-section" className={collapsed ? "collapsed" : undefined}>
+      <div className="details-header" onClick={() => setCollapsed((c) => !c)}>
+        <span className="panel-header-arrow">{collapsed ? <IconManager.ChevronRightIcon /> : <IconManager.ChevronDownIcon />}</span>
+        <span className="panel-header-title">{i18n.components.details_panel.header}</span>
+      </div>
+      {!collapsed && (
+        <>
+          {variable && <VariableDetails store={store} variable={variable} />}
+          {selectedNode && <NodeDetails store={store} node={selectedNode} properties={nodeProperties ?? []} />}
+          {selectedNode && getNodeDef(selectedNode.type).editableInputs && <NodeInputsPanel store={store} getSelectedNode={() => selectedNode!} />}
+          {selectedNode && getNodeDef(selectedNode.type).editableOutputs && <NodeOutputsPanel store={store} getSelectedNode={() => selectedNode!} />}
+          {selectedComment && <CommentDetails store={store} comment={selectedComment} />}
+          {fn && (
+            <div className="details-content">
+              <FunctionDescription store={store} fn={fn} />
+              <FunctionIoPanel store={store} kind="input" getActiveFunction={() => fn} />
+              <FunctionIoPanel store={store} kind="output" getActiveFunction={() => fn} />
+            </div>
+          )}
+          {script && (
+            <div className="details-content">
+              <ScriptIoPanel store={store} kind="input" getSelectedScript={() => script} />
+              <ScriptIoPanel store={store} kind="output" getSelectedScript={() => script} />
+            </div>
+          )}
+        </>
       )}
     </div>
   );

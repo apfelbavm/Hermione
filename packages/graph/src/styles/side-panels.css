@@ -17,9 +17,14 @@
 }
 
 .details-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 10px 12px;
   font-weight: 600;
   border-bottom: 1px solid var(--pp-border);
+  cursor: pointer;
+  user-select: none;
 }
 
 .details-content {
@@ -364,4 +369,25 @@
 .variable-row input.variable-name.typed-value-input {
   flex: 1 1 auto;
   width: 0;
+}
+
+.library-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+}
+
+.library-search-input {
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 4px;
+}
+
+.library-panel-list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+#details-section.collapsed {
+  flex: 0 0 auto;
 }

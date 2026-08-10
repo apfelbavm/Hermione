@@ -4,6 +4,7 @@ import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import { SFTP_EXISTING_FILE_MODE_ENUM_TYPE } from "@hermione/graph/enum/sftp";
 import { TEXT_ENCODING_ENUM_TYPE } from "@hermione/graph/enum/common";
 import { i18n } from "@i18n";
+import { NodeColorCategory } from "../engine/types";
 
 const EXISTING_FILE_MODES = enumOptionIds(SFTP_EXISTING_FILE_MODE_ENUM_TYPE);
 
@@ -33,6 +34,7 @@ registerNode({
   type: "sftp.upload",
   label: i18n.nodes.sftp.upload.label,
   description: i18n.nodes.sftp.upload.description,
+  colorCategory: NodeColorCategory.Integration,
   group: "Request",
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
