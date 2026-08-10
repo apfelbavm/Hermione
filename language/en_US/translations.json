@@ -4121,28 +4121,28 @@
     },
     "event": {
       "start": {
-        "label": "On Start",
+        "label": "Event Start",
         "description": "Fires once when the graph starts running."
       },
       "interval": {
-        "label": "On Interval",
+        "label": "Event Interval",
         "description": "Fires repeatedly on a configurable interval, in milliseconds.",
         "pin_interval_ms": "Interval (ms)"
       },
       "simulate": {
-        "label": "On Simulate",
+        "label": "Event Simulate",
         "description": "Fires when the editor's own Run button is pressed."
       },
       "deploy": {
-        "label": "On Deploy",
+        "label": "Event Deploy",
         "description": "Fires once, right after the graph is deployed."
       },
       "request": {
-        "label": "On HTTP Request",
+        "label": "Event HTTP Request",
         "description": "Fires when the deployed script's HTTP endpoint is called, outputting its user-declared request fields."
       },
       "execute": {
-        "label": "On Execute",
+        "label": "Event Execute",
         "description": "Fires when another Flow calls this one via Execute Flow, outputting its user-declared fields."
       }
     },
