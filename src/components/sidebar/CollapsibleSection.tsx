@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { getStoredCollapsed, setStoredCollapsed } from "../../client/collapsedSections";
 import { IconManager } from "../../shared/iconManager";
 
 /** A collapsible sidebar section (Functions/Variables/Scripts/Local Variables/Inputs/Outputs) —
@@ -8,7 +9,7 @@ import { IconManager } from "../../shared/iconManager";
  * row is never hidden by an already-collapsed section). Mirrors overlay/collapsibleSection.ts;
  * collapsed state lives as local component state here instead of a DOM class, since there's no
  * separate "section wrapper never gets rebuilt" concern anymore — this whole section IS the
- * component. */
+ * component. `id` also doubles as the localStorage key so collapse state survives across sessions. */
 export function CollapsibleSection({
   id,
   title,
@@ -18,7 +19,7 @@ export function CollapsibleSection({
   disabled = false,
   children,
 }: {
-  id?: string;
+  id: string;
   title: string;
   empty: boolean;
   onAdd: () => void;
@@ -28,10 +29,14 @@ export function CollapsibleSection({
   disabled?: boolean;
   children: ReactNode;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsedState] = useState(() => getStoredCollapsed(id));
+  function setCollapsed(next: boolean): void {
+    setCollapsedState(next);
+    setStoredCollapsed(id, next);
+  }
   return (
     <div id={id} className={"panel-section" + (collapsed ? " collapsed" : "")}>
-      <div className="panel-header" onClick={() => setCollapsed((c) => !c)}>
+      <div className="panel-header" onClick={() => setCollapsed(!collapsed)}>
         <span className="panel-header-arrow">{!empty && (collapsed ? <IconManager.ChevronRightIcon /> : <IconManager.ChevronDownIcon />)}</span>
         <span className="panel-header-title">{title}</span>
         <button

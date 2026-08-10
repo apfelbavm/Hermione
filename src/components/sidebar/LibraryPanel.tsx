@@ -9,8 +9,10 @@ import { buildMenuTree, flattenVisible, type MenuNode, type VisibleRow } from "@
 import { snapPositionToGrid } from "@hermione/graph/render/drawGrid";
 import { getEditingGraph, type Store } from "@hermione/graph/state/store";
 import { useStoreRevision } from "@hermione/graph/state/useStore";
+import { getStoredCollapsed, getStoredExpandedGroups, setStoredCollapsed, setStoredExpandedGroups } from "../../client/collapsedSections";
 import { IconManager } from "../../shared/iconManager";
 
+const LIBRARY_SECTION_ID = "library-section";
 const EXCLUDED_TOP_LEVEL_GROUPS = ["Variables", "Functions", "Code", "Internal"];
 
 /** Same candidate set as the canvas's empty-space right-click menu (see AppShell's
@@ -24,9 +26,14 @@ function creatableNodeDefs(store: Store): NodeDef[] {
 
 export function LibraryPanel({ store }: { store: Store }) {
   useStoreRevision(store);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsedState] = useState(() => getStoredCollapsed(LIBRARY_SECTION_ID));
   const [query, setQuery] = useState("");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(() => getStoredExpandedGroups());
+
+  function setCollapsed(next: boolean): void {
+    setCollapsedState(next);
+    setStoredCollapsed(LIBRARY_SECTION_ID, next);
+  }
 
   const disabled = store.state.simulating || store.state.readOnly;
   const candidates = useMemo(() => creatableNodeDefs(store), [store, store.state.activeFunctionId, store.state.rootGraph]);
@@ -53,6 +60,7 @@ export function LibraryPanel({ store }: { store: Store }) {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path);
       else next.add(path);
+      setStoredExpandedGroups(next);
       return next;
     });
   }
@@ -69,8 +77,8 @@ export function LibraryPanel({ store }: { store: Store }) {
   }
 
   return (
-    <div id="library-section" className={"panel-section" + (collapsed ? " collapsed" : "")}>
-      <div className="panel-header" onClick={() => setCollapsed((c) => !c)}>
+    <div id={LIBRARY_SECTION_ID} className={"panel-section" + (collapsed ? " collapsed" : "")}>
+      <div className="panel-header" onClick={() => setCollapsed(!collapsed)}>
         <span className="panel-header-arrow">{collapsed ? <IconManager.ChevronRightIcon /> : <IconManager.ChevronDownIcon />}</span>
         <span className="panel-header-title">{i18n.components.library_panel.header}</span>
       </div>
