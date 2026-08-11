@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { i18n } from "@i18n";
 
 type Step = "email" | "code";
 
@@ -43,7 +44,7 @@ export default function LoginPage() {
     try {
       const result = await signIn(useAuthenticator ? "email-totp" : "email-code", { email, code, redirect: false });
       if (result?.error) {
-        setError("Invalid or expired code");
+        setError(i18n.pages.login.error_invalid_code);
         return;
       }
       router.replace(callbackUrl);
@@ -63,25 +64,25 @@ export default function LoginPage() {
   return (
     <div className="auth-page">
       <div className="modal-box auth-page-card">
-        <h1 className="modal-title">Sign in to Hermione</h1>
+        <h1 className="modal-title">{i18n.pages.login.title}</h1>
 
         <button type="button" className="btn btn-blue" style={{ width: "100%" }} disabled={loading} onClick={() => signIn("microsoft-entra-id", { callbackUrl })}>
-          Sign in with Microsoft
+          {i18n.pages.login.microsoft_button}
         </button>
 
-        <div className="auth-page-divider">or</div>
+        <div className="auth-page-divider">{i18n.pages.login.divider}</div>
 
         {step === "email" && (
           <form onSubmit={submitEmailStep}>
             <label className="modal-field-row">
-              <span className="modal-field-label">Work email (external companies)</span>
-              <input type="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
+              <span className="modal-field-label">{i18n.pages.login.email_label}</span>
+              <input type="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder={i18n.pages.login.email_placeholder} />
             </label>
             <button type="submit" className="btn btn-gray" style={{ width: "100%" }} disabled={loading}>
-              {useAuthenticator ? "Continue" : "Send sign-in code"}
+              {useAuthenticator ? i18n.pages.login.submit_button_continue : i18n.pages.login.submit_button_send_code}
             </button>
             <button type="button" className="auth-page-hint" onClick={() => setUseAuthenticator((v) => !v)}>
-              {useAuthenticator ? "Use an emailed code instead" : "Use an authenticator app instead"}
+              {useAuthenticator ? i18n.pages.login.toggle_email : i18n.pages.login.toggle_authenticator}
             </button>
           </form>
         )}
@@ -94,11 +95,11 @@ export default function LoginPage() {
             }}
           >
             <label className="modal-field-row">
-              <span className="modal-field-label">{useAuthenticator ? "6-digit code from your authenticator app" : `Code sent to ${email}`}</span>
-              <input type="text" inputMode="numeric" autoFocus required value={code} onChange={(e) => setCode(e.target.value)} placeholder="000000" />
+              <span className="modal-field-label">{useAuthenticator ? i18n.pages.login.code_label_authenticator : i18n.pages.login.code_label_email.replace("{email}", email)}</span>
+              <input type="text" inputMode="numeric" autoFocus required value={code} onChange={(e) => setCode(e.target.value)} placeholder={i18n.pages.login.code_placeholder} />
             </label>
             <button type="submit" className="btn btn-blue" style={{ width: "100%" }} disabled={loading}>
-              Sign in
+              {i18n.pages.login.sign_in_button}
             </button>
             <button
               type="button"
@@ -109,7 +110,7 @@ export default function LoginPage() {
                 setError(null);
               }}
             >
-              Back
+              {i18n.pages.login.back_button}
             </button>
           </form>
         )}

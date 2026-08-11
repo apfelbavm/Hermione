@@ -178,6 +178,23 @@
       "delete_confirm": "Delete the user {email}? This cannot be undone.",
       "empty_state": "No users yet."
     },
+    "login": {
+      "title": "Sign in to Hermione",
+      "microsoft_button": "Sign in with Microsoft",
+      "divider": "or",
+      "email_label": "Work email (external companies)",
+      "email_placeholder": "you@company.com",
+      "submit_button_continue": "Continue",
+      "submit_button_send_code": "Send sign-in code",
+      "toggle_authenticator": "Use an authenticator app instead",
+      "toggle_email": "Use an emailed code instead",
+      "code_label_authenticator": "6-digit code from your authenticator app",
+      "code_label_email": "Code sent to {email}",
+      "code_placeholder": "000000",
+      "sign_in_button": "Sign in",
+      "back_button": "Back",
+      "error_invalid_code": "Invalid or expired code"
+    },
     "project_webhooks": {
       "back": "Back",
       "title": "Webhooks",
