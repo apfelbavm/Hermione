@@ -26,7 +26,7 @@ Do not run the full test suite unless:
 
 Prefer targeted tests for the files being modified.
 
-Run typecheck when appropriate.
+Always run `npm run typecheck` and `npm run lint` from package.json for verification. Do not verify code yourself — let the tools confirm correctness.
 
 ## Where to look
 - Architecture details: [docs/architecture.md](docs/architecture.md)
