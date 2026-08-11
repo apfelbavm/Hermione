@@ -160,6 +160,24 @@
       "session_scope_browser": "Per browser — all tabs share one session",
       "session_scope_tab": "Per tab — each tab needs its own sign-in"
     },
+    "admin_users": {
+      "breadcrumb": "Users",
+      "access_denied": "You don't have access to this page.",
+      "title": "Users",
+      "email_header": "Email",
+      "name_header": "Name",
+      "role_header": "Role",
+      "status_header": "Status",
+      "last_login_header": "Last login",
+      "empty_placeholder": "—",
+      "status_active": "Active",
+      "status_blocked": "Blocked",
+      "block_button": "Block",
+      "unblock_button": "Unblock",
+      "delete_button": "Delete",
+      "delete_confirm": "Delete the user {email}? This cannot be undone.",
+      "empty_state": "No users yet."
+    },
     "project_webhooks": {
       "back": "Back",
       "title": "Webhooks",

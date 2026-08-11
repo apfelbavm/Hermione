@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { i18n } from "@i18n";
 import { deleteUser, getCurrentUser, listUsers, setUserBlocked, setUserRole } from "../../../client/api";
 import type { UserAccount, UserRole } from "@hermione/core/server/models";
 import { PageShell } from "../../../components/PageHeader";
@@ -49,7 +50,7 @@ export default function AdminUsersPage() {
   }
 
   async function remove(user: UserAccount): Promise<void> {
-    if (!confirm(`Delete the user ${user.email}? This cannot be undone.`)) return;
+    if (!confirm(i18n.pages.admin_users.delete_confirm.replace("{email}", user.email))) return;
     try {
       await deleteUser(user.id);
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
@@ -61,26 +62,26 @@ export default function AdminUsersPage() {
   if (me && !me.isAdmin) {
     return (
       <PageShell>
-        <Breadcrumbs items={[{ label: "Users" }]} />
-        <p>You don't have access to this page.</p>
+        <Breadcrumbs items={[{ label: i18n.pages.admin_users.breadcrumb }]} />
+        <p>{i18n.pages.admin_users.access_denied}</p>
       </PageShell>
     );
   }
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Users" }]} />
+      <Breadcrumbs items={[{ label: i18n.pages.admin_users.breadcrumb }]} />
 
       <div className="modal-box" style={{ width: "100%", maxWidth: 900 }}>
-        <h2 className="modal-title">Users</h2>
+        <h2 className="modal-title">{i18n.pages.admin_users.title}</h2>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
-              <th style={{ textAlign: "left", padding: "6px 8px" }}>Email</th>
-              <th style={{ textAlign: "left", padding: "6px 8px" }}>Name</th>
-              <th style={{ textAlign: "left", padding: "6px 8px" }}>Role</th>
-              <th style={{ textAlign: "left", padding: "6px 8px" }}>Status</th>
-              <th style={{ textAlign: "left", padding: "6px 8px" }}>Last login</th>
+              <th style={{ textAlign: "left", padding: "6px 8px" }}>{i18n.pages.admin_users.email_header}</th>
+              <th style={{ textAlign: "left", padding: "6px 8px" }}>{i18n.pages.admin_users.name_header}</th>
+              <th style={{ textAlign: "left", padding: "6px 8px" }}>{i18n.pages.admin_users.role_header}</th>
+              <th style={{ textAlign: "left", padding: "6px 8px" }}>{i18n.pages.admin_users.status_header}</th>
+              <th style={{ textAlign: "left", padding: "6px 8px" }}>{i18n.pages.admin_users.last_login_header}</th>
               <th style={{ textAlign: "left", padding: "6px 8px" }}></th>
             </tr>
           </thead>
@@ -90,7 +91,7 @@ export default function AdminUsersPage() {
               return (
                 <tr key={user.id}>
                   <td style={{ padding: "6px 8px" }}>{user.email}</td>
-                  <td style={{ padding: "6px 8px" }}>{user.name ?? "—"}</td>
+                  <td style={{ padding: "6px 8px" }}>{user.name ?? i18n.pages.admin_users.empty_placeholder}</td>
                   <td style={{ padding: "6px 8px" }}>
                     <select value={user.role} disabled={isSelf} onChange={(e) => changeRole(user.id, e.target.value as UserRole)}>
                       {ROLES.map((role) => (
@@ -100,14 +101,14 @@ export default function AdminUsersPage() {
                       ))}
                     </select>
                   </td>
-                  <td style={{ padding: "6px 8px" }}>{user.blocked ? "Blocked" : "Active"}</td>
-                  <td style={{ padding: "6px 8px" }}>{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : "—"}</td>
+                  <td style={{ padding: "6px 8px" }}>{user.blocked ? i18n.pages.admin_users.status_blocked : i18n.pages.admin_users.status_active}</td>
+                  <td style={{ padding: "6px 8px" }}>{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : i18n.pages.admin_users.empty_placeholder}</td>
                   <td style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>
                     <button type="button" className="btn btn-gray btn-sm" disabled={isSelf} onClick={() => toggleBlocked(user)} style={{ marginRight: 6 }}>
-                      {user.blocked ? "Unblock" : "Block"}
+                      {user.blocked ? i18n.pages.admin_users.unblock_button : i18n.pages.admin_users.block_button}
                     </button>
                     <button type="button" className="btn btn-outline btn-sm" disabled={isSelf} onClick={() => remove(user)}>
-                      Delete
+                      {i18n.pages.admin_users.delete_button}
                     </button>
                   </td>
                 </tr>
@@ -116,7 +117,7 @@ export default function AdminUsersPage() {
             {users.length === 0 && (
               <tr>
                 <td colSpan={6} style={{ padding: "6px 8px" }}>
-                  No users yet.
+                  {i18n.pages.admin_users.empty_state}
                 </td>
               </tr>
             )}
