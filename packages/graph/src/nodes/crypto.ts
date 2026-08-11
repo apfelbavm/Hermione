@@ -1,9 +1,9 @@
 import * as openpgp from "openpgp";
-import { compileResultVar, FUNCTION_LIBRARY_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, CRYPTO_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { registerNode } from "@hermione/graph/engine/registry";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import { PGP_SYMMETRIC_ALGORITHM_ENUM_TYPE, PGP_COMPRESSION_ALGORITHM_ENUM_TYPE, PGP_AEAD_ALGORITHM_ENUM_TYPE, PKCS7_CIPHER_ALGORITHM_ENUM_TYPE } from "@hermione/graph/enum/crypto";
-import { pgpEncrypt, pgpDecrypt, pkcs7Encrypt, pkcs7Decrypt } from "@hermione/core/server/functionLibrary";
+import { CryptoManager, type PgpEncryptInputs, type PgpDecryptInputs, type Pkcs7EncryptInputs, type Pkcs7DecryptInputs } from "@hermione/core/lib/cryptoManager";
 import { i18n } from "@i18n";
 
 registerNode({
@@ -31,10 +31,10 @@ registerNode({
   ],
   execute: async ({ inputs }) => ({
     nextExec: "exec-out",
-    outputs: await pgpEncrypt(inputs as unknown as Parameters<typeof pgpEncrypt>[0]),
+    outputs: await CryptoManager.pgpEncrypt(inputs as unknown as PgpEncryptInputs),
   }),
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibrary.pgpEncrypt({ plaintext: ${inputs.plaintext}, publicKeyArmored: ${inputs.publicKeyArmored}, autoDetectSettings: ${inputs.autoDetectSettings}, symmetricAlgorithm: ${inputs.symmetricAlgorithm}, compressionAlgorithm: ${inputs.compressionAlgorithm}, aeadProtect: ${inputs.aeadProtect}, aeadAlgorithm: ${inputs.aeadAlgorithm}, showVersion: ${inputs.showVersion}, versionString: ${inputs.versionString}, showComment: ${inputs.showComment}, commentString: ${inputs.commentString} });`,
+    `const ${compileResultVar(node.id)} = await CryptoManager.pgpEncrypt({ plaintext: ${inputs.plaintext}, publicKeyArmored: ${inputs.publicKeyArmored}, autoDetectSettings: ${inputs.autoDetectSettings}, symmetricAlgorithm: ${inputs.symmetricAlgorithm}, compressionAlgorithm: ${inputs.compressionAlgorithm}, aeadProtect: ${inputs.aeadProtect}, aeadAlgorithm: ${inputs.aeadAlgorithm}, showVersion: ${inputs.showVersion}, versionString: ${inputs.versionString}, showComment: ${inputs.showComment}, commentString: ${inputs.commentString} });`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
@@ -45,7 +45,7 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [CRYPTO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -68,10 +68,10 @@ registerNode({
   ],
   execute: async ({ inputs }) => ({
     nextExec: "exec-out",
-    outputs: await pgpDecrypt(inputs as unknown as Parameters<typeof pgpDecrypt>[0]),
+    outputs: await CryptoManager.pgpDecrypt(inputs as unknown as PgpDecryptInputs),
   }),
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibrary.pgpDecrypt({ encryptedArmored: ${inputs.encryptedArmored}, privateKeyArmored: ${inputs.privateKeyArmored}, passphrase: ${inputs.passphrase}, autoDetectSettings: ${inputs.autoDetectSettings}, allowUnauthenticatedMessages: ${inputs.allowUnauthenticatedMessages}, minRSABits: ${inputs.minRSABits} });`,
+    `const ${compileResultVar(node.id)} = await CryptoManager.pgpDecrypt({ encryptedArmored: ${inputs.encryptedArmored}, privateKeyArmored: ${inputs.privateKeyArmored}, passphrase: ${inputs.passphrase}, autoDetectSettings: ${inputs.autoDetectSettings}, allowUnauthenticatedMessages: ${inputs.allowUnauthenticatedMessages}, minRSABits: ${inputs.minRSABits} });`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
@@ -82,7 +82,7 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [CRYPTO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -103,10 +103,10 @@ registerNode({
   ],
   execute: async ({ inputs }) => ({
     nextExec: "exec-out",
-    outputs: pkcs7Encrypt(inputs as unknown as Parameters<typeof pkcs7Encrypt>[0]),
+    outputs: CryptoManager.pkcs7Encrypt(inputs as unknown as Pkcs7EncryptInputs),
   }),
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = functionLibrary.pkcs7Encrypt({ plaintext: ${inputs.plaintext}, recipientCertPem: ${inputs.recipientCertPem}, autoDetectSettings: ${inputs.autoDetectSettings}, cipherAlgorithm: ${inputs.cipherAlgorithm} });`,
+    `const ${compileResultVar(node.id)} = CryptoManager.pkcs7Encrypt({ plaintext: ${inputs.plaintext}, recipientCertPem: ${inputs.recipientCertPem}, autoDetectSettings: ${inputs.autoDetectSettings}, cipherAlgorithm: ${inputs.cipherAlgorithm} });`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
@@ -117,7 +117,7 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [CRYPTO_MANAGER_IMPORT],
 });
 
 registerNode({
@@ -136,9 +136,9 @@ registerNode({
   ],
   execute: async ({ inputs }) => ({
     nextExec: "exec-out",
-    outputs: pkcs7Decrypt(inputs as unknown as Parameters<typeof pkcs7Decrypt>[0]),
+    outputs: CryptoManager.pkcs7Decrypt(inputs as unknown as Pkcs7DecryptInputs),
   }),
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = functionLibrary.pkcs7Decrypt({ envelopedDataPem: ${inputs.envelopedDataPem}, privateKeyPem: ${inputs.privateKeyPem} });`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = CryptoManager.pkcs7Decrypt({ envelopedDataPem: ${inputs.envelopedDataPem}, privateKeyPem: ${inputs.privateKeyPem} });`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -147,5 +147,5 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [CRYPTO_MANAGER_IMPORT],
 });

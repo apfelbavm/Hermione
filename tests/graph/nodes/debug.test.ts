@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerBuiltins } from "../../../src/graph/nodes/index";
 import { getNodeDef } from "@hermione/graph/engine/registry";
-import * as functionLibrary from "@hermione/core/server/functionLibrary";
+import { formatForLog } from "@hermione/core/server/logFormat";
 
 beforeAll(() => {
   registerBuiltins();
@@ -17,9 +17,9 @@ async function print(message: string, format: string): Promise<string> {
   return logs[0];
 }
 
-/** Runs the exact generated wiring (see debug.ts's compileExecute) against the real functionLibrary
- * module — proves the compiled call site (`functionLibrary.formatForLog(...)`) actually matches the
- * real exported function, not a hand re-created stand-in. */
+/** Runs the exact generated wiring (see debug.ts's compileExecute) against the real logFormat module —
+ * proves the compiled call site (`formatForLog(...)`) actually matches the real exported function, not
+ * a hand re-created stand-in. */
 async function runCompiledPrint(message: string, format: string): Promise<string> {
   const def = getNodeDef("debug.printFormatted");
   const logs: string[] = [];
@@ -32,8 +32,8 @@ async function runCompiledPrint(message: string, format: string): Promise<string
     graph: {} as any,
     compileFrom: () => [],
   });
-  const fn = new AsyncFunction("functionLibrary", statements.join("\n"));
-  await fn.call({ log: (m: string) => logs.push(m) }, functionLibrary);
+  const fn = new AsyncFunction("formatForLog", statements.join("\n"));
+  await fn.call({ log: (m: string) => logs.push(m) }, formatForLog);
   return logs[0];
 }
 

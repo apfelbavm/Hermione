@@ -1,8 +1,8 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, OAUTH2SAML_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import type { Oauth2SamlBearerCredentialData } from "@hermione/shared/types";
-import { oauth2SamlExchange, type Oauth2SamlExchangeOutputs } from "@hermione/core/server/functionLibrary";
+import { Oauth2SamlManager, type Oauth2SamlExchangeOutputs } from "@hermione/core/lib/oauth2SamlManager";
 import { i18n } from "@i18n";
 
 function failResult(error: string): Oauth2SamlExchangeOutputs {
@@ -59,7 +59,7 @@ registerNode({
     }
 
     const data = credential.data as Oauth2SamlBearerCredentialData;
-    const result = await oauth2SamlExchange({
+    const result = await Oauth2SamlManager.exchange({
       idpUrl: data.idpUrl,
       tokenServiceUrl: data.tokenServiceUrl,
       clientId: data.clientId,
@@ -71,14 +71,10 @@ registerNode({
   },
   // The compiled (standalone .mjs) path has no access to the Credential Vault database — only the
   // interpreter, running inside /api/simulate/route.ts, can reach that — so it reads the same
-  // credential's fields from environment variables instead via functionLibrary.credentialFromEnv, a
-  // genuinely different credential-sourcing behavior, not duplicated logic (see that function's own
-  // doc comment).
-  compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)}_cred = functionLibrary.credentialFromEnv(${inputs.credentialName});`,
-    `const ${compileResultVar(node.id)} = await functionLibrary.oauth2SamlExchange(${compileResultVar(node.id)}_cred);`,
-    ...compileFrom("exec-out"),
-  ],
+  // credential's fields from environment variables instead via Oauth2SamlManager.credentialFromEnv, a
+  // genuinely different credential-sourcing behavior, not duplicated logic (see that method's own doc
+  // comment).
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)}_cred = Oauth2SamlManager.credentialFromEnv(${inputs.credentialName});`, `const ${compileResultVar(node.id)} = await Oauth2SamlManager.exchange(${compileResultVar(node.id)}_cred);`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -90,5 +86,5 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [OAUTH2SAML_MANAGER_IMPORT],
 });

@@ -16,14 +16,21 @@ export function compileResultVar(nodeId: string): string {
   return `__result_${nodeId.replace(/[^a-zA-Z0-9_]/g, "_")}`;
 }
 
-/** Real ESM import of src/server/functionLibrary.ts, the single shared home for every node type's
- * actual runtime logic — every node's compileImports contributes this exact same string, so
- * codegen.ts's plain string-equality dedup collapses it to one import line for the whole compiled
- * file no matter how many distinct nodes/functions are used from it. The relative path assumes a
- * deployed script always lives at data/deployed-scripts/<flowId>.mjs (see server/deployedScriptFile.ts).
- * Resolving this at runtime with no separate build step requires the running Node process to have
- * NODE_OPTIONS=--experimental-strip-types set (see package.json's dev/start scripts). */
-export const FUNCTION_LIBRARY_IMPORT = 'import * as functionLibrary from "../../packages/core/src/server/functionLibrary.ts";';
+/** None of these five resolve credentials from the vault/database themselves (see graph/nodes/http.ts,
+ * webhook.ts, odata.ts, crypto.ts, oauth2Saml.ts), so — like FUNCTION_LIBRARY_IMPORT before them —
+ * both the interpreter and the compiled/deployed script call the exact same static methods directly,
+ * no separate env-var-reading layer needed. The relative path assumes a deployed script always lives
+ * at data/deployed-scripts/<flowId>.mjs (see server/deployedScriptFile.ts); resolving it at runtime
+ * with no separate build step requires NODE_OPTIONS=--experimental-strip-types (see package.json's
+ * dev/start scripts). */
+export const HTTP_MANAGER_IMPORT = 'import { HttpManager } from "../../packages/core/src/lib/httpManager.ts";';
+export const WEBHOOK_MANAGER_IMPORT = 'import { WebhookManager } from "../../packages/core/src/lib/webhookManager.ts";';
+export const ODATA_MANAGER_IMPORT = 'import { ODataManager } from "../../packages/core/src/lib/odataManager.ts";';
+export const CRYPTO_MANAGER_IMPORT = 'import { CryptoManager } from "../../packages/core/src/lib/cryptoManager.ts";';
+export const OAUTH2SAML_MANAGER_IMPORT = 'import { Oauth2SamlManager } from "../../packages/core/src/lib/oauth2SamlManager.ts";';
+/** Sibling of the constants above for src/server/logFormat.ts's formatForLog — a plain formatting
+ * utility, not a Manager (it wraps no external client/resource), used by graph/nodes/debug.ts. */
+export const LOG_FORMAT_IMPORT = 'import { formatForLog } from "../../packages/core/src/server/logFormat.ts";';
 
 /** SftpManager (packages/core/src/lib/sftpManager.ts) resolves its own credentials straight from
  * the database (see its findCredential), so both the interpreter and the compiled/deployed script

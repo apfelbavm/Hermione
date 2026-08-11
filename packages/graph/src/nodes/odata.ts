@@ -1,8 +1,8 @@
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, ODATA_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import { ODATA_PAGINATION_TYPE_ENUM_TYPE } from "@hermione/graph/enum/odata";
-import { odataV2Request } from "@hermione/core/server/functionLibrary";
+import { ODataManager } from "@hermione/core/lib/odataManager";
 import { i18n } from "@i18n";
 
 const PAGINATION_TYPES = enumOptionIds(ODATA_PAGINATION_TYPE_ENUM_TYPE);
@@ -34,7 +34,7 @@ registerNode({
   // exec-out convention as http.request rather than inventing separate success/failure exec paths.
   execute: async ({ inputs }) => ({
     nextExec: "exec-out",
-    outputs: await odataV2Request({
+    outputs: await ODataManager.v2Request({
       baseUrl: String(inputs.url ?? ""),
       pageSize: Number(inputs.pageSize ?? 1000),
       paginationType: String(inputs.paginationType ?? PAGINATION_TYPES[0]),
@@ -45,7 +45,7 @@ registerNode({
     }),
   }),
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibrary.odataV2Request({ baseUrl: ${inputs.url}, pageSize: ${inputs.pageSize}, paginationType: ${inputs.paginationType}, maxPages: ${inputs.maxPages}, headersJson: ${inputs.headers}, auth: ${inputs.auth}, timeoutMs: ${inputs.timeoutMs} });`,
+    `const ${compileResultVar(node.id)} = await ODataManager.v2Request({ baseUrl: ${inputs.url}, pageSize: ${inputs.pageSize}, paginationType: ${inputs.paginationType}, maxPages: ${inputs.maxPages}, headersJson: ${inputs.headers}, auth: ${inputs.auth}, timeoutMs: ${inputs.timeoutMs} });`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
@@ -58,5 +58,5 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [ODATA_MANAGER_IMPORT],
 });

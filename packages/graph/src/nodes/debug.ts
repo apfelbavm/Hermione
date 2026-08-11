@@ -1,10 +1,10 @@
 import { registerNode } from "@hermione/graph/engine/registry";
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import type { LogFormat } from "@hermione/graph/engine/types";
-import { FUNCTION_LIBRARY_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { LOG_FORMAT_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import { DEBUG_LOG_FORMAT_ENUM_TYPE } from "@hermione/graph/enum/debug";
-import { formatForLog } from "@hermione/core/server/functionLibrary";
+import { formatForLog } from "@hermione/core/server/logFormat";
 import { i18n } from "@i18n";
 
 registerNode({
@@ -44,6 +44,6 @@ registerNode({
     ctx.log(formatForLog(String(inputs.message ?? ""), format), format);
     return { nextExec: "exec-out" };
   },
-  compileExecute: ({ inputs, compileFrom }) => [`this.log(functionLibrary.formatForLog(String(${inputs.message}), String(${inputs.format})));`, ...compileFrom("exec-out")],
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileExecute: ({ inputs, compileFrom }) => [`this.log(formatForLog(String(${inputs.message}), String(${inputs.format})));`, ...compileFrom("exec-out")],
+  compileImports: [LOG_FORMAT_IMPORT],
 });

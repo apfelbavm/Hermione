@@ -1,6 +1,6 @@
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_IMPORT } from "@hermione/graph/engine/compileUtils";
-import { sendWebhook } from "@hermione/core/server/functionLibrary";
+import { compileResultVar, WEBHOOK_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { WebhookManager } from "@hermione/core/lib/webhookManager";
 import { i18n } from "@i18n";
 
 registerNode({
@@ -28,7 +28,7 @@ registerNode({
   latent: true,
   execute: async ({ inputs }) => ({
     nextExec: "exec-out",
-    outputs: await sendWebhook({
+    outputs: await WebhookManager.send({
       url: String(inputs.url ?? ""),
       payloadJson: String(inputs.payload ?? ""),
       headersJson: String(inputs.headers ?? ""),
@@ -40,7 +40,7 @@ registerNode({
     }),
   }),
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibrary.sendWebhook({ url: ${inputs.url}, payloadJson: ${inputs.payload}, headersJson: ${inputs.headers}, secret: ${inputs.secret}, signatureHeader: ${inputs.signatureHeader}, retryCount: ${inputs.retryCount}, retryDelayMsBase: ${inputs.retryDelayMs}, timeoutMs: ${inputs.timeoutMs} });`,
+    `const ${compileResultVar(node.id)} = await WebhookManager.send({ url: ${inputs.url}, payloadJson: ${inputs.payload}, headersJson: ${inputs.headers}, secret: ${inputs.secret}, signatureHeader: ${inputs.signatureHeader}, retryCount: ${inputs.retryCount}, retryDelayMsBase: ${inputs.retryDelayMs}, timeoutMs: ${inputs.timeoutMs} });`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
@@ -53,5 +53,5 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [WEBHOOK_MANAGER_IMPORT],
 });

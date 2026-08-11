@@ -1,8 +1,8 @@
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FUNCTION_LIBRARY_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, HTTP_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import { HTTP_METHOD_ENUM_TYPE } from "@hermione/graph/enum/common";
-import { httpRequest } from "@hermione/core/server/functionLibrary";
+import { HttpManager } from "@hermione/core/lib/httpManager";
 import { i18n } from "@i18n";
 
 registerNode({
@@ -27,7 +27,7 @@ registerNode({
   ],
   execute: async ({ inputs }) => ({
     nextExec: "exec-out",
-    outputs: await httpRequest({
+    outputs: await HttpManager.request({
       url: String(inputs.url ?? ""),
       method: String(inputs.method ?? "GET"),
       headersJson: String(inputs.headers ?? ""),
@@ -38,7 +38,7 @@ registerNode({
   }),
   latent: true,
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await functionLibrary.httpRequest({ url: ${inputs.url}, method: ${inputs.method}, headersJson: ${inputs.headers}, auth: ${inputs.auth}, body: ${inputs.body}, timeoutMs: ${inputs.timeoutMs} });`,
+    `const ${compileResultVar(node.id)} = await HttpManager.request({ url: ${inputs.url}, method: ${inputs.method}, headersJson: ${inputs.headers}, auth: ${inputs.auth}, body: ${inputs.body}, timeoutMs: ${inputs.timeoutMs} });`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
@@ -51,5 +51,5 @@ registerNode({
       error: `${v}.error`,
     };
   },
-  compileImports: [FUNCTION_LIBRARY_IMPORT],
+  compileImports: [HTTP_MANAGER_IMPORT],
 });
