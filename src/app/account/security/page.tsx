@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { i18n } from "@i18n";
 import { addAllowedDomain, confirmTotp, disableTotp, getAuthSettings, getCurrentUser, listAllowedDomains, removeAllowedDomain, setSessionScope, setupTotp } from "../../../client/api";
 import type { AuthSettings, UserAccount } from "@hermione/core/server/models";
 import { PageShell } from "../../../components/PageHeader";
@@ -93,28 +94,28 @@ export default function AccountSecurityPage() {
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Account security" }]} />
+      <Breadcrumbs items={[{ label: i18n.pages.account_security.breadcrumb }]} />
       <div className="modal-box" style={{ width: 480, maxWidth: "100%" }}>
-        <h2 className="modal-title">Authenticator app sign-in</h2>
+        <h2 className="modal-title">{i18n.pages.account_security.totp_section_title}</h2>
 
-        {!user && !error && <p>Loading…</p>}
+        {!user && !error && <p>{i18n.pages.account_security.loading}</p>}
 
-        {user?.provider === "entra" && <p>You sign in with your Microsoft account — an authenticator app isn't used for Entra ID sign-in.</p>}
+        {user?.provider === "entra" && <p>{i18n.pages.account_security.entra_notice}</p>}
 
         {user?.provider === "email" && !enrollment && user.totpEnabled && (
           <>
-            <p>An authenticator app is enrolled for {user.email}. You can sign in with either an emailed code or a code from your app.</p>
+            <p>{i18n.pages.account_security.totp_enrolled_message.replace("{email}", user.email)}</p>
             <button type="button" className="btn btn-gray" onClick={disable} disabled={busy}>
-              Disable authenticator app
+              {i18n.pages.account_security.totp_disable_button}
             </button>
           </>
         )}
 
         {user?.provider === "email" && !enrollment && !user.totpEnabled && (
           <>
-            <p>Set up an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, Authy, ...) to sign in with a generated code instead of waiting on an email each time.</p>
+            <p>{i18n.pages.account_security.totp_setup_description}</p>
             <button type="button" className="btn btn-blue" onClick={startEnrollment} disabled={busy}>
-              Set up authenticator app
+              {i18n.pages.account_security.totp_setup_button}
             </button>
           </>
         )}
@@ -122,14 +123,14 @@ export default function AccountSecurityPage() {
         {enrollment && (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element -- data: URL, no next/image benefit */}
-            <img src={enrollment.qrDataUrl} alt="Scan with your authenticator app" width={200} height={200} />
-            <p className="modal-field-label">Can't scan? Enter this manually: {enrollment.otpauthUri}</p>
+            <img src={enrollment.qrDataUrl} alt={i18n.pages.account_security.totp_qr_alt} width={200} height={200} />
+            <p className="modal-field-label">{i18n.pages.account_security.totp_manual_entry.replace("{uri}", enrollment.otpauthUri)}</p>
             <label className="modal-field-row">
-              <span className="modal-field-label">Enter the 6-digit code your app now shows</span>
-              <input type="text" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} placeholder="000000" />
+              <span className="modal-field-label">{i18n.pages.account_security.totp_code_label}</span>
+              <input type="text" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} placeholder={i18n.pages.account_security.totp_code_placeholder} />
             </label>
             <button type="button" className="btn btn-blue" onClick={confirm} disabled={busy}>
-              Confirm
+              {i18n.pages.account_security.totp_confirm_button}
             </button>
           </>
         )}
@@ -140,39 +141,39 @@ export default function AccountSecurityPage() {
       {user?.isAdmin && (
         <>
           <div className="modal-box" style={{ width: 480, maxWidth: "100%", marginTop: 16 }}>
-            <h2 className="modal-title">Allowed email domains</h2>
-            <p className="modal-field-label">Only email addresses at these domains can sign in via emailed code or authenticator app. Microsoft sign-in is unaffected.</p>
+            <h2 className="modal-title">{i18n.pages.account_security.domains_section_title}</h2>
+            <p className="modal-field-label">{i18n.pages.account_security.domains_description}</p>
             <ul>
               {domains.map((domain) => (
                 <li key={domain}>
                   @{domain}{" "}
                   <button type="button" className="auth-page-hint" onClick={() => removeDomain(domain)}>
-                    remove
+                    {i18n.pages.account_security.domains_remove_button}
                   </button>
                 </li>
               ))}
-              {domains.length === 0 && <li>No domains allowed yet — email sign-in is disabled until one is added.</li>}
+              {domains.length === 0 && <li>{i18n.pages.account_security.domains_empty}</li>}
             </ul>
             <label className="modal-field-row">
-              <span className="modal-field-label">Add a domain</span>
-              <input type="text" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} placeholder="example.com" />
+              <span className="modal-field-label">{i18n.pages.account_security.domains_add_label}</span>
+              <input type="text" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} placeholder={i18n.pages.account_security.domains_placeholder} />
             </label>
             <button type="button" className="btn btn-blue" onClick={addDomain}>
-              Add domain
+              {i18n.pages.account_security.domains_add_button}
             </button>
           </div>
 
           <div className="modal-box" style={{ width: 480, maxWidth: "100%", marginTop: 16 }}>
-            <h2 className="modal-title">Session scope</h2>
-            <p className="modal-field-label">Whether signing in applies to the whole browser (shared across tabs) or only the tab that signed in.</p>
+            <h2 className="modal-title">{i18n.pages.account_security.session_scope_section_title}</h2>
+            <p className="modal-field-label">{i18n.pages.account_security.session_scope_description}</p>
             <label className="modal-field-row">
               <span>
-                <input type="radio" checked={settings?.sessionScope === "browser"} onChange={() => changeScope("browser")} /> Per browser — all tabs share one session
+                <input type="radio" checked={settings?.sessionScope === "browser"} onChange={() => changeScope("browser")} /> {i18n.pages.account_security.session_scope_browser}
               </span>
             </label>
             <label className="modal-field-row">
               <span>
-                <input type="radio" checked={settings?.sessionScope === "tab"} onChange={() => changeScope("tab")} /> Per tab — each tab needs its own sign-in
+                <input type="radio" checked={settings?.sessionScope === "tab"} onChange={() => changeScope("tab")} /> {i18n.pages.account_security.session_scope_tab}
               </span>
             </label>
           </div>
