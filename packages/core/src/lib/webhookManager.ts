@@ -18,9 +18,7 @@ export interface SendWebhookOutputs {
   [key: string]: unknown;
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { delay } from "./retry.ts";
 
 /** Uses the standard Web Crypto API (globalThis.crypto.subtle) rather than node:crypto's HMAC —
  * available in both Node (18+) and the browser, so this stays safe for the interpreter's own

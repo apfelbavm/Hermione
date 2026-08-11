@@ -1,9 +1,11 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, DYNAMODB_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { DYNAMODB_TABLE_DESCRIPTION_STRUCT_TYPE } from "@hermione/graph/structs/dynamoDb";
 import { DYNAMODB_ATTRIBUTE_TYPE_ENUM_TYPE, DYNAMODB_BILLING_MODE_ENUM_TYPE, DYNAMODB_RETURN_VALUES_PUT_ENUM_TYPE, DYNAMODB_RETURN_VALUES_UPDATE_ENUM_TYPE } from "@hermione/graph/enum/dynamoDb";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over DynamoDbManager (src/lib/dynamoDbManager.ts),
@@ -86,23 +88,27 @@ registerNode({
     credentialNamePin(),
     { id: "exclusiveStartTableName", label: i18n.nodes.dynamoDb.listTables.pin_exclusive_start_table_name, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.dynamoDb.__shared.pin_limit, type: "number", direction: "input", defaultValue: 0, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "tableNames", label: i18n.nodes.dynamoDb.listTables.pin_table_names, type: "string", container: "array", direction: "output" },
     { id: "lastEvaluatedTableName", label: i18n.nodes.dynamoDb.listTables.pin_last_evaluated_table_name, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadDynamoDbManager()).listTables(String(inputs.credentialName ?? ""), String(inputs.exclusiveStartTableName ?? ""), Number(inputs.limit) || 0);
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(() => manager.listTables(String(inputs.credentialName ?? ""), String(inputs.exclusiveStartTableName ?? ""), Number(inputs.limit) || 0), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.listTables(${inputs.credentialName}, ${inputs.exclusiveStartTableName}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.listTables(${inputs.credentialName}, ${inputs.exclusiveStartTableName}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, tableNames: `${v}.tableNames`, lastEvaluatedTableName: `${v}.lastEvaluatedTableName`, error: `${v}.error` };
+    return { success: `${v}.success`, tableNames: `${v}.tableNames`, lastEvaluatedTableName: `${v}.lastEvaluatedTableName`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -122,8 +128,11 @@ registerNode({
     { id: "billingMode", label: i18n.nodes.dynamoDb.__shared.pin_billing_mode, type: "enum", subType: DYNAMODB_BILLING_MODE_ENUM_TYPE, direction: "input", defaultValue: "PAY_PER_REQUEST", options: enumOptionIds(DYNAMODB_BILLING_MODE_ENUM_TYPE) },
     { id: "readCapacityUnits", label: i18n.nodes.dynamoDb.__shared.pin_read_capacity_units, type: "number", direction: "input", defaultValue: 5, integer: true },
     { id: "writeCapacityUnits", label: i18n.nodes.dynamoDb.__shared.pin_write_capacity_units, type: "number", direction: "input", defaultValue: 5, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
@@ -131,20 +140,23 @@ registerNode({
     const partitionKeyType = inputs.partitionKeyType === "N" || inputs.partitionKeyType === "B" ? inputs.partitionKeyType : "S";
     const sortKeyType = inputs.sortKeyType === "N" || inputs.sortKeyType === "B" ? inputs.sortKeyType : "S";
     const billingMode = inputs.billingMode === "PROVISIONED" ? "PROVISIONED" : "PAY_PER_REQUEST";
-    const result = await (
-      await loadDynamoDbManager()
-    ).createTable(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.partitionKeyName ?? ""), partitionKeyType, String(inputs.sortKeyName ?? ""), sortKeyType, billingMode, Number(inputs.readCapacityUnits) || 0, Number(inputs.writeCapacityUnits) || 0);
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(
+      () => manager.createTable(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.partitionKeyName ?? ""), partitionKeyType, String(inputs.sortKeyName ?? ""), sortKeyType, billingMode, Number(inputs.readCapacityUnits) || 0, Number(inputs.writeCapacityUnits) || 0),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await DynamoDbManager.createTable(${inputs.credentialName}, ${inputs.tableName}, ${inputs.partitionKeyName}, ${inputs.partitionKeyType}, ${inputs.sortKeyName}, ${inputs.sortKeyType}, ${inputs.billingMode}, ${inputs.readCapacityUnits}, ${inputs.writeCapacityUnits});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.createTable(${inputs.credentialName}, ${inputs.tableName}, ${inputs.partitionKeyName}, ${inputs.partitionKeyType}, ${inputs.sortKeyName}, ${inputs.sortKeyType}, ${inputs.billingMode}, ${inputs.readCapacityUnits}, ${inputs.writeCapacityUnits}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -153,18 +165,19 @@ registerNode({
   description: i18n.nodes.dynamoDb.deleteTable.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), tableNamePin(), execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), tableNamePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadDynamoDbManager()).deleteTable(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""));
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(() => manager.deleteTable(String(inputs.credentialName ?? ""), String(inputs.tableName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.deleteTable(${inputs.credentialName}, ${inputs.tableName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.deleteTable(${inputs.credentialName}, ${inputs.tableName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -173,23 +186,36 @@ registerNode({
   description: i18n.nodes.dynamoDb.describeTable.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), tableNamePin(), execOutPin(), successPin(), { id: "table", label: i18n.nodes.dynamoDb.tableDescription.label, type: "struct", subType: DYNAMODB_TABLE_DESCRIPTION_STRUCT_TYPE, direction: "output" }, errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    tableNamePin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    { id: "table", label: i18n.nodes.dynamoDb.tableDescription.label, type: "struct", subType: DYNAMODB_TABLE_DESCRIPTION_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadDynamoDbManager()).describeTable(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""));
-    const { success, error, ...table } = result;
-    return { nextExec: "exec-out", outputs: { success, table, error } };
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(() => manager.describeTable(String(inputs.credentialName ?? ""), String(inputs.tableName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    const { success, error, attempts, ...table } = result;
+    return { nextExec: "exec-out", outputs: { success, table, attempts, error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.describeTable(${inputs.credentialName}, ${inputs.tableName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.describeTable(${inputs.credentialName}, ${inputs.tableName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
       success: `${v}.success`,
       table: `{ status: ${v}.status, itemCount: ${v}.itemCount, sizeBytes: ${v}.sizeBytes, partitionKeyName: ${v}.partitionKeyName, partitionKeyType: ${v}.partitionKeyType, sortKeyName: ${v}.sortKeyName, sortKeyType: ${v}.sortKeyType, billingMode: ${v}.billingMode, readCapacityUnits: ${v}.readCapacityUnits, writeCapacityUnits: ${v}.writeCapacityUnits }`,
+      attempts: `${v}.attempts`,
       error: `${v}.error`,
     };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -205,22 +231,29 @@ registerNode({
     { id: "billingMode", label: i18n.nodes.dynamoDb.__shared.pin_billing_mode, type: "enum", subType: DYNAMODB_BILLING_MODE_ENUM_TYPE, direction: "input", defaultValue: "PAY_PER_REQUEST", options: enumOptionIds(DYNAMODB_BILLING_MODE_ENUM_TYPE) },
     { id: "readCapacityUnits", label: i18n.nodes.dynamoDb.__shared.pin_read_capacity_units, type: "number", direction: "input", defaultValue: 5, integer: true },
     { id: "writeCapacityUnits", label: i18n.nodes.dynamoDb.__shared.pin_write_capacity_units, type: "number", direction: "input", defaultValue: 5, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
     const billingMode = inputs.billingMode === "PROVISIONED" ? "PROVISIONED" : "PAY_PER_REQUEST";
-    const result = await (await loadDynamoDbManager()).updateTableCapacity(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), billingMode, Number(inputs.readCapacityUnits) || 0, Number(inputs.writeCapacityUnits) || 0);
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(() => manager.updateTableCapacity(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), billingMode, Number(inputs.readCapacityUnits) || 0, Number(inputs.writeCapacityUnits) || 0), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.updateTableCapacity(${inputs.credentialName}, ${inputs.tableName}, ${inputs.billingMode}, ${inputs.readCapacityUnits}, ${inputs.writeCapacityUnits});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.updateTableCapacity(${inputs.credentialName}, ${inputs.tableName}, ${inputs.billingMode}, ${inputs.readCapacityUnits}, ${inputs.writeCapacityUnits}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -238,28 +271,34 @@ registerNode({
     expressionAttributeNamesPin(),
     expressionAttributeValuesPin(),
     { id: "returnValues", label: i18n.nodes.dynamoDb.__shared.pin_return_values, type: "enum", subType: DYNAMODB_RETURN_VALUES_PUT_ENUM_TYPE, direction: "input", defaultValue: "NONE", options: enumOptionIds(DYNAMODB_RETURN_VALUES_PUT_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     attributesOutPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
     const returnValues = inputs.returnValues === "ALL_OLD" ? "ALL_OLD" : "NONE";
-    const result = await (
-      await loadDynamoDbManager()
-    ).putItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.item ?? ""), String(inputs.conditionExpression ?? ""), String(inputs.expressionAttributeNames ?? ""), String(inputs.expressionAttributeValues ?? ""), returnValues);
-    return { nextExec: "exec-out", outputs: { success: result.success, attributes: result.attributesJson, error: result.error } };
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(
+      () => manager.putItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.item ?? ""), String(inputs.conditionExpression ?? ""), String(inputs.expressionAttributeNames ?? ""), String(inputs.expressionAttributeValues ?? ""), returnValues),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, attributes: result.attributesJson, attempts: result.attempts, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await DynamoDbManager.putItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.item}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.putItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.item}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, attributes: `${v}.attributesJson`, error: `${v}.error` };
+    return { success: `${v}.success`, attributes: `${v}.attributesJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -275,22 +314,29 @@ registerNode({
     keyPin(),
     { id: "consistentRead", label: i18n.nodes.dynamoDb.__shared.pin_consistent_read, type: "boolean", direction: "input", defaultValue: false },
     { id: "projectionExpression", label: i18n.nodes.dynamoDb.getItem.pin_projection_expression, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "item", label: i18n.nodes.dynamoDb.__shared.pin_item, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadDynamoDbManager()).getItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.key ?? ""), Boolean(inputs.consistentRead), String(inputs.projectionExpression ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, item: result.itemJson, error: result.error } };
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(() => manager.getItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.key ?? ""), Boolean(inputs.consistentRead), String(inputs.projectionExpression ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, item: result.itemJson, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.getItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.consistentRead}, ${inputs.projectionExpression});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.getItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.consistentRead}, ${inputs.projectionExpression}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, item: `${v}.itemJson`, error: `${v}.error` };
+    return { success: `${v}.success`, item: `${v}.itemJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -309,37 +355,44 @@ registerNode({
     expressionAttributeNamesPin(),
     expressionAttributeValuesPin(),
     { id: "returnValues", label: i18n.nodes.dynamoDb.__shared.pin_return_values, type: "enum", subType: DYNAMODB_RETURN_VALUES_UPDATE_ENUM_TYPE, direction: "input", defaultValue: "NONE", options: enumOptionIds(DYNAMODB_RETURN_VALUES_UPDATE_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     attributesOutPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
     const returnValues = ["ALL_OLD", "UPDATED_OLD", "ALL_NEW", "UPDATED_NEW"].includes(String(inputs.returnValues)) ? (inputs.returnValues as "ALL_OLD" | "UPDATED_OLD" | "ALL_NEW" | "UPDATED_NEW") : "NONE";
-    const result = await (
-      await loadDynamoDbManager()
-    ).updateItem(
-      String(inputs.credentialName ?? ""),
-      String(inputs.tableName ?? ""),
-      String(inputs.key ?? ""),
-      String(inputs.updateExpression ?? ""),
-      String(inputs.conditionExpression ?? ""),
-      String(inputs.expressionAttributeNames ?? ""),
-      String(inputs.expressionAttributeValues ?? ""),
-      returnValues,
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(
+      () =>
+        manager.updateItem(
+          String(inputs.credentialName ?? ""),
+          String(inputs.tableName ?? ""),
+          String(inputs.key ?? ""),
+          String(inputs.updateExpression ?? ""),
+          String(inputs.conditionExpression ?? ""),
+          String(inputs.expressionAttributeNames ?? ""),
+          String(inputs.expressionAttributeValues ?? ""),
+          returnValues,
+        ),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
     );
-    return { nextExec: "exec-out", outputs: { success: result.success, attributes: result.attributesJson, error: result.error } };
+    return { nextExec: "exec-out", outputs: { success: result.success, attributes: result.attributesJson, attempts: result.attempts, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await DynamoDbManager.updateItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.updateExpression}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.updateItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.updateExpression}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, attributes: `${v}.attributesJson`, error: `${v}.error` };
+    return { success: `${v}.success`, attributes: `${v}.attributesJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -357,28 +410,34 @@ registerNode({
     expressionAttributeNamesPin(),
     expressionAttributeValuesPin(),
     { id: "returnValues", label: i18n.nodes.dynamoDb.__shared.pin_return_values, type: "enum", subType: DYNAMODB_RETURN_VALUES_PUT_ENUM_TYPE, direction: "input", defaultValue: "NONE", options: enumOptionIds(DYNAMODB_RETURN_VALUES_PUT_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     attributesOutPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
     const returnValues = inputs.returnValues === "ALL_OLD" ? "ALL_OLD" : "NONE";
-    const result = await (
-      await loadDynamoDbManager()
-    ).deleteItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.key ?? ""), String(inputs.conditionExpression ?? ""), String(inputs.expressionAttributeNames ?? ""), String(inputs.expressionAttributeValues ?? ""), returnValues);
-    return { nextExec: "exec-out", outputs: { success: result.success, attributes: result.attributesJson, error: result.error } };
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(
+      () => manager.deleteItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.key ?? ""), String(inputs.conditionExpression ?? ""), String(inputs.expressionAttributeNames ?? ""), String(inputs.expressionAttributeValues ?? ""), returnValues),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, attributes: result.attributesJson, attempts: result.attempts, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await DynamoDbManager.deleteItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.deleteItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.key}, ${inputs.conditionExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.returnValues}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, attributes: `${v}.attributesJson`, error: `${v}.error` };
+    return { success: `${v}.success`, attributes: `${v}.attributesJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -400,42 +459,49 @@ registerNode({
     { id: "limit", label: i18n.nodes.dynamoDb.__shared.pin_limit, type: "number", direction: "input", defaultValue: 0, integer: true },
     { id: "exclusiveStartKey", label: i18n.nodes.dynamoDb.__shared.pin_exclusive_start_key, type: "string", direction: "input", defaultValue: "" },
     { id: "consistentRead", label: i18n.nodes.dynamoDb.__shared.pin_consistent_read, type: "boolean", direction: "input", defaultValue: false },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "items", label: i18n.nodes.dynamoDb.__shared.pin_items, type: "string", direction: "output" },
     { id: "lastEvaluatedKey", label: i18n.nodes.dynamoDb.__shared.pin_last_evaluated_key, type: "string", direction: "output" },
     { id: "count", label: i18n.nodes.dynamoDb.__shared.pin_count, type: "number", direction: "output" },
     { id: "scannedCount", label: i18n.nodes.dynamoDb.__shared.pin_scanned_count, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (
-      await loadDynamoDbManager()
-    ).query(
-      String(inputs.credentialName ?? ""),
-      String(inputs.tableName ?? ""),
-      String(inputs.keyConditionExpression ?? ""),
-      String(inputs.filterExpression ?? ""),
-      String(inputs.expressionAttributeNames ?? ""),
-      String(inputs.expressionAttributeValues ?? ""),
-      String(inputs.indexName ?? ""),
-      Boolean(inputs.scanIndexForward),
-      Number(inputs.limit) || 0,
-      String(inputs.exclusiveStartKey ?? ""),
-      Boolean(inputs.consistentRead),
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(
+      () =>
+        manager.query(
+          String(inputs.credentialName ?? ""),
+          String(inputs.tableName ?? ""),
+          String(inputs.keyConditionExpression ?? ""),
+          String(inputs.filterExpression ?? ""),
+          String(inputs.expressionAttributeNames ?? ""),
+          String(inputs.expressionAttributeValues ?? ""),
+          String(inputs.indexName ?? ""),
+          Boolean(inputs.scanIndexForward),
+          Number(inputs.limit) || 0,
+          String(inputs.exclusiveStartKey ?? ""),
+          Boolean(inputs.consistentRead),
+        ),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
     );
-    return { nextExec: "exec-out", outputs: { success: result.success, items: result.itemsJson, lastEvaluatedKey: result.lastEvaluatedKeyJson, count: result.count, scannedCount: result.scannedCount, error: result.error } };
+    return { nextExec: "exec-out", outputs: { success: result.success, items: result.itemsJson, lastEvaluatedKey: result.lastEvaluatedKeyJson, count: result.count, scannedCount: result.scannedCount, attempts: result.attempts, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await DynamoDbManager.query(${inputs.credentialName}, ${inputs.tableName}, ${inputs.keyConditionExpression}, ${inputs.filterExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.indexName}, ${inputs.scanIndexForward}, ${inputs.limit}, ${inputs.exclusiveStartKey}, ${inputs.consistentRead});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.query(${inputs.credentialName}, ${inputs.tableName}, ${inputs.keyConditionExpression}, ${inputs.filterExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.indexName}, ${inputs.scanIndexForward}, ${inputs.limit}, ${inputs.exclusiveStartKey}, ${inputs.consistentRead}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, items: `${v}.itemsJson`, lastEvaluatedKey: `${v}.lastEvaluatedKeyJson`, count: `${v}.count`, scannedCount: `${v}.scannedCount`, error: `${v}.error` };
+    return { success: `${v}.success`, items: `${v}.itemsJson`, lastEvaluatedKey: `${v}.lastEvaluatedKeyJson`, count: `${v}.count`, scannedCount: `${v}.scannedCount`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -455,40 +521,47 @@ registerNode({
     { id: "limit", label: i18n.nodes.dynamoDb.__shared.pin_limit, type: "number", direction: "input", defaultValue: 0, integer: true },
     { id: "exclusiveStartKey", label: i18n.nodes.dynamoDb.__shared.pin_exclusive_start_key, type: "string", direction: "input", defaultValue: "" },
     { id: "consistentRead", label: i18n.nodes.dynamoDb.__shared.pin_consistent_read, type: "boolean", direction: "input", defaultValue: false },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "items", label: i18n.nodes.dynamoDb.__shared.pin_items, type: "string", direction: "output" },
     { id: "lastEvaluatedKey", label: i18n.nodes.dynamoDb.__shared.pin_last_evaluated_key, type: "string", direction: "output" },
     { id: "count", label: i18n.nodes.dynamoDb.__shared.pin_count, type: "number", direction: "output" },
     { id: "scannedCount", label: i18n.nodes.dynamoDb.__shared.pin_scanned_count, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (
-      await loadDynamoDbManager()
-    ).scan(
-      String(inputs.credentialName ?? ""),
-      String(inputs.tableName ?? ""),
-      String(inputs.filterExpression ?? ""),
-      String(inputs.expressionAttributeNames ?? ""),
-      String(inputs.expressionAttributeValues ?? ""),
-      String(inputs.indexName ?? ""),
-      Number(inputs.limit) || 0,
-      String(inputs.exclusiveStartKey ?? ""),
-      Boolean(inputs.consistentRead),
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(
+      () =>
+        manager.scan(
+          String(inputs.credentialName ?? ""),
+          String(inputs.tableName ?? ""),
+          String(inputs.filterExpression ?? ""),
+          String(inputs.expressionAttributeNames ?? ""),
+          String(inputs.expressionAttributeValues ?? ""),
+          String(inputs.indexName ?? ""),
+          Number(inputs.limit) || 0,
+          String(inputs.exclusiveStartKey ?? ""),
+          Boolean(inputs.consistentRead),
+        ),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
     );
-    return { nextExec: "exec-out", outputs: { success: result.success, items: result.itemsJson, lastEvaluatedKey: result.lastEvaluatedKeyJson, count: result.count, scannedCount: result.scannedCount, error: result.error } };
+    return { nextExec: "exec-out", outputs: { success: result.success, items: result.itemsJson, lastEvaluatedKey: result.lastEvaluatedKeyJson, count: result.count, scannedCount: result.scannedCount, attempts: result.attempts, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await DynamoDbManager.scan(${inputs.credentialName}, ${inputs.tableName}, ${inputs.filterExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.indexName}, ${inputs.limit}, ${inputs.exclusiveStartKey}, ${inputs.consistentRead});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.scan(${inputs.credentialName}, ${inputs.tableName}, ${inputs.filterExpression}, ${inputs.expressionAttributeNames}, ${inputs.expressionAttributeValues}, ${inputs.indexName}, ${inputs.limit}, ${inputs.exclusiveStartKey}, ${inputs.consistentRead}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, items: `${v}.itemsJson`, lastEvaluatedKey: `${v}.lastEvaluatedKeyJson`, count: `${v}.count`, scannedCount: `${v}.scannedCount`, error: `${v}.error` };
+    return { success: `${v}.success`, items: `${v}.itemsJson`, lastEvaluatedKey: `${v}.lastEvaluatedKeyJson`, count: `${v}.count`, scannedCount: `${v}.scannedCount`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -503,23 +576,30 @@ registerNode({
     tableNamePin(),
     { id: "keys", label: i18n.nodes.dynamoDb.batchGetItem.pin_keys, type: "string", direction: "input", defaultValue: "[]" },
     { id: "consistentRead", label: i18n.nodes.dynamoDb.__shared.pin_consistent_read, type: "boolean", direction: "input", defaultValue: false },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "items", label: i18n.nodes.dynamoDb.__shared.pin_items, type: "string", direction: "output" },
     { id: "unprocessedKeys", label: i18n.nodes.dynamoDb.batchGetItem.pin_unprocessed_keys, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadDynamoDbManager()).batchGetItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.keys ?? ""), Boolean(inputs.consistentRead));
-    return { nextExec: "exec-out", outputs: { success: result.success, items: result.itemsJson, unprocessedKeys: result.unprocessedKeysJson, error: result.error } };
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(() => manager.batchGetItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.keys ?? ""), Boolean(inputs.consistentRead)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, items: result.itemsJson, unprocessedKeys: result.unprocessedKeysJson, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.batchGetItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.keys}, ${inputs.consistentRead});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.batchGetItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.keys}, ${inputs.consistentRead}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, items: `${v}.itemsJson`, unprocessedKeys: `${v}.unprocessedKeysJson`, error: `${v}.error` };
+    return { success: `${v}.success`, items: `${v}.itemsJson`, unprocessedKeys: `${v}.unprocessedKeysJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -534,22 +614,29 @@ registerNode({
     tableNamePin(),
     { id: "putItems", label: i18n.nodes.dynamoDb.batchWriteItem.pin_put_items, type: "string", direction: "input", defaultValue: "[]" },
     { id: "deleteKeys", label: i18n.nodes.dynamoDb.batchWriteItem.pin_delete_keys, type: "string", direction: "input", defaultValue: "[]" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "unprocessedCount", label: i18n.nodes.dynamoDb.batchWriteItem.pin_unprocessed_count, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadDynamoDbManager()).batchWriteItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.putItems ?? ""), String(inputs.deleteKeys ?? ""));
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(() => manager.batchWriteItem(String(inputs.credentialName ?? ""), String(inputs.tableName ?? ""), String(inputs.putItems ?? ""), String(inputs.deleteKeys ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.batchWriteItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.putItems}, ${inputs.deleteKeys});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.batchWriteItem(${inputs.credentialName}, ${inputs.tableName}, ${inputs.putItems}, ${inputs.deleteKeys}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, unprocessedCount: `${v}.unprocessedCount`, error: `${v}.error` };
+    return { success: `${v}.success`, unprocessedCount: `${v}.unprocessedCount`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -562,22 +649,26 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     { id: "items", label: i18n.nodes.dynamoDb.transactGetItems.pin_items_spec, type: "string", direction: "input", defaultValue: "[]" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "items-out", label: i18n.nodes.dynamoDb.__shared.pin_items, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadDynamoDbManager()).transactGetItems(String(inputs.credentialName ?? ""), String(inputs.items ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, "items-out": result.itemsJson, error: result.error } };
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(() => manager.transactGetItems(String(inputs.credentialName ?? ""), String(inputs.items ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, "items-out": result.itemsJson, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.transactGetItems(${inputs.credentialName}, ${inputs.items});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.transactGetItems(${inputs.credentialName}, ${inputs.items}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, "items-out": `${v}.itemsJson`, error: `${v}.error` };
+    return { success: `${v}.success`, "items-out": `${v}.itemsJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -586,16 +677,17 @@ registerNode({
   description: i18n.nodes.dynamoDb.transactWriteItems.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), { id: "operations", label: i18n.nodes.dynamoDb.transactWriteItems.pin_operations, type: "string", direction: "input", defaultValue: "[]" }, execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), { id: "operations", label: i18n.nodes.dynamoDb.transactWriteItems.pin_operations, type: "string", direction: "input", defaultValue: "[]" }, retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadDynamoDbManager()).transactWriteItems(String(inputs.credentialName ?? ""), String(inputs.operations ?? ""));
+    const manager = await loadDynamoDbManager();
+    const result = await withRetry(() => manager.transactWriteItems(String(inputs.credentialName ?? ""), String(inputs.operations ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await DynamoDbManager.transactWriteItems(${inputs.credentialName}, ${inputs.operations});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => DynamoDbManager.transactWriteItems(${inputs.credentialName}, ${inputs.operations}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [DYNAMODB_MANAGER_IMPORT],
+  compileImports: [DYNAMODB_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

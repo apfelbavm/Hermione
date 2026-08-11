@@ -1,7 +1,9 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, TWILIO_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, TWILIO_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { MESSAGE_STRUCT_TYPE, CALL_STRUCT_TYPE } from "@hermione/graph/structs/twilio";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // Every operation below calls the exact same TwilioManager static method (packages/core/src/lib/
@@ -41,23 +43,26 @@ registerNode({
     { id: "to", label: i18n.nodes.twilio.sendSms.pin_to, type: "string", direction: "input", defaultValue: "" },
     { id: "from", label: i18n.nodes.twilio.sendSms.pin_from, type: "string", direction: "input", defaultValue: "" },
     { id: "body", label: i18n.nodes.twilio.sendSms.pin_body, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "sid", label: i18n.nodes.twilio.sendSms.pin_sid, type: "string", direction: "output" },
     { id: "status", label: i18n.nodes.twilio.sendSms.pin_status, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadTwilioManager()).sendSms(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), String(inputs.body ?? ""));
+    const result = await withRetry(() => loadTwilioManager().then((m) => m.sendSms(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), String(inputs.body ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.sendSms(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => TwilioManager.sendSms(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.body}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, sid: `${v}.sid`, status: `${v}.status`, error: `${v}.error` };
+    return { success: `${v}.success`, sid: `${v}.sid`, status: `${v}.status`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [TWILIO_MANAGER_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -70,33 +75,38 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "messageSid", label: i18n.nodes.twilio.getMessage.pin_message_sid, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "message", label: i18n.nodes.twilio.getMessage.pin_message, type: "struct", subType: MESSAGE_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadTwilioManager()).getMessage(String(inputs.credentialName ?? ""), String(inputs.messageSid ?? ""));
+    const result = await withRetry(() => loadTwilioManager().then((m) => m.getMessage(String(inputs.credentialName ?? ""), String(inputs.messageSid ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
         message: result.success ? { sid: result.sid, status: result.status, body: result.body, to: result.to, from: result.from, dateSent: result.dateSent } : emptyMessage,
+        attempts: result.attempts,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.getMessage(${inputs.credentialName}, ${inputs.messageSid});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => TwilioManager.getMessage(${inputs.credentialName}, ${inputs.messageSid}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
       success: `${v}.success`,
       message: `(${v}.success ? { sid: ${v}.sid, status: ${v}.status, body: ${v}.body, to: ${v}.to, from: ${v}.from, dateSent: ${v}.dateSent } : { sid: "", status: "", body: "", to: "", from: "", dateSent: "" })`,
+      attempts: `${v}.attempts`,
       error: `${v}.error`,
     };
   },
-  compileImports: [TWILIO_MANAGER_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -111,22 +121,25 @@ registerNode({
     { id: "to", label: i18n.nodes.twilio.listMessages.pin_to, type: "string", direction: "input", defaultValue: "" },
     { id: "from", label: i18n.nodes.twilio.listMessages.pin_from, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.twilio.listMessages.pin_limit, type: "number", direction: "input", defaultValue: 20 },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "messages", label: i18n.nodes.twilio.listMessages.pin_messages, type: "struct", subType: MESSAGE_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadTwilioManager()).listMessages(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), Number(inputs.limit) || 20);
+    const result = await withRetry(() => loadTwilioManager().then((m) => m.listMessages(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), Number(inputs.limit) || 20)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.listMessages(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => TwilioManager.listMessages(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, messages: `${v}.messages`, error: `${v}.error` };
+    return { success: `${v}.success`, messages: `${v}.messages`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [TWILIO_MANAGER_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -139,22 +152,25 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "messageSid", label: i18n.nodes.twilio.deleteMessage.pin_message_sid, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "deleted", label: i18n.nodes.twilio.deleteMessage.pin_deleted, type: "boolean", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadTwilioManager()).deleteMessage(String(inputs.credentialName ?? ""), String(inputs.messageSid ?? ""));
+    const result = await withRetry(() => loadTwilioManager().then((m) => m.deleteMessage(String(inputs.credentialName ?? ""), String(inputs.messageSid ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.deleteMessage(${inputs.credentialName}, ${inputs.messageSid});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => TwilioManager.deleteMessage(${inputs.credentialName}, ${inputs.messageSid}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, deleted: `${v}.deleted`, error: `${v}.error` };
+    return { success: `${v}.success`, deleted: `${v}.deleted`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [TWILIO_MANAGER_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -169,23 +185,26 @@ registerNode({
     { id: "to", label: i18n.nodes.twilio.makeCall.pin_to, type: "string", direction: "input", defaultValue: "" },
     { id: "from", label: i18n.nodes.twilio.makeCall.pin_from, type: "string", direction: "input", defaultValue: "" },
     { id: "twimlUrl", label: i18n.nodes.twilio.makeCall.pin_twiml_url, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "sid", label: i18n.nodes.twilio.makeCall.pin_sid, type: "string", direction: "output" },
     { id: "status", label: i18n.nodes.twilio.makeCall.pin_status, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadTwilioManager()).makeCall(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), String(inputs.twimlUrl ?? ""));
+    const result = await withRetry(() => loadTwilioManager().then((m) => m.makeCall(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), String(inputs.twimlUrl ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.makeCall(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.twimlUrl});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => TwilioManager.makeCall(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.twimlUrl}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, sid: `${v}.sid`, status: `${v}.status`, error: `${v}.error` };
+    return { success: `${v}.success`, sid: `${v}.sid`, status: `${v}.status`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [TWILIO_MANAGER_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -198,25 +217,31 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "callSid", label: i18n.nodes.twilio.getCall.pin_call_sid, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "status", label: i18n.nodes.twilio.getCall.pin_status, type: "string", direction: "output" },
     { id: "duration", label: i18n.nodes.twilio.getCall.pin_duration, type: "number", direction: "output" },
     { id: "to", label: i18n.nodes.twilio.getCall.pin_to, type: "string", direction: "output" },
     { id: "from", label: i18n.nodes.twilio.getCall.pin_from, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadTwilioManager()).getCall(String(inputs.credentialName ?? ""), String(inputs.callSid ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, status: result.status, duration: Number(result.duration) || 0, to: result.to, from: result.from, error: result.error } };
+    const result = await withRetry(() => loadTwilioManager().then((m) => m.getCall(String(inputs.credentialName ?? ""), String(inputs.callSid ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return {
+      nextExec: "exec-out",
+      outputs: { success: result.success, status: result.status, duration: Number(result.duration) || 0, to: result.to, from: result.from, attempts: result.attempts, error: result.error },
+    };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.getCall(${inputs.credentialName}, ${inputs.callSid});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => TwilioManager.getCall(${inputs.credentialName}, ${inputs.callSid}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, status: `${v}.status`, duration: `(Number(${v}.duration) || 0)`, to: `${v}.to`, from: `${v}.from`, error: `${v}.error` };
+    return { success: `${v}.success`, status: `${v}.status`, duration: `(Number(${v}.duration) || 0)`, to: `${v}.to`, from: `${v}.from`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [TWILIO_MANAGER_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -231,23 +256,26 @@ registerNode({
     { id: "to", label: i18n.nodes.twilio.sendWhatsApp.pin_to, type: "string", direction: "input", defaultValue: "" },
     { id: "from", label: i18n.nodes.twilio.sendWhatsApp.pin_from, type: "string", direction: "input", defaultValue: "" },
     { id: "body", label: i18n.nodes.twilio.sendWhatsApp.pin_body, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "sid", label: i18n.nodes.twilio.sendWhatsApp.pin_sid, type: "string", direction: "output" },
     { id: "status", label: i18n.nodes.twilio.sendWhatsApp.pin_status, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadTwilioManager()).sendWhatsApp(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), String(inputs.body ?? ""));
+    const result = await withRetry(() => loadTwilioManager().then((m) => m.sendWhatsApp(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), String(inputs.body ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.sendWhatsApp(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => TwilioManager.sendWhatsApp(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.body}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, sid: `${v}.sid`, status: `${v}.status`, error: `${v}.error` };
+    return { success: `${v}.success`, sid: `${v}.sid`, status: `${v}.status`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [TWILIO_MANAGER_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -262,22 +290,25 @@ registerNode({
     { id: "to", label: i18n.nodes.twilio.listCalls.pin_to, type: "string", direction: "input", defaultValue: "" },
     { id: "from", label: i18n.nodes.twilio.listCalls.pin_from, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.twilio.listCalls.pin_limit, type: "number", direction: "input", defaultValue: 20 },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "calls", label: i18n.nodes.twilio.listCalls.pin_calls, type: "struct", subType: CALL_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadTwilioManager()).listCalls(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), Number(inputs.limit) || 20);
+    const result = await withRetry(() => loadTwilioManager().then((m) => m.listCalls(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.from ?? ""), Number(inputs.limit) || 20)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.listCalls(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => TwilioManager.listCalls(${inputs.credentialName}, ${inputs.to}, ${inputs.from}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, calls: `${v}.calls`, error: `${v}.error` };
+    return { success: `${v}.success`, calls: `${v}.calls`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [TWILIO_MANAGER_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -290,22 +321,25 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "callSid", label: i18n.nodes.twilio.hangupCall.pin_call_sid, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "status", label: i18n.nodes.twilio.hangupCall.pin_status, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadTwilioManager()).hangupCall(String(inputs.credentialName ?? ""), String(inputs.callSid ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, status: result.status, error: result.error } };
+    const result = await withRetry(() => loadTwilioManager().then((m) => m.hangupCall(String(inputs.credentialName ?? ""), String(inputs.callSid ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, status: result.status, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.hangupCall(${inputs.credentialName}, ${inputs.callSid});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => TwilioManager.hangupCall(${inputs.credentialName}, ${inputs.callSid}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, status: `${v}.status`, error: `${v}.error` };
+    return { success: `${v}.success`, status: `${v}.status`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [TWILIO_MANAGER_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -318,6 +352,8 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "phoneNumber", label: i18n.nodes.twilio.lookupPhoneNumber.pin_phone_number, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "valid", label: i18n.nodes.twilio.lookupPhoneNumber.pin_valid, type: "boolean", direction: "output" },
@@ -325,17 +361,27 @@ registerNode({
     { id: "nationalFormat", label: i18n.nodes.twilio.lookupPhoneNumber.pin_national_format, type: "string", direction: "output" },
     { id: "callerName", label: i18n.nodes.twilio.lookupPhoneNumber.pin_caller_name, type: "string", direction: "output" },
     { id: "lineType", label: i18n.nodes.twilio.lookupPhoneNumber.pin_line_type, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadTwilioManager()).lookupPhoneNumber(String(inputs.credentialName ?? ""), String(inputs.phoneNumber ?? ""));
+    const result = await withRetry(() => loadTwilioManager().then((m) => m.lookupPhoneNumber(String(inputs.credentialName ?? ""), String(inputs.phoneNumber ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await TwilioManager.lookupPhoneNumber(${inputs.credentialName}, ${inputs.phoneNumber});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => TwilioManager.lookupPhoneNumber(${inputs.credentialName}, ${inputs.phoneNumber}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, valid: `${v}.valid`, countryCode: `${v}.countryCode`, nationalFormat: `${v}.nationalFormat`, callerName: `${v}.callerName`, lineType: `${v}.lineType`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      valid: `${v}.valid`,
+      countryCode: `${v}.countryCode`,
+      nationalFormat: `${v}.nationalFormat`,
+      callerName: `${v}.callerName`,
+      lineType: `${v}.lineType`,
+      attempts: `${v}.attempts`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [TWILIO_MANAGER_IMPORT],
+  compileImports: [TWILIO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

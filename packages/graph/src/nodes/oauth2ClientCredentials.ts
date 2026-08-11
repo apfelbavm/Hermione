@@ -3,6 +3,8 @@ import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import { OAUTH2_SEND_AS_ENUM_TYPE } from "@hermione/graph/enum/oauth2ClientCredentials";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // OAuth2 Client Credentials (RFC 6749 §4.4) — the standard app-only / service-to-service grant:
@@ -27,12 +29,15 @@ registerNode({
     { id: "clientSecret", label: i18n.nodes.auth.oauth2ClientCredentials.pin_client_secret, type: "string", direction: "input", defaultValue: "" },
     { id: "scope", label: i18n.nodes.auth.oauth2ClientCredentials.pin_scope, type: "string", direction: "input", defaultValue: "" },
     { id: "sendAs", label: i18n.nodes.auth.oauth2ClientCredentials.pin_send_as, type: "enum", subType: OAUTH2_SEND_AS_ENUM_TYPE, direction: "input", defaultValue: "body", options: enumOptionIds(OAUTH2_SEND_AS_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "auth", label: i18n.nodes.__shared.pin_auth, type: "object", direction: "output" },
     { id: "accessToken", label: i18n.nodes.auth.oauth2ClientCredentials.pin_access_token, type: "string", direction: "output" },
     { id: "expiresIn", label: i18n.nodes.auth.oauth2ClientCredentials.pin_expires_in, type: "number", direction: "output" },
     { id: "status", label: i18n.nodes.__shared.pin_status, type: "number", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
@@ -53,43 +58,45 @@ registerNode({
     const client: oauth.Client = { client_id: clientId };
     const clientAuth = sendAs === "basicAuthHeader" ? oauth.ClientSecretBasic(clientSecret) : oauth.ClientSecretPost(clientSecret);
 
-    let status = 0;
-    try {
-      const response = await oauth.clientCredentialsGrantRequest(as, client, clientAuth, new URLSearchParams(scope ? { scope } : {}));
-      status = response.status;
+    const result = await withRetry(
+      async () => {
+        let status = 0;
+        try {
+          const response = await oauth.clientCredentialsGrantRequest(as, client, clientAuth, new URLSearchParams(scope ? { scope } : {}));
+          status = response.status;
 
-      const result = await oauth.processClientCredentialsResponse(as, client, response);
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: true,
-          auth: {
-            header: "Authorization",
-            value: `Bearer ${result.access_token}`,
-          },
-          accessToken: result.access_token,
-          expiresIn: Number(result.expires_in ?? 0),
-          status,
-          error: "",
-        },
-      };
-    } catch (err) {
-      if (err instanceof oauth.ResponseBodyError || err instanceof oauth.WWWAuthenticateChallengeError) {
-        status = err.status;
-      }
-      const message = err instanceof oauth.ResponseBodyError ? err.error_description || err.error : err instanceof Error ? err.message : String(err);
-      return {
-        nextExec: "exec-out",
-        outputs: {
-          success: false,
-          auth: null,
-          accessToken: "",
-          expiresIn: 0,
-          status,
-          error: message,
-        },
-      };
-    }
+          const tokenResult = await oauth.processClientCredentialsResponse(as, client, response);
+          return {
+            success: true,
+            auth: {
+              header: "Authorization",
+              value: `Bearer ${tokenResult.access_token}`,
+            },
+            accessToken: tokenResult.access_token,
+            expiresIn: Number(tokenResult.expires_in ?? 0),
+            status,
+            error: "",
+          };
+        } catch (err) {
+          if (err instanceof oauth.ResponseBodyError || err instanceof oauth.WWWAuthenticateChallengeError) {
+            status = err.status;
+          }
+          const message = err instanceof oauth.ResponseBodyError ? err.error_description || err.error : err instanceof Error ? err.message : String(err);
+          return {
+            success: false,
+            auth: null,
+            accessToken: "",
+            expiresIn: 0,
+            status,
+            error: message,
+          };
+        }
+      },
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+
+    return { nextExec: "exec-out", outputs: result };
   },
   // Compiler support (compileExecute) is intentionally out of scope for now — this node has data
   // outputs beyond a single result, which needs the compiler's compileExecuteOutputs hook (see

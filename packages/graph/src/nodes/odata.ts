@@ -1,8 +1,10 @@
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, ODATA_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, ODATA_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import { ODATA_PAGINATION_TYPE_ENUM_TYPE } from "@hermione/graph/enum/odata";
 import { ODataManager } from "@hermione/core/lib/odataManager";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 const PAGINATION_TYPES = enumOptionIds(ODATA_PAGINATION_TYPE_ENUM_TYPE);
@@ -21,11 +23,14 @@ registerNode({
     { id: "headers", label: i18n.nodes.odata.v2Request.pin_headers, type: "string", direction: "input", defaultValue: "{}" },
     { id: "auth", label: i18n.nodes.__shared.pin_auth, type: "object", direction: "input", defaultValue: null },
     { id: "timeoutMs", label: i18n.nodes.__shared.pin_timeout, type: "number", direction: "input", defaultValue: 10000, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "status", label: i18n.nodes.__shared.pin_status, type: "number", direction: "output" },
     { id: "rows", label: i18n.nodes.odata.v2Request.pin_rows, type: "object", container: "array", direction: "output" },
     { id: "pageCount", label: i18n.nodes.odata.v2Request.pin_page_count, type: "number", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
@@ -34,18 +39,23 @@ registerNode({
   // exec-out convention as http.request rather than inventing separate success/failure exec paths.
   execute: async ({ inputs }) => ({
     nextExec: "exec-out",
-    outputs: await ODataManager.v2Request({
-      baseUrl: String(inputs.url ?? ""),
-      pageSize: Number(inputs.pageSize ?? 1000),
-      paginationType: String(inputs.paginationType ?? PAGINATION_TYPES[0]),
-      maxPages: Number(inputs.maxPages ?? 50),
-      headersJson: String(inputs.headers ?? ""),
-      auth: inputs.auth as { header?: unknown; value?: unknown } | null | undefined,
-      timeoutMs: Number(inputs.timeoutMs ?? 0),
-    }),
+    outputs: await withRetry(
+      () =>
+        ODataManager.v2Request({
+          baseUrl: String(inputs.url ?? ""),
+          pageSize: Number(inputs.pageSize ?? 1000),
+          paginationType: String(inputs.paginationType ?? PAGINATION_TYPES[0]),
+          maxPages: Number(inputs.maxPages ?? 50),
+          headersJson: String(inputs.headers ?? ""),
+          auth: inputs.auth as { header?: unknown; value?: unknown } | null | undefined,
+          timeoutMs: Number(inputs.timeoutMs ?? 0),
+        }),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    ),
   }),
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await ODataManager.v2Request({ baseUrl: ${inputs.url}, pageSize: ${inputs.pageSize}, paginationType: ${inputs.paginationType}, maxPages: ${inputs.maxPages}, headersJson: ${inputs.headers}, auth: ${inputs.auth}, timeoutMs: ${inputs.timeoutMs} });`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => ODataManager.v2Request({ baseUrl: ${inputs.url}, pageSize: ${inputs.pageSize}, paginationType: ${inputs.paginationType}, maxPages: ${inputs.maxPages}, headersJson: ${inputs.headers}, auth: ${inputs.auth}, timeoutMs: ${inputs.timeoutMs} }), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
@@ -55,8 +65,9 @@ registerNode({
       status: `${v}.status`,
       rows: `${v}.rows`,
       pageCount: `${v}.pageCount`,
+      attempts: `${v}.attempts`,
       error: `${v}.error`,
     };
   },
-  compileImports: [ODATA_MANAGER_IMPORT],
+  compileImports: [ODATA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

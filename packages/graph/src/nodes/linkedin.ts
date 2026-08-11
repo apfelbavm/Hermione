@@ -1,7 +1,9 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, LINKEDIN_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { TOKEN_STRUCT_TYPE, INTROSPECT_STRUCT_TYPE } from "@hermione/graph/structs/linkedin";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // Every operation below calls the exact same LinkedInManager static method (packages/core/src/lib/
@@ -124,18 +126,18 @@ registerNode({
   description: i18n.nodes.linkedin.authorize.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "tokens", label: i18n.nodes.linkedin.token.label, type: "struct", subType: TOKEN_STRUCT_TYPE, direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "tokens", label: i18n.nodes.linkedin.token.label, type: "struct", subType: TOKEN_STRUCT_TYPE, direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).exchangeAuthCode(String(inputs.credentialName ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, tokens: result.success ? toTokenStruct(result) : emptyToken(), error: result.error } };
+    const result = await withRetry(async () => (await loadLinkedInManager()).exchangeAuthCode(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, tokens: result.success ? toTokenStruct(result) : emptyToken(), attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.exchangeAuthCode(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.exchangeAuthCode(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, tokens: tokenStructExpr(v), error: `${v}.error` };
+    return { success: `${v}.success`, tokens: tokenStructExpr(v), attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -144,18 +146,18 @@ registerNode({
   description: i18n.nodes.linkedin.refreshToken.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "tokens", label: i18n.nodes.linkedin.token.label, type: "struct", subType: TOKEN_STRUCT_TYPE, direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "tokens", label: i18n.nodes.linkedin.token.label, type: "struct", subType: TOKEN_STRUCT_TYPE, direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).exchangeRefreshToken(String(inputs.credentialName ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, tokens: result.success ? toTokenStruct(result) : emptyToken(), error: result.error } };
+    const result = await withRetry(async () => (await loadLinkedInManager()).exchangeRefreshToken(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, tokens: result.success ? toTokenStruct(result) : emptyToken(), attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.exchangeRefreshToken(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.exchangeRefreshToken(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, tokens: tokenStructExpr(v), error: `${v}.error` };
+    return { success: `${v}.success`, tokens: tokenStructExpr(v), attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -164,18 +166,18 @@ registerNode({
   description: i18n.nodes.linkedin.getTwoLeggedAccessToken.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "tokens", label: i18n.nodes.linkedin.token.label, type: "struct", subType: TOKEN_STRUCT_TYPE, direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "tokens", label: i18n.nodes.linkedin.token.label, type: "struct", subType: TOKEN_STRUCT_TYPE, direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).getTwoLeggedAccessToken(String(inputs.credentialName ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, tokens: result.success ? toTokenStruct(result) : emptyToken(), error: result.error } };
+    const result = await withRetry(async () => (await loadLinkedInManager()).getTwoLeggedAccessToken(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, tokens: result.success ? toTokenStruct(result) : emptyToken(), attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.getTwoLeggedAccessToken(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.getTwoLeggedAccessToken(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, tokens: tokenStructExpr(v), error: `${v}.error` };
+    return { success: `${v}.success`, tokens: tokenStructExpr(v), attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -188,22 +190,25 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     { id: "accessToken", label: i18n.nodes.linkedin.__shared.pin_access_token, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "result", label: i18n.nodes.linkedin.introspectAccessToken.label, type: "struct", subType: INTROSPECT_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).introspectAccessToken(String(inputs.credentialName ?? ""), String(inputs.accessToken ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, result: result.success ? toIntrospectStruct(result) : emptyIntrospect(), error: result.error } };
+    const result = await withRetry(async () => (await loadLinkedInManager()).introspectAccessToken(String(inputs.credentialName ?? ""), String(inputs.accessToken ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, result: result.success ? toIntrospectStruct(result) : emptyIntrospect(), attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.introspectAccessToken(${inputs.credentialName}, ${inputs.accessToken});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.introspectAccessToken(${inputs.credentialName}, ${inputs.accessToken}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, result: introspectStructExpr(v), error: `${v}.error` };
+    return { success: `${v}.success`, result: introspectStructExpr(v), attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 function tokenStructExpr(v: string): string {
@@ -220,18 +225,25 @@ registerNode({
   description: i18n.nodes.linkedin.get.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), resourcePathPin(), idJsonPin(), pathKeysJsonPin(), queryParamsJsonPin(), versionStringPin(), execOutPin(), successPin(), resultJsonPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), resourcePathPin(), idJsonPin(), pathKeysJsonPin(), queryParamsJsonPin(), versionStringPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), resultJsonPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).get(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).get(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.get(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.get(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, resultJson: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -240,18 +252,25 @@ registerNode({
   description: i18n.nodes.linkedin.batchGet.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), resourcePathPin(), idsJsonPin(), pathKeysJsonPin(), queryParamsJsonPin(), versionStringPin(), execOutPin(), successPin(), resultJsonPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), resourcePathPin(), idsJsonPin(), pathKeysJsonPin(), queryParamsJsonPin(), versionStringPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), resultJsonPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).batchGet(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).batchGet(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.batchGet(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.batchGet(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, resultJson: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -260,18 +279,25 @@ registerNode({
   description: i18n.nodes.linkedin.getAll.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), resourcePathPin(), pathKeysJsonPin(), queryParamsJsonPin(), versionStringPin(), execOutPin(), successPin(), resultJsonPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), resourcePathPin(), pathKeysJsonPin(), queryParamsJsonPin(), versionStringPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), resultJsonPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).getAll(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).getAll(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.getAll(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.getAll(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, resultJson: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -288,22 +314,32 @@ registerNode({
     pathKeysJsonPin(),
     queryParamsJsonPin(),
     versionStringPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     resultJsonPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).finder(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.finderName ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).finder(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.finderName ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.queryParamsJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.finder(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.finderName}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.finder(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.finderName}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, resultJson: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -322,36 +358,42 @@ registerNode({
     pathKeysJsonPin(),
     queryParamsJsonPin(),
     versionStringPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     resultJsonPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (
-      await loadLinkedInManager()
-    ).batchFinder(
-      String(inputs.credentialName ?? ""),
-      String(inputs.resourcePath ?? ""),
-      String(inputs.finderName ?? ""),
-      String(inputs.finderCriteriaName ?? ""),
-      String(inputs.finderCriteriaValuesJson ?? "[]"),
-      String(inputs.pathKeysJson ?? "{}"),
-      String(inputs.queryParamsJson ?? "{}"),
-      String(inputs.versionString ?? ""),
+    const result = await withRetry(
+      async () =>
+        (await loadLinkedInManager()).batchFinder(
+          String(inputs.credentialName ?? ""),
+          String(inputs.resourcePath ?? ""),
+          String(inputs.finderName ?? ""),
+          String(inputs.finderCriteriaName ?? ""),
+          String(inputs.finderCriteriaValuesJson ?? "[]"),
+          String(inputs.pathKeysJson ?? "{}"),
+          String(inputs.queryParamsJson ?? "{}"),
+          String(inputs.versionString ?? ""),
+        ),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
     );
-    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
+    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, attempts: result.attempts, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await LinkedInManager.batchFinder(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.finderName}, ${inputs.finderCriteriaName}, ${inputs.finderCriteriaValuesJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.batchFinder(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.finderName}, ${inputs.finderCriteriaName}, ${inputs.finderCriteriaValuesJson}, ${inputs.pathKeysJson}, ${inputs.queryParamsJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, resultJson: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -367,22 +409,32 @@ registerNode({
     { id: "entityJson", label: i18n.nodes.linkedin.__shared.pin_entity_json, type: "string", direction: "input", defaultValue: "{}" },
     pathKeysJsonPin(),
     versionStringPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "createdEntityId", label: i18n.nodes.linkedin.create.pin_created_entity_id, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).create(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.entityJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, createdEntityId: result.createdEntityId, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).create(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.entityJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, createdEntityId: result.createdEntityId, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.create(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.entityJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.create(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.entityJson}, ${inputs.pathKeysJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, createdEntityId: `${v}.createdEntityId`, error: `${v}.error` };
+    return { success: `${v}.success`, createdEntityId: `${v}.createdEntityId`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -391,18 +443,39 @@ registerNode({
   description: i18n.nodes.linkedin.batchCreate.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), resourcePathPin(), { id: "entitiesJson", label: i18n.nodes.linkedin.batchCreate.pin_entities_json, type: "string", direction: "input", defaultValue: "[]" }, pathKeysJsonPin(), versionStringPin(), execOutPin(), successPin(), resultJsonPin(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    resourcePathPin(),
+    { id: "entitiesJson", label: i18n.nodes.linkedin.batchCreate.pin_entities_json, type: "string", direction: "input", defaultValue: "[]" },
+    pathKeysJsonPin(),
+    versionStringPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    resultJsonPin(),
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).batchCreate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.entitiesJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).batchCreate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.entitiesJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.batchCreate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.entitiesJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.batchCreate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.entitiesJson}, ${inputs.pathKeysJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, resultJson: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -411,15 +484,36 @@ registerNode({
   description: i18n.nodes.linkedin.update.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), resourcePathPin(), idJsonPin(), { id: "entityJson", label: i18n.nodes.linkedin.__shared.pin_entity_json, type: "string", direction: "input", defaultValue: "{}" }, pathKeysJsonPin(), versionStringPin(), execOutPin(), successPin(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    resourcePathPin(),
+    idJsonPin(),
+    { id: "entityJson", label: i18n.nodes.linkedin.__shared.pin_entity_json, type: "string", direction: "input", defaultValue: "{}" },
+    pathKeysJsonPin(),
+    versionStringPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).update(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.entityJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).update(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.entityJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.update(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.entityJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
-  compileExecuteOutputs: ({ node }) => ({ success: `${compileResultVar(node.id)}.success`, error: `${compileResultVar(node.id)}.error` }),
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.update(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.entityJson}, ${inputs.pathKeysJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => ({ success: `${compileResultVar(node.id)}.success`, attempts: `${compileResultVar(node.id)}.attempts`, error: `${compileResultVar(node.id)}.error` }),
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -436,22 +530,32 @@ registerNode({
     { id: "entitiesJson", label: i18n.nodes.linkedin.batchCreate.pin_entities_json, type: "string", direction: "input", defaultValue: "[]" },
     pathKeysJsonPin(),
     versionStringPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     resultJsonPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).batchUpdate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.entitiesJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).batchUpdate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.entitiesJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.batchUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.entitiesJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.batchUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.entitiesJson}, ${inputs.pathKeysJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, resultJson: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -468,21 +572,28 @@ registerNode({
     { id: "patchSetObjectJson", label: i18n.nodes.linkedin.partialUpdate.pin_patch_set_object_json, type: "string", direction: "input", defaultValue: "{}" },
     pathKeysJsonPin(),
     versionStringPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).partialUpdate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.patchSetObjectJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).partialUpdate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.patchSetObjectJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, attempts: result.attempts, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await LinkedInManager.partialUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.patchSetObjectJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.partialUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.patchSetObjectJson}, ${inputs.pathKeysJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
-  compileExecuteOutputs: ({ node }) => ({ success: `${compileResultVar(node.id)}.success`, error: `${compileResultVar(node.id)}.error` }),
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileExecuteOutputs: ({ node }) => ({ success: `${compileResultVar(node.id)}.success`, attempts: `${compileResultVar(node.id)}.attempts`, error: `${compileResultVar(node.id)}.error` }),
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -499,25 +610,32 @@ registerNode({
     { id: "patchSetObjectsJson", label: i18n.nodes.linkedin.batchPartialUpdate.pin_patch_set_objects_json, type: "string", direction: "input", defaultValue: "[]" },
     pathKeysJsonPin(),
     versionStringPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     resultJsonPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).batchPartialUpdate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.patchSetObjectsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).batchPartialUpdate(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.patchSetObjectsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, attempts: result.attempts, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await LinkedInManager.batchPartialUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.patchSetObjectsJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.batchPartialUpdate(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.patchSetObjectsJson}, ${inputs.pathKeysJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, resultJson: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -526,15 +644,22 @@ registerNode({
   description: i18n.nodes.linkedin.delete.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), resourcePathPin(), idJsonPin(), pathKeysJsonPin(), versionStringPin(), execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), resourcePathPin(), idJsonPin(), pathKeysJsonPin(), versionStringPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).delete(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).delete(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idJson ?? ""), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.delete(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
-  compileExecuteOutputs: ({ node }) => ({ success: `${compileResultVar(node.id)}.success`, error: `${compileResultVar(node.id)}.error` }),
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.delete(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idJson}, ${inputs.pathKeysJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
+  compileExecuteOutputs: ({ node }) => ({ success: `${compileResultVar(node.id)}.success`, attempts: `${compileResultVar(node.id)}.attempts`, error: `${compileResultVar(node.id)}.error` }),
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -543,18 +668,25 @@ registerNode({
   description: i18n.nodes.linkedin.batchDelete.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), resourcePathPin(), idsJsonPin(), pathKeysJsonPin(), versionStringPin(), execOutPin(), successPin(), resultJsonPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), resourcePathPin(), idsJsonPin(), pathKeysJsonPin(), versionStringPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), resultJsonPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).batchDelete(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).batchDelete(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.idsJson ?? "[]"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, resultJson: result.json, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.batchDelete(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.batchDelete(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.idsJson}, ${inputs.pathKeysJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, resultJson: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, resultJson: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -571,20 +703,30 @@ registerNode({
     { id: "dataJson", label: i18n.nodes.linkedin.action.pin_data_json, type: "string", direction: "input", defaultValue: "{}" },
     pathKeysJsonPin(),
     versionStringPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "valueJson", label: i18n.nodes.linkedin.action.pin_value_json, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadLinkedInManager()).action(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.actionName ?? ""), String(inputs.dataJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, valueJson: result.json, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadLinkedInManager()).action(String(inputs.credentialName ?? ""), String(inputs.resourcePath ?? ""), String(inputs.actionName ?? ""), String(inputs.dataJson ?? "{}"), String(inputs.pathKeysJson ?? "{}"), String(inputs.versionString ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, valueJson: result.json, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await LinkedInManager.action(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.actionName}, ${inputs.dataJson}, ${inputs.pathKeysJson}, ${inputs.versionString});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => LinkedInManager.action(${inputs.credentialName}, ${inputs.resourcePath}, ${inputs.actionName}, ${inputs.dataJson}, ${inputs.pathKeysJson}, ${inputs.versionString}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, valueJson: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, valueJson: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [LINKEDIN_MANAGER_IMPORT],
+  compileImports: [LINKEDIN_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

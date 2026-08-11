@@ -1,8 +1,10 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, OAUTH2SAML_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, OAUTH2SAML_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import type { Oauth2SamlBearerCredentialData } from "@hermione/shared/types";
 import { Oauth2SamlManager, type Oauth2SamlExchangeOutputs } from "@hermione/core/lib/oauth2SamlManager";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 function failResult(error: string): Oauth2SamlExchangeOutputs {
@@ -25,12 +27,15 @@ registerNode({
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "credentialName", label: i18n.nodes.auth.oauth2Saml.pin_credential_name, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "auth", label: i18n.nodes.__shared.pin_auth, type: "object", direction: "output" },
     { id: "accessToken", label: i18n.nodes.auth.oauth2Saml.pin_access_token, type: "string", direction: "output" },
     { id: "expiresIn", label: i18n.nodes.auth.oauth2Saml.pin_expires_in, type: "number", direction: "output" },
     { id: "status", label: i18n.nodes.__shared.pin_status, type: "number", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
@@ -59,14 +64,19 @@ registerNode({
     }
 
     const data = credential.data as Oauth2SamlBearerCredentialData;
-    const result = await Oauth2SamlManager.exchange({
-      idpUrl: data.idpUrl,
-      tokenServiceUrl: data.tokenServiceUrl,
-      clientId: data.clientId,
-      userId: data.userId,
-      companyId: data.companyId,
-      privateKey: data.privateKey,
-    });
+    const result = await withRetry(
+      () =>
+        Oauth2SamlManager.exchange({
+          idpUrl: data.idpUrl,
+          tokenServiceUrl: data.tokenServiceUrl,
+          clientId: data.clientId,
+          userId: data.userId,
+          companyId: data.companyId,
+          privateKey: data.privateKey,
+        }),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
   // The compiled (standalone .mjs) path has no access to the Credential Vault database — only the
@@ -74,7 +84,11 @@ registerNode({
   // credential's fields from environment variables instead via Oauth2SamlManager.credentialFromEnv, a
   // genuinely different credential-sourcing behavior, not duplicated logic (see that method's own doc
   // comment).
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)}_cred = Oauth2SamlManager.credentialFromEnv(${inputs.credentialName});`, `const ${compileResultVar(node.id)} = await Oauth2SamlManager.exchange(${compileResultVar(node.id)}_cred);`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)}_cred = Oauth2SamlManager.credentialFromEnv(${inputs.credentialName});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => Oauth2SamlManager.exchange(${compileResultVar(node.id)}_cred), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -83,8 +97,9 @@ registerNode({
       accessToken: `${v}.accessToken`,
       expiresIn: `${v}.expiresIn`,
       status: `${v}.status`,
+      attempts: `${v}.attempts`,
       error: `${v}.error`,
     };
   },
-  compileImports: [OAUTH2SAML_MANAGER_IMPORT],
+  compileImports: [OAUTH2SAML_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

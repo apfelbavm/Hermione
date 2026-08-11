@@ -1,9 +1,11 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, SLACK_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { CHANNEL_STRUCT_TYPE, USER_STRUCT_TYPE, MESSAGE_STRUCT_TYPE, PIN_ITEM_STRUCT_TYPE, SEARCH_MATCH_STRUCT_TYPE, USER_GROUP_STRUCT_TYPE, REMINDER_STRUCT_TYPE } from "@hermione/graph/structs/slack";
 import { TEXT_ENCODING_ENUM_TYPE } from "@hermione/graph/enum/common";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // SlackManager (packages/core/src/lib/slackManager.ts) reaches the database directly to resolve the
@@ -51,22 +53,25 @@ registerNode({
     { id: "channel", label: i18n.nodes.slack.postMessage.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "text", label: i18n.nodes.slack.postMessage.pin_text, type: "string", direction: "input", defaultValue: "" },
     { id: "threadTs", label: i18n.nodes.slack.postMessage.pin_thread_ts, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "ts", label: i18n.nodes.slack.postMessage.pin_ts, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).postMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.text ?? ""), String(inputs.threadTs ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).postMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.text ?? ""), String(inputs.threadTs ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.postMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.text}, ${inputs.threadTs});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.postMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.text}, ${inputs.threadTs}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, ts: `${v}.ts`, error: `${v}.error` };
+    return { success: `${v}.success`, ts: `${v}.ts`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -81,23 +86,26 @@ registerNode({
     { id: "channel", label: i18n.nodes.slack.updateMessage.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "ts", label: i18n.nodes.slack.updateMessage.pin_ts, type: "string", direction: "input", defaultValue: "" },
     { id: "text", label: i18n.nodes.slack.updateMessage.pin_text, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "channelOut", label: i18n.nodes.slack.updateMessage.pin_channel_out, type: "string", direction: "output" },
     { id: "tsOut", label: i18n.nodes.slack.updateMessage.pin_ts_out, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).updateMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.ts ?? ""), String(inputs.text ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, channelOut: result.channel, tsOut: result.ts, error: result.error } };
+    const result = await withRetry(async () => (await loadSlackManager()).updateMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.ts ?? ""), String(inputs.text ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, channelOut: result.channel, tsOut: result.ts, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.updateMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.ts}, ${inputs.text});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.updateMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.ts}, ${inputs.text}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, channelOut: `${v}.channel`, tsOut: `${v}.ts`, error: `${v}.error` };
+    return { success: `${v}.success`, channelOut: `${v}.channel`, tsOut: `${v}.ts`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -111,21 +119,24 @@ registerNode({
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.deleteMessage.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "ts", label: i18n.nodes.slack.deleteMessage.pin_ts, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).deleteMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.ts ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).deleteMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.ts ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.deleteMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.ts});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.deleteMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.ts}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -140,22 +151,25 @@ registerNode({
     { id: "channel", label: i18n.nodes.slack.postEphemeral.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "user", label: i18n.nodes.slack.postEphemeral.pin_user, type: "string", direction: "input", defaultValue: "" },
     { id: "text", label: i18n.nodes.slack.postEphemeral.pin_text, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "messageTs", label: i18n.nodes.slack.postEphemeral.pin_message_ts, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).postEphemeral(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.user ?? ""), String(inputs.text ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).postEphemeral(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.user ?? ""), String(inputs.text ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.postEphemeral(${inputs.credentialName}, ${inputs.channel}, ${inputs.user}, ${inputs.text});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.postEphemeral(${inputs.credentialName}, ${inputs.channel}, ${inputs.user}, ${inputs.text}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, messageTs: `${v}.messageTs`, error: `${v}.error` };
+    return { success: `${v}.success`, messageTs: `${v}.messageTs`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -170,23 +184,26 @@ registerNode({
     { id: "channel", label: i18n.nodes.slack.scheduleMessage.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "text", label: i18n.nodes.slack.scheduleMessage.pin_text, type: "string", direction: "input", defaultValue: "" },
     { id: "postAt", label: i18n.nodes.slack.scheduleMessage.pin_post_at, type: "number", direction: "input", defaultValue: 0 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "scheduledMessageId", label: i18n.nodes.slack.scheduleMessage.pin_scheduled_message_id, type: "string", direction: "output" },
     { id: "postAtOut", label: i18n.nodes.slack.scheduleMessage.pin_post_at_out, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).scheduleMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.text ?? ""), Number(inputs.postAt ?? 0));
-    return { nextExec: "exec-out", outputs: { success: result.success, scheduledMessageId: result.scheduledMessageId, postAtOut: result.postAt, error: result.error } };
+    const result = await withRetry(async () => (await loadSlackManager()).scheduleMessage(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.text ?? ""), Number(inputs.postAt ?? 0)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, scheduledMessageId: result.scheduledMessageId, postAtOut: result.postAt, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.scheduleMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.text}, ${inputs.postAt});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.scheduleMessage(${inputs.credentialName}, ${inputs.channel}, ${inputs.text}, ${inputs.postAt}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, scheduledMessageId: `${v}.scheduledMessageId`, postAtOut: `${v}.postAt`, error: `${v}.error` };
+    return { success: `${v}.success`, scheduledMessageId: `${v}.scheduledMessageId`, postAtOut: `${v}.postAt`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -200,22 +217,25 @@ registerNode({
     credentialNamePin(),
     { id: "limit", label: i18n.nodes.slack.listConversations.pin_limit, type: "number", direction: "input", defaultValue: 200 },
     { id: "types", label: i18n.nodes.slack.listConversations.pin_types, type: "string", direction: "input", defaultValue: "public_channel,private_channel" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "channels", label: i18n.nodes.slack.listConversations.pin_channels, type: "struct", subType: CHANNEL_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).listConversations(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 200), String(inputs.types ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).listConversations(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 200), String(inputs.types ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.listConversations(${inputs.credentialName}, ${inputs.limit}, ${inputs.types});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.listConversations(${inputs.credentialName}, ${inputs.limit}, ${inputs.types}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, channels: `${v}.channels`, error: `${v}.error` };
+    return { success: `${v}.success`, channels: `${v}.channels`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -229,23 +249,26 @@ registerNode({
     credentialNamePin(),
     { id: "name", label: i18n.nodes.slack.createConversation.pin_name, type: "string", direction: "input", defaultValue: "" },
     { id: "isPrivate", label: i18n.nodes.slack.createConversation.pin_is_private, type: "boolean", direction: "input", defaultValue: false },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "channelId", label: i18n.nodes.slack.createConversation.pin_channel_id, type: "string", direction: "output" },
     { id: "nameOut", label: i18n.nodes.slack.createConversation.pin_name_out, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).createConversation(String(inputs.credentialName ?? ""), String(inputs.name ?? ""), Boolean(inputs.isPrivate));
-    return { nextExec: "exec-out", outputs: { success: result.success, channelId: result.channelId, nameOut: result.name, error: result.error } };
+    const result = await withRetry(async () => (await loadSlackManager()).createConversation(String(inputs.credentialName ?? ""), String(inputs.name ?? ""), Boolean(inputs.isPrivate)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, channelId: result.channelId, nameOut: result.name, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.createConversation(${inputs.credentialName}, ${inputs.name}, ${inputs.isPrivate});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.createConversation(${inputs.credentialName}, ${inputs.name}, ${inputs.isPrivate}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, channelId: `${v}.channelId`, nameOut: `${v}.name`, error: `${v}.error` };
+    return { success: `${v}.success`, channelId: `${v}.channelId`, nameOut: `${v}.name`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -254,18 +277,18 @@ registerNode({
   description: i18n.nodes.slack.archiveConversation.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), { id: "channel", label: i18n.nodes.slack.archiveConversation.pin_channel, type: "string", direction: "input", defaultValue: "" }, execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), { id: "channel", label: i18n.nodes.slack.archiveConversation.pin_channel, type: "string", direction: "input", defaultValue: "" }, retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).archiveConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).archiveConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.archiveConversation(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.archiveConversation(${inputs.credentialName}, ${inputs.channel}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -279,21 +302,24 @@ registerNode({
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.inviteToConversation.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "userIds", label: i18n.nodes.slack.inviteToConversation.pin_user_ids, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).inviteToConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.userIds ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).inviteToConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.userIds ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.inviteToConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.userIds});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.inviteToConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.userIds}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -307,21 +333,24 @@ registerNode({
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.kickFromConversation.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "user", label: i18n.nodes.slack.kickFromConversation.pin_user, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).kickFromConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.user ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).kickFromConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.user ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.kickFromConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.user});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.kickFromConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.user}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -330,18 +359,18 @@ registerNode({
   description: i18n.nodes.slack.joinConversation.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), { id: "channel", label: i18n.nodes.slack.joinConversation.pin_channel, type: "string", direction: "input", defaultValue: "" }, execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), { id: "channel", label: i18n.nodes.slack.joinConversation.pin_channel, type: "string", direction: "input", defaultValue: "" }, retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).joinConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).joinConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.joinConversation(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.joinConversation(${inputs.credentialName}, ${inputs.channel}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -355,22 +384,25 @@ registerNode({
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.getConversationHistory.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.slack.getConversationHistory.pin_limit, type: "number", direction: "input", defaultValue: 100 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "messages", label: i18n.nodes.slack.getConversationHistory.pin_messages, type: "struct", subType: MESSAGE_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).getConversationHistory(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), Number(inputs.limit ?? 100));
+    const result = await withRetry(async () => (await loadSlackManager()).getConversationHistory(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), Number(inputs.limit ?? 100)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getConversationHistory(${inputs.credentialName}, ${inputs.channel}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.getConversationHistory(${inputs.credentialName}, ${inputs.channel}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, messages: `${v}.messages`, error: `${v}.error` };
+    return { success: `${v}.success`, messages: `${v}.messages`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -383,6 +415,8 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.getConversationInfo.pin_channel, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "id", label: i18n.nodes.slack.getConversationInfo.pin_id, type: "string", direction: "output" },
@@ -392,14 +426,15 @@ registerNode({
     { id: "topic", label: i18n.nodes.slack.getConversationInfo.pin_topic, type: "string", direction: "output" },
     { id: "purpose", label: i18n.nodes.slack.getConversationInfo.pin_purpose, type: "string", direction: "output" },
     { id: "memberCount", label: i18n.nodes.slack.getConversationInfo.pin_member_count, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).getConversationInfo(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).getConversationInfo(String(inputs.credentialName ?? ""), String(inputs.channel ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getConversationInfo(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.getConversationInfo(${inputs.credentialName}, ${inputs.channel}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -411,10 +446,11 @@ registerNode({
       topic: `${v}.topic`,
       purpose: `${v}.purpose`,
       memberCount: `${v}.memberCount`,
+      attempts: `${v}.attempts`,
       error: `${v}.error`,
     };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -428,22 +464,25 @@ registerNode({
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.getConversationMembers.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.slack.getConversationMembers.pin_limit, type: "number", direction: "input", defaultValue: 200 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "memberIds", label: i18n.nodes.slack.getConversationMembers.pin_member_ids, type: "string", container: "array", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).getConversationMembers(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), Number(inputs.limit ?? 200));
+    const result = await withRetry(async () => (await loadSlackManager()).getConversationMembers(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), Number(inputs.limit ?? 200)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getConversationMembers(${inputs.credentialName}, ${inputs.channel}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.getConversationMembers(${inputs.credentialName}, ${inputs.channel}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, memberIds: `${v}.memberIds`, error: `${v}.error` };
+    return { success: `${v}.success`, memberIds: `${v}.memberIds`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -457,21 +496,24 @@ registerNode({
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.setConversationTopic.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "topic", label: i18n.nodes.slack.setConversationTopic.pin_topic, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).setConversationTopic(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.topic ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).setConversationTopic(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.topic ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.setConversationTopic(${inputs.credentialName}, ${inputs.channel}, ${inputs.topic});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.setConversationTopic(${inputs.credentialName}, ${inputs.channel}, ${inputs.topic}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -485,21 +527,24 @@ registerNode({
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.setConversationPurpose.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "purpose", label: i18n.nodes.slack.setConversationPurpose.pin_purpose, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).setConversationPurpose(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.purpose ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).setConversationPurpose(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.purpose ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.setConversationPurpose(${inputs.credentialName}, ${inputs.channel}, ${inputs.purpose});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.setConversationPurpose(${inputs.credentialName}, ${inputs.channel}, ${inputs.purpose}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -513,21 +558,24 @@ registerNode({
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.renameConversation.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "name", label: i18n.nodes.slack.renameConversation.pin_name, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).renameConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.name ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).renameConversation(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.name ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.renameConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.name});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.renameConversation(${inputs.credentialName}, ${inputs.channel}, ${inputs.name}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -540,22 +588,25 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     { id: "limit", label: i18n.nodes.slack.listUsers.pin_limit, type: "number", direction: "input", defaultValue: 200 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "users", label: i18n.nodes.slack.listUsers.pin_users, type: "struct", subType: USER_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).listUsers(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 200));
+    const result = await withRetry(async () => (await loadSlackManager()).listUsers(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 200)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.listUsers(${inputs.credentialName}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.listUsers(${inputs.credentialName}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, users: `${v}.users`, error: `${v}.error` };
+    return { success: `${v}.success`, users: `${v}.users`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -568,6 +619,8 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     { id: "user", label: i18n.nodes.slack.getUserInfo.pin_user, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "id", label: i18n.nodes.slack.getUserInfo.pin_id, type: "string", direction: "output" },
@@ -575,19 +628,20 @@ registerNode({
     { id: "realName", label: i18n.nodes.slack.getUserInfo.pin_real_name, type: "string", direction: "output" },
     { id: "email", label: i18n.nodes.slack.getUserInfo.pin_email, type: "string", direction: "output" },
     { id: "isBot", label: i18n.nodes.slack.getUserInfo.pin_is_bot, type: "boolean", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).getUserInfo(String(inputs.credentialName ?? ""), String(inputs.user ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).getUserInfo(String(inputs.credentialName ?? ""), String(inputs.user ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getUserInfo(${inputs.credentialName}, ${inputs.user});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.getUserInfo(${inputs.credentialName}, ${inputs.user}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, realName: `${v}.realName`, email: `${v}.email`, isBot: `${v}.isBot`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, realName: `${v}.realName`, email: `${v}.email`, isBot: `${v}.isBot`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -600,24 +654,27 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     { id: "email", label: i18n.nodes.slack.lookupUserByEmail.pin_email, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "id", label: i18n.nodes.slack.lookupUserByEmail.pin_id, type: "string", direction: "output" },
     { id: "name", label: i18n.nodes.slack.lookupUserByEmail.pin_name, type: "string", direction: "output" },
     { id: "realName", label: i18n.nodes.slack.lookupUserByEmail.pin_real_name, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).lookupUserByEmail(String(inputs.credentialName ?? ""), String(inputs.email ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).lookupUserByEmail(String(inputs.credentialName ?? ""), String(inputs.email ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.lookupUserByEmail(${inputs.credentialName}, ${inputs.email});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.lookupUserByEmail(${inputs.credentialName}, ${inputs.email}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, realName: `${v}.realName`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, realName: `${v}.realName`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -634,23 +691,33 @@ registerNode({
     { id: "content", label: i18n.nodes.slack.uploadFile.pin_content, type: "string", direction: "input", defaultValue: "" },
     { id: "encoding", label: i18n.nodes.slack.__shared.pin_encoding, type: "enum", subType: TEXT_ENCODING_ENUM_TYPE, direction: "input", defaultValue: "utf8", options: enumOptionIds(TEXT_ENCODING_ENUM_TYPE) },
     { id: "initialComment", label: i18n.nodes.slack.uploadFile.pin_initial_comment, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "fileId", label: i18n.nodes.slack.uploadFile.pin_file_id, type: "string", direction: "output" },
     { id: "permalink", label: i18n.nodes.slack.uploadFile.pin_permalink, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).uploadFile(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.filename ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", String(inputs.initialComment ?? ""));
+    const result = await withRetry(
+      async () => (await loadSlackManager()).uploadFile(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.filename ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", String(inputs.initialComment ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.uploadFile(${inputs.credentialName}, ${inputs.channel}, ${inputs.filename}, ${inputs.content}, ${inputs.encoding}, ${inputs.initialComment});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.uploadFile(${inputs.credentialName}, ${inputs.channel}, ${inputs.filename}, ${inputs.content}, ${inputs.encoding}, ${inputs.initialComment}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, fileId: `${v}.fileId`, permalink: `${v}.permalink`, error: `${v}.error` };
+    return { success: `${v}.success`, fileId: `${v}.fileId`, permalink: `${v}.permalink`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -659,18 +726,18 @@ registerNode({
   description: i18n.nodes.slack.deleteFile.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), { id: "fileId", label: i18n.nodes.slack.deleteFile.pin_file_id, type: "string", direction: "input", defaultValue: "" }, execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), { id: "fileId", label: i18n.nodes.slack.deleteFile.pin_file_id, type: "string", direction: "input", defaultValue: "" }, retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).deleteFile(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).deleteFile(String(inputs.credentialName ?? ""), String(inputs.fileId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.deleteFile(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.deleteFile(${inputs.credentialName}, ${inputs.fileId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -683,6 +750,8 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     { id: "fileId", label: i18n.nodes.slack.getFileInfo.pin_file_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "id", label: i18n.nodes.slack.getFileInfo.pin_id, type: "string", direction: "output" },
@@ -690,19 +759,20 @@ registerNode({
     { id: "title", label: i18n.nodes.slack.getFileInfo.pin_title, type: "string", direction: "output" },
     { id: "permalink", label: i18n.nodes.slack.getFileInfo.pin_permalink, type: "string", direction: "output" },
     { id: "size", label: i18n.nodes.slack.getFileInfo.pin_size, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).getFileInfo(String(inputs.credentialName ?? ""), String(inputs.fileId ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).getFileInfo(String(inputs.credentialName ?? ""), String(inputs.fileId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getFileInfo(${inputs.credentialName}, ${inputs.fileId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.getFileInfo(${inputs.credentialName}, ${inputs.fileId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, title: `${v}.title`, permalink: `${v}.permalink`, size: `${v}.size`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, title: `${v}.title`, permalink: `${v}.permalink`, size: `${v}.size`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -717,21 +787,27 @@ registerNode({
     { id: "channel", label: i18n.nodes.slack.addReaction.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "timestamp", label: i18n.nodes.slack.addReaction.pin_timestamp, type: "string", direction: "input", defaultValue: "" },
     { id: "emojiName", label: i18n.nodes.slack.addReaction.pin_emoji_name, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).addReaction(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? ""), String(inputs.emojiName ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).addReaction(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? ""), String(inputs.emojiName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.addReaction(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp}, ${inputs.emojiName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.addReaction(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp}, ${inputs.emojiName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -746,21 +822,27 @@ registerNode({
     { id: "channel", label: i18n.nodes.slack.removeReaction.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "timestamp", label: i18n.nodes.slack.removeReaction.pin_timestamp, type: "string", direction: "input", defaultValue: "" },
     { id: "emojiName", label: i18n.nodes.slack.removeReaction.pin_emoji_name, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).removeReaction(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? ""), String(inputs.emojiName ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).removeReaction(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? ""), String(inputs.emojiName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.removeReaction(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp}, ${inputs.emojiName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.removeReaction(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp}, ${inputs.emojiName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -774,21 +856,24 @@ registerNode({
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.addPin.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "timestamp", label: i18n.nodes.slack.addPin.pin_timestamp, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).addPin(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).addPin(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.addPin(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.addPin(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -802,21 +887,24 @@ registerNode({
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.removePin.pin_channel, type: "string", direction: "input", defaultValue: "" },
     { id: "timestamp", label: i18n.nodes.slack.removePin.pin_timestamp, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).removePin(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).removePin(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""), String(inputs.timestamp ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.removePin(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.removePin(${inputs.credentialName}, ${inputs.channel}, ${inputs.timestamp}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -829,22 +917,25 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     { id: "channel", label: i18n.nodes.slack.listPins.pin_channel, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "items", label: i18n.nodes.slack.listPins.pin_items, type: "struct", subType: PIN_ITEM_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).listPins(String(inputs.credentialName ?? ""), String(inputs.channel ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).listPins(String(inputs.credentialName ?? ""), String(inputs.channel ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.listPins(${inputs.credentialName}, ${inputs.channel});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.listPins(${inputs.credentialName}, ${inputs.channel}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, items: `${v}.items`, error: `${v}.error` };
+    return { success: `${v}.success`, items: `${v}.items`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -858,22 +949,25 @@ registerNode({
     credentialNamePin(),
     { id: "query", label: i18n.nodes.slack.searchMessages.pin_query, type: "string", direction: "input", defaultValue: "" },
     { id: "count", label: i18n.nodes.slack.searchMessages.pin_count, type: "number", direction: "input", defaultValue: 20 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "matches", label: i18n.nodes.slack.searchMessages.pin_matches, type: "struct", subType: SEARCH_MATCH_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).searchMessages(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), Number(inputs.count ?? 20));
+    const result = await withRetry(async () => (await loadSlackManager()).searchMessages(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), Number(inputs.count ?? 20)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.searchMessages(${inputs.credentialName}, ${inputs.query}, ${inputs.count});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.searchMessages(${inputs.credentialName}, ${inputs.query}, ${inputs.count}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, matches: `${v}.matches`, error: `${v}.error` };
+    return { success: `${v}.success`, matches: `${v}.matches`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -885,24 +979,27 @@ registerNode({
   pins: [
     execInPin(),
     credentialNamePin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "id", label: i18n.nodes.slack.getTeamInfo.pin_id, type: "string", direction: "output" },
     { id: "name", label: i18n.nodes.slack.getTeamInfo.pin_name, type: "string", direction: "output" },
     { id: "domain", label: i18n.nodes.slack.getTeamInfo.pin_domain, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).getTeamInfo(String(inputs.credentialName ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).getTeamInfo(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.getTeamInfo(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.getTeamInfo(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, domain: `${v}.domain`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, name: `${v}.name`, domain: `${v}.domain`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -911,18 +1008,18 @@ registerNode({
   description: i18n.nodes.slack.listUserGroups.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "groups", label: i18n.nodes.slack.listUserGroups.pin_groups, type: "struct", subType: USER_GROUP_STRUCT_TYPE, container: "array", direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "groups", label: i18n.nodes.slack.listUserGroups.pin_groups, type: "struct", subType: USER_GROUP_STRUCT_TYPE, container: "array", direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).listUserGroups(String(inputs.credentialName ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).listUserGroups(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.listUserGroups(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.listUserGroups(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, groups: `${v}.groups`, error: `${v}.error` };
+    return { success: `${v}.success`, groups: `${v}.groups`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -936,22 +1033,25 @@ registerNode({
     credentialNamePin(),
     { id: "name", label: i18n.nodes.slack.createUserGroup.pin_name, type: "string", direction: "input", defaultValue: "" },
     { id: "handle", label: i18n.nodes.slack.createUserGroup.pin_handle, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "id", label: i18n.nodes.slack.createUserGroup.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).createUserGroup(String(inputs.credentialName ?? ""), String(inputs.name ?? ""), String(inputs.handle ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).createUserGroup(String(inputs.credentialName ?? ""), String(inputs.name ?? ""), String(inputs.handle ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.createUserGroup(${inputs.credentialName}, ${inputs.name}, ${inputs.handle});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.createUserGroup(${inputs.credentialName}, ${inputs.name}, ${inputs.handle}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -966,21 +1066,27 @@ registerNode({
     { id: "usergroup", label: i18n.nodes.slack.updateUserGroup.pin_usergroup, type: "string", direction: "input", defaultValue: "" },
     { id: "name", label: i18n.nodes.slack.updateUserGroup.pin_name, type: "string", direction: "input", defaultValue: "" },
     { id: "handle", label: i18n.nodes.slack.updateUserGroup.pin_handle, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).updateUserGroup(String(inputs.credentialName ?? ""), String(inputs.usergroup ?? ""), String(inputs.name ?? ""), String(inputs.handle ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).updateUserGroup(String(inputs.credentialName ?? ""), String(inputs.usergroup ?? ""), String(inputs.name ?? ""), String(inputs.handle ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.updateUserGroup(${inputs.credentialName}, ${inputs.usergroup}, ${inputs.name}, ${inputs.handle});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.updateUserGroup(${inputs.credentialName}, ${inputs.usergroup}, ${inputs.name}, ${inputs.handle}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -994,21 +1100,24 @@ registerNode({
     credentialNamePin(),
     { id: "usergroup", label: i18n.nodes.slack.updateUserGroupUsers.pin_usergroup, type: "string", direction: "input", defaultValue: "" },
     { id: "userIds", label: i18n.nodes.slack.updateUserGroupUsers.pin_user_ids, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).updateUserGroupUsers(String(inputs.credentialName ?? ""), String(inputs.usergroup ?? ""), String(inputs.userIds ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).updateUserGroupUsers(String(inputs.credentialName ?? ""), String(inputs.usergroup ?? ""), String(inputs.userIds ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.updateUserGroupUsers(${inputs.credentialName}, ${inputs.usergroup}, ${inputs.userIds});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.updateUserGroupUsers(${inputs.credentialName}, ${inputs.usergroup}, ${inputs.userIds}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1023,22 +1132,25 @@ registerNode({
     { id: "text", label: i18n.nodes.slack.addReminder.pin_text, type: "string", direction: "input", defaultValue: "" },
     { id: "time", label: i18n.nodes.slack.addReminder.pin_time, type: "string", direction: "input", defaultValue: "" },
     { id: "user", label: i18n.nodes.slack.addReminder.pin_user, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "reminderId", label: i18n.nodes.slack.addReminder.pin_reminder_id, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).addReminder(String(inputs.credentialName ?? ""), String(inputs.text ?? ""), String(inputs.time ?? ""), String(inputs.user ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, reminderId: result.reminderId, error: result.error } };
+    const result = await withRetry(async () => (await loadSlackManager()).addReminder(String(inputs.credentialName ?? ""), String(inputs.text ?? ""), String(inputs.time ?? ""), String(inputs.user ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, reminderId: result.reminderId, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.addReminder(${inputs.credentialName}, ${inputs.text}, ${inputs.time}, ${inputs.user});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.addReminder(${inputs.credentialName}, ${inputs.text}, ${inputs.time}, ${inputs.user}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, reminderId: `${v}.reminderId`, error: `${v}.error` };
+    return { success: `${v}.success`, reminderId: `${v}.reminderId`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1047,18 +1159,18 @@ registerNode({
   description: i18n.nodes.slack.listReminders.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "reminders", label: i18n.nodes.slack.listReminders.pin_reminders, type: "struct", subType: REMINDER_STRUCT_TYPE, container: "array", direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "reminders", label: i18n.nodes.slack.listReminders.pin_reminders, type: "struct", subType: REMINDER_STRUCT_TYPE, container: "array", direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).listReminders(String(inputs.credentialName ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).listReminders(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.listReminders(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.listReminders(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, reminders: `${v}.reminders`, error: `${v}.error` };
+    return { success: `${v}.success`, reminders: `${v}.reminders`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1067,16 +1179,16 @@ registerNode({
   description: i18n.nodes.slack.deleteReminder.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), { id: "reminderId", label: i18n.nodes.slack.deleteReminder.pin_reminder_id, type: "string", direction: "input", defaultValue: "" }, execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), { id: "reminderId", label: i18n.nodes.slack.deleteReminder.pin_reminder_id, type: "string", direction: "input", defaultValue: "" }, retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSlackManager()).deleteReminder(String(inputs.credentialName ?? ""), String(inputs.reminderId ?? ""));
+    const result = await withRetry(async () => (await loadSlackManager()).deleteReminder(String(inputs.credentialName ?? ""), String(inputs.reminderId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SlackManager.deleteReminder(${inputs.credentialName}, ${inputs.reminderId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SlackManager.deleteReminder(${inputs.credentialName}, ${inputs.reminderId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SLACK_MANAGER_IMPORT],
+  compileImports: [SLACK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

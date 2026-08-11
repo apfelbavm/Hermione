@@ -1,8 +1,10 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, KINESIS_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { KINESIS_STREAM_MODE_ENUM_TYPE, KINESIS_SHARD_ITERATOR_TYPE_ENUM_TYPE, KINESIS_ENCRYPTION_TYPE_ENUM_TYPE, KINESIS_SCALING_TYPE_ENUM_TYPE } from "@hermione/graph/enum/kinesis";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // Every operation below calls the exact same KinesisManager static method (packages/core/src/lib/
@@ -65,22 +67,28 @@ registerNode({
     streamNamePin(),
     { id: "shardCount", label: i18n.nodes.kinesis.createStream.pin_shard_count, type: "number", direction: "input", defaultValue: 1, integer: true },
     { id: "streamMode", label: i18n.nodes.kinesis.createStream.pin_stream_mode, type: "enum", subType: KINESIS_STREAM_MODE_ENUM_TYPE, direction: "input", defaultValue: "ON_DEMAND", options: enumOptionIds(KINESIS_STREAM_MODE_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
     const streamMode = inputs.streamMode === "PROVISIONED" ? "PROVISIONED" : "ON_DEMAND";
-    const result = await (await loadKinesisManager()).createStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.shardCount) || 0, streamMode);
+    const result = await withRetry(async () => (await loadKinesisManager()).createStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.shardCount) || 0, streamMode), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.createStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardCount}, ${inputs.streamMode});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.createStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardCount}, ${inputs.streamMode}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -89,18 +97,32 @@ registerNode({
   description: i18n.nodes.kinesis.deleteStream.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "enforceConsumerDeletion", label: i18n.nodes.kinesis.deleteStream.pin_enforce_consumer_deletion, type: "boolean", direction: "input", defaultValue: false }, execOutPin(), successPin(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    streamNamePin(),
+    { id: "enforceConsumerDeletion", label: i18n.nodes.kinesis.deleteStream.pin_enforce_consumer_deletion, type: "boolean", direction: "input", defaultValue: false },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).deleteStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Boolean(inputs.enforceConsumerDeletion));
+    const result = await withRetry(async () => (await loadKinesisManager()).deleteStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Boolean(inputs.enforceConsumerDeletion)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.deleteStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.enforceConsumerDeletion});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.deleteStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.enforceConsumerDeletion}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -114,23 +136,26 @@ registerNode({
     credentialNamePin(),
     { id: "exclusiveStartStreamName", label: i18n.nodes.kinesis.listStreams.pin_exclusive_start_stream_name, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.kinesis.__shared.pin_limit, type: "number", direction: "input", defaultValue: 0, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "streamNames", label: i18n.nodes.kinesis.listStreams.pin_stream_names, type: "string", container: "array", direction: "output" },
     { id: "hasMoreStreams", label: i18n.nodes.kinesis.listStreams.pin_has_more_streams, type: "boolean", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).listStreams(String(inputs.credentialName ?? ""), String(inputs.exclusiveStartStreamName ?? ""), Number(inputs.limit) || 0);
+    const result = await withRetry(async () => (await loadKinesisManager()).listStreams(String(inputs.credentialName ?? ""), String(inputs.exclusiveStartStreamName ?? ""), Number(inputs.limit) || 0), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.listStreams(${inputs.credentialName}, ${inputs.exclusiveStartStreamName}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.listStreams(${inputs.credentialName}, ${inputs.exclusiveStartStreamName}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, streamNames: `${v}.streamNames`, hasMoreStreams: `${v}.hasMoreStreams`, error: `${v}.error` };
+    return { success: `${v}.success`, streamNames: `${v}.streamNames`, hasMoreStreams: `${v}.hasMoreStreams`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -143,6 +168,8 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     streamNamePin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "streamArn", label: i18n.nodes.kinesis.describeStreamSummary.pin_stream_arn, type: "string", direction: "output" },
@@ -152,14 +179,15 @@ registerNode({
     { id: "openShardCount", label: i18n.nodes.kinesis.describeStreamSummary.pin_open_shard_count, type: "number", direction: "output" },
     { id: "encryptionType", label: i18n.nodes.kinesis.describeStreamSummary.pin_encryption_type, type: "string", direction: "output" },
     { id: "keyId", label: i18n.nodes.kinesis.describeStreamSummary.pin_key_id, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).describeStreamSummary(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""));
+    const result = await withRetry(async () => (await loadKinesisManager()).describeStreamSummary(String(inputs.credentialName ?? ""), String(inputs.streamName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.describeStreamSummary(${inputs.credentialName}, ${inputs.streamName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.describeStreamSummary(${inputs.credentialName}, ${inputs.streamName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -171,10 +199,11 @@ registerNode({
       openShardCount: `${v}.openShardCount`,
       encryptionType: `${v}.encryptionType`,
       keyId: `${v}.keyId`,
+      attempts: `${v}.attempts`,
       error: `${v}.error`,
     };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -186,23 +215,26 @@ registerNode({
   pins: [
     execInPin(),
     credentialNamePin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "shardLimit", label: i18n.nodes.kinesis.describeLimits.pin_shard_limit, type: "number", direction: "output" },
     { id: "openShardCount", label: i18n.nodes.kinesis.describeLimits.pin_open_shard_count, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).describeLimits(String(inputs.credentialName ?? ""));
+    const result = await withRetry(async () => (await loadKinesisManager()).describeLimits(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.describeLimits(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.describeLimits(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, shardLimit: `${v}.shardLimit`, openShardCount: `${v}.openShardCount`, error: `${v}.error` };
+    return { success: `${v}.success`, shardLimit: `${v}.shardLimit`, openShardCount: `${v}.openShardCount`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -211,18 +243,32 @@ registerNode({
   description: i18n.nodes.kinesis.increaseStreamRetentionPeriod.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "retentionPeriodHours", label: i18n.nodes.kinesis.__shared.pin_retention_period_hours, type: "number", direction: "input", defaultValue: 24, integer: true }, execOutPin(), successPin(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    streamNamePin(),
+    { id: "retentionPeriodHours", label: i18n.nodes.kinesis.__shared.pin_retention_period_hours, type: "number", direction: "input", defaultValue: 24, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).increaseStreamRetentionPeriod(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.retentionPeriodHours) || 0);
+    const result = await withRetry(async () => (await loadKinesisManager()).increaseStreamRetentionPeriod(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.retentionPeriodHours) || 0), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.increaseStreamRetentionPeriod(${inputs.credentialName}, ${inputs.streamName}, ${inputs.retentionPeriodHours});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.increaseStreamRetentionPeriod(${inputs.credentialName}, ${inputs.streamName}, ${inputs.retentionPeriodHours}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -231,18 +277,32 @@ registerNode({
   description: i18n.nodes.kinesis.decreaseStreamRetentionPeriod.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "retentionPeriodHours", label: i18n.nodes.kinesis.__shared.pin_retention_period_hours, type: "number", direction: "input", defaultValue: 24, integer: true }, execOutPin(), successPin(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    streamNamePin(),
+    { id: "retentionPeriodHours", label: i18n.nodes.kinesis.__shared.pin_retention_period_hours, type: "number", direction: "input", defaultValue: 24, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).decreaseStreamRetentionPeriod(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.retentionPeriodHours) || 0);
+    const result = await withRetry(async () => (await loadKinesisManager()).decreaseStreamRetentionPeriod(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.retentionPeriodHours) || 0), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.decreaseStreamRetentionPeriod(${inputs.credentialName}, ${inputs.streamName}, ${inputs.retentionPeriodHours});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.decreaseStreamRetentionPeriod(${inputs.credentialName}, ${inputs.streamName}, ${inputs.retentionPeriodHours}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -257,23 +317,29 @@ registerNode({
     streamNamePin(),
     { id: "targetShardCount", label: i18n.nodes.kinesis.updateShardCount.pin_target_shard_count, type: "number", direction: "input", defaultValue: 1, integer: true },
     { id: "scalingType", label: i18n.nodes.kinesis.updateShardCount.pin_scaling_type, type: "enum", subType: KINESIS_SCALING_TYPE_ENUM_TYPE, direction: "input", defaultValue: "UNIFORM_SCALING", options: enumOptionIds(KINESIS_SCALING_TYPE_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "currentShardCount", label: i18n.nodes.kinesis.updateShardCount.pin_current_shard_count, type: "number", direction: "output" },
     { id: "targetShardCountResult", label: i18n.nodes.kinesis.updateShardCount.pin_target_shard_count, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).updateShardCount(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.targetShardCount) || 0, "UNIFORM_SCALING");
-    return { nextExec: "exec-out", outputs: { success: result.success, currentShardCount: result.currentShardCount, targetShardCountResult: result.targetShardCount, error: result.error } };
+    const result = await withRetry(async () => (await loadKinesisManager()).updateShardCount(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), Number(inputs.targetShardCount) || 0, "UNIFORM_SCALING"), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, currentShardCount: result.currentShardCount, targetShardCountResult: result.targetShardCount, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.updateShardCount(${inputs.credentialName}, ${inputs.streamName}, ${inputs.targetShardCount}, ${inputs.scalingType});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.updateShardCount(${inputs.credentialName}, ${inputs.streamName}, ${inputs.targetShardCount}, ${inputs.scalingType}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, currentShardCount: `${v}.currentShardCount`, targetShardCountResult: `${v}.targetShardCount`, error: `${v}.error` };
+    return { success: `${v}.success`, currentShardCount: `${v}.currentShardCount`, targetShardCountResult: `${v}.targetShardCount`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -289,23 +355,33 @@ registerNode({
     { id: "exclusiveStartShardId", label: i18n.nodes.kinesis.listShards.pin_exclusive_start_shard_id, type: "string", direction: "input", defaultValue: "" },
     { id: "maxResults", label: i18n.nodes.kinesis.listShards.pin_max_results, type: "number", direction: "input", defaultValue: 0, integer: true },
     { id: "nextToken", label: i18n.nodes.kinesis.listShards.pin_next_token, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "shards", label: i18n.nodes.kinesis.listShards.pin_shards, type: "string", direction: "output" },
     { id: "nextTokenOut", label: i18n.nodes.kinesis.listShards.pin_next_token, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).listShards(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.exclusiveStartShardId ?? ""), Number(inputs.maxResults) || 0, String(inputs.nextToken ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, shards: result.shardsJson, nextTokenOut: result.nextToken, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadKinesisManager()).listShards(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.exclusiveStartShardId ?? ""), Number(inputs.maxResults) || 0, String(inputs.nextToken ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, shards: result.shardsJson, nextTokenOut: result.nextToken, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.listShards(${inputs.credentialName}, ${inputs.streamName}, ${inputs.exclusiveStartShardId}, ${inputs.maxResults}, ${inputs.nextToken});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.listShards(${inputs.credentialName}, ${inputs.streamName}, ${inputs.exclusiveStartShardId}, ${inputs.maxResults}, ${inputs.nextToken}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, shards: `${v}.shardsJson`, nextTokenOut: `${v}.nextToken`, error: `${v}.error` };
+    return { success: `${v}.success`, shards: `${v}.shardsJson`, nextTokenOut: `${v}.nextToken`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -320,21 +396,31 @@ registerNode({
     streamNamePin(),
     { id: "shardToMerge", label: i18n.nodes.kinesis.mergeShards.pin_shard_to_merge, type: "string", direction: "input", defaultValue: "" },
     { id: "adjacentShardToMerge", label: i18n.nodes.kinesis.mergeShards.pin_adjacent_shard_to_merge, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).mergeShards(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.shardToMerge ?? ""), String(inputs.adjacentShardToMerge ?? ""));
+    const result = await withRetry(
+      async () => (await loadKinesisManager()).mergeShards(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.shardToMerge ?? ""), String(inputs.adjacentShardToMerge ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.mergeShards(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardToMerge}, ${inputs.adjacentShardToMerge});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.mergeShards(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardToMerge}, ${inputs.adjacentShardToMerge}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -349,21 +435,27 @@ registerNode({
     streamNamePin(),
     { id: "shardToSplit", label: i18n.nodes.kinesis.splitShard.pin_shard_to_split, type: "string", direction: "input", defaultValue: "" },
     { id: "newStartingHashKey", label: i18n.nodes.kinesis.splitShard.pin_new_starting_hash_key, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).splitShard(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.shardToSplit ?? ""), String(inputs.newStartingHashKey ?? ""));
+    const result = await withRetry(async () => (await loadKinesisManager()).splitShard(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.shardToSplit ?? ""), String(inputs.newStartingHashKey ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.splitShard(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardToSplit}, ${inputs.newStartingHashKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.splitShard(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardToSplit}, ${inputs.newStartingHashKey}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -379,23 +471,33 @@ registerNode({
     { id: "data", label: i18n.nodes.kinesis.__shared.pin_data, type: "string", direction: "input", defaultValue: "" },
     { id: "partitionKey", label: i18n.nodes.kinesis.__shared.pin_partition_key, type: "string", direction: "input", defaultValue: "" },
     { id: "explicitHashKey", label: i18n.nodes.kinesis.__shared.pin_explicit_hash_key, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "shardId", label: i18n.nodes.kinesis.putRecord.pin_shard_id, type: "string", direction: "output" },
     { id: "sequenceNumber", label: i18n.nodes.kinesis.putRecord.pin_sequence_number, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).putRecord(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.data ?? ""), String(inputs.partitionKey ?? ""), String(inputs.explicitHashKey ?? ""));
+    const result = await withRetry(
+      async () => (await loadKinesisManager()).putRecord(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.data ?? ""), String(inputs.partitionKey ?? ""), String(inputs.explicitHashKey ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.putRecord(${inputs.credentialName}, ${inputs.streamName}, ${inputs.data}, ${inputs.partitionKey}, ${inputs.explicitHashKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.putRecord(${inputs.credentialName}, ${inputs.streamName}, ${inputs.data}, ${inputs.partitionKey}, ${inputs.explicitHashKey}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, shardId: `${v}.shardId`, sequenceNumber: `${v}.sequenceNumber`, error: `${v}.error` };
+    return { success: `${v}.success`, shardId: `${v}.shardId`, sequenceNumber: `${v}.sequenceNumber`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -409,23 +511,26 @@ registerNode({
     credentialNamePin(),
     streamNamePin(),
     { id: "records", label: i18n.nodes.kinesis.putRecords.pin_records, type: "string", direction: "input", defaultValue: "[]" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "failedRecordCount", label: i18n.nodes.kinesis.putRecords.pin_failed_record_count, type: "number", direction: "output" },
     { id: "resultRecords", label: i18n.nodes.kinesis.putRecords.pin_result_records, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).putRecords(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.records ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, failedRecordCount: result.failedRecordCount, resultRecords: result.recordsJson, error: result.error } };
+    const result = await withRetry(async () => (await loadKinesisManager()).putRecords(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.records ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, failedRecordCount: result.failedRecordCount, resultRecords: result.recordsJson, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.putRecords(${inputs.credentialName}, ${inputs.streamName}, ${inputs.records});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.putRecords(${inputs.credentialName}, ${inputs.streamName}, ${inputs.records}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, failedRecordCount: `${v}.failedRecordCount`, resultRecords: `${v}.recordsJson`, error: `${v}.error` };
+    return { success: `${v}.success`, failedRecordCount: `${v}.failedRecordCount`, resultRecords: `${v}.recordsJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -442,27 +547,34 @@ registerNode({
     { id: "shardIteratorType", label: i18n.nodes.kinesis.getShardIterator.pin_shard_iterator_type, type: "enum", subType: KINESIS_SHARD_ITERATOR_TYPE_ENUM_TYPE, direction: "input", defaultValue: "LATEST", options: enumOptionIds(KINESIS_SHARD_ITERATOR_TYPE_ENUM_TYPE) },
     { id: "startingSequenceNumber", label: i18n.nodes.kinesis.getShardIterator.pin_starting_sequence_number, type: "string", direction: "input", defaultValue: "" },
     { id: "timestamp", label: i18n.nodes.kinesis.getShardIterator.pin_timestamp, type: "number", direction: "input", defaultValue: 0, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "shardIterator", label: i18n.nodes.kinesis.getShardIterator.pin_shard_iterator, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
     const validTypes = ["AT_SEQUENCE_NUMBER", "AFTER_SEQUENCE_NUMBER", "AT_TIMESTAMP", "TRIM_HORIZON", "LATEST"];
     const shardIteratorType = validTypes.includes(String(inputs.shardIteratorType)) ? (inputs.shardIteratorType as "AT_SEQUENCE_NUMBER" | "AFTER_SEQUENCE_NUMBER" | "AT_TIMESTAMP" | "TRIM_HORIZON" | "LATEST") : "LATEST";
-    const result = await (await loadKinesisManager()).getShardIterator(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.shardId ?? ""), shardIteratorType, String(inputs.startingSequenceNumber ?? ""), Number(inputs.timestamp) || 0);
+    const result = await withRetry(
+      async () => (await loadKinesisManager()).getShardIterator(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.shardId ?? ""), shardIteratorType, String(inputs.startingSequenceNumber ?? ""), Number(inputs.timestamp) || 0),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await KinesisManager.getShardIterator(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardId}, ${inputs.shardIteratorType}, ${inputs.startingSequenceNumber}, ${inputs.timestamp});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.getShardIterator(${inputs.credentialName}, ${inputs.streamName}, ${inputs.shardId}, ${inputs.shardIteratorType}, ${inputs.startingSequenceNumber}, ${inputs.timestamp}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, shardIterator: `${v}.shardIterator`, error: `${v}.error` };
+    return { success: `${v}.success`, shardIterator: `${v}.shardIterator`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -476,24 +588,27 @@ registerNode({
     credentialNamePin(),
     { id: "shardIterator", label: i18n.nodes.kinesis.getRecords.pin_shard_iterator, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.kinesis.__shared.pin_limit, type: "number", direction: "input", defaultValue: 0, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "records", label: i18n.nodes.kinesis.getRecords.pin_records, type: "string", direction: "output" },
     { id: "nextShardIterator", label: i18n.nodes.kinesis.getRecords.pin_next_shard_iterator, type: "string", direction: "output" },
     { id: "millisBehindLatest", label: i18n.nodes.kinesis.getRecords.pin_millis_behind_latest, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).getRecords(String(inputs.credentialName ?? ""), String(inputs.shardIterator ?? ""), Number(inputs.limit) || 0);
-    return { nextExec: "exec-out", outputs: { success: result.success, records: result.recordsJson, nextShardIterator: result.nextShardIterator, millisBehindLatest: result.millisBehindLatest, error: result.error } };
+    const result = await withRetry(async () => (await loadKinesisManager()).getRecords(String(inputs.credentialName ?? ""), String(inputs.shardIterator ?? ""), Number(inputs.limit) || 0), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, records: result.recordsJson, nextShardIterator: result.nextShardIterator, millisBehindLatest: result.millisBehindLatest, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.getRecords(${inputs.credentialName}, ${inputs.shardIterator}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.getRecords(${inputs.credentialName}, ${inputs.shardIterator}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, records: `${v}.recordsJson`, nextShardIterator: `${v}.nextShardIterator`, millisBehindLatest: `${v}.millisBehindLatest`, error: `${v}.error` };
+    return { success: `${v}.success`, records: `${v}.recordsJson`, nextShardIterator: `${v}.nextShardIterator`, millisBehindLatest: `${v}.millisBehindLatest`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -502,18 +617,18 @@ registerNode({
   description: i18n.nodes.kinesis.addTagsToStream.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "tags", label: i18n.nodes.kinesis.addTagsToStream.pin_tags, type: "string", direction: "input", defaultValue: "{}" }, execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "tags", label: i18n.nodes.kinesis.addTagsToStream.pin_tags, type: "string", direction: "input", defaultValue: "{}" }, retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).addTagsToStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.tags ?? ""));
+    const result = await withRetry(async () => (await loadKinesisManager()).addTagsToStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.tags ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.addTagsToStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.tags});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.addTagsToStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.tags}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -522,18 +637,18 @@ registerNode({
   description: i18n.nodes.kinesis.removeTagsFromStream.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "tagKeys", label: i18n.nodes.kinesis.removeTagsFromStream.pin_tag_keys, type: "string", direction: "input", defaultValue: "[]" }, execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), streamNamePin(), { id: "tagKeys", label: i18n.nodes.kinesis.removeTagsFromStream.pin_tag_keys, type: "string", direction: "input", defaultValue: "[]" }, retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).removeTagsFromStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.tagKeys ?? ""));
+    const result = await withRetry(async () => (await loadKinesisManager()).removeTagsFromStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.tagKeys ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.removeTagsFromStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.tagKeys});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.removeTagsFromStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.tagKeys}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -548,23 +663,33 @@ registerNode({
     streamNamePin(),
     { id: "exclusiveStartTagKey", label: i18n.nodes.kinesis.listTagsForStream.pin_exclusive_start_tag_key, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.kinesis.__shared.pin_limit, type: "number", direction: "input", defaultValue: 0, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "tags", label: i18n.nodes.kinesis.listTagsForStream.pin_tags, type: "string", direction: "output" },
     { id: "hasMoreTags", label: i18n.nodes.kinesis.listTagsForStream.pin_has_more_tags, type: "boolean", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadKinesisManager()).listTagsForStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.exclusiveStartTagKey ?? ""), Number(inputs.limit) || 0);
-    return { nextExec: "exec-out", outputs: { success: result.success, tags: result.tagsJson, hasMoreTags: result.hasMoreTags, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadKinesisManager()).listTagsForStream(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), String(inputs.exclusiveStartTagKey ?? ""), Number(inputs.limit) || 0),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, tags: result.tagsJson, hasMoreTags: result.hasMoreTags, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.listTagsForStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.exclusiveStartTagKey}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.listTagsForStream(${inputs.credentialName}, ${inputs.streamName}, ${inputs.exclusiveStartTagKey}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, tags: `${v}.tagsJson`, hasMoreTags: `${v}.hasMoreTags`, error: `${v}.error` };
+    return { success: `${v}.success`, tags: `${v}.tagsJson`, hasMoreTags: `${v}.hasMoreTags`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -579,22 +704,28 @@ registerNode({
     streamNamePin(),
     { id: "encryptionType", label: i18n.nodes.kinesis.startStreamEncryption.pin_encryption_type, type: "enum", subType: KINESIS_ENCRYPTION_TYPE_ENUM_TYPE, direction: "input", defaultValue: "KMS", options: enumOptionIds(KINESIS_ENCRYPTION_TYPE_ENUM_TYPE) },
     { id: "keyId", label: i18n.nodes.kinesis.startStreamEncryption.pin_key_id, type: "string", direction: "input", defaultValue: "alias/aws/kinesis" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
     const encryptionType = inputs.encryptionType === "NONE" ? "NONE" : "KMS";
-    const result = await (await loadKinesisManager()).startStreamEncryption(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), encryptionType, String(inputs.keyId ?? ""));
+    const result = await withRetry(async () => (await loadKinesisManager()).startStreamEncryption(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), encryptionType, String(inputs.keyId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.startStreamEncryption(${inputs.credentialName}, ${inputs.streamName}, ${inputs.encryptionType}, ${inputs.keyId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.startStreamEncryption(${inputs.credentialName}, ${inputs.streamName}, ${inputs.encryptionType}, ${inputs.keyId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -609,20 +740,26 @@ registerNode({
     streamNamePin(),
     { id: "encryptionType", label: i18n.nodes.kinesis.stopStreamEncryption.pin_encryption_type, type: "enum", subType: KINESIS_ENCRYPTION_TYPE_ENUM_TYPE, direction: "input", defaultValue: "KMS", options: enumOptionIds(KINESIS_ENCRYPTION_TYPE_ENUM_TYPE) },
     { id: "keyId", label: i18n.nodes.kinesis.stopStreamEncryption.pin_key_id, type: "string", direction: "input", defaultValue: "alias/aws/kinesis" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
     const encryptionType = inputs.encryptionType === "NONE" ? "NONE" : "KMS";
-    const result = await (await loadKinesisManager()).stopStreamEncryption(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), encryptionType, String(inputs.keyId ?? ""));
+    const result = await withRetry(async () => (await loadKinesisManager()).stopStreamEncryption(String(inputs.credentialName ?? ""), String(inputs.streamName ?? ""), encryptionType, String(inputs.keyId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await KinesisManager.stopStreamEncryption(${inputs.credentialName}, ${inputs.streamName}, ${inputs.encryptionType}, ${inputs.keyId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => KinesisManager.stopStreamEncryption(${inputs.credentialName}, ${inputs.streamName}, ${inputs.encryptionType}, ${inputs.keyId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [KINESIS_MANAGER_IMPORT],
+  compileImports: [KINESIS_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

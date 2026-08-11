@@ -155,17 +155,17 @@ describe("soap.call", () => {
     const node = buildGraph("soap.call").node;
     const statements = def.compileExecute!({
       node,
-      inputs: { credentialName: "c", wsdlUrl: "w", operation: "o", args: "a", endpointOverride: "e", headers: "h", timeoutMs: "t" },
+      inputs: { credentialName: "c", wsdlUrl: "w", operation: "o", args: "a", endpointOverride: "e", headers: "h", timeoutMs: "t", retryCount: "rc", retryDelayMs: "rd" },
       graph: {} as never,
       compileFrom: () => ["/* continuation */"],
     });
-    expect(statements[0]).toBe("const __result_req = await SoapManager.call(c, w, o, a, e, h, t);");
+    expect(statements[0]).toBe("const __result_req = await withRetry(() => SoapManager.call(c, w, o, a, e, h, t), rc, rd);");
     expect(statements[1]).toBe("/* continuation */");
   });
 
   it("compileImports declares the SoapManager module the compiled output needs", () => {
     const def = getNodeDef("soap.call");
-    expect(def.compileImports).toEqual(['import { SoapManager } from "../../packages/core/src/lib/soapManager.ts";']);
+    expect(def.compileImports).toEqual(['import { SoapManager } from "../../packages/core/src/lib/soapManager.ts";', 'import { withRetry } from "../../packages/core/src/lib/retry.ts";']);
   });
 });
 
@@ -190,11 +190,11 @@ describe("soap.describe", () => {
     const node = buildGraph("soap.describe").node;
     const statements = def.compileExecute!({
       node,
-      inputs: { wsdlUrl: "w", timeoutMs: "t" },
+      inputs: { wsdlUrl: "w", timeoutMs: "t", retryCount: "rc", retryDelayMs: "rd" },
       graph: {} as never,
       compileFrom: () => ["/* continuation */"],
     });
-    expect(statements[0]).toBe("const __result_req = await SoapManager.describe(w, t);");
+    expect(statements[0]).toBe("const __result_req = await withRetry(() => SoapManager.describe(w, t), rc, rd);");
 
     const outputs = def.compileExecuteOutputs!({ node } as never);
     expect(outputs.description).toBe("__result_req.descriptionJson");

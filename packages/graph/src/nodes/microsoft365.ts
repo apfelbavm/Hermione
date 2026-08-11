@@ -1,6 +1,8 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, MICROSOFT365_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import {
   USER_STRUCT_TYPE,
   GROUP_STRUCT_TYPE,
@@ -117,22 +119,25 @@ registerNode({
     credentialNamePin(),
     { id: "filter", label: i18n.nodes.microsoft365.__shared.pin_filter, type: "string", direction: "input", defaultValue: "" },
     { id: "top", label: i18n.nodes.microsoft365.__shared.pin_top, type: "number", direction: "input", defaultValue: 100 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "users", label: i18n.nodes.microsoft365.listUsers.pin_users, type: "struct", subType: USER_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listUsers(String(inputs.credentialName ?? ""), String(inputs.filter ?? ""), Number(inputs.top ?? 100));
+    const result = await withRetry(async () => (await loadGraphManager()).listUsers(String(inputs.credentialName ?? ""), String(inputs.filter ?? ""), Number(inputs.top ?? 100)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listUsers(${inputs.credentialName}, ${inputs.filter}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listUsers(${inputs.credentialName}, ${inputs.filter}, ${inputs.top}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, users: `${v}.users`, error: `${v}.error` };
+    return { success: `${v}.success`, users: `${v}.users`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -141,10 +146,21 @@ registerNode({
   description: i18n.nodes.microsoft365.getUser.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "user", label: i18n.nodes.microsoft365.graphUser.label, type: "struct", subType: USER_STRUCT_TYPE, direction: "output" }, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    { id: "user", label: i18n.nodes.microsoft365.graphUser.label, type: "struct", subType: USER_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).getUser(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).getUser(String(inputs.credentialName ?? ""), String(inputs.userId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -155,16 +171,17 @@ registerNode({
           userPrincipalName: result.userPrincipalName,
           mail: result.mail,
         },
+        attempts: result.attempts,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.getUser(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.getUser(${inputs.credentialName}, ${inputs.userId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, user: `{ id: ${v}.id, displayName: ${v}.displayName, userPrincipalName: ${v}.userPrincipalName, mail: ${v}.mail }`, error: `${v}.error` };
+    return { success: `${v}.success`, user: `{ id: ${v}.id, displayName: ${v}.displayName, userPrincipalName: ${v}.userPrincipalName, mail: ${v}.mail }`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -181,25 +198,32 @@ registerNode({
     { id: "mailNickname", label: i18n.nodes.microsoft365.__shared.pin_mail_nickname, type: "string", direction: "input", defaultValue: "" },
     { id: "password", label: i18n.nodes.microsoft365.createUser.pin_password, type: "string", direction: "input", defaultValue: "" },
     { id: "forceChangePasswordNextSignIn", label: i18n.nodes.microsoft365.createUser.pin_force_change_password, type: "boolean", direction: "input", defaultValue: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).createUser(String(inputs.credentialName ?? ""), String(inputs.displayName ?? ""), String(inputs.userPrincipalName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.password ?? ""), Boolean(inputs.forceChangePasswordNextSignIn));
+    const result = await withRetry(
+      async () => (await loadGraphManager()).createUser(String(inputs.credentialName ?? ""), String(inputs.displayName ?? ""), String(inputs.userPrincipalName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.password ?? ""), Boolean(inputs.forceChangePasswordNextSignIn)),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await GraphManager.createUser(${inputs.credentialName}, ${inputs.displayName}, ${inputs.userPrincipalName}, ${inputs.mailNickname}, ${inputs.password}, ${inputs.forceChangePasswordNextSignIn});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.createUser(${inputs.credentialName}, ${inputs.displayName}, ${inputs.userPrincipalName}, ${inputs.mailNickname}, ${inputs.password}, ${inputs.forceChangePasswordNextSignIn}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -208,18 +232,29 @@ registerNode({
   description: i18n.nodes.microsoft365.updateUser.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "propertiesJson", label: i18n.nodes.microsoft365.updateUser.pin_properties_json, type: "string", direction: "input", defaultValue: "{}" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    { id: "propertiesJson", label: i18n.nodes.microsoft365.updateUser.pin_properties_json, type: "string", direction: "input", defaultValue: "{}" },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).updateUser(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.propertiesJson ?? "{}"));
+    const result = await withRetry(async () => (await loadGraphManager()).updateUser(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.propertiesJson ?? "{}")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.updateUser(${inputs.credentialName}, ${inputs.userId}, ${inputs.propertiesJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.updateUser(${inputs.credentialName}, ${inputs.userId}, ${inputs.propertiesJson}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -228,18 +263,18 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteUser.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), retryCountPin(), retryDelayMsPin(), execInOutPins().execOut, execInOutPins().success, attemptsPin(), execInOutPins().error],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).deleteUser(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).deleteUser(String(inputs.credentialName ?? ""), String(inputs.userId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteUser(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.deleteUser(${inputs.credentialName}, ${inputs.userId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -253,22 +288,25 @@ registerNode({
     credentialNamePin(),
     { id: "filter", label: i18n.nodes.microsoft365.__shared.pin_filter, type: "string", direction: "input", defaultValue: "" },
     { id: "top", label: i18n.nodes.microsoft365.__shared.pin_top, type: "number", direction: "input", defaultValue: 100 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "groups", label: i18n.nodes.microsoft365.listGroups.pin_groups, type: "struct", subType: GROUP_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listGroups(String(inputs.credentialName ?? ""), String(inputs.filter ?? ""), Number(inputs.top ?? 100));
+    const result = await withRetry(async () => (await loadGraphManager()).listGroups(String(inputs.credentialName ?? ""), String(inputs.filter ?? ""), Number(inputs.top ?? 100)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listGroups(${inputs.credentialName}, ${inputs.filter}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listGroups(${inputs.credentialName}, ${inputs.filter}, ${inputs.top}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, groups: `${v}.groups`, error: `${v}.error` };
+    return { success: `${v}.success`, groups: `${v}.groups`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -285,22 +323,32 @@ registerNode({
     { id: "description", label: i18n.nodes.microsoft365.__shared.pin_description, type: "string", direction: "input", defaultValue: "" },
     { id: "securityEnabled", label: i18n.nodes.microsoft365.createGroup.pin_security_enabled, type: "boolean", direction: "input", defaultValue: true },
     { id: "mailEnabled", label: i18n.nodes.microsoft365.createGroup.pin_mail_enabled, type: "boolean", direction: "input", defaultValue: false },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).createGroup(String(inputs.credentialName ?? ""), String(inputs.displayName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.description ?? ""), Boolean(inputs.securityEnabled), Boolean(inputs.mailEnabled));
+    const result = await withRetry(
+      async () => (await loadGraphManager()).createGroup(String(inputs.credentialName ?? ""), String(inputs.displayName ?? ""), String(inputs.mailNickname ?? ""), String(inputs.description ?? ""), Boolean(inputs.securityEnabled), Boolean(inputs.mailEnabled)),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createGroup(${inputs.credentialName}, ${inputs.displayName}, ${inputs.mailNickname}, ${inputs.description}, ${inputs.securityEnabled}, ${inputs.mailEnabled});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.createGroup(${inputs.credentialName}, ${inputs.displayName}, ${inputs.mailNickname}, ${inputs.description}, ${inputs.securityEnabled}, ${inputs.mailEnabled}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -309,18 +357,28 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteGroup.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), { id: "groupId", label: i18n.nodes.microsoft365.__shared.pin_group_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    { id: "groupId", label: i18n.nodes.microsoft365.__shared.pin_group_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).deleteGroup(String(inputs.credentialName ?? ""), String(inputs.groupId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).deleteGroup(String(inputs.credentialName ?? ""), String(inputs.groupId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteGroup(${inputs.credentialName}, ${inputs.groupId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.deleteGroup(${inputs.credentialName}, ${inputs.groupId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -329,18 +387,29 @@ registerNode({
   description: i18n.nodes.microsoft365.addGroupMember.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), { id: "groupId", label: i18n.nodes.microsoft365.__shared.pin_group_id, type: "string", direction: "input", defaultValue: "" }, userIdPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    { id: "groupId", label: i18n.nodes.microsoft365.__shared.pin_group_id, type: "string", direction: "input", defaultValue: "" },
+    userIdPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).addGroupMember(String(inputs.credentialName ?? ""), String(inputs.groupId ?? ""), String(inputs.userId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).addGroupMember(String(inputs.credentialName ?? ""), String(inputs.groupId ?? ""), String(inputs.userId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.addGroupMember(${inputs.credentialName}, ${inputs.groupId}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.addGroupMember(${inputs.credentialName}, ${inputs.groupId}, ${inputs.userId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -358,23 +427,40 @@ registerNode({
     { id: "body", label: i18n.nodes.microsoft365.__shared.pin_body, type: "string", direction: "input", defaultValue: "" },
     { id: "bodyType", label: i18n.nodes.microsoft365.__shared.pin_body_type, type: "enum", subType: MICROSOFT365_BODY_TYPE_ENUM_TYPE, direction: "input", defaultValue: "text", options: enumOptionIds(MICROSOFT365_BODY_TYPE_ENUM_TYPE) },
     { id: "saveToSentItems", label: i18n.nodes.microsoft365.sendMail.pin_save_to_sent_items, type: "boolean", direction: "input", defaultValue: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (
-      await loadGraphManager()
-    ).sendMail(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), (Array.isArray(inputs.to) ? inputs.to : []).map(String), String(inputs.subject ?? ""), String(inputs.body ?? ""), inputs.bodyType === "html" ? "html" : "text", Boolean(inputs.saveToSentItems));
+    const result = await withRetry(
+      async () =>
+        (await loadGraphManager()).sendMail(
+          String(inputs.credentialName ?? ""),
+          String(inputs.userId ?? ""),
+          (Array.isArray(inputs.to) ? inputs.to : []).map(String),
+          String(inputs.subject ?? ""),
+          String(inputs.body ?? ""),
+          inputs.bodyType === "html" ? "html" : "text",
+          Boolean(inputs.saveToSentItems),
+        ),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.sendMail(${inputs.credentialName}, ${inputs.userId}, ${inputs.to}, ${inputs.subject}, ${inputs.body}, ${inputs.bodyType}, ${inputs.saveToSentItems});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.sendMail(${inputs.credentialName}, ${inputs.userId}, ${inputs.to}, ${inputs.subject}, ${inputs.body}, ${inputs.bodyType}, ${inputs.saveToSentItems}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -389,22 +475,25 @@ registerNode({
     userIdPin(),
     { id: "top", label: i18n.nodes.microsoft365.__shared.pin_top, type: "number", direction: "input", defaultValue: 25 },
     { id: "filter", label: i18n.nodes.microsoft365.__shared.pin_filter, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "messages", label: i18n.nodes.microsoft365.listMessages.pin_messages, type: "struct", subType: MESSAGE_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listMessages(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), Number(inputs.top ?? 25), String(inputs.filter ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listMessages(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), Number(inputs.top ?? 25), String(inputs.filter ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listMessages(${inputs.credentialName}, ${inputs.userId}, ${inputs.top}, ${inputs.filter});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listMessages(${inputs.credentialName}, ${inputs.userId}, ${inputs.top}, ${inputs.filter}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, messages: `${v}.messages`, error: `${v}.error` };
+    return { success: `${v}.success`, messages: `${v}.messages`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -418,14 +507,17 @@ registerNode({
     credentialNamePin(),
     userIdPin(),
     { id: "messageId", label: i18n.nodes.microsoft365.__shared.pin_message_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "message", label: i18n.nodes.microsoft365.graphMessageDetail.label, type: "struct", subType: MESSAGE_DETAIL_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).getMessage(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).getMessage(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.messageId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -436,16 +528,17 @@ registerNode({
           bodyContent: result.bodyContent,
           receivedDateTime: result.receivedDateTime,
         },
+        attempts: result.attempts,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.getMessage(${inputs.credentialName}, ${inputs.userId}, ${inputs.messageId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.getMessage(${inputs.credentialName}, ${inputs.userId}, ${inputs.messageId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, message: `{ subject: ${v}.subject, from: ${v}.from, bodyContent: ${v}.bodyContent, receivedDateTime: ${v}.receivedDateTime }`, error: `${v}.error` };
+    return { success: `${v}.success`, message: `{ subject: ${v}.subject, from: ${v}.from, bodyContent: ${v}.bodyContent, receivedDateTime: ${v}.receivedDateTime }`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -454,18 +547,29 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteMessage.description,
   group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "messageId", label: i18n.nodes.microsoft365.__shared.pin_message_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    { id: "messageId", label: i18n.nodes.microsoft365.__shared.pin_message_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).deleteMessage(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.messageId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).deleteMessage(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.messageId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteMessage(${inputs.credentialName}, ${inputs.userId}, ${inputs.messageId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.deleteMessage(${inputs.credentialName}, ${inputs.userId}, ${inputs.messageId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -479,22 +583,25 @@ registerNode({
     credentialNamePin(),
     userIdPin(),
     { id: "top", label: i18n.nodes.microsoft365.__shared.pin_top, type: "number", direction: "input", defaultValue: 25 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "events", label: i18n.nodes.microsoft365.listEvents.pin_events, type: "struct", subType: EVENT_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listEvents(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), Number(inputs.top ?? 25));
+    const result = await withRetry(async () => (await loadGraphManager()).listEvents(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), Number(inputs.top ?? 25)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listEvents(${inputs.credentialName}, ${inputs.userId}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listEvents(${inputs.credentialName}, ${inputs.userId}, ${inputs.top}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, events: `${v}.events`, error: `${v}.error` };
+    return { success: `${v}.success`, events: `${v}.events`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -513,27 +620,42 @@ registerNode({
     { id: "timeZone", label: i18n.nodes.microsoft365.createEvent.pin_time_zone, type: "string", direction: "input", defaultValue: "UTC" },
     { id: "body", label: i18n.nodes.microsoft365.__shared.pin_body, type: "string", direction: "input", defaultValue: "" },
     { id: "attendees", label: i18n.nodes.microsoft365.createEvent.pin_attendees, type: "string", container: "array", direction: "input", defaultValue: [] },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (
-      await loadGraphManager()
-    ).createEvent(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.subject ?? ""), String(inputs.start ?? ""), String(inputs.end ?? ""), String(inputs.timeZone ?? "UTC"), String(inputs.body ?? ""), (Array.isArray(inputs.attendees) ? inputs.attendees : []).map(String));
+    const result = await withRetry(
+      async () =>
+        (await loadGraphManager()).createEvent(
+          String(inputs.credentialName ?? ""),
+          String(inputs.userId ?? ""),
+          String(inputs.subject ?? ""),
+          String(inputs.start ?? ""),
+          String(inputs.end ?? ""),
+          String(inputs.timeZone ?? "UTC"),
+          String(inputs.body ?? ""),
+          (Array.isArray(inputs.attendees) ? inputs.attendees : []).map(String),
+        ),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await GraphManager.createEvent(${inputs.credentialName}, ${inputs.userId}, ${inputs.subject}, ${inputs.start}, ${inputs.end}, ${inputs.timeZone}, ${inputs.body}, ${inputs.attendees});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.createEvent(${inputs.credentialName}, ${inputs.userId}, ${inputs.subject}, ${inputs.start}, ${inputs.end}, ${inputs.timeZone}, ${inputs.body}, ${inputs.attendees}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -542,18 +664,29 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteEvent.description,
   group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "eventId", label: i18n.nodes.microsoft365.__shared.pin_event_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    { id: "eventId", label: i18n.nodes.microsoft365.__shared.pin_event_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).deleteEvent(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.eventId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).deleteEvent(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.eventId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteEvent(${inputs.credentialName}, ${inputs.userId}, ${inputs.eventId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.deleteEvent(${inputs.credentialName}, ${inputs.userId}, ${inputs.eventId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -567,22 +700,25 @@ registerNode({
     credentialNamePin(),
     userIdPin(),
     { id: "folderPath", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "items", label: i18n.nodes.microsoft365.listDriveItems.pin_items, type: "struct", subType: DRIVE_ITEM_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listDriveItems(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.folderPath ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listDriveItems(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.folderPath ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listDriveItems(${inputs.credentialName}, ${inputs.userId}, ${inputs.folderPath});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listDriveItems(${inputs.credentialName}, ${inputs.userId}, ${inputs.folderPath}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, items: `${v}.items`, error: `${v}.error` };
+    return { success: `${v}.success`, items: `${v}.items`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -597,22 +733,32 @@ registerNode({
     userIdPin(),
     { id: "filePath", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "encoding", label: i18n.nodes.microsoft365.__shared.pin_encoding, type: "enum", subType: TEXT_ENCODING_ENUM_TYPE, direction: "input", defaultValue: "utf8", options: enumOptionIds(TEXT_ENCODING_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "content", label: i18n.nodes.microsoft365.__shared.pin_content, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).downloadFile(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.filePath ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+    const result = await withRetry(
+      async () => (await loadGraphManager()).downloadFile(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.filePath ?? ""), inputs.encoding === "base64" ? "base64" : "utf8"),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.downloadFile(${inputs.credentialName}, ${inputs.userId}, ${inputs.filePath}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.downloadFile(${inputs.credentialName}, ${inputs.userId}, ${inputs.filePath}, ${inputs.encoding}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, content: `${v}.content`, error: `${v}.error` };
+    return { success: `${v}.success`, content: `${v}.content`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -628,21 +774,31 @@ registerNode({
     { id: "filePath", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "content", label: i18n.nodes.microsoft365.__shared.pin_content, type: "string", direction: "input", defaultValue: "" },
     { id: "encoding", label: i18n.nodes.microsoft365.__shared.pin_encoding, type: "enum", subType: TEXT_ENCODING_ENUM_TYPE, direction: "input", defaultValue: "utf8", options: enumOptionIds(TEXT_ENCODING_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).uploadFile(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.filePath ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+    const result = await withRetry(
+      async () => (await loadGraphManager()).uploadFile(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.filePath ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8"),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.uploadFile(${inputs.credentialName}, ${inputs.userId}, ${inputs.filePath}, ${inputs.content}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.uploadFile(${inputs.credentialName}, ${inputs.userId}, ${inputs.filePath}, ${inputs.content}, ${inputs.encoding}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -651,18 +807,29 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteDriveItem.description,
   group: GROUP_NAME_ONEDRIVE,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).deleteDriveItem(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).deleteDriveItem(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.deleteDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -671,18 +838,29 @@ registerNode({
   description: i18n.nodes.microsoft365.listJoinedTeams.description,
   group: GROUP_NAME_TEAMS,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "teams", label: i18n.nodes.microsoft365.listJoinedTeams.pin_teams, type: "struct", subType: TEAM_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    { id: "teams", label: i18n.nodes.microsoft365.listJoinedTeams.pin_teams, type: "struct", subType: TEAM_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listJoinedTeams(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listJoinedTeams(String(inputs.credentialName ?? ""), String(inputs.userId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listJoinedTeams(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listJoinedTeams(${inputs.credentialName}, ${inputs.userId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, teams: `${v}.teams`, error: `${v}.error` };
+    return { success: `${v}.success`, teams: `${v}.teams`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -697,21 +875,27 @@ registerNode({
     { id: "teamId", label: i18n.nodes.microsoft365.sendChannelMessage.pin_team_id, type: "string", direction: "input", defaultValue: "" },
     { id: "channelId", label: i18n.nodes.microsoft365.sendChannelMessage.pin_channel_id, type: "string", direction: "input", defaultValue: "" },
     { id: "message", label: i18n.nodes.microsoft365.__shared.pin_body, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).sendChannelMessage(String(inputs.credentialName ?? ""), String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), String(inputs.message ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).sendChannelMessage(String(inputs.credentialName ?? ""), String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), String(inputs.message ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.sendChannelMessage(${inputs.credentialName}, ${inputs.teamId}, ${inputs.channelId}, ${inputs.message});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.sendChannelMessage(${inputs.credentialName}, ${inputs.teamId}, ${inputs.channelId}, ${inputs.message}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -726,23 +910,26 @@ registerNode({
     { id: "method", label: i18n.nodes.microsoft365.request.pin_method, type: "enum", subType: MICROSOFT365_HTTP_METHOD_ENUM_TYPE, direction: "input", defaultValue: "GET", options: enumOptionIds(MICROSOFT365_HTTP_METHOD_ENUM_TYPE) },
     { id: "path", label: i18n.nodes.microsoft365.request.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "bodyJson", label: i18n.nodes.microsoft365.request.pin_body_json, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "status", label: i18n.nodes.__shared.pin_status, type: "number", direction: "output" },
     { id: "data", label: i18n.nodes.microsoft365.request.pin_data, type: "object", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).rawRequest(String(inputs.credentialName ?? ""), String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.bodyJson ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).rawRequest(String(inputs.credentialName ?? ""), String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.bodyJson ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.rawRequest(${inputs.credentialName}, ${inputs.method}, ${inputs.path}, ${inputs.bodyJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.rawRequest(${inputs.credentialName}, ${inputs.method}, ${inputs.path}, ${inputs.bodyJson}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, status: `${v}.status`, data: `${v}.data`, error: `${v}.error` };
+    return { success: `${v}.success`, status: `${v}.status`, data: `${v}.data`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -755,22 +942,25 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     { id: "teamId", label: i18n.nodes.microsoft365.sendChannelMessage.pin_team_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "channels", label: i18n.nodes.microsoft365.listChannels.pin_channels, type: "struct", subType: CHANNEL_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listChannels(String(inputs.credentialName ?? ""), String(inputs.teamId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listChannels(String(inputs.credentialName ?? ""), String(inputs.teamId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listChannels(${inputs.credentialName}, ${inputs.teamId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listChannels(${inputs.credentialName}, ${inputs.teamId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, channels: `${v}.channels`, error: `${v}.error` };
+    return { success: `${v}.success`, channels: `${v}.channels`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -785,6 +975,8 @@ registerNode({
     { id: "teamId", label: i18n.nodes.microsoft365.sendChannelMessage.pin_team_id, type: "string", direction: "input", defaultValue: "" },
     { id: "displayName", label: i18n.nodes.microsoft365.__shared.pin_display_name, type: "string", direction: "input", defaultValue: "" },
     { id: "description", label: i18n.nodes.microsoft365.__shared.pin_description, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     {
@@ -793,19 +985,23 @@ registerNode({
       type: "string",
       direction: "output",
     },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).createChannel(String(inputs.credentialName ?? ""), String(inputs.teamId ?? ""), String(inputs.displayName ?? ""), String(inputs.description ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).createChannel(String(inputs.credentialName ?? ""), String(inputs.teamId ?? ""), String(inputs.displayName ?? ""), String(inputs.description ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createChannel(${inputs.credentialName}, ${inputs.teamId}, ${inputs.displayName}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.createChannel(${inputs.credentialName}, ${inputs.teamId}, ${inputs.displayName}, ${inputs.description}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -820,22 +1016,28 @@ registerNode({
     { id: "teamId", label: i18n.nodes.microsoft365.sendChannelMessage.pin_team_id, type: "string", direction: "input", defaultValue: "" },
     { id: "channelId", label: i18n.nodes.microsoft365.sendChannelMessage.pin_channel_id, type: "string", direction: "input", defaultValue: "" },
     { id: "top", label: i18n.nodes.microsoft365.__shared.pin_top, type: "number", direction: "input", defaultValue: 25 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "messages", label: i18n.nodes.microsoft365.listChannelMessages.pin_messages, type: "struct", subType: CHANNEL_MESSAGE_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listChannelMessages(String(inputs.credentialName ?? ""), String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), Number(inputs.top ?? 25));
+    const result = await withRetry(async () => (await loadGraphManager()).listChannelMessages(String(inputs.credentialName ?? ""), String(inputs.teamId ?? ""), String(inputs.channelId ?? ""), Number(inputs.top ?? 25)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listChannelMessages(${inputs.credentialName}, ${inputs.teamId}, ${inputs.channelId}, ${inputs.top});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listChannelMessages(${inputs.credentialName}, ${inputs.teamId}, ${inputs.channelId}, ${inputs.top}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, messages: `${v}.messages`, error: `${v}.error` };
+    return { success: `${v}.success`, messages: `${v}.messages`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -844,18 +1046,29 @@ registerNode({
   description: i18n.nodes.microsoft365.listChats.description,
   group: GROUP_NAME_TEAMS,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "chats", label: i18n.nodes.microsoft365.listChats.pin_chats, type: "struct", subType: CHAT_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    { id: "chats", label: i18n.nodes.microsoft365.listChats.pin_chats, type: "struct", subType: CHAT_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listChats(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listChats(String(inputs.credentialName ?? ""), String(inputs.userId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listChats(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listChats(${inputs.credentialName}, ${inputs.userId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, chats: `${v}.chats`, error: `${v}.error` };
+    return { success: `${v}.success`, chats: `${v}.chats`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -869,21 +1082,24 @@ registerNode({
     credentialNamePin(),
     { id: "chatId", label: i18n.nodes.microsoft365.sendChatMessage.pin_chat_id, type: "string", direction: "input", defaultValue: "" },
     { id: "message", label: i18n.nodes.microsoft365.__shared.pin_body, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).sendChatMessage(String(inputs.credentialName ?? ""), String(inputs.chatId ?? ""), String(inputs.message ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).sendChatMessage(String(inputs.credentialName ?? ""), String(inputs.chatId ?? ""), String(inputs.message ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.sendChatMessage(${inputs.credentialName}, ${inputs.chatId}, ${inputs.message});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.sendChatMessage(${inputs.credentialName}, ${inputs.chatId}, ${inputs.message}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -896,22 +1112,25 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     { id: "search", label: i18n.nodes.microsoft365.listSites.pin_search, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "sites", label: i18n.nodes.microsoft365.listSites.pin_sites, type: "struct", subType: SITE_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listSites(String(inputs.credentialName ?? ""), String(inputs.search ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listSites(String(inputs.credentialName ?? ""), String(inputs.search ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listSites(${inputs.credentialName}, ${inputs.search});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listSites(${inputs.credentialName}, ${inputs.search}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, sites: `${v}.sites`, error: `${v}.error` };
+    return { success: `${v}.success`, sites: `${v}.sites`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -924,22 +1143,25 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     { id: "siteId", label: i18n.nodes.microsoft365.__shared.pin_site_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "lists", label: i18n.nodes.microsoft365.listSiteLists.pin_lists, type: "struct", subType: SITE_LIST_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listSiteLists(String(inputs.credentialName ?? ""), String(inputs.siteId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listSiteLists(String(inputs.credentialName ?? ""), String(inputs.siteId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listSiteLists(${inputs.credentialName}, ${inputs.siteId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listSiteLists(${inputs.credentialName}, ${inputs.siteId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, lists: `${v}.lists`, error: `${v}.error` };
+    return { success: `${v}.success`, lists: `${v}.lists`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -953,22 +1175,25 @@ registerNode({
     credentialNamePin(),
     { id: "siteId", label: i18n.nodes.microsoft365.__shared.pin_site_id, type: "string", direction: "input", defaultValue: "" },
     { id: "listId", label: i18n.nodes.microsoft365.__shared.pin_list_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "items", label: i18n.nodes.microsoft365.listListItems.pin_items, type: "struct", subType: LIST_ITEM_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listListItems(String(inputs.credentialName ?? ""), String(inputs.siteId ?? ""), String(inputs.listId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listListItems(String(inputs.credentialName ?? ""), String(inputs.siteId ?? ""), String(inputs.listId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listListItems(${inputs.credentialName}, ${inputs.siteId}, ${inputs.listId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listListItems(${inputs.credentialName}, ${inputs.siteId}, ${inputs.listId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, items: `${v}.items`, error: `${v}.error` };
+    return { success: `${v}.success`, items: `${v}.items`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -983,22 +1208,28 @@ registerNode({
     { id: "siteId", label: i18n.nodes.microsoft365.__shared.pin_site_id, type: "string", direction: "input", defaultValue: "" },
     { id: "listId", label: i18n.nodes.microsoft365.__shared.pin_list_id, type: "string", direction: "input", defaultValue: "" },
     { id: "fieldsJson", label: i18n.nodes.microsoft365.createListItem.pin_fields_json, type: "string", direction: "input", defaultValue: "{}" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).createListItem(String(inputs.credentialName ?? ""), String(inputs.siteId ?? ""), String(inputs.listId ?? ""), String(inputs.fieldsJson ?? "{}"));
+    const result = await withRetry(async () => (await loadGraphManager()).createListItem(String(inputs.credentialName ?? ""), String(inputs.siteId ?? ""), String(inputs.listId ?? ""), String(inputs.fieldsJson ?? "{}")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createListItem(${inputs.credentialName}, ${inputs.siteId}, ${inputs.listId}, ${inputs.fieldsJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.createListItem(${inputs.credentialName}, ${inputs.siteId}, ${inputs.listId}, ${inputs.fieldsJson}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1013,22 +1244,25 @@ registerNode({
     userIdPin(),
     { id: "parentPath", label: i18n.nodes.microsoft365.createFolder.pin_parent_path, type: "string", direction: "input", defaultValue: "" },
     { id: "name", label: i18n.nodes.microsoft365.__shared.pin_name, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).createFolder(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.parentPath ?? ""), String(inputs.name ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).createFolder(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.parentPath ?? ""), String(inputs.name ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createFolder(${inputs.credentialName}, ${inputs.userId}, ${inputs.parentPath}, ${inputs.name});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.createFolder(${inputs.credentialName}, ${inputs.userId}, ${inputs.parentPath}, ${inputs.name}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1043,21 +1277,27 @@ registerNode({
     userIdPin(),
     { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "destinationFolderPath", label: i18n.nodes.microsoft365.__shared.pin_destination_folder_path, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).moveDriveItem(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).moveDriveItem(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.moveDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.destinationFolderPath});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.moveDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.destinationFolderPath}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1073,21 +1313,31 @@ registerNode({
     { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "destinationFolderPath", label: i18n.nodes.microsoft365.__shared.pin_destination_folder_path, type: "string", direction: "input", defaultValue: "" },
     { id: "newName", label: i18n.nodes.microsoft365.copyDriveItem.pin_new_name, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).copyDriveItem(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""), String(inputs.newName ?? ""));
+    const result = await withRetry(
+      async () => (await loadGraphManager()).copyDriveItem(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.destinationFolderPath ?? ""), String(inputs.newName ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.copyDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.destinationFolderPath}, ${inputs.newName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.copyDriveItem(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.destinationFolderPath}, ${inputs.newName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1103,22 +1353,32 @@ registerNode({
     { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "type", label: i18n.nodes.microsoft365.createSharingLink.pin_type, type: "enum", subType: MICROSOFT365_SHARING_LINK_TYPE_ENUM_TYPE, direction: "input", defaultValue: "view", options: enumOptionIds(MICROSOFT365_SHARING_LINK_TYPE_ENUM_TYPE) },
     { id: "scope", label: i18n.nodes.microsoft365.createSharingLink.pin_scope, type: "enum", subType: MICROSOFT365_SHARING_LINK_SCOPE_ENUM_TYPE, direction: "input", defaultValue: "organization", options: enumOptionIds(MICROSOFT365_SHARING_LINK_SCOPE_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "link", label: i18n.nodes.microsoft365.createSharingLink.pin_link, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).createSharingLink(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.type ?? "view"), String(inputs.scope ?? "organization"));
+    const result = await withRetry(
+      async () => (await loadGraphManager()).createSharingLink(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.type ?? "view"), String(inputs.scope ?? "organization")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createSharingLink(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.type}, ${inputs.scope});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.createSharingLink(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.type}, ${inputs.scope}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, link: `${v}.link`, error: `${v}.error` };
+    return { success: `${v}.success`, link: `${v}.link`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1132,22 +1392,25 @@ registerNode({
     credentialNamePin(),
     userIdPin(),
     { id: "query", label: i18n.nodes.microsoft365.searchDriveItems.pin_query, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "items", label: i18n.nodes.microsoft365.listDriveItems.pin_items, type: "struct", subType: DRIVE_ITEM_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).searchDriveItems(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.query ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).searchDriveItems(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.query ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.searchDriveItems(${inputs.credentialName}, ${inputs.userId}, ${inputs.query});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.searchDriveItems(${inputs.credentialName}, ${inputs.userId}, ${inputs.query}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, items: `${v}.items`, error: `${v}.error` };
+    return { success: `${v}.success`, items: `${v}.items`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1161,22 +1424,25 @@ registerNode({
     credentialNamePin(),
     userIdPin(),
     { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "worksheets", label: i18n.nodes.microsoft365.listWorksheets.pin_worksheets, type: "struct", subType: WORKSHEET_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listWorksheets(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listWorksheets(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listWorksheets(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listWorksheets(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, worksheets: `${v}.worksheets`, error: `${v}.error` };
+    return { success: `${v}.success`, worksheets: `${v}.worksheets`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1192,22 +1458,32 @@ registerNode({
     { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "worksheetName", label: i18n.nodes.microsoft365.__shared.pin_worksheet_name, type: "string", direction: "input", defaultValue: "" },
     { id: "address", label: i18n.nodes.microsoft365.__shared.pin_address, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "valuesJson", label: i18n.nodes.microsoft365.__shared.pin_values_json, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).getWorksheetRange(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""));
+    const result = await withRetry(
+      async () => (await loadGraphManager()).getWorksheetRange(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.getWorksheetRange(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.worksheetName}, ${inputs.address});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.getWorksheetRange(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.worksheetName}, ${inputs.address}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, valuesJson: `${v}.valuesJson`, error: `${v}.error` };
+    return { success: `${v}.success`, valuesJson: `${v}.valuesJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1224,21 +1500,31 @@ registerNode({
     { id: "worksheetName", label: i18n.nodes.microsoft365.__shared.pin_worksheet_name, type: "string", direction: "input", defaultValue: "" },
     { id: "address", label: i18n.nodes.microsoft365.__shared.pin_address, type: "string", direction: "input", defaultValue: "" },
     { id: "valuesJson", label: i18n.nodes.microsoft365.__shared.pin_values_json, type: "string", direction: "input", defaultValue: "[]" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).setWorksheetRange(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""), String(inputs.valuesJson ?? "[]"));
+    const result = await withRetry(
+      async () => (await loadGraphManager()).setWorksheetRange(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.worksheetName ?? ""), String(inputs.address ?? ""), String(inputs.valuesJson ?? "[]")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.setWorksheetRange(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.worksheetName}, ${inputs.address}, ${inputs.valuesJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.setWorksheetRange(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.worksheetName}, ${inputs.address}, ${inputs.valuesJson}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1252,22 +1538,25 @@ registerNode({
     credentialNamePin(),
     userIdPin(),
     { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "tables", label: i18n.nodes.microsoft365.listTables.pin_tables, type: "struct", subType: TABLE_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listTables(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listTables(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listTables(${inputs.credentialName}, ${inputs.userId}, ${inputs.path});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listTables(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, tables: `${v}.tables`, error: `${v}.error` };
+    return { success: `${v}.success`, tables: `${v}.tables`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1283,21 +1572,31 @@ registerNode({
     { id: "path", label: i18n.nodes.microsoft365.__shared.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "tableName", label: i18n.nodes.microsoft365.addTableRow.pin_table_name, type: "string", direction: "input", defaultValue: "" },
     { id: "valuesJson", label: i18n.nodes.microsoft365.__shared.pin_values_json, type: "string", direction: "input", defaultValue: "[]" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).addTableRow(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.tableName ?? ""), String(inputs.valuesJson ?? "[]"));
+    const result = await withRetry(
+      async () => (await loadGraphManager()).addTableRow(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.path ?? ""), String(inputs.tableName ?? ""), String(inputs.valuesJson ?? "[]")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.addTableRow(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.tableName}, ${inputs.valuesJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.addTableRow(${inputs.credentialName}, ${inputs.userId}, ${inputs.path}, ${inputs.tableName}, ${inputs.valuesJson}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1310,22 +1609,25 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     { id: "groupId", label: i18n.nodes.microsoft365.__shared.pin_group_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "plans", label: i18n.nodes.microsoft365.listPlannerPlans.pin_plans, type: "struct", subType: PLANNER_PLAN_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listPlannerPlans(String(inputs.credentialName ?? ""), String(inputs.groupId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listPlannerPlans(String(inputs.credentialName ?? ""), String(inputs.groupId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listPlannerPlans(${inputs.credentialName}, ${inputs.groupId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listPlannerPlans(${inputs.credentialName}, ${inputs.groupId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, plans: `${v}.plans`, error: `${v}.error` };
+    return { success: `${v}.success`, plans: `${v}.plans`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1340,22 +1642,28 @@ registerNode({
     { id: "planId", label: i18n.nodes.microsoft365.createPlannerTask.pin_plan_id, type: "string", direction: "input", defaultValue: "" },
     { id: "bucketId", label: i18n.nodes.microsoft365.createPlannerTask.pin_bucket_id, type: "string", direction: "input", defaultValue: "" },
     { id: "title", label: i18n.nodes.microsoft365.__shared.pin_title, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).createPlannerTask(String(inputs.credentialName ?? ""), String(inputs.planId ?? ""), String(inputs.bucketId ?? ""), String(inputs.title ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).createPlannerTask(String(inputs.credentialName ?? ""), String(inputs.planId ?? ""), String(inputs.bucketId ?? ""), String(inputs.title ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createPlannerTask(${inputs.credentialName}, ${inputs.planId}, ${inputs.bucketId}, ${inputs.title});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.createPlannerTask(${inputs.credentialName}, ${inputs.planId}, ${inputs.bucketId}, ${inputs.title}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1368,22 +1676,25 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     { id: "planId", label: i18n.nodes.microsoft365.createPlannerTask.pin_plan_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "tasks", label: i18n.nodes.microsoft365.listPlannerTasks.pin_tasks, type: "struct", subType: PLANNER_TASK_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listPlannerTasks(String(inputs.credentialName ?? ""), String(inputs.planId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listPlannerTasks(String(inputs.credentialName ?? ""), String(inputs.planId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listPlannerTasks(${inputs.credentialName}, ${inputs.planId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listPlannerTasks(${inputs.credentialName}, ${inputs.planId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, tasks: `${v}.tasks`, error: `${v}.error` };
+    return { success: `${v}.success`, tasks: `${v}.tasks`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1396,22 +1707,25 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     userIdPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "lists", label: i18n.nodes.microsoft365.listTodoLists.pin_lists, type: "struct", subType: TODO_LIST_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listTodoLists(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listTodoLists(String(inputs.credentialName ?? ""), String(inputs.userId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listTodoLists(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listTodoLists(${inputs.credentialName}, ${inputs.userId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, lists: `${v}.lists`, error: `${v}.error` };
+    return { success: `${v}.success`, lists: `${v}.lists`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1426,22 +1740,25 @@ registerNode({
     userIdPin(),
     { id: "listId", label: i18n.nodes.microsoft365.__shared.pin_list_id, type: "string", direction: "input", defaultValue: "" },
     { id: "title", label: i18n.nodes.microsoft365.__shared.pin_title, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).createTodoTask(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.listId ?? ""), String(inputs.title ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).createTodoTask(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.listId ?? ""), String(inputs.title ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createTodoTask(${inputs.credentialName}, ${inputs.userId}, ${inputs.listId}, ${inputs.title});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.createTodoTask(${inputs.credentialName}, ${inputs.userId}, ${inputs.listId}, ${inputs.title}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1455,22 +1772,25 @@ registerNode({
     credentialNamePin(),
     userIdPin(),
     { id: "listId", label: i18n.nodes.microsoft365.__shared.pin_list_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "tasks", label: i18n.nodes.microsoft365.listTodoTasks.pin_tasks, type: "struct", subType: TODO_TASK_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listTodoTasks(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.listId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listTodoTasks(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.listId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listTodoTasks(${inputs.credentialName}, ${inputs.userId}, ${inputs.listId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listTodoTasks(${inputs.credentialName}, ${inputs.userId}, ${inputs.listId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, tasks: `${v}.tasks`, error: `${v}.error` };
+    return { success: `${v}.success`, tasks: `${v}.tasks`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1483,22 +1803,25 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     userIdPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "contacts", label: i18n.nodes.microsoft365.listContacts.pin_contacts, type: "struct", subType: CONTACT_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listContacts(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listContacts(String(inputs.credentialName ?? ""), String(inputs.userId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listContacts(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listContacts(${inputs.credentialName}, ${inputs.userId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, contacts: `${v}.contacts`, error: `${v}.error` };
+    return { success: `${v}.success`, contacts: `${v}.contacts`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1513,22 +1836,28 @@ registerNode({
     userIdPin(),
     { id: "displayName", label: i18n.nodes.microsoft365.__shared.pin_display_name, type: "string", direction: "input", defaultValue: "" },
     { id: "email", label: i18n.nodes.microsoft365.__shared.pin_mail, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).createContact(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.displayName ?? ""), String(inputs.email ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).createContact(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.displayName ?? ""), String(inputs.email ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createContact(${inputs.credentialName}, ${inputs.userId}, ${inputs.displayName}, ${inputs.email});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.createContact(${inputs.credentialName}, ${inputs.userId}, ${inputs.displayName}, ${inputs.email}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1537,18 +1866,29 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteContact.description,
   group: GROUP_NAME_MAIL,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), { id: "contactId", label: i18n.nodes.microsoft365.deleteContact.pin_contact_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    { id: "contactId", label: i18n.nodes.microsoft365.deleteContact.pin_contact_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).deleteContact(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.contactId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).deleteContact(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""), String(inputs.contactId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteContact(${inputs.credentialName}, ${inputs.userId}, ${inputs.contactId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.deleteContact(${inputs.credentialName}, ${inputs.userId}, ${inputs.contactId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1561,22 +1901,25 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     { id: "filter", label: i18n.nodes.microsoft365.__shared.pin_filter, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "applications", label: i18n.nodes.microsoft365.listApplications.pin_applications, type: "struct", subType: APPLICATION_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listApplications(String(inputs.credentialName ?? ""), String(inputs.filter ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listApplications(String(inputs.credentialName ?? ""), String(inputs.filter ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listApplications(${inputs.credentialName}, ${inputs.filter});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listApplications(${inputs.credentialName}, ${inputs.filter}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, applications: `${v}.applications`, error: `${v}.error` };
+    return { success: `${v}.success`, applications: `${v}.applications`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1585,18 +1928,28 @@ registerNode({
   description: i18n.nodes.microsoft365.listDirectoryRoles.description,
   group: GROUP_NAME_ADMIN,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), execInOutPins().execOut, execInOutPins().success, { id: "roles", label: i18n.nodes.microsoft365.listDirectoryRoles.pin_roles, type: "struct", subType: DIRECTORY_ROLE_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    { id: "roles", label: i18n.nodes.microsoft365.listDirectoryRoles.pin_roles, type: "struct", subType: DIRECTORY_ROLE_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listDirectoryRoles(String(inputs.credentialName ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listDirectoryRoles(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listDirectoryRoles(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listDirectoryRoles(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, roles: `${v}.roles`, error: `${v}.error` };
+    return { success: `${v}.success`, roles: `${v}.roles`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1605,18 +1958,29 @@ registerNode({
   description: i18n.nodes.microsoft365.listUserLicenses.description,
   group: GROUP_NAME_ADMIN,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), userIdPin(), execInOutPins().execOut, execInOutPins().success, { id: "skuIds", label: i18n.nodes.microsoft365.listUserLicenses.pin_sku_ids, type: "string", container: "array", direction: "output" }, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    userIdPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    { id: "skuIds", label: i18n.nodes.microsoft365.listUserLicenses.pin_sku_ids, type: "string", container: "array", direction: "output" },
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listUserLicenses(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listUserLicenses(String(inputs.credentialName ?? ""), String(inputs.userId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listUserLicenses(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listUserLicenses(${inputs.credentialName}, ${inputs.userId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, skuIds: `${v}.skuIds`, error: `${v}.error` };
+    return { success: `${v}.success`, skuIds: `${v}.skuIds`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1632,22 +1996,32 @@ registerNode({
     { id: "changeType", label: i18n.nodes.microsoft365.createSubscription.pin_change_type, type: "string", direction: "input", defaultValue: "updated" },
     { id: "notificationUrl", label: i18n.nodes.microsoft365.createSubscription.pin_notification_url, type: "string", direction: "input", defaultValue: "" },
     { id: "expirationDateTime", label: i18n.nodes.microsoft365.createSubscription.pin_expiration_date_time, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.microsoft365.__shared.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).createSubscription(String(inputs.credentialName ?? ""), String(inputs.resource ?? ""), String(inputs.changeType ?? "updated"), String(inputs.notificationUrl ?? ""), String(inputs.expirationDateTime ?? ""));
+    const result = await withRetry(
+      async () => (await loadGraphManager()).createSubscription(String(inputs.credentialName ?? ""), String(inputs.resource ?? ""), String(inputs.changeType ?? "updated"), String(inputs.notificationUrl ?? ""), String(inputs.expirationDateTime ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.createSubscription(${inputs.credentialName}, ${inputs.resource}, ${inputs.changeType}, ${inputs.notificationUrl}, ${inputs.expirationDateTime});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.createSubscription(${inputs.credentialName}, ${inputs.resource}, ${inputs.changeType}, ${inputs.notificationUrl}, ${inputs.expirationDateTime}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1656,18 +2030,28 @@ registerNode({
   description: i18n.nodes.microsoft365.deleteSubscription.description,
   group: GROUP_NAME_ADMIN,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), { id: "subscriptionId", label: i18n.nodes.microsoft365.deleteSubscription.pin_subscription_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    { id: "subscriptionId", label: i18n.nodes.microsoft365.deleteSubscription.pin_subscription_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).deleteSubscription(String(inputs.credentialName ?? ""), String(inputs.subscriptionId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).deleteSubscription(String(inputs.credentialName ?? ""), String(inputs.subscriptionId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.deleteSubscription(${inputs.credentialName}, ${inputs.subscriptionId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.deleteSubscription(${inputs.credentialName}, ${inputs.subscriptionId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -1680,20 +2064,23 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     userIdPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "documents", label: i18n.nodes.microsoft365.listTrendingDocuments.pin_documents, type: "struct", subType: TRENDING_DOCUMENT_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadGraphManager()).listTrendingDocuments(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
+    const result = await withRetry(async () => (await loadGraphManager()).listTrendingDocuments(String(inputs.credentialName ?? ""), String(inputs.userId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await GraphManager.listTrendingDocuments(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => GraphManager.listTrendingDocuments(${inputs.credentialName}, ${inputs.userId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, documents: `${v}.documents`, error: `${v}.error` };
+    return { success: `${v}.success`, documents: `${v}.documents`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MICROSOFT365_MANAGER_IMPORT],
+  compileImports: [MICROSOFT365_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

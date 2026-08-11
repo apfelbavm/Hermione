@@ -1,10 +1,12 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, FACEBOOK_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { AUTH_TOKENS_STRUCT_TYPE, DEBUG_TOKEN_STRUCT_TYPE, PAGE_STRUCT_TYPE, POST_STRUCT_TYPE, COMMENT_STRUCT_TYPE, USER_STRUCT_TYPE, AD_ACCOUNT_STRUCT_TYPE, CAMPAIGN_STRUCT_TYPE } from "@hermione/graph/structs/facebook";
 import { FACEBOOK_CAMPAIGN_OBJECTIVE_ENUM_TYPE, FACEBOOK_CAMPAIGN_STATUS_ENUM_TYPE, FACEBOOK_INSIGHTS_PERIOD_ENUM_TYPE } from "@hermione/graph/enum/facebook";
 import { HTTP_METHOD_ENUM_TYPE } from "@hermione/graph/enum/common";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // Every operation below calls the exact same FacebookManager static method (packages/core/src/lib/
@@ -39,22 +41,26 @@ registerNode({
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "tokens", label: i18n.nodes.facebook.authTokens.label, type: "struct", subType: AUTH_TOKENS_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).authorize(String(inputs.credentialName ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, tokens: { accessToken: result.accessToken, expiresIn: result.expiresIn }, error: result.error } };
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.authorize(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, tokens: { accessToken: result.accessToken, expiresIn: result.expiresIn }, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.authorize(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.authorize(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, tokens: `{ accessToken: ${v}.accessToken, expiresIn: ${v}.expiresIn }`, error: `${v}.error` };
+    return { success: `${v}.success`, tokens: `{ accessToken: ${v}.accessToken, expiresIn: ${v}.expiresIn }`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -67,29 +73,34 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "inputToken", label: i18n.nodes.facebook.debugToken.pin_input_token, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "result", label: i18n.nodes.facebook.debugTokenResult.label, type: "struct", subType: DEBUG_TOKEN_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).debugToken(String(inputs.credentialName ?? ""), String(inputs.inputToken ?? ""));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.debugToken(String(inputs.credentialName ?? ""), String(inputs.inputToken ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
         result: { appId: result.appId, isValid: result.isValid, expiresAt: result.expiresAt, scopes: result.scopes },
+        attempts: result.attempts,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.debugToken(${inputs.credentialName}, ${inputs.inputToken});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.debugToken(${inputs.credentialName}, ${inputs.inputToken}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, result: `{ appId: ${v}.appId, isValid: ${v}.isValid, expiresAt: ${v}.expiresAt, scopes: ${v}.scopes }`, error: `${v}.error` };
+    return { success: `${v}.success`, result: `{ appId: ${v}.appId, isValid: ${v}.isValid, expiresAt: ${v}.expiresAt, scopes: ${v}.scopes }`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -102,29 +113,34 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "pageId", label: i18n.nodes.facebook.__shared.pin_page_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "page", label: i18n.nodes.facebook.page.label, type: "struct", subType: PAGE_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).getPageInfo(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.getPageInfo(String(inputs.credentialName ?? ""), String(inputs.pageId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return {
       nextExec: "exec-out",
       outputs: {
         success: result.success,
         page: { id: result.id, name: result.name, category: result.category, fanCount: result.fanCount, link: result.link },
+        attempts: result.attempts,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getPageInfo(${inputs.credentialName}, ${inputs.pageId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.getPageInfo(${inputs.credentialName}, ${inputs.pageId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, page: `{ id: ${v}.id, name: ${v}.name, category: ${v}.category, fanCount: ${v}.fanCount, link: ${v}.link }`, error: `${v}.error` };
+    return { success: `${v}.success`, page: `{ id: ${v}.id, name: ${v}.name, category: ${v}.category, fanCount: ${v}.fanCount, link: ${v}.link }`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -139,22 +155,26 @@ registerNode({
     { id: "pageId", label: i18n.nodes.facebook.__shared.pin_page_id, type: "string", direction: "input", defaultValue: "" },
     { id: "message", label: i18n.nodes.facebook.__shared.pin_message, type: "string", direction: "input", defaultValue: "" },
     { id: "link", label: i18n.nodes.facebook.createPost.pin_link, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "postId", label: i18n.nodes.facebook.__shared.pin_post_id, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).createPost(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), String(inputs.message ?? ""), String(inputs.link ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, error: result.error } };
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.createPost(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), String(inputs.message ?? ""), String(inputs.link ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.createPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.message}, ${inputs.link});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.createPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.message}, ${inputs.link}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, postId: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, postId: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -169,22 +189,29 @@ registerNode({
     { id: "pageId", label: i18n.nodes.facebook.__shared.pin_page_id, type: "string", direction: "input", defaultValue: "" },
     { id: "url", label: i18n.nodes.facebook.createPhotoPost.pin_url, type: "string", direction: "input", defaultValue: "" },
     { id: "caption", label: i18n.nodes.facebook.createPhotoPost.pin_caption, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "postId", label: i18n.nodes.facebook.__shared.pin_post_id, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).createPhotoPost(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), String(inputs.url ?? ""), String(inputs.caption ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, error: result.error } };
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.createPhotoPost(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), String(inputs.url ?? ""), String(inputs.caption ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.createPhotoPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.url}, ${inputs.caption});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.createPhotoPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.url}, ${inputs.caption}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, postId: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, postId: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -199,22 +226,29 @@ registerNode({
     { id: "pageId", label: i18n.nodes.facebook.__shared.pin_page_id, type: "string", direction: "input", defaultValue: "" },
     { id: "videoUrl", label: i18n.nodes.facebook.createVideoPost.pin_video_url, type: "string", direction: "input", defaultValue: "" },
     { id: "description", label: i18n.nodes.facebook.createVideoPost.pin_description, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "postId", label: i18n.nodes.facebook.__shared.pin_post_id, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).createVideoPost(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), String(inputs.videoUrl ?? ""), String(inputs.description ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, error: result.error } };
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.createVideoPost(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), String(inputs.videoUrl ?? ""), String(inputs.description ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, postId: result.id, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.createVideoPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.videoUrl}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.createVideoPost(${inputs.credentialName}, ${inputs.pageId}, ${inputs.videoUrl}, ${inputs.description}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, postId: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, postId: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -227,21 +261,25 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "postId", label: i18n.nodes.facebook.__shared.pin_post_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).deletePost(String(inputs.credentialName ?? ""), String(inputs.postId ?? ""));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.deletePost(String(inputs.credentialName ?? ""), String(inputs.postId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.deletePost(${inputs.credentialName}, ${inputs.postId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.deletePost(${inputs.credentialName}, ${inputs.postId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -255,22 +293,26 @@ registerNode({
     credentialNamePin(),
     { id: "pageId", label: i18n.nodes.facebook.__shared.pin_page_id, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.facebook.__shared.pin_limit, type: "number", direction: "input", defaultValue: 25, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "posts", label: i18n.nodes.facebook.getPosts.pin_posts, type: "struct", subType: POST_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).getPosts(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), Number(inputs.limit ?? 25));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.getPosts(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), Number(inputs.limit ?? 25)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getPosts(${inputs.credentialName}, ${inputs.pageId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.getPosts(${inputs.credentialName}, ${inputs.pageId}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, posts: `${v}.posts`, error: `${v}.error` };
+    return { success: `${v}.success`, posts: `${v}.posts`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -285,22 +327,29 @@ registerNode({
     { id: "pageId", label: i18n.nodes.facebook.__shared.pin_page_id, type: "string", direction: "input", defaultValue: "" },
     { id: "metrics", label: i18n.nodes.facebook.getPageInsights.pin_metrics, type: "string", container: "array", direction: "input" },
     { id: "period", label: i18n.nodes.facebook.__shared.pin_period, type: "enum", subType: FACEBOOK_INSIGHTS_PERIOD_ENUM_TYPE, direction: "input", defaultValue: "day", options: enumOptionIds(FACEBOOK_INSIGHTS_PERIOD_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "json", label: i18n.nodes.facebook.__shared.pin_json, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).getPageInsights(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), (inputs.metrics as string[]) ?? [], String(inputs.period ?? "day"));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.getPageInsights(String(inputs.credentialName ?? ""), String(inputs.pageId ?? ""), (inputs.metrics as string[]) ?? [], String(inputs.period ?? "day")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getPageInsights(${inputs.credentialName}, ${inputs.pageId}, ${inputs.metrics}, ${inputs.period});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.getPageInsights(${inputs.credentialName}, ${inputs.pageId}, ${inputs.metrics}, ${inputs.period}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, json: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, json: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -314,22 +363,26 @@ registerNode({
     credentialNamePin(),
     { id: "objectId", label: i18n.nodes.facebook.__shared.pin_object_id, type: "string", direction: "input", defaultValue: "" },
     { id: "message", label: i18n.nodes.facebook.__shared.pin_message, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "id", label: i18n.nodes.facebook.__shared.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).createComment(String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""), String(inputs.message ?? ""));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.createComment(String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""), String(inputs.message ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.createComment(${inputs.credentialName}, ${inputs.objectId}, ${inputs.message});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.createComment(${inputs.credentialName}, ${inputs.objectId}, ${inputs.message}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -343,22 +396,26 @@ registerNode({
     credentialNamePin(),
     { id: "objectId", label: i18n.nodes.facebook.__shared.pin_object_id, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.facebook.__shared.pin_limit, type: "number", direction: "input", defaultValue: 25, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "comments", label: i18n.nodes.facebook.getComments.pin_comments, type: "struct", subType: COMMENT_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).getComments(String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""), Number(inputs.limit ?? 25));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.getComments(String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""), Number(inputs.limit ?? 25)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getComments(${inputs.credentialName}, ${inputs.objectId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.getComments(${inputs.credentialName}, ${inputs.objectId}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, comments: `${v}.comments`, error: `${v}.error` };
+    return { success: `${v}.success`, comments: `${v}.comments`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -371,21 +428,25 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "commentId", label: i18n.nodes.facebook.__shared.pin_comment_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).deleteComment(String(inputs.credentialName ?? ""), String(inputs.commentId ?? ""));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.deleteComment(String(inputs.credentialName ?? ""), String(inputs.commentId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.deleteComment(${inputs.credentialName}, ${inputs.commentId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.deleteComment(${inputs.credentialName}, ${inputs.commentId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 function registerLikeNode(type: "likeObject" | "unlikeObject") {
@@ -399,22 +460,25 @@ function registerLikeNode(type: "likeObject" | "unlikeObject") {
       { id: "exec-in", label: "", type: "exec", direction: "input" },
       credentialNamePin(),
       { id: "objectId", label: i18n.nodes.facebook.__shared.pin_object_id, type: "string", direction: "input", defaultValue: "" },
+      retryCountPin(),
+      retryDelayMsPin(),
       { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
       { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+      attemptsPin(),
       { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
     ],
     latent: true,
     execute: async ({ inputs }) => {
       const manager = await loadFacebookManager();
-      const result = await manager[type](String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""));
+      const result = await withRetry(() => manager[type](String(inputs.credentialName ?? ""), String(inputs.objectId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
       return { nextExec: "exec-out", outputs: result };
     },
-    compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.${type}(${inputs.credentialName}, ${inputs.objectId});`, ...compileFrom("exec-out")],
+    compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.${type}(${inputs.credentialName}, ${inputs.objectId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
     compileExecuteOutputs: ({ node }) => {
       const v = compileResultVar(node.id);
-      return { success: `${v}.success`, error: `${v}.error` };
+      return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
     },
-    compileImports: [FACEBOOK_MANAGER_IMPORT],
+    compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
   });
 }
 
@@ -431,22 +495,26 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "objectId", label: i18n.nodes.facebook.__shared.pin_object_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "count", label: i18n.nodes.facebook.getLikesCount.pin_count, type: "number", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).getLikesCount(String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.getLikesCount(String(inputs.credentialName ?? ""), String(inputs.objectId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getLikesCount(${inputs.credentialName}, ${inputs.objectId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.getLikesCount(${inputs.credentialName}, ${inputs.objectId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, count: `${v}.count`, error: `${v}.error` };
+    return { success: `${v}.success`, count: `${v}.count`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -459,25 +527,29 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "userId", label: i18n.nodes.facebook.getUserProfile.pin_user_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "user", label: i18n.nodes.facebook.user.label, type: "struct", subType: USER_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).getUserProfile(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.getUserProfile(String(inputs.credentialName ?? ""), String(inputs.userId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return {
       nextExec: "exec-out",
-      outputs: { success: result.success, user: { id: result.id, name: result.name, email: result.email }, error: result.error },
+      outputs: { success: result.success, user: { id: result.id, name: result.name, email: result.email }, attempts: result.attempts, error: result.error },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getUserProfile(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.getUserProfile(${inputs.credentialName}, ${inputs.userId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, user: `{ id: ${v}.id, name: ${v}.name, email: ${v}.email }`, error: `${v}.error` };
+    return { success: `${v}.success`, user: `{ id: ${v}.id, name: ${v}.name, email: ${v}.email }`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -490,22 +562,26 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "userId", label: i18n.nodes.facebook.getUserProfile.pin_user_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "accounts", label: i18n.nodes.facebook.getAdAccounts.pin_accounts, type: "struct", subType: AD_ACCOUNT_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).getAdAccounts(String(inputs.credentialName ?? ""), String(inputs.userId ?? ""));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.getAdAccounts(String(inputs.credentialName ?? ""), String(inputs.userId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getAdAccounts(${inputs.credentialName}, ${inputs.userId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.getAdAccounts(${inputs.credentialName}, ${inputs.userId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, accounts: `${v}.accounts`, error: `${v}.error` };
+    return { success: `${v}.success`, accounts: `${v}.accounts`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -521,22 +597,33 @@ registerNode({
     { id: "name", label: i18n.nodes.facebook.__shared.pin_name, type: "string", direction: "input", defaultValue: "" },
     { id: "objective", label: i18n.nodes.facebook.createCampaign.pin_objective, type: "enum", subType: FACEBOOK_CAMPAIGN_OBJECTIVE_ENUM_TYPE, direction: "input", defaultValue: "OUTCOME_TRAFFIC", options: enumOptionIds(FACEBOOK_CAMPAIGN_OBJECTIVE_ENUM_TYPE) },
     { id: "status", label: i18n.nodes.facebook.__shared.pin_status, type: "enum", subType: FACEBOOK_CAMPAIGN_STATUS_ENUM_TYPE, direction: "input", defaultValue: "PAUSED", options: enumOptionIds(FACEBOOK_CAMPAIGN_STATUS_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "id", label: i18n.nodes.facebook.__shared.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).createCampaign(String(inputs.credentialName ?? ""), String(inputs.adAccountId ?? ""), String(inputs.name ?? ""), String(inputs.objective ?? "OUTCOME_TRAFFIC"), String(inputs.status ?? "PAUSED"));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(
+      () => manager.createCampaign(String(inputs.credentialName ?? ""), String(inputs.adAccountId ?? ""), String(inputs.name ?? ""), String(inputs.objective ?? "OUTCOME_TRAFFIC"), String(inputs.status ?? "PAUSED")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.createCampaign(${inputs.credentialName}, ${inputs.adAccountId}, ${inputs.name}, ${inputs.objective}, ${inputs.status});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.createCampaign(${inputs.credentialName}, ${inputs.adAccountId}, ${inputs.name}, ${inputs.objective}, ${inputs.status}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -550,22 +637,26 @@ registerNode({
     credentialNamePin(),
     { id: "adAccountId", label: i18n.nodes.facebook.__shared.pin_ad_account_id, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.facebook.__shared.pin_limit, type: "number", direction: "input", defaultValue: 25, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "campaigns", label: i18n.nodes.facebook.getCampaigns.pin_campaigns, type: "struct", subType: CAMPAIGN_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).getCampaigns(String(inputs.credentialName ?? ""), String(inputs.adAccountId ?? ""), Number(inputs.limit ?? 25));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.getCampaigns(String(inputs.credentialName ?? ""), String(inputs.adAccountId ?? ""), Number(inputs.limit ?? 25)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getCampaigns(${inputs.credentialName}, ${inputs.adAccountId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.getCampaigns(${inputs.credentialName}, ${inputs.adAccountId}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, campaigns: `${v}.campaigns`, error: `${v}.error` };
+    return { success: `${v}.success`, campaigns: `${v}.campaigns`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -578,21 +669,25 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "campaignId", label: i18n.nodes.facebook.deleteCampaign.pin_campaign_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).deleteCampaign(String(inputs.credentialName ?? ""), String(inputs.campaignId ?? ""));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.deleteCampaign(String(inputs.credentialName ?? ""), String(inputs.campaignId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.deleteCampaign(${inputs.credentialName}, ${inputs.campaignId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.deleteCampaign(${inputs.credentialName}, ${inputs.campaignId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -606,22 +701,26 @@ registerNode({
     credentialNamePin(),
     { id: "objectId", label: i18n.nodes.facebook.__shared.pin_object_id, type: "string", direction: "input", defaultValue: "" },
     { id: "fields", label: i18n.nodes.facebook.getInsights.pin_fields, type: "string", container: "array", direction: "input" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "json", label: i18n.nodes.facebook.__shared.pin_json, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).getInsights(String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""), (inputs.fields as string[]) ?? []);
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.getInsights(String(inputs.credentialName ?? ""), String(inputs.objectId ?? ""), (inputs.fields as string[]) ?? []), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.getInsights(${inputs.credentialName}, ${inputs.objectId}, ${inputs.fields});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.getInsights(${inputs.credentialName}, ${inputs.objectId}, ${inputs.fields}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, json: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, json: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -636,20 +735,24 @@ registerNode({
     { id: "method", label: i18n.nodes.facebook.apiCall.pin_method, type: "enum", subType: HTTP_METHOD_ENUM_TYPE, direction: "input", defaultValue: "GET", options: enumOptionIds(HTTP_METHOD_ENUM_TYPE) },
     { id: "path", label: i18n.nodes.facebook.apiCall.pin_path, type: "string", direction: "input", defaultValue: "" },
     { id: "paramsJson", label: i18n.nodes.facebook.apiCall.pin_params_json, type: "string", direction: "input", defaultValue: "{}" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "json", label: i18n.nodes.facebook.__shared.pin_json, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadFacebookManager()).apiCall(String(inputs.credentialName ?? ""), String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.paramsJson ?? "{}"));
+    const manager = await loadFacebookManager();
+    const result = await withRetry(() => manager.apiCall(String(inputs.credentialName ?? ""), String(inputs.method ?? "GET"), String(inputs.path ?? ""), String(inputs.paramsJson ?? "{}")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await FacebookManager.apiCall(${inputs.credentialName}, ${inputs.method}, ${inputs.path}, ${inputs.paramsJson});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => FacebookManager.apiCall(${inputs.credentialName}, ${inputs.method}, ${inputs.path}, ${inputs.paramsJson}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, json: `${v}.json`, error: `${v}.error` };
+    return { success: `${v}.success`, json: `${v}.json`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [FACEBOOK_MANAGER_IMPORT],
+  compileImports: [FACEBOOK_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

@@ -6,7 +6,9 @@
 
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, SAP_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, SAP_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // Every operation below calls the exact same SapManager static method (packages/core/src/lib/
@@ -72,22 +74,28 @@ registerNode({
     servicePathPin(i18n.nodes.sap.getEntitySet.pin_service_path),
     entitySetPin(i18n.nodes.sap.getEntitySet.pin_entity_set),
     { id: "queryOptions", label: i18n.nodes.sap.getEntitySet.pin_query_options, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "resultsJson", label: i18n.nodes.sap.getEntitySet.pin_results_json, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSapManager()).getEntitySet(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.queryOptions ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, resultsJson: JSON.stringify(result.results), error: result.error } };
+    const result = await withRetry(async () => (await loadSapManager()).getEntitySet(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.queryOptions ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, resultsJson: JSON.stringify(result.results), attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SapManager.getEntitySet(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.queryOptions});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => SapManager.getEntitySet(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.queryOptions}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, resultsJson: `JSON.stringify(${v}.results)`, error: `${v}.error` };
+    return { success: `${v}.success`, resultsJson: `JSON.stringify(${v}.results)`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SAP_MANAGER_IMPORT],
+  compileImports: [SAP_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -102,22 +110,28 @@ registerNode({
     servicePathPin(i18n.nodes.sap.getEntity.pin_service_path),
     entitySetPin(i18n.nodes.sap.getEntity.pin_entity_set),
     keyPredicatePin(i18n.nodes.sap.getEntity.pin_key_predicate),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "entityJson", label: i18n.nodes.sap.getEntity.pin_entity_json, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSapManager()).getEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.keyPredicate ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, entityJson: JSON.stringify(result.entity), error: result.error } };
+    const result = await withRetry(async () => (await loadSapManager()).getEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.keyPredicate ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, entityJson: JSON.stringify(result.entity), attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SapManager.getEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => SapManager.getEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, entityJson: `JSON.stringify(${v}.entity)`, error: `${v}.error` };
+    return { success: `${v}.success`, entityJson: `JSON.stringify(${v}.entity)`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SAP_MANAGER_IMPORT],
+  compileImports: [SAP_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -132,22 +146,28 @@ registerNode({
     servicePathPin(i18n.nodes.sap.createEntity.pin_service_path),
     entitySetPin(i18n.nodes.sap.createEntity.pin_entity_set),
     { id: "bodyJson", label: i18n.nodes.sap.createEntity.pin_body_json, type: "string", direction: "input", defaultValue: "{}" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "entityJson", label: i18n.nodes.sap.createEntity.pin_entity_json, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSapManager()).createEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), JSON.parse(String(inputs.bodyJson ?? "{}")));
-    return { nextExec: "exec-out", outputs: { success: result.success, entityJson: JSON.stringify(result.entity), error: result.error } };
+    const result = await withRetry(async () => (await loadSapManager()).createEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), JSON.parse(String(inputs.bodyJson ?? "{}"))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, entityJson: JSON.stringify(result.entity), attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SapManager.createEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, JSON.parse(${inputs.bodyJson}));`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => SapManager.createEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, JSON.parse(${inputs.bodyJson})), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, entityJson: `JSON.stringify(${v}.entity)`, error: `${v}.error` };
+    return { success: `${v}.success`, entityJson: `JSON.stringify(${v}.entity)`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SAP_MANAGER_IMPORT],
+  compileImports: [SAP_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -163,21 +183,31 @@ registerNode({
     entitySetPin(i18n.nodes.sap.updateEntity.pin_entity_set),
     keyPredicatePin(i18n.nodes.sap.updateEntity.pin_key_predicate),
     { id: "bodyJson", label: i18n.nodes.sap.updateEntity.pin_body_json, type: "string", direction: "input", defaultValue: "{}" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSapManager()).updateEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.keyPredicate ?? ""), JSON.parse(String(inputs.bodyJson ?? "{}")));
-    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+    const result = await withRetry(
+      async () => (await loadSapManager()).updateEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.keyPredicate ?? ""), JSON.parse(String(inputs.bodyJson ?? "{}"))),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SapManager.updateEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate}, JSON.parse(${inputs.bodyJson}));`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => SapManager.updateEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate}, JSON.parse(${inputs.bodyJson})), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SAP_MANAGER_IMPORT],
+  compileImports: [SAP_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -186,16 +216,31 @@ registerNode({
   description: i18n.nodes.sap.deleteEntity.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), servicePathPin(i18n.nodes.sap.deleteEntity.pin_service_path), entitySetPin(i18n.nodes.sap.deleteEntity.pin_entity_set), keyPredicatePin(i18n.nodes.sap.deleteEntity.pin_key_predicate), execOutPin(), successPin(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    servicePathPin(i18n.nodes.sap.deleteEntity.pin_service_path),
+    entitySetPin(i18n.nodes.sap.deleteEntity.pin_entity_set),
+    keyPredicatePin(i18n.nodes.sap.deleteEntity.pin_key_predicate),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSapManager()).deleteEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.keyPredicate ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, error: result.error } };
+    const result = await withRetry(async () => (await loadSapManager()).deleteEntity(String(inputs.credentialName ?? ""), String(inputs.servicePath ?? ""), String(inputs.entitySet ?? ""), String(inputs.keyPredicate ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SapManager.deleteEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => SapManager.deleteEntity(${inputs.credentialName}, ${inputs.servicePath}, ${inputs.entitySet}, ${inputs.keyPredicate}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [SAP_MANAGER_IMPORT],
+  compileImports: [SAP_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

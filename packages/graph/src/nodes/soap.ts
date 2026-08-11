@@ -1,6 +1,8 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, SOAP_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, SOAP_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // Every operation below calls the exact same SoapManager static method (packages/core/src/lib/
@@ -41,19 +43,29 @@ registerNode({
     { id: "endpointOverride", label: i18n.nodes.soap.call.pin_endpoint_override, type: "string", direction: "input", defaultValue: "" },
     { id: "headers", label: i18n.nodes.soap.call.pin_headers, type: "string", direction: "input", defaultValue: "{}" },
     { id: "timeoutMs", label: i18n.nodes.__shared.pin_timeout, type: "number", direction: "input", defaultValue: 10000, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "result", label: i18n.nodes.__shared.pin_result, type: "string", direction: "output" },
     { id: "rawRequest", label: i18n.nodes.soap.call.pin_raw_request, type: "string", direction: "output" },
     { id: "rawResponse", label: i18n.nodes.soap.call.pin_raw_response, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSoapManager()).call(String(inputs.credentialName ?? ""), String(inputs.wsdlUrl ?? ""), String(inputs.operation ?? ""), String(inputs.args ?? ""), String(inputs.endpointOverride ?? ""), String(inputs.headers ?? ""), Number(inputs.timeoutMs) || 0);
+    const result = await withRetry(
+      async () => (await loadSoapManager()).call(String(inputs.credentialName ?? ""), String(inputs.wsdlUrl ?? ""), String(inputs.operation ?? ""), String(inputs.args ?? ""), String(inputs.endpointOverride ?? ""), String(inputs.headers ?? ""), Number(inputs.timeoutMs) || 0),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SoapManager.call(${inputs.credentialName}, ${inputs.wsdlUrl}, ${inputs.operation}, ${inputs.args}, ${inputs.endpointOverride}, ${inputs.headers}, ${inputs.timeoutMs});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => SoapManager.call(${inputs.credentialName}, ${inputs.wsdlUrl}, ${inputs.operation}, ${inputs.args}, ${inputs.endpointOverride}, ${inputs.headers}, ${inputs.timeoutMs}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
@@ -61,10 +73,11 @@ registerNode({
       result: `${v}.result`,
       rawRequest: `${v}.rawRequest`,
       rawResponse: `${v}.rawResponse`,
+      attempts: `${v}.attempts`,
       error: `${v}.error`,
     };
   },
-  compileImports: [SOAP_MANAGER_IMPORT],
+  compileImports: [SOAP_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 // Lists the operations/services/ports a WSDL exposes — useful for exploring an unfamiliar SOAP
@@ -81,24 +94,35 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     { id: "wsdlUrl", label: i18n.nodes.soap.describe.pin_wsdl_url, type: "string", direction: "input", defaultValue: "" },
     { id: "timeoutMs", label: i18n.nodes.__shared.pin_timeout, type: "number", direction: "input", defaultValue: 10000, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "description", label: i18n.nodes.soap.describe.pin_description, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSoapManager()).describe(String(inputs.wsdlUrl ?? ""), Number(inputs.timeoutMs) || 0);
-    return { nextExec: "exec-out", outputs: { success: result.success, description: result.descriptionJson, error: result.error } };
+    const result = await withRetry(
+      async () => {
+        const raw = await (await loadSoapManager()).describe(String(inputs.wsdlUrl ?? ""), Number(inputs.timeoutMs) || 0);
+        return { success: raw.success, description: raw.descriptionJson, error: raw.error };
+      },
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SoapManager.describe(${inputs.wsdlUrl}, ${inputs.timeoutMs});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SoapManager.describe(${inputs.wsdlUrl}, ${inputs.timeoutMs}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
       success: `${v}.success`,
       description: `${v}.descriptionJson`,
+      attempts: `${v}.attempts`,
       error: `${v}.error`,
     };
   },
-  compileImports: [SOAP_MANAGER_IMPORT],
+  compileImports: [SOAP_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

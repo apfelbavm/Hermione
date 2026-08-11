@@ -1,9 +1,11 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, JIRA_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { JIRA_ISSUE_STRUCT_TYPE, JIRA_COMMENT_STRUCT_TYPE, JIRA_TRANSITION_STRUCT_TYPE, JIRA_PROJECT_STRUCT_TYPE, JIRA_USER_STRUCT_TYPE } from "@hermione/graph/structs/jira";
 import { JIRA_VALIDATE_QUERY_ENUM_TYPE } from "@hermione/graph/enum/jira";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // Every operation below is a thin pin-wiring shim over JiraManager (src/lib/jiraManager.ts), which
@@ -71,24 +73,31 @@ registerNode({
     { id: "issueType", label: i18n.nodes.jira.createIssue.pin_issue_type, type: "string", direction: "input", defaultValue: "Task" },
     { id: "summary", label: i18n.nodes.jira.createIssue.pin_summary, type: "string", direction: "input", defaultValue: "" },
     { id: "description", label: i18n.nodes.jira.createIssue.pin_description, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.jira.createIssue.pin_id, type: "string", direction: "output" },
     { id: "key", label: i18n.nodes.jira.createIssue.pin_key, type: "string", direction: "output" },
     { id: "url", label: i18n.nodes.jira.createIssue.pin_url, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).createIssue(String(inputs.credentialName ?? ""), String(inputs.projectKey ?? ""), String(inputs.issueType ?? ""), String(inputs.summary ?? ""), String(inputs.description ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.createIssue(String(inputs.credentialName ?? ""), String(inputs.projectKey ?? ""), String(inputs.issueType ?? ""), String(inputs.summary ?? ""), String(inputs.description ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.createIssue(${inputs.credentialName}, ${inputs.projectKey}, ${inputs.issueType}, ${inputs.summary}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.createIssue(${inputs.credentialName}, ${inputs.projectKey}, ${inputs.issueType}, ${inputs.summary}, ${inputs.description}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, key: `${v}.key`, url: `${v}.url`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, key: `${v}.key`, url: `${v}.url`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -97,18 +106,30 @@ registerNode({
   description: i18n.nodes.jira.getIssue.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), issueKeyPin(), execInOutPins().execOut, execInOutPins().success, { id: "issue", label: i18n.nodes.jira.getIssue.pin_issue, type: "struct", subType: JIRA_ISSUE_STRUCT_TYPE, direction: "output" }, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    issueKeyPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    { id: "issue", label: i18n.nodes.jira.getIssue.pin_issue, type: "struct", subType: JIRA_ISSUE_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).getIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.getIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.getIssue(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.getIssue(${inputs.credentialName}, ${inputs.issueKey}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, issue: `${v}.issue`, error: `${v}.error` };
+    return { success: `${v}.success`, issue: `${v}.issue`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -123,21 +144,28 @@ registerNode({
     issueKeyPin(),
     { id: "summary", label: i18n.nodes.jira.updateIssue.pin_summary, type: "string", direction: "input", defaultValue: "" },
     { id: "description", label: i18n.nodes.jira.updateIssue.pin_description, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).updateIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.summary ?? ""), String(inputs.description ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.updateIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.summary ?? ""), String(inputs.description ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.updateIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.summary}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.updateIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.summary}, ${inputs.description}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -146,18 +174,19 @@ registerNode({
   description: i18n.nodes.jira.deleteIssue.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), issueKeyPin(), execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [execInOutPins().execIn, credentialNamePin(), issueKeyPin(), retryCountPin(), retryDelayMsPin(), execInOutPins().execOut, execInOutPins().success, attemptsPin(), execInOutPins().error],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).deleteIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.deleteIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.deleteIssue(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.deleteIssue(${inputs.credentialName}, ${inputs.issueKey}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -172,23 +201,30 @@ registerNode({
     { id: "jql", label: i18n.nodes.jira.searchIssues.pin_jql, type: "string", direction: "input", defaultValue: "" },
     { id: "maxResults", label: i18n.nodes.jira.searchIssues.pin_max_results, type: "number", direction: "input", defaultValue: 50 },
     { id: "validateQuery", label: i18n.nodes.jira.searchIssues.pin_validate_query, type: "enum", subType: JIRA_VALIDATE_QUERY_ENUM_TYPE, direction: "input", defaultValue: "warn", options: enumOptionIds(JIRA_VALIDATE_QUERY_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "issues", label: i18n.nodes.jira.searchIssues.pin_issues, type: "struct", subType: JIRA_ISSUE_STRUCT_TYPE, container: "array", direction: "output" },
     { id: "total", label: i18n.nodes.jira.searchIssues.pin_total, type: "number", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).searchIssues(String(inputs.credentialName ?? ""), String(inputs.jql ?? ""), Number(inputs.maxResults ?? 50), (inputs.validateQuery as "strict" | "warn" | "none") ?? "warn");
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.searchIssues(String(inputs.credentialName ?? ""), String(inputs.jql ?? ""), Number(inputs.maxResults ?? 50), (inputs.validateQuery as "strict" | "warn" | "none") ?? "warn"), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.searchIssues(${inputs.credentialName}, ${inputs.jql}, ${inputs.maxResults}, ${inputs.validateQuery});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.searchIssues(${inputs.credentialName}, ${inputs.jql}, ${inputs.maxResults}, ${inputs.validateQuery}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, issues: `${v}.issues`, total: `${v}.total`, error: `${v}.error` };
+    return { success: `${v}.success`, issues: `${v}.issues`, total: `${v}.total`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -202,22 +238,26 @@ registerNode({
     credentialNamePin(),
     issueKeyPin(),
     { id: "body", label: i18n.nodes.jira.addComment.pin_body, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.jira.addComment.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).addComment(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.body ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.addComment(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.body ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.addComment(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.body});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.addComment(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.body}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -230,22 +270,26 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     issueKeyPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "comments", label: i18n.nodes.jira.listComments.pin_comments, type: "struct", subType: JIRA_COMMENT_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).listComments(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.listComments(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.listComments(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.listComments(${inputs.credentialName}, ${inputs.issueKey}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, comments: `${v}.comments`, error: `${v}.error` };
+    return { success: `${v}.success`, comments: `${v}.comments`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -258,22 +302,26 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     issueKeyPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "transitions", label: i18n.nodes.jira.listTransitions.pin_transitions, type: "struct", subType: JIRA_TRANSITION_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).listTransitions(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.listTransitions(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.listTransitions(${inputs.credentialName}, ${inputs.issueKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.listTransitions(${inputs.credentialName}, ${inputs.issueKey}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, transitions: `${v}.transitions`, error: `${v}.error` };
+    return { success: `${v}.success`, transitions: `${v}.transitions`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -282,18 +330,30 @@ registerNode({
   description: i18n.nodes.jira.transitionIssue.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), issueKeyPin(), { id: "transitionId", label: i18n.nodes.jira.transitionIssue.pin_transition_id, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    issueKeyPin(),
+    { id: "transitionId", label: i18n.nodes.jira.transitionIssue.pin_transition_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).transitionIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.transitionId ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.transitionIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.transitionId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.transitionIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.transitionId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.transitionIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.transitionId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -302,18 +362,30 @@ registerNode({
   description: i18n.nodes.jira.assignIssue.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), issueKeyPin(), { id: "assignee", label: i18n.nodes.jira.assignIssue.pin_assignee, type: "string", direction: "input", defaultValue: "" }, execInOutPins().execOut, execInOutPins().success, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    issueKeyPin(),
+    { id: "assignee", label: i18n.nodes.jira.assignIssue.pin_assignee, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).assignIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.assignee ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.assignIssue(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.assignee ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.assignIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.assignee});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.assignIssue(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.assignee}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -322,18 +394,29 @@ registerNode({
   description: i18n.nodes.jira.listProjects.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInOutPins().execIn, credentialNamePin(), execInOutPins().execOut, execInOutPins().success, { id: "projects", label: i18n.nodes.jira.listProjects.pin_projects, type: "struct", subType: JIRA_PROJECT_STRUCT_TYPE, container: "array", direction: "output" }, execInOutPins().error],
+  pins: [
+    execInOutPins().execIn,
+    credentialNamePin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execInOutPins().execOut,
+    execInOutPins().success,
+    { id: "projects", label: i18n.nodes.jira.listProjects.pin_projects, type: "struct", subType: JIRA_PROJECT_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
+    execInOutPins().error,
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).listProjects(String(inputs.credentialName ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.listProjects(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.listProjects(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.listProjects(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, projects: `${v}.projects`, error: `${v}.error` };
+    return { success: `${v}.success`, projects: `${v}.projects`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -346,22 +429,26 @@ registerNode({
     execInOutPins().execIn,
     credentialNamePin(),
     { id: "projectKey", label: i18n.nodes.jira.getProject.pin_project_key, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "project", label: i18n.nodes.jira.getProject.pin_project, type: "struct", subType: JIRA_PROJECT_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).getProject(String(inputs.credentialName ?? ""), String(inputs.projectKey ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.getProject(String(inputs.credentialName ?? ""), String(inputs.projectKey ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.getProject(${inputs.credentialName}, ${inputs.projectKey});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.getProject(${inputs.credentialName}, ${inputs.projectKey}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, project: `${v}.project`, error: `${v}.error` };
+    return { success: `${v}.success`, project: `${v}.project`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -376,22 +463,29 @@ registerNode({
     issueKeyPin(),
     { id: "timeSpent", label: i18n.nodes.jira.addWorklog.pin_time_spent, type: "string", direction: "input", defaultValue: "1h" },
     { id: "comment", label: i18n.nodes.jira.addWorklog.pin_comment, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "id", label: i18n.nodes.jira.addWorklog.pin_id, type: "string", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).addWorklog(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.timeSpent ?? ""), String(inputs.comment ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.addWorklog(String(inputs.credentialName ?? ""), String(inputs.issueKey ?? ""), String(inputs.timeSpent ?? ""), String(inputs.comment ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.addWorklog(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.timeSpent}, ${inputs.comment});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.addWorklog(${inputs.credentialName}, ${inputs.issueKey}, ${inputs.timeSpent}, ${inputs.comment}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.id`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.id`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -406,21 +500,28 @@ registerNode({
     issueKeyPin("inwardIssueKey"),
     issueKeyPin("outwardIssueKey"),
     { id: "linkType", label: i18n.nodes.jira.linkIssues.pin_link_type, type: "string", direction: "input", defaultValue: "Relates" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).linkIssues(String(inputs.credentialName ?? ""), String(inputs.inwardIssueKey ?? ""), String(inputs.outwardIssueKey ?? ""), String(inputs.linkType ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.linkIssues(String(inputs.credentialName ?? ""), String(inputs.inwardIssueKey ?? ""), String(inputs.outwardIssueKey ?? ""), String(inputs.linkType ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.linkIssues(${inputs.credentialName}, ${inputs.inwardIssueKey}, ${inputs.outwardIssueKey}, ${inputs.linkType});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.linkIssues(${inputs.credentialName}, ${inputs.inwardIssueKey}, ${inputs.outwardIssueKey}, ${inputs.linkType}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -434,22 +535,26 @@ registerNode({
     credentialNamePin(),
     { id: "accountId", label: i18n.nodes.jira.getUser.pin_account_id, type: "string", direction: "input", defaultValue: "" },
     { id: "username", label: i18n.nodes.jira.getUser.pin_username, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "user", label: i18n.nodes.jira.getUser.pin_user, type: "struct", subType: JIRA_USER_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).getUser(String(inputs.credentialName ?? ""), String(inputs.accountId ?? ""), String(inputs.username ?? ""));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.getUser(String(inputs.credentialName ?? ""), String(inputs.accountId ?? ""), String(inputs.username ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.getUser(${inputs.credentialName}, ${inputs.accountId}, ${inputs.username});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.getUser(${inputs.credentialName}, ${inputs.accountId}, ${inputs.username}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, user: `${v}.user`, error: `${v}.error` };
+    return { success: `${v}.success`, user: `${v}.user`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -463,20 +568,24 @@ registerNode({
     credentialNamePin(),
     { id: "query", label: i18n.nodes.jira.findUsers.pin_query, type: "string", direction: "input", defaultValue: "" },
     { id: "maxResults", label: i18n.nodes.jira.findUsers.pin_max_results, type: "number", direction: "input", defaultValue: 50 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execInOutPins().execOut,
     execInOutPins().success,
     { id: "users", label: i18n.nodes.jira.findUsers.pin_users, type: "struct", subType: JIRA_USER_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     execInOutPins().error,
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadJiraManager()).findUsers(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), Number(inputs.maxResults ?? 50));
+    const JiraManager = await loadJiraManager();
+    const result = await withRetry(() => JiraManager.findUsers(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), Number(inputs.maxResults ?? 50)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await JiraManager.findUsers(${inputs.credentialName}, ${inputs.query}, ${inputs.maxResults});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => JiraManager.findUsers(${inputs.credentialName}, ${inputs.query}, ${inputs.maxResults}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, users: `${v}.users`, error: `${v}.error` };
+    return { success: `${v}.success`, users: `${v}.users`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [JIRA_MANAGER_IMPORT],
+  compileImports: [JIRA_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

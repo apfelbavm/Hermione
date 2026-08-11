@@ -1,8 +1,10 @@
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, SFTP_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, SFTP_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import { SFTP_EXISTING_FILE_MODE_ENUM_TYPE } from "@hermione/graph/enum/sftp";
 import { TEXT_ENCODING_ENUM_TYPE } from "@hermione/graph/enum/common";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 import { NodeColorCategory } from "../engine/types";
 
@@ -45,35 +47,44 @@ registerNode({
     { id: "createDirectory", label: i18n.nodes.sftp.upload.pin_create_directory, type: "boolean", direction: "input", defaultValue: true },
     { id: "existingFileMode", label: i18n.nodes.sftp.upload.pin_existing_file, type: "enum", subType: SFTP_EXISTING_FILE_MODE_ENUM_TYPE, direction: "input", defaultValue: EXISTING_FILE_MODES[0], options: EXISTING_FILE_MODES },
     { id: "preventDirectoryTraversal", label: i18n.nodes.sftp.upload.pin_prevent_traversal, type: "boolean", direction: "input", defaultValue: true },
-    { id: "maxReconnectAttempts", label: i18n.nodes.sftp.upload.pin_max_reconnect, type: "number", direction: "input", defaultValue: 3, integer: true },
-    { id: "reconnectDelayMs", label: i18n.nodes.sftp.upload.pin_reconnect_delay, type: "number", direction: "input", defaultValue: 1000, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "timeoutMs", label: i18n.nodes.__shared.pin_timeout, type: "number", direction: "input", defaultValue: 10000, integer: true },
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "skipped", label: i18n.nodes.sftp.upload.pin_skipped, type: "boolean", direction: "output" },
-    { id: "attempts", label: i18n.nodes.sftp.upload.pin_attempts, type: "number", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
+  // SftpManager.upload used to run its own internal reconnect loop, driven by the
+  // maxReconnectAttempts/reconnectDelayMs parameters below — it always opens a brand-new
+  // SftpClient connection per attempt (see sftpManager.ts), so calling it once per attempt from
+  // outside is equivalent to that loop. Passing 0 for those two parameters makes each call a single
+  // attempt, and withRetry drives the outer attempt loop instead, giving every latent node the same
+  // shared retry semantics while still reconnecting a fresh session per attempt.
   execute: async ({ inputs }) => {
-    const result = await (
-      await loadSftpManager()
-    ).upload(
-      String(inputs.credentialName ?? ""),
-      String(inputs.filePath ?? ""),
-      String(inputs.content ?? ""),
-      String(inputs.encoding ?? ""),
-      Boolean(inputs.createDirectory),
-      String(inputs.existingFileMode ?? ""),
-      Boolean(inputs.preventDirectoryTraversal),
-      Number(inputs.maxReconnectAttempts) || 0,
-      Number(inputs.reconnectDelayMs) || 0,
-      Number(inputs.timeoutMs) || 0,
+    const result = await withRetry(
+      async () =>
+        (await loadSftpManager()).upload(
+          String(inputs.credentialName ?? ""),
+          String(inputs.filePath ?? ""),
+          String(inputs.content ?? ""),
+          String(inputs.encoding ?? ""),
+          Boolean(inputs.createDirectory),
+          String(inputs.existingFileMode ?? ""),
+          Boolean(inputs.preventDirectoryTraversal),
+          0,
+          0,
+          Number(inputs.timeoutMs) || 0,
+        ),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
     );
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await SftpManager.upload(${inputs.credentialName}, ${inputs.filePath}, ${inputs.content}, ${inputs.encoding}, ${inputs.createDirectory}, ${inputs.existingFileMode}, ${inputs.preventDirectoryTraversal}, ${inputs.maxReconnectAttempts}, ${inputs.reconnectDelayMs}, ${inputs.timeoutMs});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => SftpManager.upload(${inputs.credentialName}, ${inputs.filePath}, ${inputs.content}, ${inputs.encoding}, ${inputs.createDirectory}, ${inputs.existingFileMode}, ${inputs.preventDirectoryTraversal}, 0, 0, ${inputs.timeoutMs}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
@@ -88,5 +99,5 @@ registerNode({
   // "ssh2-sftp-client" is a real Node dependency this project itself never needs (nothing here can
   // run it live) — it only needs to be `npm install`ed alongside the COMPILED .mjs. sftpManager.ts
   // itself imports it directly; this line just makes that module reachable from the compiled script.
-  compileImports: [SFTP_MANAGER_IMPORT],
+  compileImports: [SFTP_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

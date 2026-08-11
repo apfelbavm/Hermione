@@ -110,7 +110,7 @@ describe("sftp.upload", () => {
 
     expect(ctx.execOutputs.get("req:success")).toBe(false);
     expect(ctx.execOutputs.get("req:skipped")).toBe(false);
-    expect(ctx.execOutputs.get("req:attempts")).toBe(0);
+    expect(ctx.execOutputs.get("req:attempts")).toBe(1);
     expect(String(ctx.execOutputs.get("req:error"))).toMatch(/not found in the vault/i);
   });
 
@@ -162,19 +162,19 @@ describe("sftp.upload", () => {
         createDirectory: "cd",
         existingFileMode: "efm",
         preventDirectoryTraversal: "pdt",
-        maxReconnectAttempts: "mra",
-        reconnectDelayMs: "rdm",
         timeoutMs: "t",
+        retryCount: "rc",
+        retryDelayMs: "rd",
       },
       graph: {} as never,
       compileFrom: () => ["/* continuation */"],
     });
-    expect(statements[0]).toBe("const __result_req = await SftpManager.upload(c, fp, co, e, cd, efm, pdt, mra, rdm, t);");
+    expect(statements[0]).toBe("const __result_req = await withRetry(() => SftpManager.upload(c, fp, co, e, cd, efm, pdt, 0, 0, t), rc, rd);");
     expect(statements[1]).toBe("/* continuation */");
   });
 
   it("compileImports declares the SftpManager module the compiled output needs", () => {
     const def = getNodeDef("sftp.upload");
-    expect(def.compileImports).toEqual(['import { SftpManager } from "../../packages/core/src/lib/sftpManager.ts";']);
+    expect(def.compileImports).toEqual(['import { SftpManager } from "../../packages/core/src/lib/sftpManager.ts";', 'import { withRetry } from "../../packages/core/src/lib/retry.ts";']);
   });
 });

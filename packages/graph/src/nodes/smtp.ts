@@ -1,5 +1,7 @@
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, SMTP_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, SMTP_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // SmtpManager (packages/core/src/lib/smtpManager.ts) wraps nodemailer, which opens a raw TCP socket
@@ -35,26 +37,37 @@ registerNode({
     { id: "cc", label: i18n.nodes.smtp.sendMail.pin_cc, type: "string", direction: "input", defaultValue: "" },
     { id: "bcc", label: i18n.nodes.smtp.sendMail.pin_bcc, type: "string", direction: "input", defaultValue: "" },
     { id: "from", label: i18n.nodes.smtp.sendMail.pin_from, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "messageId", label: i18n.nodes.smtp.sendMail.pin_message_id, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSmtpManager()).sendMail(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.subject ?? ""), String(inputs.text ?? ""), String(inputs.html ?? ""), String(inputs.cc ?? ""), String(inputs.bcc ?? ""), String(inputs.from ?? ""));
+    const result = await withRetry(
+      async () => (await loadSmtpManager()).sendMail(String(inputs.credentialName ?? ""), String(inputs.to ?? ""), String(inputs.subject ?? ""), String(inputs.text ?? ""), String(inputs.html ?? ""), String(inputs.cc ?? ""), String(inputs.bcc ?? ""), String(inputs.from ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SmtpManager.sendMail(${inputs.credentialName}, ${inputs.to}, ${inputs.subject}, ${inputs.text}, ${inputs.html}, ${inputs.cc}, ${inputs.bcc}, ${inputs.from});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => SmtpManager.sendMail(${inputs.credentialName}, ${inputs.to}, ${inputs.subject}, ${inputs.text}, ${inputs.html}, ${inputs.cc}, ${inputs.bcc}, ${inputs.from}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
       success: `${v}.success`,
       messageId: `${v}.messageId`,
+      attempts: `${v}.attempts`,
       error: `${v}.error`,
     };
   },
-  compileImports: [SMTP_MANAGER_IMPORT],
+  compileImports: [SMTP_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -65,22 +78,26 @@ registerNode({
   pins: [
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadSmtpManager()).verifyConnection(String(inputs.credentialName ?? ""));
+    const result = await withRetry(async () => (await loadSmtpManager()).verifyConnection(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await SmtpManager.verifyConnection(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => SmtpManager.verifyConnection(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
       success: `${v}.success`,
+      attempts: `${v}.attempts`,
       error: `${v}.error`,
     };
   },
-  compileImports: [SMTP_MANAGER_IMPORT],
+  compileImports: [SMTP_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

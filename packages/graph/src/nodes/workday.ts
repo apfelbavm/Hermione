@@ -1,6 +1,8 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, WORKDAY_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, WORKDAY_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 const GROUP_NAME = "Request.Workday";
@@ -46,23 +48,29 @@ registerNode({
     { id: "limit", label: i18n.nodes.workday.getWorkers.pin_limit, type: "number", direction: "input", defaultValue: 20 },
     { id: "offset", label: i18n.nodes.workday.getWorkers.pin_offset, type: "number", direction: "input", defaultValue: 0 },
     { id: "searchTerm", label: i18n.nodes.workday.getWorkers.pin_search_term, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "workersJson", label: i18n.nodes.workday.getWorkers.pin_workers_json, type: "string", direction: "output" },
     { id: "total", label: i18n.nodes.workday.getWorkers.pin_total, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadWorkdayManager()).getWorkers(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 20), Number(inputs.offset ?? 0), String(inputs.searchTerm ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, workersJson: JSON.stringify(result.workers), total: result.total, error: result.error } };
+    const result = await withRetry(async () => (await loadWorkdayManager()).getWorkers(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 20), Number(inputs.offset ?? 0), String(inputs.searchTerm ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, workersJson: JSON.stringify(result.workers), total: result.total, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await WorkdayManager.getWorkers(${inputs.credentialName}, ${inputs.limit}, ${inputs.offset}, ${inputs.searchTerm});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => WorkdayManager.getWorkers(${inputs.credentialName}, ${inputs.limit}, ${inputs.offset}, ${inputs.searchTerm}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, workersJson: `JSON.stringify(${v}.workers)`, total: `${v}.total`, error: `${v}.error` };
+    return { success: `${v}.success`, workersJson: `JSON.stringify(${v}.workers)`, total: `${v}.total`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [WORKDAY_MANAGER_IMPORT],
+  compileImports: [WORKDAY_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -75,22 +83,25 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     { id: "workerId", label: i18n.nodes.workday.getWorker.pin_worker_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "workerJson", label: i18n.nodes.workday.getWorker.pin_worker_json, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadWorkdayManager()).getWorker(String(inputs.credentialName ?? ""), String(inputs.workerId ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, workerJson: JSON.stringify(result.worker), error: result.error } };
+    const result = await withRetry(async () => (await loadWorkdayManager()).getWorker(String(inputs.credentialName ?? ""), String(inputs.workerId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, workerJson: JSON.stringify(result.worker), attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await WorkdayManager.getWorker(${inputs.credentialName}, ${inputs.workerId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => WorkdayManager.getWorker(${inputs.credentialName}, ${inputs.workerId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, workerJson: `JSON.stringify(${v}.worker)`, error: `${v}.error` };
+    return { success: `${v}.success`, workerJson: `JSON.stringify(${v}.worker)`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [WORKDAY_MANAGER_IMPORT],
+  compileImports: [WORKDAY_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -104,23 +115,26 @@ registerNode({
     credentialNamePin(),
     { id: "query", label: i18n.nodes.workday.searchWorkers.pin_query, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.workday.searchWorkers.pin_limit, type: "number", direction: "input", defaultValue: 20 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "workersJson", label: i18n.nodes.workday.searchWorkers.pin_workers_json, type: "string", direction: "output" },
     { id: "total", label: i18n.nodes.workday.searchWorkers.pin_total, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadWorkdayManager()).searchWorkers(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), Number(inputs.limit ?? 20));
-    return { nextExec: "exec-out", outputs: { success: result.success, workersJson: JSON.stringify(result.workers), total: result.total, error: result.error } };
+    const result = await withRetry(async () => (await loadWorkdayManager()).searchWorkers(String(inputs.credentialName ?? ""), String(inputs.query ?? ""), Number(inputs.limit ?? 20)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, workersJson: JSON.stringify(result.workers), total: result.total, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await WorkdayManager.searchWorkers(${inputs.credentialName}, ${inputs.query}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => WorkdayManager.searchWorkers(${inputs.credentialName}, ${inputs.query}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, workersJson: `JSON.stringify(${v}.workers)`, total: `${v}.total`, error: `${v}.error` };
+    return { success: `${v}.success`, workersJson: `JSON.stringify(${v}.workers)`, total: `${v}.total`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [WORKDAY_MANAGER_IMPORT],
+  compileImports: [WORKDAY_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -134,23 +148,26 @@ registerNode({
     credentialNamePin(),
     { id: "limit", label: i18n.nodes.workday.getStaffingOrganizations.pin_limit, type: "number", direction: "input", defaultValue: 20 },
     { id: "offset", label: i18n.nodes.workday.getStaffingOrganizations.pin_offset, type: "number", direction: "input", defaultValue: 0 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "organizationsJson", label: i18n.nodes.workday.getStaffingOrganizations.pin_organizations_json, type: "string", direction: "output" },
     { id: "total", label: i18n.nodes.workday.getStaffingOrganizations.pin_total, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadWorkdayManager()).getStaffingOrganizations(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 20), Number(inputs.offset ?? 0));
-    return { nextExec: "exec-out", outputs: { success: result.success, organizationsJson: JSON.stringify(result.organizations), total: result.total, error: result.error } };
+    const result = await withRetry(async () => (await loadWorkdayManager()).getStaffingOrganizations(String(inputs.credentialName ?? ""), Number(inputs.limit ?? 20), Number(inputs.offset ?? 0)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, organizationsJson: JSON.stringify(result.organizations), total: result.total, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await WorkdayManager.getStaffingOrganizations(${inputs.credentialName}, ${inputs.limit}, ${inputs.offset});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => WorkdayManager.getStaffingOrganizations(${inputs.credentialName}, ${inputs.limit}, ${inputs.offset}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, organizationsJson: `JSON.stringify(${v}.organizations)`, total: `${v}.total`, error: `${v}.error` };
+    return { success: `${v}.success`, organizationsJson: `JSON.stringify(${v}.organizations)`, total: `${v}.total`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [WORKDAY_MANAGER_IMPORT],
+  compileImports: [WORKDAY_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -163,20 +180,23 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     { id: "organizationId", label: i18n.nodes.workday.getOrganization.pin_organization_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "organizationJson", label: i18n.nodes.workday.getOrganization.pin_organization_json, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadWorkdayManager()).getOrganization(String(inputs.credentialName ?? ""), String(inputs.organizationId ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, organizationJson: JSON.stringify(result.organization), error: result.error } };
+    const result = await withRetry(async () => (await loadWorkdayManager()).getOrganization(String(inputs.credentialName ?? ""), String(inputs.organizationId ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, organizationJson: JSON.stringify(result.organization), attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await WorkdayManager.getOrganization(${inputs.credentialName}, ${inputs.organizationId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => WorkdayManager.getOrganization(${inputs.credentialName}, ${inputs.organizationId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, organizationJson: `JSON.stringify(${v}.organization)`, error: `${v}.error` };
+    return { success: `${v}.success`, organizationJson: `JSON.stringify(${v}.organization)`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [WORKDAY_MANAGER_IMPORT],
+  compileImports: [WORKDAY_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

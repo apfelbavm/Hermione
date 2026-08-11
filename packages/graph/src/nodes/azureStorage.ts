@@ -1,11 +1,13 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, AZURE_STORAGE_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { UPLOAD_OPTIONS_STRUCT_TYPE, CONTAINER_PROPERTIES_STRUCT_TYPE, BLOB_PROPERTIES_STRUCT_TYPE, ACCOUNT_INFO_STRUCT_TYPE } from "@hermione/graph/structs/azureStorage";
 import { AZURE_STORAGE_CONTAINER_ACCESS_ENUM_TYPE } from "@hermione/graph/enum/azureStorage";
 import { TEXT_ENCODING_ENUM_TYPE } from "@hermione/graph/enum/common";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
 import type { AzureStorageBlobUploadOptions } from "@hermione/core/lib/azureStorageManager";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // Every operation below calls the exact same AzureStorageManager static method (packages/core/src/
@@ -147,22 +149,26 @@ registerNode({
     execInPin(),
     credentialNamePin(),
     { id: "prefix", label: i18n.nodes.azureStorage.__shared.pin_prefix, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "containers", label: i18n.nodes.azureStorage.listContainers.pin_containers, type: "string", container: "array", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).listContainers(String(inputs.credentialName ?? ""), String(inputs.prefix ?? ""));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.listContainers(String(inputs.credentialName ?? ""), String(inputs.prefix ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.listContainers(${inputs.credentialName}, ${inputs.prefix});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.listContainers(${inputs.credentialName}, ${inputs.prefix}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, containers: `${v}.containers`, error: `${v}.error` };
+    return { success: `${v}.success`, containers: `${v}.containers`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -176,22 +182,26 @@ registerNode({
     credentialNamePin(),
     containerNamePin(),
     { id: "access", label: i18n.nodes.azureStorage.createContainer.pin_access, type: "enum", subType: AZURE_STORAGE_CONTAINER_ACCESS_ENUM_TYPE, direction: "input", defaultValue: "private", options: enumOptionIds(AZURE_STORAGE_CONTAINER_ACCESS_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
     const access = inputs.access === "blob" || inputs.access === "container" ? inputs.access : "private";
-    const result = await (await loadAzureStorageManager()).createContainer(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), access);
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.createContainer(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), access), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.createContainer(${inputs.credentialName}, ${inputs.containerName}, ${inputs.access});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.createContainer(${inputs.credentialName}, ${inputs.containerName}, ${inputs.access}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -200,18 +210,19 @@ registerNode({
   description: i18n.nodes.azureStorage.deleteContainer.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), containerNamePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).deleteContainer(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.deleteContainer(String(inputs.credentialName ?? ""), String(inputs.containerName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.deleteContainer(${inputs.credentialName}, ${inputs.containerName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.deleteContainer(${inputs.credentialName}, ${inputs.containerName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -220,10 +231,22 @@ registerNode({
   description: i18n.nodes.azureStorage.getContainerProperties.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), execOutPin(), successPin(), { id: "properties", label: i18n.nodes.azureStorage.containerProperties.label, type: "struct", subType: CONTAINER_PROPERTIES_STRUCT_TYPE, direction: "output" }, errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    containerNamePin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    { id: "properties", label: i18n.nodes.azureStorage.containerProperties.label, type: "struct", subType: CONTAINER_PROPERTIES_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).getContainerProperties(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.getContainerProperties(String(inputs.credentialName ?? ""), String(inputs.containerName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -234,16 +257,22 @@ registerNode({
           publicAccess: result.publicAccess,
           metadata: recordToMapEntries(result.metadata),
         },
+        attempts: result.attempts,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.getContainerProperties(${inputs.credentialName}, ${inputs.containerName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.getContainerProperties(${inputs.credentialName}, ${inputs.containerName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, properties: `{ etag: ${v}.etag, lastModified: ${v}.lastModified, publicAccess: ${v}.publicAccess, metadata: ${inlineEntriesFromRecord(`${v}.metadata`)} }`, error: `${v}.error` };
+    return {
+      success: `${v}.success`,
+      properties: `{ etag: ${v}.etag, lastModified: ${v}.lastModified, publicAccess: ${v}.publicAccess, metadata: ${inlineEntriesFromRecord(`${v}.metadata`)} }`,
+      attempts: `${v}.attempts`,
+      error: `${v}.error`,
+    };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -252,18 +281,22 @@ registerNode({
   description: i18n.nodes.azureStorage.setContainerMetadata.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), metadataInPin(), execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), containerNamePin(), metadataInPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).setContainerMetadata(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), mapEntriesToRecord(inputs.metadata));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.setContainerMetadata(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), mapEntriesToRecord(inputs.metadata)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.setContainerMetadata(${inputs.credentialName}, ${inputs.containerName}, ${inlineRecordFromEntries(inputs.metadata)});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.setContainerMetadata(${inputs.credentialName}, ${inputs.containerName}, ${inlineRecordFromEntries(inputs.metadata)}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -278,22 +311,29 @@ registerNode({
     containerNamePin(),
     { id: "prefix", label: i18n.nodes.azureStorage.__shared.pin_prefix, type: "string", direction: "input", defaultValue: "" },
     { id: "recursive", label: i18n.nodes.azureStorage.listBlobs.pin_recursive, type: "boolean", direction: "input", defaultValue: false },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "blobs", label: i18n.nodes.azureStorage.listBlobs.pin_blobs, type: "string", container: "array", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).listBlobs(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.prefix ?? ""), Boolean(inputs.recursive));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.listBlobs(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.prefix ?? ""), Boolean(inputs.recursive)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.listBlobs(${inputs.credentialName}, ${inputs.containerName}, ${inputs.prefix}, ${inputs.recursive});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.listBlobs(${inputs.credentialName}, ${inputs.containerName}, ${inputs.prefix}, ${inputs.recursive}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, blobs: `${v}.blobs`, error: `${v}.error` };
+    return { success: `${v}.success`, blobs: `${v}.blobs`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -326,8 +366,11 @@ registerNode({
       },
     },
     { id: "overwrite", label: i18n.nodes.azureStorage.uploadBlob.pin_overwrite, type: "boolean", direction: "input", defaultValue: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
@@ -342,18 +385,23 @@ registerNode({
       tier: String(options.tier ?? ""),
       metadata: mapEntriesToRecord(options.metadata),
     };
-    const result = await (await loadAzureStorageManager()).uploadBlob(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", uploadOptions, Boolean(inputs.overwrite));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(
+      () => manager.uploadBlob(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.content ?? ""), inputs.encoding === "base64" ? "base64" : "utf8", uploadOptions, Boolean(inputs.overwrite)),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await AzureStorageManager.uploadBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.content}, ${inputs.encoding}, { ...${inputs.options}, metadata: ${inlineRecordFromEntries(`${inputs.options}.metadata`)} }, ${inputs.overwrite});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.uploadBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.content}, ${inputs.encoding}, { ...${inputs.options}, metadata: ${inlineRecordFromEntries(`${inputs.options}.metadata`)} }, ${inputs.overwrite}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -368,22 +416,29 @@ registerNode({
     containerNamePin(),
     blobNamePin(),
     { id: "encoding", label: i18n.nodes.azureStorage.__shared.pin_encoding, type: "enum", subType: TEXT_ENCODING_ENUM_TYPE, direction: "input", defaultValue: "utf8", options: enumOptionIds(TEXT_ENCODING_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "content", label: i18n.nodes.azureStorage.downloadBlob.pin_content, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).downloadBlob(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), inputs.encoding === "base64" ? "base64" : "utf8");
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.downloadBlob(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), inputs.encoding === "base64" ? "base64" : "utf8"), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.downloadBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.encoding});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.downloadBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.encoding}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, content: `${v}.content`, error: `${v}.error` };
+    return { success: `${v}.success`, content: `${v}.content`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -392,18 +447,19 @@ registerNode({
   description: i18n.nodes.azureStorage.deleteBlob.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).deleteBlob(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.deleteBlob(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.deleteBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.deleteBlob(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 function registerRelocationNode(type: "copyBlob" | "moveBlob") {
@@ -421,22 +477,28 @@ function registerRelocationNode(type: "copyBlob" | "moveBlob") {
       { id: "sourceBlob", label: i18n.nodes.azureStorage.__shared.pin_source_blob, type: "string", direction: "input", defaultValue: "" },
       { id: "destContainer", label: i18n.nodes.azureStorage.__shared.pin_dest_container, type: "string", direction: "input", defaultValue: "" },
       { id: "destBlob", label: i18n.nodes.azureStorage.__shared.pin_dest_blob, type: "string", direction: "input", defaultValue: "" },
+      retryCountPin(),
+      retryDelayMsPin(),
       execOutPin(),
       successPin(),
+      attemptsPin(),
       errorPin(),
     ],
     latent: true,
     execute: async ({ inputs }) => {
       const manager = await loadAzureStorageManager();
-      const result = await manager[fn](String(inputs.credentialName ?? ""), String(inputs.sourceContainer ?? ""), String(inputs.sourceBlob ?? ""), String(inputs.destContainer ?? ""), String(inputs.destBlob ?? ""));
+      const result = await withRetry(() => manager[fn](String(inputs.credentialName ?? ""), String(inputs.sourceContainer ?? ""), String(inputs.sourceBlob ?? ""), String(inputs.destContainer ?? ""), String(inputs.destBlob ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
       return { nextExec: "exec-out", outputs: result };
     },
-    compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.${fn}(${inputs.credentialName}, ${inputs.sourceContainer}, ${inputs.sourceBlob}, ${inputs.destContainer}, ${inputs.destBlob});`, ...compileFrom("exec-out")],
+    compileExecute: ({ node, inputs, compileFrom }) => [
+      `const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.${fn}(${inputs.credentialName}, ${inputs.sourceContainer}, ${inputs.sourceBlob}, ${inputs.destContainer}, ${inputs.destBlob}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+      ...compileFrom("exec-out"),
+    ],
     compileExecuteOutputs: ({ node }) => {
       const v = compileResultVar(node.id);
-      return { success: `${v}.success`, error: `${v}.error` };
+      return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
     },
-    compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+    compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
   });
 }
 
@@ -449,10 +511,23 @@ registerNode({
   description: i18n.nodes.azureStorage.getBlobProperties.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), execOutPin(), successPin(), { id: "properties", label: i18n.nodes.azureStorage.blobProperties.label, type: "struct", subType: BLOB_PROPERTIES_STRUCT_TYPE, direction: "output" }, errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    containerNamePin(),
+    blobNamePin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    { id: "properties", label: i18n.nodes.azureStorage.blobProperties.label, type: "struct", subType: BLOB_PROPERTIES_STRUCT_TYPE, direction: "output" },
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).getBlobProperties(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.getBlobProperties(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -464,20 +539,25 @@ registerNode({
           lastModified: result.lastModified,
           metadata: recordToMapEntries(result.metadata),
         },
+        attempts: result.attempts,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.getBlobProperties(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.getBlobProperties(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
     return {
       success: `${v}.success`,
       properties: `{ size: ${v}.size, contentType: ${v}.contentType, etag: ${v}.etag, lastModified: ${v}.lastModified, metadata: ${inlineEntriesFromRecord(`${v}.metadata`)} }`,
+      attempts: `${v}.attempts`,
       error: `${v}.error`,
     };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -486,18 +566,22 @@ registerNode({
   description: i18n.nodes.azureStorage.setBlobMetadata.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), metadataInPin(), execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), metadataInPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).setBlobMetadata(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), mapEntriesToRecord(inputs.metadata));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.setBlobMetadata(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), mapEntriesToRecord(inputs.metadata)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.setBlobMetadata(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inlineRecordFromEntries(inputs.metadata)});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.setBlobMetadata(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inlineRecordFromEntries(inputs.metadata)}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -506,18 +590,19 @@ registerNode({
   description: i18n.nodes.azureStorage.blobExists.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), execOutPin(), successPin(), { id: "exists", label: i18n.nodes.azureStorage.blobExists.pin_exists, type: "boolean", direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), containerNamePin(), blobNamePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "exists", label: i18n.nodes.azureStorage.blobExists.pin_exists, type: "boolean", direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).blobExists(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.blobExists(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.blobExists(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.blobExists(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, exists: `${v}.exists`, error: `${v}.error` };
+    return { success: `${v}.success`, exists: `${v}.exists`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -533,22 +618,33 @@ registerNode({
     blobNamePin(),
     { id: "permissions", label: i18n.nodes.azureStorage.__shared.pin_permissions, type: "string", direction: "input", defaultValue: "r" },
     { id: "expiresInMinutes", label: i18n.nodes.azureStorage.__shared.pin_expires_in_minutes, type: "number", direction: "input", defaultValue: 60 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "url", label: i18n.nodes.azureStorage.__shared.pin_url, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).generateBlobSasUrl(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(
+      () => manager.generateBlobSasUrl(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.blobName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60)),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.generateBlobSasUrl(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.permissions}, ${inputs.expiresInMinutes});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.generateBlobSasUrl(${inputs.credentialName}, ${inputs.containerName}, ${inputs.blobName}, ${inputs.permissions}, ${inputs.expiresInMinutes}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, url: `${v}.url`, error: `${v}.error` };
+    return { success: `${v}.success`, url: `${v}.url`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -563,22 +659,29 @@ registerNode({
     containerNamePin(),
     { id: "permissions", label: i18n.nodes.azureStorage.__shared.pin_permissions, type: "string", direction: "input", defaultValue: "r" },
     { id: "expiresInMinutes", label: i18n.nodes.azureStorage.__shared.pin_expires_in_minutes, type: "number", direction: "input", defaultValue: 60 },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "url", label: i18n.nodes.azureStorage.__shared.pin_url, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).generateContainerSasUrl(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.generateContainerSasUrl(String(inputs.credentialName ?? ""), String(inputs.containerName ?? ""), String(inputs.permissions ?? "r"), Number(inputs.expiresInMinutes ?? 60)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.generateContainerSasUrl(${inputs.credentialName}, ${inputs.containerName}, ${inputs.permissions}, ${inputs.expiresInMinutes});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.generateContainerSasUrl(${inputs.credentialName}, ${inputs.containerName}, ${inputs.permissions}, ${inputs.expiresInMinutes}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, url: `${v}.url`, error: `${v}.error` };
+    return { success: `${v}.success`, url: `${v}.url`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -587,10 +690,11 @@ registerNode({
   description: i18n.nodes.azureStorage.getAccountInfo.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "accountInfo", label: i18n.nodes.azureStorage.accountInfo.label, type: "struct", subType: ACCOUNT_INFO_STRUCT_TYPE, direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "accountInfo", label: i18n.nodes.azureStorage.accountInfo.label, type: "struct", subType: ACCOUNT_INFO_STRUCT_TYPE, direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadAzureStorageManager()).getAccountInfo(String(inputs.credentialName ?? ""));
+    const manager = await loadAzureStorageManager();
+    const result = await withRetry(() => manager.getAccountInfo(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return {
       nextExec: "exec-out",
       outputs: {
@@ -599,14 +703,15 @@ registerNode({
           accountKind: result.accountKind,
           skuName: result.skuName,
         },
+        attempts: result.attempts,
         error: result.error,
       },
     };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await AzureStorageManager.getAccountInfo(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => AzureStorageManager.getAccountInfo(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, accountInfo: `{ accountKind: ${v}.accountKind, skuName: ${v}.skuName }`, error: `${v}.error` };
+    return { success: `${v}.success`, accountInfo: `{ accountKind: ${v}.accountKind, skuName: ${v}.skuName }`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [AZURE_STORAGE_MANAGER_IMPORT],
+  compileImports: [AZURE_STORAGE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

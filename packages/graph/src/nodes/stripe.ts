@@ -1,7 +1,9 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, STRIPE_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, STRIPE_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { CHARGE_STRUCT_TYPE, CUSTOMER_STRUCT_TYPE } from "@hermione/graph/structs/stripe";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // Every operation below calls the exact same StripeManager static method (packages/core/src/lib/
@@ -39,23 +41,29 @@ registerNode({
     { id: "email", label: i18n.nodes.stripe.createCustomer.pin_email, type: "string", direction: "input", defaultValue: "" },
     { id: "name", label: i18n.nodes.stripe.createCustomer.pin_name, type: "string", direction: "input", defaultValue: "" },
     { id: "description", label: i18n.nodes.stripe.createCustomer.pin_description, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "customerId", label: i18n.nodes.stripe.createCustomer.pin_customer_id, type: "string", direction: "output" },
     { id: "customerEmail", label: i18n.nodes.stripe.createCustomer.pin_customer_email, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadStripeManager()).createCustomer(String(inputs.credentialName ?? ""), String(inputs.email ?? ""), String(inputs.name ?? ""), String(inputs.description ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, customerId: result.customerId, customerEmail: result.email, error: result.error } };
+    const result = await withRetry(() => loadStripeManager().then((m) => m.createCustomer(String(inputs.credentialName ?? ""), String(inputs.email ?? ""), String(inputs.name ?? ""), String(inputs.description ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, customerId: result.customerId, customerEmail: result.email, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.createCustomer(${inputs.credentialName}, ${inputs.email}, ${inputs.name}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => StripeManager.createCustomer(${inputs.credentialName}, ${inputs.email}, ${inputs.name}, ${inputs.description}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, customerId: `${v}.customerId`, customerEmail: `${v}.email`, error: `${v}.error` };
+    return { success: `${v}.success`, customerId: `${v}.customerId`, customerEmail: `${v}.email`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [STRIPE_MANAGER_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -68,24 +76,27 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "customerId", label: i18n.nodes.stripe.getCustomer.pin_customer_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "id", label: i18n.nodes.stripe.getCustomer.pin_id, type: "string", direction: "output" },
     { id: "email", label: i18n.nodes.stripe.getCustomer.pin_email, type: "string", direction: "output" },
     { id: "name", label: i18n.nodes.stripe.getCustomer.pin_name, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadStripeManager()).getCustomer(String(inputs.credentialName ?? ""), String(inputs.customerId ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, id: result.customerId, email: result.email, name: result.name, error: result.error } };
+    const result = await withRetry(() => loadStripeManager().then((m) => m.getCustomer(String(inputs.credentialName ?? ""), String(inputs.customerId ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, id: result.customerId, email: result.email, name: result.name, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.getCustomer(${inputs.credentialName}, ${inputs.customerId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => StripeManager.getCustomer(${inputs.credentialName}, ${inputs.customerId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, id: `${v}.customerId`, email: `${v}.email`, name: `${v}.name`, error: `${v}.error` };
+    return { success: `${v}.success`, id: `${v}.customerId`, email: `${v}.email`, name: `${v}.name`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [STRIPE_MANAGER_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -98,22 +109,25 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "customerId", label: i18n.nodes.stripe.deleteCustomer.pin_customer_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "deleted", label: i18n.nodes.stripe.deleteCustomer.pin_deleted, type: "boolean", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadStripeManager()).deleteCustomer(String(inputs.credentialName ?? ""), String(inputs.customerId ?? ""));
+    const result = await withRetry(() => loadStripeManager().then((m) => m.deleteCustomer(String(inputs.credentialName ?? ""), String(inputs.customerId ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.deleteCustomer(${inputs.credentialName}, ${inputs.customerId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => StripeManager.deleteCustomer(${inputs.credentialName}, ${inputs.customerId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, deleted: `${v}.deleted`, error: `${v}.error` };
+    return { success: `${v}.success`, deleted: `${v}.deleted`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [STRIPE_MANAGER_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -127,22 +141,25 @@ registerNode({
     credentialNamePin(),
     { id: "email", label: i18n.nodes.stripe.listCustomers.pin_email, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.stripe.listCustomers.pin_limit, type: "number", direction: "input", defaultValue: 20 },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "customers", label: i18n.nodes.stripe.listCustomers.pin_customers, type: "struct", subType: CUSTOMER_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadStripeManager()).listCustomers(String(inputs.credentialName ?? ""), String(inputs.email ?? ""), Number(inputs.limit) || 20);
+    const result = await withRetry(() => loadStripeManager().then((m) => m.listCustomers(String(inputs.credentialName ?? ""), String(inputs.email ?? ""), Number(inputs.limit) || 20)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.listCustomers(${inputs.credentialName}, ${inputs.email}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => StripeManager.listCustomers(${inputs.credentialName}, ${inputs.email}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, customers: `${v}.customers`, error: `${v}.error` };
+    return { success: `${v}.success`, customers: `${v}.customers`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [STRIPE_MANAGER_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -158,24 +175,34 @@ registerNode({
     { id: "currency", label: i18n.nodes.stripe.createPaymentIntent.pin_currency, type: "string", direction: "input", defaultValue: "usd" },
     { id: "customerId", label: i18n.nodes.stripe.createPaymentIntent.pin_customer_id, type: "string", direction: "input", defaultValue: "" },
     { id: "description", label: i18n.nodes.stripe.createPaymentIntent.pin_description, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "paymentIntentId", label: i18n.nodes.stripe.createPaymentIntent.pin_payment_intent_id, type: "string", direction: "output" },
     { id: "clientSecret", label: i18n.nodes.stripe.createPaymentIntent.pin_client_secret, type: "string", direction: "output" },
     { id: "status", label: i18n.nodes.stripe.createPaymentIntent.pin_status, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadStripeManager()).createPaymentIntent(String(inputs.credentialName ?? ""), Number(inputs.amount) || 0, String(inputs.currency ?? ""), String(inputs.customerId ?? ""), String(inputs.description ?? ""));
+    const result = await withRetry(
+      () => loadStripeManager().then((m) => m.createPaymentIntent(String(inputs.credentialName ?? ""), Number(inputs.amount) || 0, String(inputs.currency ?? ""), String(inputs.customerId ?? ""), String(inputs.description ?? ""))),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.createPaymentIntent(${inputs.credentialName}, ${inputs.amount}, ${inputs.currency}, ${inputs.customerId}, ${inputs.description});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => StripeManager.createPaymentIntent(${inputs.credentialName}, ${inputs.amount}, ${inputs.currency}, ${inputs.customerId}, ${inputs.description}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, paymentIntentId: `${v}.paymentIntentId`, clientSecret: `${v}.clientSecret`, status: `${v}.status`, error: `${v}.error` };
+    return { success: `${v}.success`, paymentIntentId: `${v}.paymentIntentId`, clientSecret: `${v}.clientSecret`, status: `${v}.status`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [STRIPE_MANAGER_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -188,24 +215,27 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "paymentIntentId", label: i18n.nodes.stripe.getPaymentIntent.pin_payment_intent_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "status", label: i18n.nodes.stripe.getPaymentIntent.pin_status, type: "string", direction: "output" },
     { id: "amount", label: i18n.nodes.stripe.getPaymentIntent.pin_amount, type: "number", direction: "output" },
     { id: "currency", label: i18n.nodes.stripe.getPaymentIntent.pin_currency, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadStripeManager()).getPaymentIntent(String(inputs.credentialName ?? ""), String(inputs.paymentIntentId ?? ""));
+    const result = await withRetry(() => loadStripeManager().then((m) => m.getPaymentIntent(String(inputs.credentialName ?? ""), String(inputs.paymentIntentId ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.getPaymentIntent(${inputs.credentialName}, ${inputs.paymentIntentId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => StripeManager.getPaymentIntent(${inputs.credentialName}, ${inputs.paymentIntentId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, status: `${v}.status`, amount: `${v}.amount`, currency: `${v}.currency`, error: `${v}.error` };
+    return { success: `${v}.success`, status: `${v}.status`, amount: `${v}.amount`, currency: `${v}.currency`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [STRIPE_MANAGER_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -218,22 +248,25 @@ registerNode({
     { id: "exec-in", label: "", type: "exec", direction: "input" },
     credentialNamePin(),
     { id: "paymentIntentId", label: i18n.nodes.stripe.cancelPaymentIntent.pin_payment_intent_id, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "status", label: i18n.nodes.stripe.cancelPaymentIntent.pin_status, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadStripeManager()).cancelPaymentIntent(String(inputs.credentialName ?? ""), String(inputs.paymentIntentId ?? ""));
+    const result = await withRetry(() => loadStripeManager().then((m) => m.cancelPaymentIntent(String(inputs.credentialName ?? ""), String(inputs.paymentIntentId ?? ""))), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.cancelPaymentIntent(${inputs.credentialName}, ${inputs.paymentIntentId});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => StripeManager.cancelPaymentIntent(${inputs.credentialName}, ${inputs.paymentIntentId}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, status: `${v}.status`, error: `${v}.error` };
+    return { success: `${v}.success`, status: `${v}.status`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [STRIPE_MANAGER_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -247,23 +280,26 @@ registerNode({
     credentialNamePin(),
     { id: "paymentIntentId", label: i18n.nodes.stripe.createRefund.pin_payment_intent_id, type: "string", direction: "input", defaultValue: "" },
     { id: "amount", label: i18n.nodes.stripe.createRefund.pin_amount, type: "number", direction: "input", defaultValue: 0 },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "refundId", label: i18n.nodes.stripe.createRefund.pin_refund_id, type: "string", direction: "output" },
     { id: "status", label: i18n.nodes.stripe.createRefund.pin_status, type: "string", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadStripeManager()).createRefund(String(inputs.credentialName ?? ""), String(inputs.paymentIntentId ?? ""), Number(inputs.amount) || 0);
+    const result = await withRetry(() => loadStripeManager().then((m) => m.createRefund(String(inputs.credentialName ?? ""), String(inputs.paymentIntentId ?? ""), Number(inputs.amount) || 0)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.createRefund(${inputs.credentialName}, ${inputs.paymentIntentId}, ${inputs.amount});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => StripeManager.createRefund(${inputs.credentialName}, ${inputs.paymentIntentId}, ${inputs.amount}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, refundId: `${v}.refundId`, status: `${v}.status`, error: `${v}.error` };
+    return { success: `${v}.success`, refundId: `${v}.refundId`, status: `${v}.status`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [STRIPE_MANAGER_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -277,20 +313,23 @@ registerNode({
     credentialNamePin(),
     { id: "customerId", label: i18n.nodes.stripe.listCharges.pin_customer_id, type: "string", direction: "input", defaultValue: "" },
     { id: "limit", label: i18n.nodes.stripe.listCharges.pin_limit, type: "number", direction: "input", defaultValue: 20 },
+    retryCountPin(),
+    retryDelayMsPin(),
     { id: "exec-out", label: i18n.nodes.__shared.pin_completed, type: "exec", direction: "output" },
     { id: "success", label: i18n.nodes.__shared.pin_success, type: "boolean", direction: "output" },
     { id: "charges", label: i18n.nodes.stripe.listCharges.pin_charges, type: "struct", subType: CHARGE_STRUCT_TYPE, container: "array", direction: "output" },
+    attemptsPin(),
     { id: "error", label: i18n.nodes.__shared.pin_error, type: "string", direction: "output" },
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadStripeManager()).listCharges(String(inputs.credentialName ?? ""), String(inputs.customerId ?? ""), Number(inputs.limit) || 20);
+    const result = await withRetry(() => loadStripeManager().then((m) => m.listCharges(String(inputs.credentialName ?? ""), String(inputs.customerId ?? ""), Number(inputs.limit) || 20)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await StripeManager.listCharges(${inputs.credentialName}, ${inputs.customerId}, ${inputs.limit});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => StripeManager.listCharges(${inputs.credentialName}, ${inputs.customerId}, ${inputs.limit}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, charges: `${v}.charges`, error: `${v}.error` };
+    return { success: `${v}.success`, charges: `${v}.charges`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [STRIPE_MANAGER_IMPORT],
+  compileImports: [STRIPE_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

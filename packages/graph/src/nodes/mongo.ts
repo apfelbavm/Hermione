@@ -1,8 +1,10 @@
 import { NodeColorCategory } from "@hermione/graph/engine/types";
 import { registerNode } from "@hermione/graph/engine/registry";
-import { compileResultVar, MONGO_MANAGER_IMPORT } from "@hermione/graph/engine/compileUtils";
+import { compileResultVar, MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT } from "@hermione/graph/engine/compileUtils";
 import { MONGO_RETURN_DOCUMENT_ENUM_TYPE } from "@hermione/graph/enum/mongo";
 import { enumOptionIds } from "@hermione/graph/engine/enumRegistry";
+import { withRetry } from "@hermione/core/lib/retry";
+import { retryCountPin, retryDelayMsPin, attemptsPin } from "@hermione/graph/nodes/shared/retryPins";
 import { i18n } from "@i18n";
 
 // Every operation below calls the exact same MongoManager static method (packages/core/src/lib/
@@ -83,18 +85,19 @@ registerNode({
   description: i18n.nodes.mongo.listDatabases.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), execOutPin(), successPin(), { id: "databaseNames", label: i18n.nodes.mongo.listDatabases.pin_database_names, type: "string", container: "array", direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "databaseNames", label: i18n.nodes.mongo.listDatabases.pin_database_names, type: "string", container: "array", direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).listDatabases(String(inputs.credentialName ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.listDatabases(String(inputs.credentialName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.listDatabases(${inputs.credentialName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.listDatabases(${inputs.credentialName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, databaseNames: `${v}.databaseNames`, error: `${v}.error` };
+    return { success: `${v}.success`, databaseNames: `${v}.databaseNames`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -103,18 +106,19 @@ registerNode({
   description: i18n.nodes.mongo.listCollections.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), execOutPin(), successPin(), { id: "collectionNames", label: i18n.nodes.mongo.listCollections.pin_collection_names, type: "string", container: "array", direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), databasePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "collectionNames", label: i18n.nodes.mongo.listCollections.pin_collection_names, type: "string", container: "array", direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).listCollections(String(inputs.credentialName ?? ""), String(inputs.database ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.listCollections(String(inputs.credentialName ?? ""), String(inputs.database ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.listCollections(${inputs.credentialName}, ${inputs.database});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.listCollections(${inputs.credentialName}, ${inputs.database}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, collectionNames: `${v}.collectionNames`, error: `${v}.error` };
+    return { success: `${v}.success`, collectionNames: `${v}.collectionNames`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -123,18 +127,19 @@ registerNode({
   description: i18n.nodes.mongo.createCollection.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).createCollection(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.createCollection(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.createCollection(${inputs.credentialName}, ${inputs.database}, ${inputs.collection});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.createCollection(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -143,18 +148,19 @@ registerNode({
   description: i18n.nodes.mongo.dropCollection.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).dropCollection(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.dropCollection(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.dropCollection(${inputs.credentialName}, ${inputs.database}, ${inputs.collection});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.dropCollection(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -163,18 +169,19 @@ registerNode({
   description: i18n.nodes.mongo.dropDatabase.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), databasePin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).dropDatabase(String(inputs.credentialName ?? ""), String(inputs.database ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.dropDatabase(String(inputs.credentialName ?? ""), String(inputs.database ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.dropDatabase(${inputs.credentialName}, ${inputs.database});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.dropDatabase(${inputs.credentialName}, ${inputs.database}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -190,21 +197,28 @@ registerNode({
     collectionPin(),
     { id: "newName", label: i18n.nodes.mongo.renameCollection.pin_new_name, type: "string", direction: "input", defaultValue: "" },
     { id: "dropTarget", label: i18n.nodes.mongo.renameCollection.pin_drop_target, type: "boolean", direction: "input", defaultValue: false },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).renameCollection(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.newName ?? ""), Boolean(inputs.dropTarget));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.renameCollection(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.newName ?? ""), Boolean(inputs.dropTarget)), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.renameCollection(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.newName}, ${inputs.dropTarget});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.renameCollection(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.newName}, ${inputs.dropTarget}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -219,22 +233,29 @@ registerNode({
     databasePin(),
     collectionPin(),
     { id: "document", label: i18n.nodes.mongo.__shared.pin_document, type: "string", direction: "input", defaultValue: "{}" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "insertedId", label: i18n.nodes.mongo.__shared.pin_inserted_id, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).insertOne(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.document ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.insertOne(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.document ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.insertOne(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.document});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.insertOne(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.document}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, insertedId: `${v}.insertedId`, error: `${v}.error` };
+    return { success: `${v}.success`, insertedId: `${v}.insertedId`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -249,23 +270,30 @@ registerNode({
     databasePin(),
     collectionPin(),
     { id: "documents", label: i18n.nodes.mongo.insertMany.pin_documents, type: "string", direction: "input", defaultValue: "[]" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "insertedIds", label: i18n.nodes.mongo.insertMany.pin_inserted_ids, type: "string", container: "array", direction: "output" },
     { id: "insertedCount", label: i18n.nodes.mongo.__shared.pin_count, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).insertMany(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.documents ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.insertMany(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.documents ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.insertMany(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.documents});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.insertMany(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.documents}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, insertedIds: `${v}.insertedIds`, insertedCount: `${v}.insertedCount`, error: `${v}.error` };
+    return { success: `${v}.success`, insertedIds: `${v}.insertedIds`, insertedCount: `${v}.insertedCount`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -282,22 +310,33 @@ registerNode({
     filterPin(),
     { id: "projection", label: i18n.nodes.mongo.__shared.pin_projection, type: "string", direction: "input", defaultValue: "{}" },
     { id: "sort", label: i18n.nodes.mongo.__shared.pin_sort, type: "string", direction: "input", defaultValue: "{}" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     documentOutPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).findOne(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.projection ?? ""), String(inputs.sort ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, document: result.documentJson, error: result.error } };
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(
+      () => MongoManager.findOne(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.projection ?? ""), String(inputs.sort ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, document: result.documentJson, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.findOne(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.projection}, ${inputs.sort});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.findOne(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.projection}, ${inputs.sort}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, document: `${v}.documentJson`, error: `${v}.error` };
+    return { success: `${v}.success`, document: `${v}.documentJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -316,25 +355,33 @@ registerNode({
     { id: "sort", label: i18n.nodes.mongo.__shared.pin_sort, type: "string", direction: "input", defaultValue: "{}" },
     { id: "limit", label: i18n.nodes.mongo.__shared.pin_limit, type: "number", direction: "input", defaultValue: 0, integer: true },
     { id: "skip", label: i18n.nodes.mongo.__shared.pin_skip, type: "number", direction: "input", defaultValue: 0, integer: true },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "documents", label: i18n.nodes.mongo.__shared.pin_documents, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).find(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.projection ?? ""), String(inputs.sort ?? ""), Number(inputs.limit) || 0, Number(inputs.skip) || 0);
-    return { nextExec: "exec-out", outputs: { success: result.success, documents: result.documentsJson, error: result.error } };
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(
+      () => MongoManager.find(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.projection ?? ""), String(inputs.sort ?? ""), Number(inputs.limit) || 0, Number(inputs.skip) || 0),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, documents: result.documentsJson, attempts: result.attempts, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await MongoManager.find(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.projection}, ${inputs.sort}, ${inputs.limit}, ${inputs.skip});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.find(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.projection}, ${inputs.sort}, ${inputs.limit}, ${inputs.skip}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, documents: `${v}.documentsJson`, error: `${v}.error` };
+    return { success: `${v}.success`, documents: `${v}.documentsJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -343,18 +390,22 @@ registerNode({
   description: i18n.nodes.mongo.countDocuments.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), filterPin(), execOutPin(), successPin(), { id: "count", label: i18n.nodes.mongo.__shared.pin_count, type: "number", direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), filterPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "count", label: i18n.nodes.mongo.__shared.pin_count, type: "number", direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).countDocuments(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.countDocuments(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.countDocuments(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.countDocuments(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, count: `${v}.count`, error: `${v}.error` };
+    return { success: `${v}.success`, count: `${v}.count`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -363,18 +414,41 @@ registerNode({
   description: i18n.nodes.mongo.updateOne.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), filterPin(), { id: "update", label: i18n.nodes.mongo.__shared.pin_update, type: "string", direction: "input", defaultValue: "{}" }, upsertPin(), execOutPin(), successPin(), ...matchedModifiedPins(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    databasePin(),
+    collectionPin(),
+    filterPin(),
+    { id: "update", label: i18n.nodes.mongo.__shared.pin_update, type: "string", direction: "input", defaultValue: "{}" },
+    upsertPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    ...matchedModifiedPins(),
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).updateOne(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.update ?? ""), Boolean(inputs.upsert));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(
+      () => MongoManager.updateOne(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.update ?? ""), Boolean(inputs.upsert)),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.updateOne(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.update}, ${inputs.upsert});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.updateOne(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.update}, ${inputs.upsert}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, matchedCount: `${v}.matchedCount`, modifiedCount: `${v}.modifiedCount`, upsertedId: `${v}.upsertedId`, error: `${v}.error` };
+    return { success: `${v}.success`, matchedCount: `${v}.matchedCount`, modifiedCount: `${v}.modifiedCount`, upsertedId: `${v}.upsertedId`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -383,18 +457,41 @@ registerNode({
   description: i18n.nodes.mongo.updateMany.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), filterPin(), { id: "update", label: i18n.nodes.mongo.__shared.pin_update, type: "string", direction: "input", defaultValue: "{}" }, upsertPin(), execOutPin(), successPin(), ...matchedModifiedPins(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    databasePin(),
+    collectionPin(),
+    filterPin(),
+    { id: "update", label: i18n.nodes.mongo.__shared.pin_update, type: "string", direction: "input", defaultValue: "{}" },
+    upsertPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    ...matchedModifiedPins(),
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).updateMany(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.update ?? ""), Boolean(inputs.upsert));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(
+      () => MongoManager.updateMany(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.update ?? ""), Boolean(inputs.upsert)),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.updateMany(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.update}, ${inputs.upsert});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.updateMany(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.update}, ${inputs.upsert}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, matchedCount: `${v}.matchedCount`, modifiedCount: `${v}.modifiedCount`, upsertedId: `${v}.upsertedId`, error: `${v}.error` };
+    return { success: `${v}.success`, matchedCount: `${v}.matchedCount`, modifiedCount: `${v}.modifiedCount`, upsertedId: `${v}.upsertedId`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -403,18 +500,41 @@ registerNode({
   description: i18n.nodes.mongo.replaceOne.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), filterPin(), { id: "replacement", label: i18n.nodes.mongo.__shared.pin_replacement, type: "string", direction: "input", defaultValue: "{}" }, upsertPin(), execOutPin(), successPin(), ...matchedModifiedPins(), errorPin()],
+  pins: [
+    execInPin(),
+    credentialNamePin(),
+    databasePin(),
+    collectionPin(),
+    filterPin(),
+    { id: "replacement", label: i18n.nodes.mongo.__shared.pin_replacement, type: "string", direction: "input", defaultValue: "{}" },
+    upsertPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
+    execOutPin(),
+    successPin(),
+    ...matchedModifiedPins(),
+    attemptsPin(),
+    errorPin(),
+  ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).replaceOne(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.replacement ?? ""), Boolean(inputs.upsert));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(
+      () => MongoManager.replaceOne(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.replacement ?? ""), Boolean(inputs.upsert)),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.replaceOne(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.replacement}, ${inputs.upsert});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.replaceOne(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.replacement}, ${inputs.upsert}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, matchedCount: `${v}.matchedCount`, modifiedCount: `${v}.modifiedCount`, upsertedId: `${v}.upsertedId`, error: `${v}.error` };
+    return { success: `${v}.success`, matchedCount: `${v}.matchedCount`, modifiedCount: `${v}.modifiedCount`, upsertedId: `${v}.upsertedId`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -423,18 +543,22 @@ registerNode({
   description: i18n.nodes.mongo.deleteOne.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), filterPin(), execOutPin(), successPin(), { id: "deletedCount", label: i18n.nodes.mongo.__shared.pin_deleted_count, type: "number", direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), filterPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "deletedCount", label: i18n.nodes.mongo.__shared.pin_deleted_count, type: "number", direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).deleteOne(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.deleteOne(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.deleteOne(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.deleteOne(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, deletedCount: `${v}.deletedCount`, error: `${v}.error` };
+    return { success: `${v}.success`, deletedCount: `${v}.deletedCount`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -443,18 +567,22 @@ registerNode({
   description: i18n.nodes.mongo.deleteMany.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), filterPin(), execOutPin(), successPin(), { id: "deletedCount", label: i18n.nodes.mongo.__shared.pin_deleted_count, type: "number", direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), filterPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "deletedCount", label: i18n.nodes.mongo.__shared.pin_deleted_count, type: "number", direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).deleteMany(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.deleteMany(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.deleteMany(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.deleteMany(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, deletedCount: `${v}.deletedCount`, error: `${v}.error` };
+    return { success: `${v}.success`, deletedCount: `${v}.deletedCount`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -472,26 +600,34 @@ registerNode({
     { id: "update", label: i18n.nodes.mongo.__shared.pin_update, type: "string", direction: "input", defaultValue: "{}" },
     upsertPin(),
     { id: "returnDocument", label: i18n.nodes.mongo.__shared.pin_return_document, type: "enum", subType: MONGO_RETURN_DOCUMENT_ENUM_TYPE, direction: "input", defaultValue: "after", options: enumOptionIds(MONGO_RETURN_DOCUMENT_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     documentOutPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
     const returnDocument = inputs.returnDocument === "before" ? "before" : "after";
-    const result = await (await loadMongoManager()).findOneAndUpdate(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.update ?? ""), Boolean(inputs.upsert), returnDocument);
-    return { nextExec: "exec-out", outputs: { success: result.success, document: result.documentJson, error: result.error } };
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(
+      () => MongoManager.findOneAndUpdate(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.update ?? ""), Boolean(inputs.upsert), returnDocument),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, document: result.documentJson, attempts: result.attempts, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await MongoManager.findOneAndUpdate(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.update}, ${inputs.upsert}, ${inputs.returnDocument});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.findOneAndUpdate(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.update}, ${inputs.upsert}, ${inputs.returnDocument}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, document: `${v}.documentJson`, error: `${v}.error` };
+    return { success: `${v}.success`, document: `${v}.documentJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -509,26 +645,34 @@ registerNode({
     { id: "replacement", label: i18n.nodes.mongo.__shared.pin_replacement, type: "string", direction: "input", defaultValue: "{}" },
     upsertPin(),
     { id: "returnDocument", label: i18n.nodes.mongo.__shared.pin_return_document, type: "enum", subType: MONGO_RETURN_DOCUMENT_ENUM_TYPE, direction: "input", defaultValue: "after", options: enumOptionIds(MONGO_RETURN_DOCUMENT_ENUM_TYPE) },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     documentOutPin(),
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
     const returnDocument = inputs.returnDocument === "before" ? "before" : "after";
-    const result = await (await loadMongoManager()).findOneAndReplace(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.replacement ?? ""), Boolean(inputs.upsert), returnDocument);
-    return { nextExec: "exec-out", outputs: { success: result.success, document: result.documentJson, error: result.error } };
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(
+      () => MongoManager.findOneAndReplace(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""), String(inputs.replacement ?? ""), Boolean(inputs.upsert), returnDocument),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
+    return { nextExec: "exec-out", outputs: { success: result.success, document: result.documentJson, attempts: result.attempts, error: result.error } };
   },
   compileExecute: ({ node, inputs, compileFrom }) => [
-    `const ${compileResultVar(node.id)} = await MongoManager.findOneAndReplace(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.replacement}, ${inputs.upsert}, ${inputs.returnDocument});`,
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.findOneAndReplace(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}, ${inputs.replacement}, ${inputs.upsert}, ${inputs.returnDocument}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
     ...compileFrom("exec-out"),
   ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, document: `${v}.documentJson`, error: `${v}.error` };
+    return { success: `${v}.success`, document: `${v}.documentJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -537,18 +681,22 @@ registerNode({
   description: i18n.nodes.mongo.findOneAndDelete.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), filterPin(), execOutPin(), successPin(), documentOutPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), filterPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), documentOutPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).findOneAndDelete(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, document: result.documentJson, error: result.error } };
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.findOneAndDelete(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.filter ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, document: result.documentJson, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.findOneAndDelete(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.findOneAndDelete(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.filter}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, document: `${v}.documentJson`, error: `${v}.error` };
+    return { success: `${v}.success`, document: `${v}.documentJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -563,22 +711,29 @@ registerNode({
     databasePin(),
     collectionPin(),
     { id: "pipeline", label: i18n.nodes.mongo.aggregate.pin_pipeline, type: "string", direction: "input", defaultValue: "[]" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "results", label: i18n.nodes.mongo.aggregate.pin_results, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).aggregate(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.pipeline ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, results: result.resultsJson, error: result.error } };
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.aggregate(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.pipeline ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, results: result.resultsJson, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.aggregate(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.pipeline});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.aggregate(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.pipeline}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, results: `${v}.resultsJson`, error: `${v}.error` };
+    return { success: `${v}.success`, results: `${v}.resultsJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -594,22 +749,29 @@ registerNode({
     collectionPin(),
     { id: "field", label: i18n.nodes.mongo.distinct.pin_field, type: "string", direction: "input", defaultValue: "" },
     filterPin(),
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "values", label: i18n.nodes.mongo.distinct.pin_values, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).distinct(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.field ?? ""), String(inputs.filter ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, values: result.valuesJson, error: result.error } };
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.distinct(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.field ?? ""), String(inputs.filter ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, values: result.valuesJson, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.distinct(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.field}, ${inputs.filter});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.distinct(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.field}, ${inputs.filter}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, values: `${v}.valuesJson`, error: `${v}.error` };
+    return { success: `${v}.success`, values: `${v}.valuesJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -626,22 +788,33 @@ registerNode({
     { id: "keys", label: i18n.nodes.mongo.createIndex.pin_keys, type: "string", direction: "input", defaultValue: "{}" },
     { id: "unique", label: i18n.nodes.mongo.createIndex.pin_unique, type: "boolean", direction: "input", defaultValue: false },
     { id: "name", label: i18n.nodes.mongo.createIndex.pin_name, type: "string", direction: "input", defaultValue: "" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "indexName", label: i18n.nodes.mongo.createIndex.pin_index_name, type: "string", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).createIndex(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.keys ?? ""), Boolean(inputs.unique), String(inputs.name ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(
+      () => MongoManager.createIndex(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.keys ?? ""), Boolean(inputs.unique), String(inputs.name ?? "")),
+      Number(inputs.retryCount ?? 0),
+      Number(inputs.retryDelayMs ?? 0),
+    );
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.createIndex(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.keys}, ${inputs.unique}, ${inputs.name});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.createIndex(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.keys}, ${inputs.unique}, ${inputs.name}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, indexName: `${v}.indexName`, error: `${v}.error` };
+    return { success: `${v}.success`, indexName: `${v}.indexName`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -650,18 +823,22 @@ registerNode({
   description: i18n.nodes.mongo.dropIndex.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), { id: "indexName", label: i18n.nodes.mongo.createIndex.pin_index_name, type: "string", direction: "input", defaultValue: "" }, execOutPin(), successPin(), errorPin()],
+  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), { id: "indexName", label: i18n.nodes.mongo.createIndex.pin_index_name, type: "string", direction: "input", defaultValue: "" }, retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).dropIndex(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.indexName ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.dropIndex(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.indexName ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.dropIndex(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.indexName});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.dropIndex(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.indexName}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, error: `${v}.error` };
+    return { success: `${v}.success`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -670,18 +847,19 @@ registerNode({
   description: i18n.nodes.mongo.listIndexes.description,
   group: GROUP_NAME,
   colorCategory: NodeColorCategory.Integration,
-  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), execOutPin(), successPin(), { id: "indexes", label: i18n.nodes.mongo.listIndexes.pin_indexes, type: "string", direction: "output" }, errorPin()],
+  pins: [execInPin(), credentialNamePin(), databasePin(), collectionPin(), retryCountPin(), retryDelayMsPin(), execOutPin(), successPin(), { id: "indexes", label: i18n.nodes.mongo.listIndexes.pin_indexes, type: "string", direction: "output" }, attemptsPin(), errorPin()],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).listIndexes(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""));
-    return { nextExec: "exec-out", outputs: { success: result.success, indexes: result.indexesJson, error: result.error } };
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.listIndexes(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
+    return { nextExec: "exec-out", outputs: { success: result.success, indexes: result.indexesJson, attempts: result.attempts, error: result.error } };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.listIndexes(${inputs.credentialName}, ${inputs.database}, ${inputs.collection});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.listIndexes(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}), ${inputs.retryCount}, ${inputs.retryDelayMs});`, ...compileFrom("exec-out")],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, indexes: `${v}.indexesJson`, error: `${v}.error` };
+    return { success: `${v}.success`, indexes: `${v}.indexesJson`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });
 
 registerNode({
@@ -696,6 +874,8 @@ registerNode({
     databasePin(),
     collectionPin(),
     { id: "operations", label: i18n.nodes.mongo.bulkWrite.pin_operations, type: "string", direction: "input", defaultValue: "[]" },
+    retryCountPin(),
+    retryDelayMsPin(),
     execOutPin(),
     successPin(),
     { id: "insertedCount", label: i18n.nodes.mongo.__shared.pin_count, type: "number", direction: "output" },
@@ -703,17 +883,22 @@ registerNode({
     { id: "modifiedCount", label: i18n.nodes.mongo.__shared.pin_modified_count, type: "number", direction: "output" },
     { id: "deletedCount", label: i18n.nodes.mongo.__shared.pin_deleted_count, type: "number", direction: "output" },
     { id: "upsertedCount", label: i18n.nodes.mongo.bulkWrite.pin_upserted_count, type: "number", direction: "output" },
+    attemptsPin(),
     errorPin(),
   ],
   latent: true,
   execute: async ({ inputs }) => {
-    const result = await (await loadMongoManager()).bulkWrite(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.operations ?? ""));
+    const MongoManager = await loadMongoManager();
+    const result = await withRetry(() => MongoManager.bulkWrite(String(inputs.credentialName ?? ""), String(inputs.database ?? ""), String(inputs.collection ?? ""), String(inputs.operations ?? "")), Number(inputs.retryCount ?? 0), Number(inputs.retryDelayMs ?? 0));
     return { nextExec: "exec-out", outputs: result };
   },
-  compileExecute: ({ node, inputs, compileFrom }) => [`const ${compileResultVar(node.id)} = await MongoManager.bulkWrite(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.operations});`, ...compileFrom("exec-out")],
+  compileExecute: ({ node, inputs, compileFrom }) => [
+    `const ${compileResultVar(node.id)} = await withRetry(() => MongoManager.bulkWrite(${inputs.credentialName}, ${inputs.database}, ${inputs.collection}, ${inputs.operations}), ${inputs.retryCount}, ${inputs.retryDelayMs});`,
+    ...compileFrom("exec-out"),
+  ],
   compileExecuteOutputs: ({ node }) => {
     const v = compileResultVar(node.id);
-    return { success: `${v}.success`, insertedCount: `${v}.insertedCount`, matchedCount: `${v}.matchedCount`, modifiedCount: `${v}.modifiedCount`, deletedCount: `${v}.deletedCount`, upsertedCount: `${v}.upsertedCount`, error: `${v}.error` };
+    return { success: `${v}.success`, insertedCount: `${v}.insertedCount`, matchedCount: `${v}.matchedCount`, modifiedCount: `${v}.modifiedCount`, deletedCount: `${v}.deletedCount`, upsertedCount: `${v}.upsertedCount`, attempts: `${v}.attempts`, error: `${v}.error` };
   },
-  compileImports: [MONGO_MANAGER_IMPORT],
+  compileImports: [MONGO_MANAGER_IMPORT, RETRY_HELPER_IMPORT],
 });

@@ -25,6 +25,9 @@ export function compileResultVar(nodeId: string): string {
  * dev/start scripts). */
 export const HTTP_MANAGER_IMPORT = 'import { HttpManager } from "../../packages/core/src/lib/httpManager.ts";';
 export const WEBHOOK_MANAGER_IMPORT = 'import { WebhookManager } from "../../packages/core/src/lib/webhookManager.ts";';
+/** Shared retry loop (packages/core/src/lib/retry.ts) used by every Manager-backed node's
+ * compileExecute to apply retryCount/retryDelayMs the same way the interpreter's execute() does. */
+export const RETRY_HELPER_IMPORT = 'import { withRetry } from "../../packages/core/src/lib/retry.ts";';
 export const ODATA_MANAGER_IMPORT = 'import { ODataManager } from "../../packages/core/src/lib/odataManager.ts";';
 export const CRYPTO_MANAGER_IMPORT = 'import { CryptoManager } from "../../packages/core/src/lib/cryptoManager.ts";';
 export const OAUTH2SAML_MANAGER_IMPORT = 'import { Oauth2SamlManager } from "../../packages/core/src/lib/oauth2SamlManager.ts";';
